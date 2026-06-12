@@ -1,0 +1,174 @@
+@page "/transactions"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Transactions — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">Transactions</MudText>
+</div>
+
+<!-- Filter bar -->
+<MudPaper Elevation="1" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4" md="3">
+            <MudDatePicker @bind-Date="_fromDate" Label="From" Clearable="true"
+                           aria-label="Filter from date" />
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudDatePicker @bind-Date="_toDate" Label="To" Clearable="true"
+                           aria-label="Filter to date" />
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect @bind-Value="_filterAccountId" Label="Account" Clearable="true"
+                       aria-label="Filter by account">
+                @foreach (var a in _accounts)
+                {
+                    <MudSelectItem Value="@((Guid?)a.Id)">@a.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="12" md="3" Class="d-flex align-end">
+            <MudButton StartIcon="@Icons.Material.Filled.Search"
+                       Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="LoadAsync"
+                       FullWidth="true"
+                       aria-label="Apply filters">
+                Filter
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading transactions" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+<MudDataGrid T="FlowLedger.Web.ApiClient.TransactionDto"
+             Items="_transactions"
+             Filterable="true"
+             FilterMode="DataGridFilterMode.ColumnFilterRow"
+             SortMode="SortMode.Multiple"
+             Hover="true"
+             Striped="true"
+             Dense="false"
+             Virtualize="false"
+             RowsPerPage="50"
+             aria-label="Transactions table">
+    <ToolBarContent>
+        <MudText Typo="Typo.body2" Class="ml-auto">@_transactions.Count transaction(s)</MudText>
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.EffectiveDate">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@context.Item.EffectiveDate.ToString("yyyy-MM-dd")</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Description" Title="Description" Sortable="true" />
+        <PropertyColumn Property="x => x.MerchantName" Title="Merchant" Sortable="true" />
+        <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
+            <CellTemplate>
+                <MudText Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
+                    @(context.Item.Direction == "Credit" ? "+" : "-")@context.Item.Amount.ToString("C2")
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Status">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Item.Status)">
+                    @context.Item.Status
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Category">
+            <CellTemplate>
+                @if (context.Item.CategoryId.HasValue)
+                {
+                    var cat = _categories.FirstOrDefault(c => c.Id == context.Item.CategoryId);
+                    <MudText Typo="Typo.body2">@(cat?.DisplayName ?? "–")</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Uncategorized</MudText>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Account" Sortable="false">
+            <CellTemplate>
+                @{
+                    var acct = _accounts.FirstOrDefault(a => a.Id == context.Item.AccountId);
+                }
+                <MudText Typo="Typo.body2">@(acct?.Name ?? "–")</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="FlowLedger.Web.ApiClient.TransactionDto" aria-label="Transactions pager" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+
+    private List<FlowLedger.Web.ApiClient.TransactionDto> _transactions = [];
+    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    private Guid? _filterAccountId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _accounts = await ApiClient.GetAccountsAsync();
+            _categories = await ApiClient.GetCategoriesAsync();
+        }
+        catch { /* non-fatal – grid still renders */ }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var from = _fromDate.HasValue ? DateOnly.FromDateTime(_fromDate.Value) : (DateOnly?)null;
+            var to = _toDate.HasValue ? DateOnly.FromDateTime(_toDate.Value) : (DateOnly?)null;
+
+            _transactions = await ApiClient.GetTransactionsAsync(
+                accountId: _filterAccountId,
+                from: from,
+                to: to,
+                take: 500);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load transactions: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "Posted" => Color.Success,
+        "Pending" => Color.Warning,
+        "Matched" => Color.Info,
+        "Reconciled" => Color.Primary,
+        "NeedsReview" => Color.Error,
+        _ => Color.Default
+    };
+}

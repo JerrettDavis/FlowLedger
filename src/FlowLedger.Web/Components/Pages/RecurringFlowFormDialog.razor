@@ -1,0 +1,139 @@
+<MudDialog aria-labelledby="rf-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="rf-dialog-title">@(Flow is null ? "Create Recurring Flow" : "Edit Recurring Flow")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" aria-label="Recurring flow form">
+            @if (Flow is null)
+            {
+                <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                              aria-required="true" aria-label="Flow name" Class="mb-3" />
+
+                <MudSelect @bind-Value="_accountId" Label="Account" Required="true"
+                           aria-required="true" aria-label="Account" Class="mb-3">
+                    @foreach (var a in Accounts)
+                    {
+                        <MudSelectItem Value="@a.Id">@a.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect @bind-Value="_direction" Label="Direction" aria-label="Direction" Class="mb-3">
+                    <MudSelectItem Value="@("Debit")">Debit (expense)</MudSelectItem>
+                    <MudSelectItem Value="@("Credit")">Credit (income)</MudSelectItem>
+                </MudSelect>
+
+                <MudNumericField @bind-Value="_amount" Label="Amount" Min="0.01m" Format="F2"
+                                 aria-label="Amount" Class="mb-3" />
+
+                <MudSelect @bind-Value="_frequency" Label="Frequency" aria-label="Frequency" Class="mb-3">
+                    <MudSelectItem Value="@("Monthly")">Monthly</MudSelectItem>
+                    <MudSelectItem Value="@("Weekly")">Weekly</MudSelectItem>
+                    <MudSelectItem Value="@("BiWeekly")">Bi-weekly</MudSelectItem>
+                    <MudSelectItem Value="@("Daily")">Daily</MudSelectItem>
+                </MudSelect>
+
+                @if (_frequency == "Monthly")
+                {
+                    <MudNumericField @bind-Value="_dayOfMonth" Label="Day of month (1–31)" Min="1" Max="31"
+                                     aria-label="Day of month" Class="mb-3" />
+                }
+                @if (_frequency is "Weekly" or "BiWeekly")
+                {
+                    <MudSelect @bind-Value="_anchorDay" Label="Day of week" aria-label="Day of week" Class="mb-3">
+                        @foreach (var d in Enum.GetNames<DayOfWeek>())
+                        {
+                            <MudSelectItem Value="@d">@d</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
+                <MudDatePicker @bind-Date="_startDate" Label="Start date" Required="true"
+                               aria-required="true" aria-label="Start date" Class="mb-3" />
+                <MudDatePicker @bind-Date="_endDate" Label="End date (optional)" Clearable="true"
+                               aria-label="End date" Class="mb-3" />
+            }
+            else
+            {
+                <!-- Edit mode: amount + model only -->
+                <MudNumericField @bind-Value="_amount" Label="Amount" Min="0.01m" Format="F2"
+                                 aria-label="Amount" Class="mb-3" />
+                <MudSelect @bind-Value="_amountModel" Label="Amount Model" aria-label="Amount model" Class="mb-3">
+                    <MudSelectItem Value="@("Fixed")">Fixed</MudSelectItem>
+                    <MudSelectItem Value="@("Estimated")">Estimated</MudSelectItem>
+                    <MudSelectItem Value="@("LastObserved")">Last Observed</MudSelectItem>
+                </MudSelect>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Variant="Variant.Filled"
+                   aria-label="@(Flow is null ? "Create flow" : "Save changes")">
+            @(Flow is null ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public FlowLedger.Web.ApiClient.RecurringFlowDto? Flow { get; set; }
+    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+
+    private MudForm _form = default!;
+    private string _name = "";
+    private Guid _accountId;
+    private string _direction = "Debit";
+    private decimal _amount = 0m;
+    private string _frequency = "Monthly";
+    private int? _dayOfMonth = 1;
+    private string? _anchorDay = "Monday";
+    private string _amountModel = "Fixed";
+    private DateTime? _startDate = DateTime.Today;
+    private DateTime? _endDate;
+
+    protected override void OnParametersSet()
+    {
+        if (Flow is not null)
+        {
+            _amount = Flow.Amount;
+            _amountModel = Flow.AmountModel;
+        }
+        if (Accounts.Count > 0 && _accountId == Guid.Empty)
+            _accountId = Accounts[0].Id;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        object result;
+        if (Flow is null)
+        {
+            result = new FlowLedger.Web.ApiClient.CreateRecurringFlowRequest(
+                AccountId: _accountId,
+                Name: _name,
+                Amount: _amount,
+                Currency: "USD",
+                Direction: _direction,
+                AmountModel: _amountModel,
+                RecurrenceFrequency: _frequency,
+                DayOfMonth: _frequency == "Monthly" ? _dayOfMonth : null,
+                SecondDayOfMonth: null,
+                IntervalWeeks: _frequency == "BiWeekly" ? 2 : null,
+                AnchorDayOfWeek: _frequency is "Weekly" or "BiWeekly" ? _anchorDay : null,
+                StartDate: _startDate.HasValue ? DateOnly.FromDateTime(_startDate.Value) : DateOnly.FromDateTime(DateTime.Today),
+                EndDate: _endDate.HasValue ? DateOnly.FromDateTime(_endDate.Value) : null,
+                CategoryId: null,
+                Counterparty: null);
+        }
+        else
+        {
+            result = new FlowLedger.Web.ApiClient.UpdateRecurringFlowRequest(_amount, _amountModel);
+        }
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+}

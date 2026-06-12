@@ -1,0 +1,87 @@
+@inject IDialogService DialogService
+
+<MudDialog aria-labelledby="account-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="account-dialog-title">@(Account is null ? "Create Account" : "Edit Account")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" aria-label="Account form">
+            @if (Account is null)
+            {
+                <!-- Create mode: all fields -->
+                <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                              aria-required="true" aria-label="Account name" Class="mb-3" />
+                <MudSelect @bind-Value="_accountType" Label="Account Type" Required="true"
+                           aria-required="true" aria-label="Account type" Class="mb-3">
+                    @foreach (var t in AccountTypes)
+                    {
+                        <MudSelectItem Value="@t">@t</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudNumericField @bind-Value="_startingBalance" Label="Starting Balance" Format="F2"
+                                 aria-label="Starting balance" Class="mb-3" />
+                <MudTextField @bind-Value="_currency" Label="Currency" MaxLength="3"
+                              aria-label="Currency code" Class="mb-3" />
+                <MudTextField @bind-Value="_institution" Label="Institution (optional)"
+                              aria-label="Institution name" Class="mb-3" />
+            }
+            else
+            {
+                <!-- Edit mode: name only -->
+                <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                              aria-required="true" aria-label="Account name" Class="mb-3" />
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Variant="Variant.Filled"
+                   aria-label="@(Account is null ? "Create account" : "Save changes")">
+            @(Account is null ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public FlowLedger.Web.ApiClient.AccountDto? Account { get; set; }
+
+    private MudForm _form = default!;
+    private string _name = "";
+    private string _accountType = "Checking";
+    private decimal _startingBalance = 0m;
+    private string _currency = "USD";
+    private string? _institution;
+
+    private static readonly string[] AccountTypes =
+    [
+        "Checking", "Savings", "CreditCard", "Loan", "Mortgage",
+        "Investment", "Cash", "ManualAsset", "ManualLiability"
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (Account is not null)
+        {
+            _name = Account.Name;
+            _accountType = Account.AccountType;
+            _currency = Account.BalanceCurrency;
+            _institution = Account.Institution;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        object result = Account is null
+            ? new FlowLedger.Web.ApiClient.CreateAccountRequest(
+                _name, _accountType, _startingBalance, _currency, _institution, null)
+            : new FlowLedger.Web.ApiClient.UpdateAccountRequest(_name);
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+}

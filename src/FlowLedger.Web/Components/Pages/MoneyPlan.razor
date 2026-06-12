@@ -1,0 +1,270 @@
+@page "/money-plan"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<PageTitle>Money Plan — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
+    <div>
+        <MudText Typo="Typo.h4">Money Plan</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Planned &amp; actual flows with running balance — virtualized for large data sets
+        </MudText>
+    </div>
+    <div class="d-flex align-center gap-2" style="gap:8px">
+        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:140px"
+                   aria-label="Forecast horizon in months">
+            <MudSelectItem Value="1">1 month</MudSelectItem>
+            <MudSelectItem Value="3">3 months</MudSelectItem>
+            <MudSelectItem Value="6">6 months</MudSelectItem>
+            <MudSelectItem Value="12">12 months</MudSelectItem>
+        </MudSelect>
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                   Color="Color.Primary"
+                   Variant="Variant.Outlined"
+                   OnClick="LoadAsync"
+                   aria-label="Refresh money plan">
+            Refresh
+        </MudButton>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading money plan" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (!_loading && _rows.Count == 0 && _error is null)
+{
+    <MudAlert Severity="Severity.Info">
+        No data yet. Use "Connect &amp; Sync" in the top bar to load demo data.
+    </MudAlert>
+}
+
+<!-- Legend -->
+<div class="d-flex gap-3 mb-3 flex-wrap" style="gap:12px" role="legend" aria-label="Row status legend">
+    @foreach (var (status, color, label) in StatusLegend)
+    {
+        <div class="d-flex align-center gap-1" style="gap:4px">
+            <div style="width:12px;height:12px;border-radius:2px;background:@color" aria-hidden="true"></div>
+            <MudText Typo="Typo.caption">@label</MudText>
+        </div>
+    }
+</div>
+
+<MudDataGrid T="MoneyPlanRow"
+             Items="_rows"
+             Virtualize="true"
+             FixedHeader="true"
+             Height="calc(100vh - 280px)"
+             Filterable="true"
+             FilterMode="DataGridFilterMode.ColumnFilterRow"
+             SortMode="SortMode.Single"
+             Hover="true"
+             Dense="true"
+             RowStyleFunc="RowStyle"
+             aria-label="Money plan spreadsheet">
+    <ToolBarContent>
+        <MudText Typo="Typo.body2" Class="ml-auto">@_rows.Count rows</MudText>
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.Date" InitialDirection="SortDirection.Ascending">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@context.Item.Date.ToString("yyyy-MM-dd")</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Status" Filterable="true" SortBy="x => x.Status">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Color="@ChipColor(context.Item.Status)">
+                    @context.Item.Status
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Description" Title="Description" Sortable="true" />
+        <TemplateColumn Title="Account" Sortable="true" SortBy="x => x.AccountName">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@context.Item.AccountName</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
+            <CellTemplate>
+                <MudText Color="@(context.Item.IsCredit ? Color.Success : Color.Error)"
+                         Typo="Typo.body2">
+                    @(context.Item.IsCredit ? "+" : "-")@context.Item.Amount.ToString("C2")
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Category" Title="Category" Sortable="true" />
+        <TemplateColumn Title="Running Balance" Sortable="true" SortBy="x => x.RunningBalance">
+            <CellTemplate>
+                <MudText Typo="Typo.body2"
+                         Color="@(context.Item.RunningBalance < 0 ? Color.Error : Color.Default)"
+                         Style="font-variant-numeric:tabular-nums;font-weight:600">
+                    @context.Item.RunningBalance.ToString("C2")
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Source" Filterable="true">
+            <CellTemplate>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Source</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private int _horizonMonths = 3;
+    private List<MoneyPlanRow> _rows = [];
+
+    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+
+    private static readonly (string Status, string Color, string Label)[] StatusLegend =
+    [
+        ("Posted",   "#4caf50", "Posted (actual)"),
+        ("Pending",  "#ff9800", "Pending"),
+        ("Matched",  "#2196f3", "Matched"),
+        ("Planned",  "#9e9e9e", "Planned (forecast)"),
+        ("Skipped",  "#bdbdbd", "Skipped"),
+    ];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _rows = [];
+        try
+        {
+            _accounts = await ApiClient.GetAccountsAsync();
+            _categories = await ApiClient.GetCategoriesAsync();
+
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var from = today.AddDays(-30); // include some history
+            var to = today.AddMonths(_horizonMonths);
+
+            // Actual transactions
+            var transactions = await ApiClient.GetTransactionsAsync(from: from, to: to, take: 5000);
+
+            // Forecast for planned future rows
+            var forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);
+
+            // Build combined rows
+            var rows = new List<MoneyPlanRow>();
+
+            // 1. Actual transactions
+            foreach (var tx in transactions)
+            {
+                var account = _accounts.FirstOrDefault(a => a.Id == tx.AccountId);
+                var category = tx.CategoryId.HasValue
+                    ? _categories.FirstOrDefault(c => c.Id == tx.CategoryId)
+                    : null;
+
+                rows.Add(new MoneyPlanRow(
+                    Date: tx.EffectiveDate,
+                    Description: string.IsNullOrWhiteSpace(tx.MerchantName) ? tx.Description : tx.MerchantName,
+                    Amount: tx.Amount,
+                    IsCredit: tx.Direction == "Credit",
+                    Status: tx.Status,
+                    AccountName: account?.Name ?? "–",
+                    Category: category?.DisplayName ?? "–",
+                    Source: "Actual",
+                    RunningBalance: 0m // calculated below
+                ));
+            }
+
+            // 2. Future planned rows from forecast (only forecast items, not actuals)
+            if (forecast is not null)
+            {
+                foreach (var series in forecast.AccountSeries)
+                {
+                    var account = _accounts.FirstOrDefault(a => a.Id == series.AccountId);
+                    foreach (var point in series.Points)
+                    {
+                        foreach (var item in point.ContributingItems.Where(i => !i.IsActual))
+                        {
+                            rows.Add(new MoneyPlanRow(
+                                Date: point.Date,
+                                Description: item.Label,
+                                Amount: item.AmountValue,
+                                IsCredit: item.Direction == "Credit",
+                                Status: "Planned",
+                                AccountName: account?.Name ?? "–",
+                                Category: "–",
+                                Source: item.Source,
+                                RunningBalance: 0m // calculated below
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // 3. Sort by date then compute running balance per account
+            rows = rows.OrderBy(r => r.Date).ThenBy(r => r.AccountName).ToList();
+
+            var runningByAccount = _accounts.ToDictionary(a => a.Name, a => a.BalanceAmount);
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var r = rows[i];
+                if (!runningByAccount.TryGetValue(r.AccountName, out var bal)) bal = 0m;
+                var delta = r.IsCredit ? r.Amount : -r.Amount;
+                bal += delta;
+                runningByAccount[r.AccountName] = bal;
+                rows[i] = r with { RunningBalance = bal };
+            }
+
+            _rows = rows;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load money plan: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string RowStyle(MoneyPlanRow row, int index)
+    {
+        var opacity = row.Status is "Skipped" ? "opacity:0.5;" : "";
+        return row.Status switch
+        {
+            "Posted" => $"{opacity}background:rgba(76,175,80,0.06)",
+            "Pending" => $"{opacity}background:rgba(255,152,0,0.08)",
+            "Matched" => $"{opacity}background:rgba(33,150,243,0.06)",
+            "Planned" => $"{opacity}background:rgba(158,158,158,0.04)",
+            "Skipped" => $"{opacity}",
+            _ => opacity
+        };
+    }
+
+    private static Color ChipColor(string status) => status switch
+    {
+        "Posted" => Color.Success,
+        "Pending" => Color.Warning,
+        "Matched" => Color.Info,
+        "Reconciled" => Color.Primary,
+        "Planned" => Color.Default,
+        "Skipped" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private sealed record MoneyPlanRow(
+        DateOnly Date,
+        string Description,
+        decimal Amount,
+        bool IsCredit,
+        string Status,
+        string AccountName,
+        string Category,
+        string Source,
+        decimal RunningBalance);
+}

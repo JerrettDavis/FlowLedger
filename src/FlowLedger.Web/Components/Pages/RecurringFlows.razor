@@ -1,0 +1,201 @@
+@page "/recurring-flows"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Recurring Flows — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">Recurring Flows</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.Add"
+               Color="Color.Primary"
+               Variant="Variant.Filled"
+               OnClick="OpenCreateDialog"
+               aria-label="Add recurring flow">
+        Add Flow
+    </MudButton>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading recurring flows" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+<MudDataGrid T="FlowLedger.Web.ApiClient.RecurringFlowDto"
+             Items="_flows"
+             Filterable="true"
+             FilterMode="DataGridFilterMode.ColumnFilterRow"
+             SortMode="SortMode.Multiple"
+             Hover="true"
+             Striped="true"
+             Dense="false"
+             aria-label="Recurring flows table">
+    <Columns>
+        <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
+        <TemplateColumn Title="Account">
+            <CellTemplate>
+                @{
+                    var acct = _accounts.FirstOrDefault(a => a.Id == context.Item.AccountId);
+                }
+                <MudText Typo="Typo.body2">@(acct?.Name ?? "–")</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
+            <CellTemplate>
+                <MudText Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
+                    @(context.Item.Direction == "Credit" ? "+" : "-")@context.Item.Amount.ToString("C2") @context.Item.Currency
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.RecurrenceFrequency" Title="Frequency" Sortable="true" />
+        <TemplateColumn Title="Schedule">
+            <CellTemplate>
+                <MudText Typo="Typo.body2">@DescribeSchedule(context.Item)</MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Window">
+            <CellTemplate>
+                <MudText Typo="Typo.caption">
+                    @context.Item.StartDate.ToString("yyyy-MM-dd")
+                    @(context.Item.EndDate.HasValue ? $" → {context.Item.EndDate:yyyy-MM-dd}" : " (ongoing)")
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Status">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                    @(context.Item.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="() => OpenEditDialog(context.Item)"
+                               aria-label="@($"Edit flow {context.Item.Name}")" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="() => DeleteFlow(context.Item)"
+                               aria-label="@($"Delete flow {context.Item.Name}")" />
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flows = [];
+    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _accounts = await ApiClient.GetAccountsAsync(); } catch { }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _flows = await ApiClient.GetRecurringFlowsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load recurring flows: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<RecurringFlowFormDialog>("Create Recurring Flow",
+            new DialogParameters<RecurringFlowFormDialog>
+            {
+                { x => x.Flow, null },
+                { x => x.Accounts, _accounts }
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.CreateRecurringFlowRequest req })
+        {
+            try
+            {
+                await ApiClient.CreateRecurringFlowAsync(req);
+                Snackbar.Add("Flow created", Severity.Success);
+                await LoadAsync();
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task OpenEditDialog(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    {
+        var dialog = await DialogService.ShowAsync<RecurringFlowFormDialog>("Edit Recurring Flow",
+            new DialogParameters<RecurringFlowFormDialog>
+            {
+                { x => x.Flow, flow },
+                { x => x.Accounts, _accounts }
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.UpdateRecurringFlowRequest updateReq })
+        {
+            try
+            {
+                await ApiClient.UpdateRecurringFlowAsync(flow.Id, updateReq);
+                Snackbar.Add("Flow updated", Severity.Success);
+                await LoadAsync();
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task DeleteFlow(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    {
+        var options = new DialogOptions { CloseButton = true };
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete '{flow.Name}'? This cannot be undone." },
+            { x => x.ConfirmText, "Delete" }
+        };
+        var confirmDialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Flow", parameters, options);
+        var confirmResult = await confirmDialog.Result;
+        if (confirmResult is { Canceled: false })
+        {
+            try
+            {
+                await ApiClient.DeleteRecurringFlowAsync(flow.Id);
+                Snackbar.Add("Flow deleted", Severity.Success);
+                await LoadAsync();
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private static string DescribeSchedule(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    {
+        return flow.RecurrenceFrequency switch
+        {
+            "Monthly" when flow.DayOfMonth.HasValue => $"On the {flow.DayOfMonth}th",
+            "Monthly" => "Monthly",
+            "Weekly" when flow.AnchorDayOfWeek is not null => $"Every {flow.AnchorDayOfWeek}",
+            "Weekly" => "Weekly",
+            "BiWeekly" when flow.IntervalWeeks.HasValue => $"Every {flow.IntervalWeeks} weeks",
+            "Daily" => "Daily",
+            _ => flow.RecurrenceFrequency
+        };
+    }
+}

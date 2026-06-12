@@ -1,47 +1,267 @@
 @page "/"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
-<MudText Typo="Typo.subtitle1" Class="mb-4">
-    Know where your money went, where it is going, and when your plans become possible.
-</MudText>
 
-<MudGrid>
-    <MudItem xs="12" sm="6" md="4">
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" aria-label="Loading dashboard" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+<!-- Summary cards -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
         <MudCard Elevation="2">
             <MudCardContent>
-                <MudText Typo="Typo.overline">Milestone 0</MudText>
-                <MudText Typo="Typo.h6">Foundation Complete</MudText>
-                <MudText Typo="Typo.body2" Class="mt-2">
-                    Solution scaffold, Aspire orchestration, CI, and one-script run are ready.
-                    Domain logic and UI features arrive in subsequent milestones.
-                </MudText>
+                <MudText Typo="Typo.overline" Color="Color.Primary">Total Balance</MudText>
+                <MudText Typo="Typo.h5" aria-label="Total balance">@FormatCurrency(_totalBalance)</MudText>
+                <MudText Typo="Typo.caption">Across @_accounts.Count account(s)</MudText>
             </MudCardContent>
         </MudCard>
     </MudItem>
-
-    <MudItem xs="12" sm="6" md="4">
+    <MudItem xs="12" sm="6" md="3">
         <MudCard Elevation="2">
             <MudCardContent>
-                <MudText Typo="Typo.overline">Stack</MudText>
-                <MudText Typo="Typo.h6">.NET 10 + Aspire + Blazor</MudText>
-                <MudText Typo="Typo.body2" Class="mt-2">
-                    PostgreSQL, Redis, MudBlazor, EF Core, OpenIddict, Quartz, Serilog, OpenTelemetry.
-                </MudText>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Net Worth</MudText>
+                <MudText Typo="Typo.h5" aria-label="Net worth">@FormatCurrency(_netWorth)</MudText>
+                <MudText Typo="Typo.caption">Assets minus liabilities</MudText>
             </MudCardContent>
         </MudCard>
     </MudItem>
-
-    <MudItem xs="12" sm="6" md="4">
-        <MudCard Elevation="2">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Style="@(_lowWaterMark < 0 ? "border-left:4px solid var(--mud-palette-error)" : "")">
             <MudCardContent>
-                <MudText Typo="Typo.overline">License</MudText>
-                <MudText Typo="Typo.h6">AGPL-3.0</MudText>
-                <MudText Typo="Typo.body2" Class="mt-2">
-                    Free and open source. Self-host first. SaaS-ready without SaaS lock-in.
+                <MudText Typo="Typo.overline" Color="@(_lowWaterMark < 0 ? Color.Error : Color.Warning)">Forecast Low</MudText>
+                <MudText Typo="Typo.h5" Color="@(_lowWaterMark < 0 ? Color.Error : Color.Default)" aria-label="Forecast low water mark">@FormatCurrency(_lowWaterMark)</MudText>
+                <MudText Typo="Typo.caption">@(_lowWaterMarkDate.HasValue ? $"on {_lowWaterMarkDate:MMM d}" : "3-month horizon")</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Style="@(_overdraftCount > 0 ? "border-left:4px solid var(--mud-palette-error)" : "")">
+            <MudCardContent>
+                <MudText Typo="Typo.overline" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)">Overdraft Risk</MudText>
+                <MudText Typo="Typo.h5" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)" aria-label="Overdraft warnings">
+                    @(_overdraftCount > 0 ? $"{_overdraftCount} warning(s)" : "None")
                 </MudText>
+                <MudText Typo="Typo.caption">Next 3 months</MudText>
             </MudCardContent>
         </MudCard>
     </MudItem>
 </MudGrid>
+
+<MudGrid>
+    <!-- Balance Projection Chart -->
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Balance Projection</MudText>
+                    <MudText Typo="Typo.caption">3-month household cash balance forecast</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_forecastSeries.Count > 0)
+                {
+                    <div style="height:200px;overflow:hidden" role="img" aria-label="Balance projection chart">
+                        <svg width="100%" height="100%" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+                            @{
+                                var pts = _forecastSeries;
+                                var minVal = pts.Min(p => p.BalanceAmount);
+                                var maxVal = pts.Max(p => p.BalanceAmount);
+                                var range = Math.Max(maxVal - minVal, 1m);
+                                var minDate = pts.First().Date;
+                                var maxDate = pts.Last().Date;
+                                var dateDays = Math.Max((maxDate.DayNumber - minDate.DayNumber), 1);
+
+                                string ToX(DateOnly d) => ((d.DayNumber - minDate.DayNumber) / (double)dateDays * 780 + 10).ToString("F1");
+                                string ToY(decimal v) => (180 - (v - minVal) / range * 160 + 10).ToString("F1");
+
+                                var polyline = string.Join(" ", pts.Select(p => $"{ToX(p.Date)},{ToY(p.BalanceAmount)}"));
+                                var areaPath = $"M {ToX(pts.First().Date)},{ToY(minVal)} " +
+                                    string.Join(" ", pts.Select(p => $"L {ToX(p.Date)},{ToY(p.BalanceAmount)}")) +
+                                    $" L {ToX(pts.Last().Date)},{ToY(minVal)} Z";
+                            }
+                            <!-- Zero line -->
+                            @if (minVal <= 0 && maxVal >= 0)
+                            {
+                                <line x1="10" y1="@ToY(0)" x2="790" y2="@ToY(0)" stroke="var(--mud-palette-error)" stroke-width="1" stroke-dasharray="4,2" />
+                            }
+                            <!-- Area fill -->
+                            <path d="@areaPath" fill="var(--mud-palette-primary)" fill-opacity="0.12" />
+                            <!-- Line -->
+                            <polyline points="@polyline" fill="none" stroke="var(--mud-palette-primary)" stroke-width="2" stroke-linejoin="round" />
+                            <!-- Overdraft breach markers -->
+                            @foreach (var w in _overdraftWarnings)
+                            {
+                                <line x1="@ToX(w.FirstBreachDate)" y1="10" x2="@ToX(w.FirstBreachDate)" y2="190"
+                                      stroke="var(--mud-palette-error)" stroke-width="1.5" stroke-dasharray="3,3" />
+                            }
+                        </svg>
+                    </div>
+                }
+                else if (!_loading)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No forecast data. Click "Connect &amp; Sync" to load demo data.</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Upcoming Flows -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Style="height:100%">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Upcoming Flows</MudText>
+                    <MudText Typo="Typo.caption">Next 14 days</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Style="max-height:260px;overflow-y:auto">
+                @if (_upcomingFlows.Count > 0)
+                {
+                    <MudList T="UpcomingFlow" Dense="true" aria-label="Upcoming flows list">
+                        @foreach (var f in _upcomingFlows)
+                        {
+                            <MudListItem>
+                                <div class="d-flex justify-space-between align-center w-100">
+                                    <div>
+                                        <MudText Typo="Typo.body2">@f.Name</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@f.Date.ToString("MMM d")</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.body2" Color="@(f.IsCredit ? Color.Success : Color.Error)">
+                                        @(f.IsCredit ? "+" : "-")@FormatCurrency(f.Amount)
+                                    </MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+                else if (!_loading)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No upcoming flows found.</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Overdraft Warnings -->
+    @if (_overdraftWarnings.Count > 0)
+    {
+        <MudItem xs="12">
+            <MudAlert Severity="Severity.Error" aria-live="assertive">
+                <MudText Typo="Typo.subtitle2">Overdraft Risk Detected</MudText>
+                @foreach (var w in _overdraftWarnings)
+                {
+                    var acct = _accounts.FirstOrDefault(a => a.Id == w.AccountId);
+                    <MudText Typo="Typo.body2">
+                        @(acct?.Name ?? w.AccountId.ToString()) may go negative on @w.FirstBreachDate.ToString("MMM d, yyyy")
+                        (projected: @FormatCurrency(w.ProjectedBalanceAmount))
+                    </MudText>
+                }
+            </MudAlert>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+
+    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private decimal _totalBalance;
+    private decimal _netWorth;
+    private decimal _lowWaterMark;
+    private DateOnly? _lowWaterMarkDate;
+    private int _overdraftCount;
+    private List<FlowLedger.Web.ApiClient.OverdraftWarningDto> _overdraftWarnings = [];
+    private List<FlowLedger.Web.ApiClient.AggregateForecastPointDto> _forecastSeries = [];
+    private List<UpcomingFlow> _upcomingFlows = [];
+
+    private record UpcomingFlow(string Name, DateOnly Date, decimal Amount, bool IsCredit);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _accounts = await ApiClient.GetAccountsAsync();
+
+            // Net worth: assets (positive balance accounts) minus liabilities
+            _totalBalance = _accounts.Sum(a => a.BalanceAmount);
+            var assetTypes = new[] { "Checking", "Savings", "Investment", "Cash", "ManualAsset" };
+            var liabilityTypes = new[] { "CreditCard", "Loan", "Mortgage", "ManualLiability" };
+            var assets = _accounts.Where(a => assetTypes.Contains(a.AccountType)).Sum(a => a.BalanceAmount);
+            var liabilities = _accounts.Where(a => liabilityTypes.Contains(a.AccountType)).Sum(a => Math.Abs(a.BalanceAmount));
+            _netWorth = assets - liabilities;
+
+            // Forecast
+            var forecast = await ApiClient.GetForecastAsync(months: 3);
+            if (forecast is not null)
+            {
+                _forecastSeries = forecast.AggregateSeries;
+
+                if (forecast.AggregateLowWaterMark is not null)
+                {
+                    _lowWaterMark = forecast.AggregateLowWaterMark.MinBalanceAmount;
+                    _lowWaterMarkDate = forecast.AggregateLowWaterMark.Date;
+                }
+
+                _overdraftWarnings = forecast.OverdraftWarnings;
+                _overdraftCount = _overdraftWarnings.Count;
+            }
+
+            // Recurring flows for upcoming 14 days
+            var flows = await ApiClient.GetRecurringFlowsAsync();
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var horizon = today.AddDays(14);
+
+            // Expand recurring flows to get upcoming occurrences (simple approximation)
+            foreach (var flow in flows.Where(f => f.IsActive))
+            {
+                for (var d = today; d <= horizon; d = d.AddDays(1))
+                {
+                    if (IsFlowOnDate(flow, d))
+                    {
+                        _upcomingFlows.Add(new UpcomingFlow(
+                            flow.Name, d, flow.Amount, flow.Direction == "Credit"));
+                    }
+                }
+            }
+
+            _upcomingFlows = _upcomingFlows.OrderBy(f => f.Date).Take(20).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load dashboard data: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static bool IsFlowOnDate(FlowLedger.Web.ApiClient.RecurringFlowDto flow, DateOnly date)
+    {
+        if (date < flow.StartDate) return false;
+        if (flow.EndDate.HasValue && date > flow.EndDate) return false;
+
+        return flow.RecurrenceFrequency switch
+        {
+            "Monthly" => flow.DayOfMonth.HasValue && date.Day == flow.DayOfMonth.Value,
+            "Weekly" => flow.AnchorDayOfWeek is not null &&
+                        date.DayOfWeek.ToString().Equals(flow.AnchorDayOfWeek, StringComparison.OrdinalIgnoreCase),
+            "Daily" => true,
+            _ => false
+        };
+    }
+
+    private static string FormatCurrency(decimal amount)
+        => amount.ToString("C2", System.Globalization.CultureInfo.CurrentCulture);
+}
