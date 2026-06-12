@@ -2,6 +2,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence.Configurations;
+using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,7 @@ public sealed class FlowLedgerDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<RecurringFlow> RecurringFlows => Set<RecurringFlow>();
     public DbSet<Category> Categories => Set<Category>();
+    internal DbSet<SyncCursorRecord> SyncCursors => Set<SyncCursorRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TransactionConfiguration());
         modelBuilder.ApplyConfiguration(new RecurringFlowConfiguration());
         modelBuilder.ApplyConfiguration(new CategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new SyncCursorRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // If _tenantContext is null (design-time or test override), filters are
@@ -78,6 +81,9 @@ public sealed class FlowLedgerDbContext : DbContext
 
             modelBuilder.Entity<Category>()
                 .HasQueryFilter(c => EF.Property<TenantId>(c, "TenantId") == TenantId.From(_tenantContext!.TenantId));
+
+            modelBuilder.Entity<SyncCursorRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
         }
     }
 

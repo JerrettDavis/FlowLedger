@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
+        services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
 
         // ── Provider wiring (TODO(provider-wiring) resolved) ──────────────────
         // Provider selection logic:

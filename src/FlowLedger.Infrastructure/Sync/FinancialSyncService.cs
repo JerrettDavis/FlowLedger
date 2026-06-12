@@ -20,31 +20,29 @@ namespace FlowLedger.Infrastructure.Sync;
 /// The fingerprint index on the database is a secondary guard; the service also performs
 /// an in-memory pre-check against the existing fingerprint set to avoid unnecessary inserts.
 ///
-/// Cursor persistence: cursors are stored per provider-account in the accounts
-/// <see cref="Account.ExternalAccountRef"/> field for now (M2 quick approach).
-/// A dedicated SyncCursorStore will replace this in Milestone 7.
+/// Cursor persistence: cursors are durably stored per tenant, provider, and provider account
+/// via <see cref="ISyncCursorStore"/>. The cursor is persisted after each successful page so
+/// that a mid-sync crash resumes from the last committed page rather than re-fetching everything.
 /// </summary>
 internal sealed class FinancialSyncService : IFinancialSyncService
 {
     private readonly IFinancialDataProvider _provider;
     private readonly FlowLedgerDbContext _db;
     private readonly ITenantContext _tenant;
+    private readonly ISyncCursorStore _cursorStore;
     private readonly ILogger<FinancialSyncService> _logger;
-
-    // We keep a simple in-process cursor cache keyed by providerAccountId → cursorValue.
-    // This is ephemeral (lost on restart) but sufficient for M2: the DB will also hold
-    // the cursor in accounts.external_account_ref prefixed by "cursor:" for persistence.
-    private readonly Dictionary<string, string> _cursorCache = new();
 
     public FinancialSyncService(
         IFinancialDataProvider provider,
         FlowLedgerDbContext db,
         ITenantContext tenant,
+        ISyncCursorStore cursorStore,
         ILogger<FinancialSyncService> logger)
     {
         _provider = provider;
         _db = db;
         _tenant = tenant;
+        _cursorStore = cursorStore;
         _logger = logger;
     }
 
@@ -164,8 +162,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         int added = 0;
         int skipped = 0;
 
-        // Load stored cursor from cache or start fresh
-        _cursorCache.TryGetValue(providerAccountId, out var storedCursorValue);
+        // Load durable cursor from the store; returns empty string if no prior sync
+        var storedCursorValue = await _cursorStore.GetAsync(_provider.ProviderName, providerAccountId, ct);
         var cursor = string.IsNullOrEmpty(storedCursorValue) ? SyncCursor.Initial : new SyncCursor(storedCursorValue);
 
         bool hasMore = true;
@@ -209,10 +207,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
             cursor = page.NextCursor;
             hasMore = page.HasMore;
-        }
 
-        // Persist cursor for next incremental run
-        _cursorCache[providerAccountId] = cursor.Value;
+            // Persist cursor after each successful page so a mid-sync crash resumes
+            // from the last committed position rather than re-fetching from the beginning.
+            await _cursorStore.SetAsync(_provider.ProviderName, providerAccountId, cursor.Value, ct);
+        }
 
         return (added, skipped);
     }

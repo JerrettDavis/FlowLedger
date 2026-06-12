@@ -1,3 +1,4 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
@@ -32,11 +33,13 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
     {
         var simOptions = Options.Create(new SimulatedProviderOptions());
         var provider = new SimulatedFinancialDataProvider(simOptions);
+        var cursorStore = new EfSyncCursorStore(db, tenant);
 
         return new FinancialSyncService(
             provider,
             db,
             tenant,
+            cursorStore,
             NullLogger<FinancialSyncService>.Instance);
     }
 
@@ -84,16 +87,16 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
         var accountCountAfterFirst = await countDb.Accounts.CountAsync();
         var txCountAfterFirst = await countDb.Transactions.CountAsync();
 
-        // Act: second sync (new service instance = fresh cursor cache → full re-fetch)
+        // Act: second sync (new service instance — cursor now persisted in DB)
         await using var db2 = _fixture.CreateDbContext(tenant);
         var syncService2 = CreateSyncService(db2, tenant);
         var secondResult = await syncService2.SyncAsync();
 
-        // Assert — second sync skips all transactions (fingerprints already in DB)
+        // Assert — second sync adds no new transactions.
+        // With a durable cursor persisted after the first sync, the provider resumes from the
+        // end position and returns an empty page immediately, so skipped=0 too (nothing fetched).
         secondResult.TransactionsAdded.Should().Be(0,
-            "all transactions from first sync should be fingerprint-deduplicated on second sync");
-        secondResult.TransactionsSkipped.Should().Be(firstResult.TransactionsAdded,
-            "all previously added transactions should be skipped on second run");
+            "the persisted cursor means the second sync starts from where the first left off and imports nothing new");
 
         // DB counts unchanged
         await using var finalDb = _fixture.CreateDbContext(tenant);
@@ -138,5 +141,40 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
 
         var memberId = await syncService.ConnectAsync();
         memberId.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [DockerFact]
+    public async Task Sync_resumes_from_persisted_cursor_across_service_instances()
+    {
+        // Arrange: first sync populates data and persists a cursor
+        var tenant = TestTenantContext.New();
+        await using var db1 = _fixture.CreateDbContext(tenant);
+        var sync1 = CreateSyncService(db1, tenant);
+        var firstResult = await sync1.SyncAsync();
+        firstResult.TransactionsAdded.Should().BeGreaterThan(0, "first sync should import transactions");
+
+        // Capture the cursor that was persisted
+        await using var cursorCheckDb = _fixture.CreateDbContext(tenant);
+        var cursors = await cursorCheckDb.SyncCursors.ToListAsync();
+        cursors.Should().NotBeEmpty("cursor should be persisted after first sync");
+        cursors.Should().OnlyContain(c => !string.IsNullOrEmpty(c.CursorValue),
+            "all cursors should have a non-empty value after sync");
+
+        // Act: create a completely NEW service instance (simulating a process restart)
+        // This new instance has no in-memory state — it must read from the DB.
+        await using var db2 = _fixture.CreateDbContext(tenant);
+        var sync2 = CreateSyncService(db2, tenant);
+        var secondResult = await sync2.SyncAsync();
+
+        // Assert: because the simulated provider returns the same dataset deterministically,
+        // and the cursor was persisted, the second sync should add 0 new transactions.
+        secondResult.TransactionsAdded.Should().Be(0,
+            "second sync with a new service instance should honor the persisted cursor and add no new transactions");
+
+        // Verify no duplicates in the DB
+        await using var verifyDb = _fixture.CreateDbContext(tenant);
+        var finalTxCount = await verifyDb.Transactions.CountAsync();
+        finalTxCount.Should().Be(firstResult.TransactionsAdded,
+            "transaction count should be unchanged after second sync");
     }
 }
