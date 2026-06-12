@@ -12,6 +12,7 @@
     </PackageReference>
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
@@ -24,6 +25,9 @@
     <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
   </ItemGroup>
 
 </Project>
