@@ -12,13 +12,23 @@ namespace FlowLedger.Domain.Aggregates;
 /// </summary>
 public sealed class Category : IEntity
 {
-    public CategoryId CategoryId { get; }
-    public Guid Id => CategoryId.Value;
-    public TenantId TenantId { get; }
+    private Guid _id;
+
+    public CategoryId CategoryId => CategoryId.From(_id);
+    public Guid Id => _id;
+    public TenantId TenantId { get; private set; }
     public CategoryPath Path { get; private set; }
     public string DisplayName { get; private set; }
-    public bool IsSystem { get; }
-    public CategoryId? ParentId { get; }
+    public bool IsSystem { get; private set; }
+    public CategoryId? ParentId { get; private set; }
+
+    private Category()
+    {
+        // EF Core parameterless constructor — fields initialised by EF.
+        // Not for direct use outside of EF hydration.
+        Path = null!;
+        DisplayName = null!;
+    }
 
     public Category(
         CategoryId id,
@@ -31,7 +41,7 @@ public sealed class Category : IEntity
         if (string.IsNullOrWhiteSpace(displayName))
             throw new EmptyStringException(nameof(displayName));
 
-        CategoryId = id;
+        _id = id.Value;
         TenantId = tenantId;
         Path = path;
         DisplayName = displayName.Trim();

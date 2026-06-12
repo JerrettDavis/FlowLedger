@@ -17,19 +17,28 @@ namespace FlowLedger.Domain.Aggregates;
 /// </summary>
 public sealed class PlannedFlowOccurrence : IEntity
 {
-    public PlannedOccurrenceId PlannedOccurrenceId { get; }
-    public Guid Id => PlannedOccurrenceId.Value;
-    public RecurringFlowId RecurringFlowId { get; }
-    public TenantId TenantId { get; }
-    public AccountId AccountId { get; }
+    private Guid _id;
+    private Guid _recurringFlowId;
+    private Guid _tenantId;
+    private Guid _accountId;
+    private Guid? _matchedTransactionId;
+    private decimal? _matchConfidence;
 
-    public Money PlannedAmount { get; }
-    public TransactionDirection Direction { get; }
-    public DateOnly PlannedDate { get; }
+    public PlannedOccurrenceId PlannedOccurrenceId => PlannedOccurrenceId.From(_id);
+    public Guid Id => _id;
+    public RecurringFlowId RecurringFlowId => RecurringFlowId.From(_recurringFlowId);
+    public TenantId TenantId => Domain.ValueObjects.TenantId.From(_tenantId);
+    public AccountId AccountId => Domain.ValueObjects.AccountId.From(_accountId);
+
+    public Money PlannedAmount { get; private set; }
+    public TransactionDirection Direction { get; private set; }
+    public DateOnly PlannedDate { get; private set; }
     public OccurrenceStatus Status { get; private set; } = OccurrenceStatus.Pending;
 
     /// <summary>Filled in when Status becomes Matched.</summary>
-    public TransactionId? MatchedTransactionId { get; private set; }
+    public TransactionId? MatchedTransactionId => _matchedTransactionId.HasValue
+        ? Domain.ValueObjects.TransactionId.From(_matchedTransactionId.Value)
+        : null;
 
     /// <summary>Amount variance = Actual - Planned (positive = overspend/underpay).</summary>
     public Money? AmountVariance { get; private set; }
@@ -37,7 +46,16 @@ public sealed class PlannedFlowOccurrence : IEntity
     /// <summary>Date variance in days = Actual.PostedDate - PlannedDate.</summary>
     public int? DateVarianceDays { get; private set; }
 
-    public ConfidenceScore? MatchConfidence { get; private set; }
+    public ConfidenceScore? MatchConfidence => _matchConfidence.HasValue
+        ? new ConfidenceScore(_matchConfidence.Value)
+        : null;
+
+    private PlannedFlowOccurrence()
+    {
+        // EF Core parameterless constructor — fields initialised by EF.
+        // Not for direct use outside of EF hydration.
+        PlannedAmount = null!;
+    }
 
     internal PlannedFlowOccurrence(
         PlannedOccurrenceId id,
@@ -48,10 +66,10 @@ public sealed class PlannedFlowOccurrence : IEntity
         TransactionDirection direction,
         DateOnly plannedDate)
     {
-        PlannedOccurrenceId = id;
-        RecurringFlowId = recurringFlowId;
-        TenantId = tenantId;
-        AccountId = accountId;
+        _id = id.Value;
+        _recurringFlowId = recurringFlowId.Value;
+        _tenantId = tenantId.Value;
+        _accountId = accountId.Value;
         PlannedAmount = plannedAmount;
         Direction = direction;
         PlannedDate = plannedDate;
@@ -79,10 +97,10 @@ public sealed class PlannedFlowOccurrence : IEntity
         if (actualAmount.Currency != PlannedAmount.Currency)
             throw new CurrencyMismatchException(PlannedAmount.Currency.Code, actualAmount.Currency.Code);
 
-        MatchedTransactionId = actualTransactionId;
+        _matchedTransactionId = actualTransactionId.Value;
         AmountVariance = actualAmount - PlannedAmount;
         DateVarianceDays = actualDate.DayNumber - PlannedDate.DayNumber;
-        MatchConfidence = confidence;
+        _matchConfidence = confidence.Value;
         Status = OccurrenceStatus.Matched;
     }
 

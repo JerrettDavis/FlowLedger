@@ -15,11 +15,11 @@ namespace FlowLedger.Domain.Aggregates;
 /// </summary>
 public sealed class RecurringFlow : AggregateRoot
 {
-    private RecurringFlowId _id;
+    private Guid _id;
     private readonly List<PlannedFlowOccurrence> _occurrences = [];
 
-    public override Guid Id => _id.Value;
-    public RecurringFlowId RecurringFlowId => _id;
+    public override Guid Id => _id;
+    public RecurringFlowId RecurringFlowId => RecurringFlowId.From(_id);
     public TenantId TenantId { get; }
     public AccountId AccountId { get; }
 
@@ -60,7 +60,7 @@ public sealed class RecurringFlow : AggregateRoot
         string? counterparty,
         DateTimeOffset createdAt)
     {
-        _id = id;
+        _id = id.Value;
         TenantId = tenantId;
         AccountId = accountId;
         Name = name;
@@ -124,15 +124,20 @@ public sealed class RecurringFlow : AggregateRoot
         if (!ActiveWindow.Contains(date))
             throw new OccurrenceDateOutOfRangeException(date, ActiveWindow.Start, ActiveWindow.End);
 
-        var effectiveAmount = overrideAmount ?? Amount;
+        // Create a new Money instance (not a reference copy) so each occurrence owns a distinct
+        // value object. EF Core's identity resolution treats owned entities by reference when
+        // building the entity graph — sharing the same Money instance across two occurrences
+        // would cause EF to nullify one of the PlannedAmount navigations.
+        var effectiveAmount = overrideAmount ?? new Money(Amount.Amount, Amount.Currency);
         effectiveAmount.GuardPositive(nameof(effectiveAmount));
 
         if (effectiveAmount.Currency != Amount.Currency)
             throw new CurrencyMismatchException(Amount.Currency.Code, effectiveAmount.Currency.Code);
 
+        var rfId = RecurringFlowId.From(_id);
         var occurrence = new PlannedFlowOccurrence(
             PlannedOccurrenceId.New(),
-            _id,
+            rfId,
             TenantId,
             AccountId,
             effectiveAmount,
@@ -140,7 +145,7 @@ public sealed class RecurringFlow : AggregateRoot
             date);
 
         _occurrences.Add(occurrence);
-        RaiseEvent(new PlannedOccurrenceGenerated(occurrence.PlannedOccurrenceId, _id, TenantId, date, effectiveAmount));
+        RaiseEvent(new PlannedOccurrenceGenerated(occurrence.PlannedOccurrenceId, rfId, TenantId, date, effectiveAmount));
         return occurrence;
     }
 

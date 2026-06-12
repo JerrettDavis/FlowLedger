@@ -17,11 +17,11 @@ namespace FlowLedger.Domain.Aggregates;
 /// </summary>
 public sealed class Transaction : AggregateRoot
 {
-    private TransactionId _id;
+    private Guid _id;
     private readonly List<TransactionSplit> _splits = [];
 
-    public override Guid Id => _id.Value;
-    public TransactionId TransactionId => _id;
+    public override Guid Id => _id;
+    public TransactionId TransactionId => TransactionId.From(_id);
     public TenantId TenantId { get; }
     public AccountId AccountId { get; }
 
@@ -72,7 +72,7 @@ public sealed class Transaction : AggregateRoot
         TransactionFingerprint? fingerprint,
         DateTimeOffset createdAt)
     {
-        _id = id;
+        _id = id.Value;
         TenantId = tenantId;
         AccountId = accountId;
         Amount = amount;
@@ -227,9 +227,15 @@ public sealed class Transaction : AggregateRoot
 /// </summary>
 public sealed class TransactionSplit
 {
-    public Money Amount { get; }
-    public CategoryId? CategoryId { get; }
-    public string? Notes { get; }
+    public Money Amount { get; private set; }
+    public CategoryId? CategoryId { get; private set; }
+    public string? Notes { get; private set; }
+
+    private TransactionSplit()
+    {
+        // EF Core parameterless constructor — fields initialised by EF.
+        Amount = null!;
+    }
 
     public TransactionSplit(Money amount, CategoryId? categoryId = null, string? notes = null)
     {

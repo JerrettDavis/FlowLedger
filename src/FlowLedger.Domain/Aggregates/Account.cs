@@ -14,10 +14,10 @@ namespace FlowLedger.Domain.Aggregates;
 /// </summary>
 public sealed class Account : AggregateRoot
 {
-    private AccountId _id;
+    private Guid _id;
 
-    public override Guid Id => _id.Value;
-    public AccountId AccountId => _id;
+    public override Guid Id => _id;
+    public AccountId AccountId => AccountId.From(_id);
     public TenantId TenantId { get; }
     public string Name { get; private set; }
     public AccountType AccountType { get; }
@@ -46,7 +46,7 @@ public sealed class Account : AggregateRoot
         string? institution,
         DateTimeOffset createdAt)
     {
-        _id = id;
+        _id = id.Value;
         TenantId = tenantId;
         Name = name;
         AccountType = accountType;
