@@ -5,7 +5,9 @@
     <Project Path="src/FlowLedger.Application/FlowLedger.Application.csproj" />
     <Project Path="src/FlowLedger.Domain/FlowLedger.Domain.csproj" />
     <Project Path="src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj" />
+    <Project Path="src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractions.csproj" />
     <Project Path="src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj" />
+    <Project Path="src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj" />
     <Project Path="src/FlowLedger.Plugins.Abstractions/FlowLedger.Plugins.Abstractions.csproj" />
     <Project Path="src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj" />
     <Project Path="src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj" />
@@ -17,5 +19,7 @@
     <Project Path="tests/FlowLedger.Application.Tests/FlowLedger.Application.Tests.csproj" />
     <Project Path="tests/FlowLedger.Architecture.Tests/FlowLedger.Architecture.Tests.csproj" />
     <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Infrastructure.Tests/FlowLedger.Infrastructure.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Integrations.Tests/FlowLedger.Integrations.Tests.csproj" />
   </Folder>
 </Solution>
