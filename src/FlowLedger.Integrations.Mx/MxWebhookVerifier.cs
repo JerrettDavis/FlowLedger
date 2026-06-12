@@ -34,12 +34,29 @@ internal sealed class MxWebhookVerifier
     /// Throws <see cref="InvalidWebhookSignatureException"/> when the presented signature does
     /// not match the HMAC computed over <paramref name="rawBody"/>.
     /// </summary>
+    /// <remarks>
+    /// The explicit length check before <see cref="CryptographicOperations.FixedTimeEquals"/>
+    /// ensures we reject a missing/empty header immediately (no HMAC is needed) and that the
+    /// constant-time comparison always operates on equal-length inputs (a hex-encoded HMAC-SHA256
+    /// is always 64 ASCII characters). This preserves true constant-time behaviour on the matched
+    /// path while failing fast on obvious mismatches.
+    /// </remarks>
     public void Verify(ReadOnlySpan<byte> rawBody, string? signatureHeader)
     {
-        var expected = ComputeSignature(rawBody);
-        var presented = Encoding.UTF8.GetBytes(signatureHeader ?? string.Empty);
+        // Reject null/empty signature before doing any crypto work.
+        if (string.IsNullOrEmpty(signatureHeader))
+        {
+            throw new InvalidWebhookSignatureException(
+                "MX webhook signature header is missing or empty.");
+        }
 
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), presented))
+        var expectedBytes = Encoding.UTF8.GetBytes(ComputeSignature(rawBody));
+        var presentedBytes = Encoding.UTF8.GetBytes(signatureHeader);
+
+        // Guard equal length so FixedTimeEquals runs on matched-length spans (true constant time
+        // on the happy path; length mismatch is itself a non-secret observable and can fast-fail).
+        if (expectedBytes.Length != presentedBytes.Length
+            || !CryptographicOperations.FixedTimeEquals(expectedBytes, presentedBytes))
         {
             throw new InvalidWebhookSignatureException(
                 "MX webhook signature verification failed.");

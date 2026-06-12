@@ -2,6 +2,7 @@ using System.Globalization;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
+using PatternKit.Behavioral.Strategy;
 
 namespace FlowLedger.Integrations.Mx.Mapping;
 
@@ -9,10 +10,75 @@ namespace FlowLedger.Integrations.Mx.Mapping;
 /// Pure, deterministic mapping functions: MX wire record → provider-neutral DTO.
 /// No I/O, no clock, no randomness — identical input always yields identical output.
 /// This is the single place that knows how MX field semantics map to the contract.
+///
+/// Uses PatternKit.Core's <see cref="Strategy{TIn,TOut}"/> for the two string-dispatch
+/// mappings (<see cref="ToConnectionStatus"/> and <see cref="NormalizeAccountType"/>) so
+/// each rule lives in one declaration and is independently readable. Strategy instances are
+/// built once at class-load time (immutable, compiled artifacts).
 /// </summary>
 internal static class MxMapper
 {
     private const string DefaultCurrency = "USD";
+
+    // ── Connection-status mapping (PatternKit Strategy) ───────────────────────────
+    //
+    // Maps a normalised (trimmed, uppercased) MX connection_status string to the
+    // contract's ConnectionStatus enum. First-match semantics — identical to the
+    // original switch expression's fall-through order.
+
+    private static readonly Strategy<string, ConnectionStatus> _connectionStatusStrategy =
+        Strategy<string, ConnectionStatus>.Create()
+
+            .When(static (in string s) => s is "CONNECTED" or "RECONNECTED" or "UPDATED" or "RESUMED")
+            .Then(static (in string _) => ConnectionStatus.Healthy)
+
+            .When(static (in string s) => s is "CREATED" or "IMPORTED" or "PENDING")
+            .Then(static (in string _) => ConnectionStatus.ConnectionPending)
+
+            .When(static (in string s) => s == "DELAYED")
+            .Then(static (in string _) => ConnectionStatus.Syncing)
+
+            .When(static (in string s) => s == "DEGRADED")
+            .Then(static (in string _) => ConnectionStatus.Degraded)
+
+            .When(static (in string s) => s is "CHALLENGED" or "DENIED" or "REJECTED" or "LOCKED"
+                                              or "IMPEDED" or "PREVENTED" or "EXPIRED" or "IMPAIRED")
+            .Then(static (in string _) => ConnectionStatus.NeedsUserAction)
+
+            .When(static (in string s) => s == "DISABLED")
+            .Then(static (in string _) => ConnectionStatus.Disabled)
+
+            .When(static (in string s) => s is "DISCONNECTED" or "DISCONTINUED" or "CLOSED" or "FAILED")
+            .Then(static (in string _) => ConnectionStatus.Error)
+
+            // Unknown status → treat as pending (safe default).
+            .Default(static (in string _) => ConnectionStatus.ConnectionPending)
+
+            .Build();
+
+    // ── Account-type mapping (PatternKit Strategy) ────────────────────────────────
+    //
+    // Maps a normalised MX account type string to a canonical, domain-aligned token.
+    // The domain's MapProviderAccountType switch consumes these uppercase tokens.
+    // Single source of truth for MX → canonical account-type mapping (DRY).
+
+    private static readonly Strategy<string, string> _accountTypeStrategy =
+        Strategy<string, string>.Create()
+
+            .When(static (in string s) => s == "CHECKING").Then(static (in string _) => "CHECKING")
+            .When(static (in string s) => s == "SAVINGS").Then(static (in string _) => "SAVINGS")
+            .When(static (in string s) => s is "CREDIT_CARD" or "CREDITCARD" or "LINE_OF_CREDIT")
+                .Then(static (in string _) => "CREDIT_CARD")
+            .When(static (in string s) => s == "LOAN").Then(static (in string _) => "LOAN")
+            .When(static (in string s) => s == "MORTGAGE").Then(static (in string _) => "MORTGAGE")
+            .When(static (in string s) => s is "INVESTMENT" or "BROKERAGE")
+                .Then(static (in string _) => "INVESTMENT")
+            .When(static (in string s) => s is "PREPAID" or "CASH").Then(static (in string _) => "CASH")
+
+            // Safe default mirrors the domain's fallback.
+            .Default(static (in string _) => "CHECKING")
+
+            .Build();
 
     // ── Accounts ──────────────────────────────────────────────────────────────
 
@@ -40,19 +106,11 @@ internal static class MxMapper
     /// The domain's MapProviderAccountType switch consumes these uppercase tokens.
     /// Single source of truth for MX → canonical account-type mapping (DRY).
     /// </summary>
-    public static string NormalizeAccountType(string? mxType) =>
-        (mxType ?? string.Empty).Trim().ToUpperInvariant() switch
-        {
-            "CHECKING" => "CHECKING",
-            "SAVINGS" => "SAVINGS",
-            "CREDIT_CARD" or "CREDITCARD" => "CREDIT_CARD",
-            "LINE_OF_CREDIT" => "CREDIT_CARD",
-            "LOAN" => "LOAN",
-            "MORTGAGE" => "MORTGAGE",
-            "INVESTMENT" or "BROKERAGE" => "INVESTMENT",
-            "PREPAID" or "CASH" => "CASH",
-            _ => "CHECKING", // safe default mirrors the domain's fallback
-        };
+    public static string NormalizeAccountType(string? mxType)
+    {
+        var key = (mxType ?? string.Empty).Trim().ToUpperInvariant();
+        return _accountTypeStrategy.Execute(in key);
+    }
 
     // ── Transactions ──────────────────────────────────────────────────────────
 
@@ -92,20 +150,11 @@ internal static class MxMapper
     /// Maps an MX member <c>connection_status</c> string to the contract's
     /// <see cref="ConnectionStatus"/>. Single source of truth (DRY).
     /// </summary>
-    public static ConnectionStatus ToConnectionStatus(string? mxConnectionStatus) =>
-        (mxConnectionStatus ?? string.Empty).Trim().ToUpperInvariant() switch
-        {
-            "CONNECTED" or "RECONNECTED" => ConnectionStatus.Healthy,
-            "UPDATED" or "RESUMED" => ConnectionStatus.Healthy,
-            "CREATED" or "IMPORTED" or "PENDING" => ConnectionStatus.ConnectionPending,
-            "DELAYED" => ConnectionStatus.Syncing,
-            "DEGRADED" => ConnectionStatus.Degraded,
-            "CHALLENGED" or "DENIED" or "REJECTED" or "LOCKED"
-                or "IMPEDED" or "PREVENTED" or "EXPIRED" or "IMPAIRED" => ConnectionStatus.NeedsUserAction,
-            "DISABLED" => ConnectionStatus.Disabled,
-            "DISCONNECTED" or "DISCONTINUED" or "CLOSED" or "FAILED" => ConnectionStatus.Error,
-            _ => ConnectionStatus.ConnectionPending,
-        };
+    public static ConnectionStatus ToConnectionStatus(string? mxConnectionStatus)
+    {
+        var key = (mxConnectionStatus ?? string.Empty).Trim().ToUpperInvariant();
+        return _connectionStatusStrategy.Execute(in key);
+    }
 
     /// <summary>
     /// True when an MX connection_status requires the end-user to act

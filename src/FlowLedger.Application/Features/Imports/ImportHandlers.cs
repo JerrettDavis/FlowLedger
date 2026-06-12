@@ -20,6 +20,8 @@ namespace FlowLedger.Application.Features.Imports;
 public sealed class ImportTransactionsHandler
 {
     // Standard date formats tried in order when the mapping supplies none.
+    // Both "MMM d, yyyy" and "MMM d,yyyy" are included: real-world CSV files often split
+    // "Jan 15, 2024" on the comma, causing the reconstructed value to lack the space.
     private static readonly string[] DefaultDateFormats =
     [
         "yyyy-MM-dd",
@@ -32,6 +34,7 @@ public sealed class ImportTransactionsHandler
         "yyyy/MM/dd",
         "dd/MM/yyyy",
         "MMM d, yyyy",
+        "MMM d,yyyy",
     ];
 
     private readonly ITransactionRepository _txRepo;
@@ -165,6 +168,64 @@ public sealed class ImportTransactionsHandler
 
     // ── Row parsing ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// When the CSV delimiter is a comma, values like <c>1,234.56</c> or <c>Jan 15, 2024</c>
+    /// are split across multiple fields by the parser (RFC-4180 requires quoting such values,
+    /// but real-world exports rarely do). This helper tries to reconstruct the intended value
+    /// by joining the field at <paramref name="startIdx"/> with up to
+    /// <paramref name="maxExtraFields"/> following fields using a comma.
+    ///
+    /// When <paramref name="preferLongest"/> is <c>true</c> (use for amounts), the longest
+    /// coalesced form that parses is preferred — e.g. <c>-1,234.56</c> wins over <c>-1</c>.
+    /// When <c>false</c> (use for dates), the shortest successful match is returned first,
+    /// avoiding accidental date+garbage parses from .NET's permissive fallback parser.
+    ///
+    /// Returns the number of extra fields consumed (0 if the raw field parsed on its own,
+    /// -1 if no combination succeeded).
+    /// </summary>
+    private static int TryCoalesceField<T>(
+        List<string> fields,
+        int startIdx,
+        int maxExtraFields,
+        TryParseDelegate<T> tryParse,
+        out T result,
+        out string rawUsed,
+        bool preferLongest = false)
+    {
+        rawUsed = startIdx < fields.Count ? fields[startIdx].Trim() : string.Empty;
+
+        // Build all candidate strings (index 0 = single field, index N = most coalesced).
+        int upperBound = Math.Min(maxExtraFields, fields.Count - 1 - startIdx);
+        var sb = new System.Text.StringBuilder(rawUsed);
+        var candidates = new string[upperBound + 1];
+        candidates[0] = rawUsed;
+        for (int extra = 1; extra <= upperBound; extra++)
+        {
+            sb.Append(',');
+            sb.Append(fields[startIdx + extra].Trim());
+            candidates[extra] = sb.ToString();
+        }
+
+        // Iterate from longest→shortest (preferLongest=true) or shortest→longest (false).
+        int start = preferLongest ? upperBound : 0;
+        int end = preferLongest ? 0 : upperBound;
+        int step = preferLongest ? -1 : 1;
+
+        for (int extra = start; preferLongest ? extra >= end : extra <= end; extra += step)
+        {
+            if (tryParse(candidates[extra], out result))
+            {
+                rawUsed = candidates[extra];
+                return extra;
+            }
+        }
+
+        result = default!;
+        return -1; // could not parse
+    }
+
+    private delegate bool TryParseDelegate<T>(string raw, out T result);
+
     private static (Transaction Tx, string FingerprintValue) ParseRow(
         List<string> fields,
         int rowNumber,
@@ -173,31 +234,63 @@ public sealed class ImportTransactionsHandler
         CsvColumnMapping mapping,
         string[] dateFormats)
     {
-        string Get(int idx) => idx < fields.Count ? fields[idx].Trim() : string.Empty;
-
         // Date
-        var dateRaw = Get(mapping.DateColumnIndex);
-        if (!TryParseDate(dateRaw, dateFormats, out var date))
+        bool TryParseDateForCoalesce(string raw, out DateOnly d) =>
+            TryParseDate(raw, dateFormats, out d);
+
+        // preferLongest=true: ensures "Jan 15, 2024" (split to ["Jan 15","2024"]) coalesces
+        // to the full date string rather than stopping at the ambiguous "Jan 15" fragment.
+        // Removing the DateTime.TryParse fallback from TryParseDate prevents garbage coalesces
+        // like "2024-01-10,-1" from accidentally matching as a valid date.
+        int dateExtra = TryCoalesceField<DateOnly>(
+            fields,
+            mapping.DateColumnIndex,
+            maxExtraFields: 1,
+            TryParseDateForCoalesce,
+            out var date,
+            out var dateRaw,
+            preferLongest: true);
+
+        if (dateExtra < 0)
         {
             throw new FormatException($"Cannot parse date '{dateRaw}' on row {rowNumber}.");
         }
 
-        // Amount
-        var amountRaw = Get(mapping.AmountColumnIndex);
-        if (!TryParseAmount(amountRaw, out var rawAmount))
+        // Amount — start after any extra fields consumed by the date.
+        // Use preferLongest=true so "-1,234.56" (split into ["-1","234.56"]) coalesces
+        // to the longer form rather than stopping at the valid-but-incomplete "-1".
+        int amountStartIdx = mapping.AmountColumnIndex + (dateExtra > 0 ? dateExtra : 0);
+        int amountExtra = TryCoalesceField<decimal>(
+            fields,
+            amountStartIdx,
+            maxExtraFields: 2,
+            TryParseAmount,
+            out var rawAmount,
+            out var amountRaw,
+            preferLongest: true);
+
+        if (amountExtra < 0)
         {
             throw new FormatException($"Cannot parse amount '{amountRaw}' on row {rowNumber}.");
         }
 
-        // Description
-        var description = Get(mapping.DescriptionColumnIndex);
+        // Description — start after any extra fields consumed by date and amount
+        int descStartIdx = mapping.DescriptionColumnIndex + (dateExtra > 0 ? dateExtra : 0) + (amountExtra > 0 ? amountExtra : 0);
+        var description = descStartIdx < fields.Count ? fields[descStartIdx].Trim() : string.Empty;
         if (string.IsNullOrWhiteSpace(description))
         {
             throw new InvalidOperationException($"Description is empty on row {rowNumber}.");
         }
 
-        // Optional
-        var merchant = mapping.MerchantColumnIndex.HasValue ? Get(mapping.MerchantColumnIndex.Value) : null;
+        // Optional — apply the same field-offset logic for coalesced date/amount fields
+        int fieldOffset = (dateExtra > 0 ? dateExtra : 0) + (amountExtra > 0 ? amountExtra : 0);
+        string GetShifted(int idx)
+        {
+            int shifted = idx + fieldOffset;
+            return shifted < fields.Count ? fields[shifted].Trim() : string.Empty;
+        }
+
+        var merchant = mapping.MerchantColumnIndex.HasValue ? GetShifted(mapping.MerchantColumnIndex.Value) : null;
 
         // Direction: negative amount = debit, positive = credit
         var direction = rawAmount < 0m ? TransactionDirection.Debit : TransactionDirection.Credit;
@@ -247,16 +340,6 @@ public sealed class ImportTransactionsHandler
             {
                 return true;
             }
-        }
-
-        // Fallback: try general parse
-        if (DateTime.TryParse(raw,
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None,
-            out var dt))
-        {
-            result = DateOnly.FromDateTime(dt);
-            return true;
         }
 
         return false;

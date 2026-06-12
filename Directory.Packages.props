@@ -122,4 +122,11 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="WireMock.Net" Version="2.10.0" />
   </ItemGroup>
+
+  <!-- ============================================================
+       Patterns (dogfooding)
+  ============================================================ -->
+  <ItemGroup>
+    <PackageVersion Include="PatternKit.Core" Version="0.147.2" />
+  </ItemGroup>
 </Project>

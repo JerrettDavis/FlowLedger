@@ -2,6 +2,7 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
 using FlowLedger.Integrations.Mx.Mapping;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Integrations.Mx;
@@ -22,16 +23,19 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
     private readonly MxApiClient _client;
     private readonly MxWebhookVerifier _webhookVerifier;
     private readonly MxProviderOptions _options;
+    private readonly ILogger<MxFinancialDataProvider> _logger;
 
     internal MxFinancialDataProvider(
         MxApiClient client,
         MxWebhookVerifier webhookVerifier,
-        IOptions<MxProviderOptions> options)
+        IOptions<MxProviderOptions> options,
+        ILogger<MxFinancialDataProvider> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _webhookVerifier = webhookVerifier ?? throw new ArgumentNullException(nameof(webhookVerifier));
         ArgumentNullException.ThrowIfNull(options);
         _options = options.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     // ── Metadata ───────────────────────────────────────────────────────────────
@@ -51,6 +55,45 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         TenantId tenantId,
         CancellationToken cancellationToken = default)
     {
+        var (memberRef, _) = await ProvisionMxConnectionAsync(
+            tenantId, fetchWidgetUrl: false, cancellationToken).ConfigureAwait(false);
+        return memberRef;
+    }
+
+    /// <summary>
+    /// Begins a connection and also returns the Connect widget URL — used by the
+    /// <c>/api/integrations/mx/connect-token</c> endpoint.
+    /// </summary>
+    public async Task<(ProviderMemberRef Member, string WidgetUrl)> BeginConnectionWithWidgetAsync(
+        TenantId tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var (memberRef, widgetUrl) = await ProvisionMxConnectionAsync(
+            tenantId, fetchWidgetUrl: true, cancellationToken).ConfigureAwait(false);
+        return (memberRef, widgetUrl!);
+    }
+
+    /// <summary>
+    /// Core provisioning: create/find the MX user, provision a member, and optionally obtain
+    /// the Connect widget URL. Both public begin-connection methods delegate here so the three
+    /// MX API calls and status-mapping logic stay in one place (DRY).
+    /// </summary>
+    /// <param name="tenantId">Tenant for whom the connection is provisioned.</param>
+    /// <param name="fetchWidgetUrl">
+    ///   When <see langword="true"/>, calls <c>GetConnectWidgetUrlAsync</c> and returns the URL;
+    ///   when <see langword="false"/>, skips the billable widget call (widget URL only needed
+    ///   by <c>/api/integrations/mx/connect-token</c>).
+    /// </param>
+    /// <returns>
+    ///   The provisioned <see cref="ProviderMemberRef"/> and, when
+    ///   <paramref name="fetchWidgetUrl"/> is <see langword="true"/>, the Connect widget URL
+    ///   (otherwise <see langword="null"/>).
+    /// </returns>
+    private async Task<(ProviderMemberRef MemberRef, string? WidgetUrl)> ProvisionMxConnectionAsync(
+        TenantId tenantId,
+        bool fetchWidgetUrl,
+        CancellationToken cancellationToken)
+    {
         // 1. Ensure an MX user exists for this tenant (idempotent external id).
         var externalId = $"flowledger-{tenantId.Value:N}";
         var user = await _client.CreateUserAsync(externalId, cancellationToken).ConfigureAwait(false);
@@ -64,54 +107,29 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         var memberGuid = member.Guid
             ?? throw new FatalProviderException("MX CreateMember returned a member without a guid.");
 
-        // 3. Obtain the Connect widget URL (presented to the user by the UI). The URL is not
-        //    part of the contract's ProviderMemberRef; BeginConnectionAsync surfaces the member
-        //    ref, and the dedicated connect-token endpoint returns the URL.
-        _ = await _client.GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
+        // 3. Optionally obtain the Connect widget URL (billable call — only request when needed).
+        string? widgetUrl = null;
+        if (fetchWidgetUrl)
+        {
+            var widget = await _client
+                .GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
+            widgetUrl = widget.Url
+                ?? throw new FatalProviderException("MX widget response contained no URL.");
+        }
 
-        var status = MxMapper.ToConnectionStatus(member.ConnectionStatus);
         var institution = string.IsNullOrWhiteSpace(member.Name) ? "MX Institution" : member.Name;
 
         // A freshly provisioned member is pending until the user completes Connect, unless MX
         // already reports it connected (e.g. test/sandbox auto-connect).
+        var status = MxMapper.ToConnectionStatus(member.ConnectionStatus);
         var refStatus = status == ConnectionStatus.Healthy
             ? ConnectionStatus.Connected
             : ConnectionStatus.ConnectionPending;
 
-        return new ProviderMemberRef(
-            MxCompositeId.Pack(userGuid, memberGuid),
-            institution,
-            refStatus);
-    }
-
-    /// <summary>
-    /// Begins a connection and also returns the Connect widget URL — used by the
-    /// <c>/api/integrations/mx/connect-token</c> endpoint.
-    /// </summary>
-    public async Task<(ProviderMemberRef Member, string WidgetUrl)> BeginConnectionWithWidgetAsync(
-        TenantId tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        var externalId = $"flowledger-{tenantId.Value:N}";
-        var user = await _client.CreateUserAsync(externalId, cancellationToken).ConfigureAwait(false);
-        var userGuid = user.Guid
-            ?? throw new FatalProviderException("MX CreateUser returned a user without a guid.");
-
-        var member = await _client
-            .CreateMemberAsync(userGuid, _options.DefaultInstitutionCode, cancellationToken)
-            .ConfigureAwait(false);
-        var memberGuid = member.Guid
-            ?? throw new FatalProviderException("MX CreateMember returned a member without a guid.");
-
-        var widget = await _client.GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
-        var widgetUrl = widget.Url
-            ?? throw new FatalProviderException("MX widget response contained no URL.");
-
-        var institution = string.IsNullOrWhiteSpace(member.Name) ? "MX Institution" : member.Name;
         var memberRef = new ProviderMemberRef(
             MxCompositeId.Pack(userGuid, memberGuid),
             institution,
-            ConnectionStatus.ConnectionPending);
+            refStatus);
 
         return (memberRef, widgetUrl);
     }
@@ -136,7 +154,10 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
     {
         var (userGuid, memberGuid) = MxCompositeId.Unpack(memberProviderId);
 
-        // Guard: a member needing user action cannot serve account data.
+        // Guard: a member needing user action cannot serve account data. This is an intentional
+        // defence-in-depth check: a fresh GetMemberStatus call costs one MX API round-trip but
+        // avoids returning stale accounts for a member that has been disconnected or challenged
+        // since the last sync. The trade-off is accepted — the safety benefit outweighs the cost.
         var member = await _client
             .GetMemberStatusAsync(userGuid, memberGuid, cancellationToken)
             .ConfigureAwait(false);
@@ -151,6 +172,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         var results = new List<ProviderAccount>();
         var page = 1;
         var recordsPerPage = _options.RecordsPerPage;
+        var maxPages = _options.MaxPages;
 
         while (true)
         {
@@ -167,6 +189,15 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
 
             if (!HasMorePages(response.Pagination, page))
             {
+                break;
+            }
+
+            if (page >= maxPages)
+            {
+                _logger.LogWarning(
+                    "GetAccountsAsync: reached MaxPages limit ({MaxPages}) for member {MemberGuid}. " +
+                    "Returning {Count} accounts collected so far. Remaining pages skipped.",
+                    maxPages, memberGuid, results.Count);
                 break;
             }
 

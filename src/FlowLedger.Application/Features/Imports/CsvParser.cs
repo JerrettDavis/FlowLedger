@@ -26,16 +26,10 @@ public static class CsvParser
         var pos = 0;
         var len = csvText.Length;
 
-        while (pos <= len)
+        while (pos < len)
         {
             var row = ParseRow(csvText, ref pos, len, delimiter);
             if (row is null)
-            {
-                break;
-            }
-
-            // Skip empty trailing row (file ends with \r\n)
-            if (row.Count == 1 && row[0].Length == 0 && pos > len)
             {
                 break;
             }
@@ -48,7 +42,7 @@ public static class CsvParser
 
     private static List<string>? ParseRow(string text, ref int pos, int len, char delimiter)
     {
-        if (pos > len)
+        if (pos >= len)
         {
             return null;
         }

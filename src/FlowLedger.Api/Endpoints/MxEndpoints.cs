@@ -74,8 +74,18 @@ internal static class MxEndpoints
             var evt = await provider.ParseWebhookAsync(rawBody, ct);
 
             // Enqueue a background sync via Quartz so the heavy work runs off the request path.
+            // Pass the webhook context in the JobDataMap so OnDemandSyncJob can scope the sync
+            // to the specific member when targeted per-member sync is supported.
+            // Note: webhook-triggered syncs intentionally bypass the manual-refresh cooldown
+            // (they are platform-initiated events, not user-initiated refreshes).
+            var jobData = new JobDataMap
+            {
+                [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
+                [OnDemandSyncJob.EventTypeKey] = evt.EventType,
+            };
+
             var scheduler = await schedulerFactory.GetScheduler(ct);
-            await scheduler.TriggerJob(OnDemandSyncJob.Key, ct);
+            await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
 
             return Results.Accepted(value: new { received = evt.EventType, memberId = evt.MemberId });
         })

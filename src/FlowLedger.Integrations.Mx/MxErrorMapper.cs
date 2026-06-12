@@ -1,15 +1,16 @@
 using System.Net;
 using System.Net.Http.Headers;
 using FlowLedger.Integrations.Abstractions;
+using PatternKit.Behavioral.Strategy;
 
 namespace FlowLedger.Integrations.Mx;
 
 /// <summary>
 /// Single source of truth for translating MX HTTP failures into the provider exception taxonomy.
 ///
-/// (PatternKit Strategy was intended here per the architecture brief, but PatternKit 0.147.2
-/// does not restore on any configured NuGet feed — see Phase 4 report. Hand-rolled switch
-/// expressions are used instead; correctness + green build over dogfooding.)
+/// Uses PatternKit.Core's <see cref="Strategy{TIn,TOut}"/> (first-match semantics) so each
+/// HTTP-status → exception rule is declared once, in isolation, and is independently testable.
+/// The strategy is built once at class-load time (immutable, compiled artifact).
 ///
 /// Mapping rules:
 ///   401 / 403            → FatalProviderException (bad creds / not allow-listed; no auto-retry).
@@ -22,40 +23,59 @@ namespace FlowLedger.Integrations.Mx;
 /// </summary>
 internal static class MxErrorMapper
 {
+    // Context tuple used as input to the Strategy. Bundling response + operation avoids
+    // a separate closure capture per call, keeping the strategy a pure value-mapping artifact.
+    private readonly record struct MxErrorContext(HttpResponseMessage Response, string Operation);
+
+    // Built once at class-load time; Strategy is an immutable, compiled artifact.
+    private static readonly Strategy<MxErrorContext, ProviderException> _strategy =
+        Strategy<MxErrorContext, ProviderException>.Create()
+
+            // 429 — rate limited; honour Retry-After when present.
+            .When(static (in MxErrorContext ctx) => ctx.Response.StatusCode == HttpStatusCode.TooManyRequests)
+            .Then(static (in MxErrorContext ctx) => (ProviderException)new RateLimitedProviderException(
+                $"MX rate limit exceeded during '{ctx.Operation}'.",
+                retryAfter: ResolveRetryAfter(ctx.Response.Headers.RetryAfter),
+                providerCode: ctx.Response.StatusCode.ToString()))
+
+            // 401 / 403 / 404 → fatal (auth failure or MX 404-for-401 pattern).
+            .When(static (in MxErrorContext ctx) => ctx.Response.StatusCode is
+                HttpStatusCode.Unauthorized or
+                HttpStatusCode.Forbidden or
+                HttpStatusCode.NotFound)
+            .Then(static (in MxErrorContext ctx) => (ProviderException)new FatalProviderException(
+                $"MX rejected '{ctx.Operation}' with {(int)ctx.Response.StatusCode} " +
+                $"{ctx.Response.StatusCode} (authentication or authorisation failure).",
+                providerCode: ctx.Response.StatusCode.ToString()))
+
+            // 408 → transient (server-side timeout).
+            .When(static (in MxErrorContext ctx) => ctx.Response.StatusCode == HttpStatusCode.RequestTimeout)
+            .Then(static (in MxErrorContext ctx) => (ProviderException)new TransientProviderException(
+                $"MX request timed out during '{ctx.Operation}' ({(int)ctx.Response.StatusCode}).",
+                retryAfter: TimeSpan.FromSeconds(5),
+                providerCode: ctx.Response.StatusCode.ToString()))
+
+            // 5xx → transient (server error, retry with back-off).
+            .When(static (in MxErrorContext ctx) => (int)ctx.Response.StatusCode >= 500)
+            .Then(static (in MxErrorContext ctx) => (ProviderException)new TransientProviderException(
+                $"MX server error during '{ctx.Operation}' ({(int)ctx.Response.StatusCode} {ctx.Response.StatusCode}).",
+                retryAfter: TimeSpan.FromSeconds(5),
+                providerCode: ctx.Response.StatusCode.ToString()))
+
+            // Anything else (unexpected 4xx) → fatal.
+            .Default(static (in MxErrorContext ctx) => (ProviderException)new FatalProviderException(
+                $"MX returned an unexpected {(int)ctx.Response.StatusCode} " +
+                $"{ctx.Response.StatusCode} during '{ctx.Operation}'.",
+                providerCode: ctx.Response.StatusCode.ToString()))
+
+            .Build();
+
     /// <summary>Builds the appropriate <see cref="ProviderException"/> for a non-success response.</summary>
     public static ProviderException FromResponse(HttpResponseMessage response, string operation)
     {
         ArgumentNullException.ThrowIfNull(response);
-
-        var status = (int)response.StatusCode;
-        var code = response.StatusCode.ToString();
-
-        return response.StatusCode switch
-        {
-            HttpStatusCode.TooManyRequests => new RateLimitedProviderException(
-                $"MX rate limit exceeded during '{operation}'.",
-                retryAfter: ResolveRetryAfter(response.Headers.RetryAfter),
-                providerCode: code),
-
-            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound =>
-                new FatalProviderException(
-                    $"MX rejected '{operation}' with {status} {code} (authentication or authorisation failure).",
-                    providerCode: code),
-
-            HttpStatusCode.RequestTimeout => new TransientProviderException(
-                $"MX request timed out during '{operation}' ({status}).",
-                retryAfter: TimeSpan.FromSeconds(5),
-                providerCode: code),
-
-            _ when status >= 500 => new TransientProviderException(
-                $"MX server error during '{operation}' ({status} {code}).",
-                retryAfter: TimeSpan.FromSeconds(5),
-                providerCode: code),
-
-            _ => new FatalProviderException(
-                $"MX returned an unexpected {status} {code} during '{operation}'.",
-                providerCode: code),
-        };
+        var ctx = new MxErrorContext(response, operation);
+        return _strategy.Execute(in ctx);
     }
 
     /// <summary>Wraps a network-level failure (no HTTP response) as transient.</summary>

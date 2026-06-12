@@ -4,6 +4,7 @@ using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.CostControl;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Integrations.Mx;
@@ -84,7 +85,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFinancialDataProvider>(sp => new MxFinancialDataProvider(
             sp.GetRequiredService<MxApiClient>(),
             sp.GetRequiredService<MxWebhookVerifier>(),
-            sp.GetRequiredService<IOptions<MxProviderOptions>>()));
+            sp.GetRequiredService<IOptions<MxProviderOptions>>(),
+            sp.GetRequiredService<ILogger<MxFinancialDataProvider>>()));
 
         return services;
     }

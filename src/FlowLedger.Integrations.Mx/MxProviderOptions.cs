@@ -33,4 +33,11 @@ public sealed class MxProviderOptions
     /// Zero or negative means "no budget cap". Reserved for future enforcement.
     /// </summary>
     public int MonthlyManualRefreshBudget { get; set; } = 0;
+
+    /// <summary>
+    /// Safety cap on the number of pages fetched in a single <c>GetAccountsAsync</c> call.
+    /// Prevents an unbounded loop if the MX API returns pathological pagination data.
+    /// Defaults to 100, which accommodates up to 100 × <see cref="RecordsPerPage"/> accounts.
+    /// </summary>
+    public int MaxPages { get; set; } = 100;
 }

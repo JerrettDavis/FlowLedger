@@ -25,6 +25,11 @@ public sealed class MxResilienceTests : IDisposable
     private readonly WireMockServer _server;
     private readonly ServiceProvider _provider;
 
+    // IFinancialDataProvider is registered as Scoped. Keep one long-lived scope for the tests
+    // so the provider outlives each call. The scope (and provider within it) is disposed together
+    // with this test class.
+    private readonly IServiceScope _scope;
+
     public MxResilienceTests()
     {
         _server = WireMockServer.Start(new WireMockServerSettings { StartAdminInterface = false });
@@ -48,10 +53,12 @@ public sealed class MxResilienceTests : IDisposable
         services.AddLogging();
         services.AddMxProvider(config);
         _provider = services.BuildServiceProvider();
+        _scope = _provider.CreateScope();
     }
 
     public void Dispose()
     {
+        _scope.Dispose();
         _provider.Dispose();
         _server.Dispose();
     }
@@ -75,11 +82,8 @@ public sealed class MxResilienceTests : IDisposable
         return new MxApiClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<MxApiClient>.Instance);
     }
 
-    private IFinancialDataProvider CreateProvider()
-    {
-        using var scope = _provider.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<IFinancialDataProvider>();
-    }
+    private IFinancialDataProvider CreateProvider() =>
+        _scope.ServiceProvider.GetRequiredService<IFinancialDataProvider>();
 
     // ── Transient retry: 503 then 200 ────────────────────────────────────────────
 

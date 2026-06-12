@@ -69,7 +69,8 @@ public sealed class MxWireMockFixture : IDisposable
             ManualRefreshCooldown = TimeSpan.FromMinutes(15),
         });
 
-        return new MxFinancialDataProvider(client, verifier, options);
+        return new MxFinancialDataProvider(
+            client, verifier, options, NullLogger<MxFinancialDataProvider>.Instance);
     }
 
     /// <summary>Builds just the typed API client against the WireMock server.</summary>

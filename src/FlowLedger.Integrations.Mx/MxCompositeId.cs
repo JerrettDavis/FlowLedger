@@ -12,7 +12,22 @@ internal static class MxCompositeId
 {
     private const char Separator = '|';
 
-    public static string Pack(string userGuid, string guid) => $"{userGuid}{Separator}{guid}";
+    public static string Pack(string userGuid, string guid)
+    {
+        if (userGuid.Contains(Separator))
+        {
+            throw new ArgumentException(
+                $"userGuid must not contain the separator character '{Separator}'.", nameof(userGuid));
+        }
+
+        if (guid.Contains(Separator))
+        {
+            throw new ArgumentException(
+                $"guid must not contain the separator character '{Separator}'.", nameof(guid));
+        }
+
+        return $"{userGuid}{Separator}{guid}";
+    }
 
     public static (string UserGuid, string Guid) Unpack(string composite)
     {
