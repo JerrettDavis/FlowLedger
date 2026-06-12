@@ -24,6 +24,7 @@
     <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\FlowLedger.Domain\FlowLedger.Domain.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
+    <ProjectReference Include="..\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
     <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
   </ItemGroup>

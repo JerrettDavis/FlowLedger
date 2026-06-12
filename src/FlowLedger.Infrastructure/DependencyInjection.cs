@@ -5,6 +5,7 @@ using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Storage;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.Integrations.Mx;
 using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -77,31 +78,27 @@ public static class DependencyInjection
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
 
-        // ── Provider wiring (TODO(provider-wiring) resolved) ──────────────────
-        // Provider selection logic:
-        //   1. If Mx:Enabled=true AND Mx:ApiKey is present → real MX provider (extension point, not yet built)
-        //   2. Otherwise (default, no key required) → Simulated provider
+        // ── Provider wiring ────────────────────────────────────────────────────
+        // Provider selection is config-only:
+        //   Mx:Enabled = true  → real MX provider (FlowLedger.Integrations.Mx)
+        //   Mx:Enabled = false → Simulated provider (default; no API key required)
         //
-        // Extension point for real MX provider: replace the else branch below with
-        //   services.AddMxProvider(configuration);
-        // when FlowLedger.Integrations.Mx is implemented in Milestone 7.
+        // When Enabled = true, FinancialProviderOptionsValidator fails fast at startup if any
+        // required credential (ApiKey/ClientId/BaseUrl/WebhookSecret) is missing. That loud
+        // failure is the intended "plug in the key and roll" behaviour — there is deliberately
+        // NO silent fallback to fake data when MX is enabled.
         services.Configure<FinancialProviderOptions>(configuration.GetSection(FinancialProviderOptions.SectionName));
         services.AddSingleton<IValidateOptions<FinancialProviderOptions>, FinancialProviderOptionsValidator>();
 
         var mxOptions = configuration.GetSection(FinancialProviderOptions.SectionName).Get<FinancialProviderOptions>()
                         ?? new FinancialProviderOptions();
 
-        if (mxOptions.Enabled && !string.IsNullOrWhiteSpace(mxOptions.ApiKey))
+        if (mxOptions.Enabled)
         {
-            // EXTENSION POINT: Wire real MX provider here.
-            // Currently falls through to Simulated because no MX implementation exists yet.
-            // TODO(M7-mx): services.AddMxProvider(configuration);
-            // Fallback to Simulated until MX is implemented.
-            services.AddSimulatedProvider(configuration);
+            services.AddMxProvider(configuration);
         }
         else
         {
-            // Default: Simulated provider — no API key required.
             services.AddSimulatedProvider(configuration);
         }
 

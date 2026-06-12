@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -9,6 +9,10 @@
     <ProjectReference Include="..\FlowLedger.Domain\FlowLedger.Domain.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
     <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,11 @@
 using FlowLedger.Api.Endpoints;
+using FlowLedger.Api.Jobs;
 using FlowLedger.Api.Tenancy;
 using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.SharedKernel;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +26,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // ── Application (handlers, validators) ───────────────────────────────────────
 builder.Services.AddApplication();
+
+// ── Quartz (on-demand sync enqueued by verified MX webhooks) ─────────────────
+// The API hosts a durable on-demand job triggered from the MX webhook endpoint.
+// The recurring scheduled sync remains owned by the Worker host.
+builder.Services.AddQuartz(q =>
+{
+    q.AddJob<OnDemandSyncJob>(opts => opts.WithIdentity(OnDemandSyncJob.Key).StoreDurably());
+});
+builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = false);
 
 // ── Dev-mode auto-migration ──────────────────────────────────────────────────
 // Migrations are applied automatically only in Development to enable `dotnet run`
@@ -62,6 +73,7 @@ app.MapTransactionEndpoints();
 app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();
+app.MapMxEndpoints();
 app.MapForecastEndpoints();
 app.MapImportEndpoints();
 

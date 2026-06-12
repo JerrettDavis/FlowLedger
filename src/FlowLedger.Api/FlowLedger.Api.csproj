@@ -4,11 +4,15 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Quartz" />
+    <PackageReference Include="Quartz.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
+    <ProjectReference Include="..\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
   </ItemGroup>
 
