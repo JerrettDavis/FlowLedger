@@ -68,6 +68,16 @@
   </ItemGroup>
 
   <!-- ============================================================
+       Microsoft Extensions (aligned with .NET 10 SDK)
+  ============================================================ -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
+  </ItemGroup>
+
+  <!-- ============================================================
        Serilog
   ============================================================ -->
   <ItemGroup>

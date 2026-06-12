@@ -6,4 +6,13 @@
     <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Bogus is referenced without a version here; version is pinned in Directory.Packages.props -->
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+  </ItemGroup>
+
 </Project>
