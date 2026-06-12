@@ -22,6 +22,8 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
   </ItemGroup>
 
 </Project>

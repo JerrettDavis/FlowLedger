@@ -1,8 +1,13 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.Infrastructure.Persistence.Repositories;
+using FlowLedger.Infrastructure.Sync;
+using FlowLedger.Integrations.Abstractions;
+using FlowLedger.Integrations.Simulated;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Infrastructure;
 
@@ -12,7 +17,7 @@ namespace FlowLedger.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Registers EF Core, PostgreSQL, and all infrastructure services.
+    /// Registers EF Core, PostgreSQL, repositories, provider wiring, and sync service.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <param name="configuration">Application configuration (used for connection strings).</param>
@@ -48,10 +53,42 @@ public static class DependencyInjection
         // Real handlers will replace the no-op in later milestones.
         services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
 
-        // TODO(provider-wiring): Register IFinancialDataProvider implementations here
-        // when the Integrations.Mx or Integrations.Simulated providers are wired in
-        // Milestone 7. Example:
-        //   services.AddScoped<IFinancialDataProvider, SimulatedFinancialDataProvider>();
+        // ── Repositories ────────────────────────────────────────────────────────
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();
+
+        // ── Provider wiring (TODO(provider-wiring) resolved) ──────────────────
+        // Provider selection logic:
+        //   1. If Mx:Enabled=true AND Mx:ApiKey is present → real MX provider (extension point, not yet built)
+        //   2. Otherwise (default, no key required) → Simulated provider
+        //
+        // Extension point for real MX provider: replace the else branch below with
+        //   services.AddMxProvider(configuration);
+        // when FlowLedger.Integrations.Mx is implemented in Milestone 7.
+        services.Configure<FinancialProviderOptions>(configuration.GetSection(FinancialProviderOptions.SectionName));
+        services.AddSingleton<IValidateOptions<FinancialProviderOptions>, FinancialProviderOptionsValidator>();
+
+        var mxOptions = configuration.GetSection(FinancialProviderOptions.SectionName).Get<FinancialProviderOptions>()
+                        ?? new FinancialProviderOptions();
+
+        if (mxOptions.Enabled && !string.IsNullOrWhiteSpace(mxOptions.ApiKey))
+        {
+            // EXTENSION POINT: Wire real MX provider here.
+            // Currently falls through to Simulated because no MX implementation exists yet.
+            // TODO(M7-mx): services.AddMxProvider(configuration);
+            // Fallback to Simulated until MX is implemented.
+            services.AddSimulatedProvider(configuration);
+        }
+        else
+        {
+            // Default: Simulated provider — no API key required.
+            services.AddSimulatedProvider(configuration);
+        }
+
+        // ── Sync service ────────────────────────────────────────────────────────
+        services.AddScoped<IFinancialSyncService, FinancialSyncService>();
 
         return services;
     }
