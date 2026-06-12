@@ -1,0 +1,64 @@
+using FlowLedger.Application.Features.Forecasting;
+using Microsoft.AspNetCore.Mvc;
+
+namespace FlowLedger.Api.Endpoints;
+
+internal static class ForecastEndpoints
+{
+    internal static IEndpointRouteBuilder MapForecastEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/forecast").WithTags("Forecast");
+
+        group.MapGet("/", async (
+            GetForecastHandler handler,
+            [FromQuery] DateOnly? asOf,
+            [FromQuery] DateOnly? from,
+            [FromQuery] DateOnly? to,
+            [FromQuery] int? months,
+            [FromQuery] string? accounts,
+            CancellationToken ct) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var effectiveAsOf = asOf ?? today;
+
+            IReadOnlyList<Guid>? accountIds = null;
+            if (!string.IsNullOrWhiteSpace(accounts))
+            {
+                var parsed = accounts
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => Guid.TryParse(s, out var g) ? g : (Guid?)null)
+                    .Where(g => g.HasValue)
+                    .Select(g => g!.Value)
+                    .ToList();
+                if (parsed.Count > 0)
+                    accountIds = parsed;
+            }
+
+            var query = new GetForecastQuery
+            {
+                AsOf = effectiveAsOf,
+                HorizonStart = from,
+                HorizonEnd = to,
+                Months = months,
+                AccountIds = accountIds
+            };
+
+            try
+            {
+                var result = await handler.HandleAsync(query, ct);
+                return Results.Ok(result);
+            }
+            catch (ForecastInputException ex)
+            {
+                return Results.Problem(
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Forecast input error");
+            }
+        })
+        .WithName("GetForecast")
+        .WithSummary("Run a deterministic balance forecast for the current tenant");
+
+        return app;
+    }
+}

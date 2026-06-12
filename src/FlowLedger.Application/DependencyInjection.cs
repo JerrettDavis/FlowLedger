@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
+using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Transactions;
 using FluentValidation;
@@ -40,6 +41,10 @@ public static class DependencyInjection
         services.AddScoped<CreateRecurringFlowHandler>();
         services.AddScoped<UpdateRecurringFlowHandler>();
         services.AddScoped<DeactivateRecurringFlowHandler>();
+
+        // ── Handlers — Forecasting ────────────────────────────────────────────────
+        services.AddSingleton<IForecastEngine, ForecastEngine>();
+        services.AddScoped<GetForecastHandler>();
 
         // ── FluentValidation ─────────────────────────────────────────────────────
         services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);

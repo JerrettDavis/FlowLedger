@@ -4,4 +4,9 @@
     <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Allow domain test project to access internal helpers (e.g. RecurrenceExpander) -->
+    <InternalsVisibleTo Include="FlowLedger.Domain.Tests" />
+  </ItemGroup>
+
 </Project>
