@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- EF Core + PostgreSQL (implementations wired in Milestone 2) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Identity (wired in Milestone auth) -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <!-- Quartz scheduler (wired in Milestone 2) -->
+    <PackageReference Include="Quartz" />
+    <PackageReference Include="Quartz.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\FlowLedger.Domain\FlowLedger.Domain.csproj" />
+    <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

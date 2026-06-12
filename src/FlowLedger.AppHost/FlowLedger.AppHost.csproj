@@ -1,0 +1,21 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.3">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- TargetFramework, LangVersion, Nullable, ImplicitUsings come from Directory.Build.props -->
+    <!-- TreatWarningsAsErrors comes from Directory.Build.props -->
+    <UserSecretsId>cf350072-2f86-4c25-ae88-a196e6e8b976</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Api\FlowLedger.Api.csproj" />
+    <ProjectReference Include="..\FlowLedger.Web\FlowLedger.Web.csproj" />
+    <ProjectReference Include="..\FlowLedger.Worker\FlowLedger.Worker.csproj" />
+  </ItemGroup>
+
+</Project>

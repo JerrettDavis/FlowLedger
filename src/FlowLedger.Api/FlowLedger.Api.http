@@ -1,0 +1,6 @@
+@FlowLedger.Api_HostAddress = http://localhost:5043
+
+GET {{FlowLedger.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

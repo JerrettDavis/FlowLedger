@@ -1,0 +1,5 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SharedKernel has no dependencies on application layers -->
+
+</Project>

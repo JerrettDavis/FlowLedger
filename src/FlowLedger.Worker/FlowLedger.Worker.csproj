@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <UserSecretsId>dotnet-FlowLedger.Worker-5e2c7bdb-44a0-4a64-abff-71cd7985cbea</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

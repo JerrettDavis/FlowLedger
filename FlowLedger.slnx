@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlowLedger.Api/FlowLedger.Api.csproj" />
+    <Project Path="src/FlowLedger.AppHost/FlowLedger.AppHost.csproj" />
+    <Project Path="src/FlowLedger.Application/FlowLedger.Application.csproj" />
+    <Project Path="src/FlowLedger.Domain/FlowLedger.Domain.csproj" />
+    <Project Path="src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj" />
+    <Project Path="src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj" />
+    <Project Path="src/FlowLedger.Plugins.Abstractions/FlowLedger.Plugins.Abstractions.csproj" />
+    <Project Path="src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj" />
+    <Project Path="src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj" />
+    <Project Path="src/FlowLedger.Web.Client/FlowLedger.Web.Client.csproj" />
+    <Project Path="src/FlowLedger.Web/FlowLedger.Web.csproj" />
+    <Project Path="src/FlowLedger.Worker/FlowLedger.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlowLedger.Application.Tests/FlowLedger.Application.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Architecture.Tests/FlowLedger.Architecture.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
