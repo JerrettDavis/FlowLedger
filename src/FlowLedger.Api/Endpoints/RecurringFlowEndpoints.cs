@@ -9,7 +9,8 @@ internal static class RecurringFlowEndpoints
 {
     internal static IEndpointRouteBuilder MapRecurringFlowEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/recurring-flows").WithTags("RecurringFlows");
+        var group = app.MapGroup("/api/recurring-flows").WithTags("RecurringFlows")
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (ListRecurringFlowsHandler handler, CancellationToken ct) =>
             Results.Ok(await handler.HandleAsync(ct)))
@@ -40,7 +41,8 @@ internal static class RecurringFlowEndpoints
             return Results.Created($"/api/recurring-flows/{result.Id}", result);
         })
         .WithName("CreateRecurringFlow")
-        .WithSummary("Create a new recurring flow");
+        .WithSummary("Create a new recurring flow")
+        .RequireRateLimiting("write");
 
         group.MapPut("/{id:guid}", async (
             Guid id,
@@ -59,7 +61,8 @@ internal static class RecurringFlowEndpoints
             return result is null ? Results.NotFound() : Results.Ok(result);
         })
         .WithName("UpdateRecurringFlow")
-        .WithSummary("Update amount/model of a recurring flow");
+        .WithSummary("Update amount/model of a recurring flow")
+        .RequireRateLimiting("write");
 
         group.MapDelete("/{id:guid}", async (Guid id, DeactivateRecurringFlowHandler handler, CancellationToken ct) =>
         {
@@ -67,7 +70,8 @@ internal static class RecurringFlowEndpoints
             return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeactivateRecurringFlow")
-        .WithSummary("Deactivate a recurring flow");
+        .WithSummary("Deactivate a recurring flow")
+        .RequireRateLimiting("write");
 
         return app;
     }

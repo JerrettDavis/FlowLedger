@@ -108,19 +108,22 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
+        // Health endpoints are mapped in ALL environments and are explicitly anonymous,
+        // so they bypass any FallbackPolicy that requires an authenticated user.
+        // They are expected to be gated at the network/infrastructure level (internal
+        // network only) rather than at the application auth level.
+        // See https://aka.ms/aspire/healthchecks for the security implications.
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
-        }
+        // All health checks must pass for app to be considered ready to accept traffic after starting.
+        app.MapHealthChecks(HealthEndpointPath)
+           .AllowAnonymous();
+
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive.
+        app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        })
+        .AllowAnonymous();
 
         return app;
     }

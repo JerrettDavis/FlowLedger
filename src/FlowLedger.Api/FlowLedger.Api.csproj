@@ -1,11 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <UserSecretsId>flowledger-api-secrets</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.AspNetCore" />
+    <!-- Serilog core: provides ILogEventEnricher for SensitivePropertyMaskingEnricher
+         (defense-in-depth log redaction). Full pipeline wiring deferred — see Program.cs. -->
+    <PackageReference Include="Serilog" />
   </ItemGroup>
 
   <ItemGroup>

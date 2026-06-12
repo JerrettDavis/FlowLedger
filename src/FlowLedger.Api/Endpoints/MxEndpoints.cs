@@ -44,7 +44,9 @@ internal static class MxEndpoints
             });
         })
         .WithName("MxConnectToken")
-        .WithSummary("Begin an MX connection and return the Connect widget URL for the current tenant");
+        .WithSummary("Begin an MX connection and return the Connect widget URL for the current tenant")
+        .RequireAuthorization()        // explicit; also covered by the FallbackPolicy
+        .RequireRateLimiting("write");
 
         // ── Webhook ──────────────────────────────────────────────────────────────
         group.MapPost("/webhooks", async (
@@ -90,7 +92,9 @@ internal static class MxEndpoints
             return Results.Accepted(value: new { received = evt.EventType, memberId = evt.MemberId });
         })
         .WithName("MxWebhook")
-        .WithSummary("Receive and verify an MX webhook, then enqueue a background sync");
+        .WithSummary("Receive and verify an MX webhook, then enqueue a background sync")
+        .AllowAnonymous()              // HMAC signature is the sole auth mechanism here
+        .RequireRateLimiting("webhook");
 
         return app;
     }

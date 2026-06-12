@@ -15,7 +15,8 @@ internal static class SyncEndpoints
             return Results.Ok(new { memberId, provider = "Simulated" });
         })
         .WithName("Connect")
-        .WithSummary("Begin a provider connection (simulated by default) for the current tenant");
+        .WithSummary("Begin a provider connection (simulated by default) for the current tenant")
+        .RequireRateLimiting("write");
 
         group.MapPost("/sync", async (IFinancialSyncService syncService, CancellationToken ct) =>
         {
@@ -23,7 +24,8 @@ internal static class SyncEndpoints
             return Results.Ok(result);
         })
         .WithName("Sync")
-        .WithSummary("Run a full/incremental financial sync for the current tenant");
+        .WithSummary("Run a full/incremental financial sync for the current tenant")
+        .RequireRateLimiting("write");
 
         return app;
     }

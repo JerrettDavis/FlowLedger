@@ -1,13 +1,27 @@
+using FlowLedger.Api.Auth;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Api.Jobs;
+using FlowLedger.Api.Middleware;
 using FlowLedger.Api.Tenancy;
 using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.SharedKernel;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Local override file (gitignored, optional) ───────────────────────────────
+// Gives operators an appsettings.{env}.local.json escape hatch for secrets
+// (e.g. Api:Key, Mx:WebhookSecret) that must never be committed.
+builder.Configuration.AddJsonFile(
+    $"appsettings.{builder.Environment.EnvironmentName}.local.json",
+    optional: true,
+    reloadOnChange: false);
 
 // ── Service defaults (OpenTelemetry, health checks, service discovery) ──────
 builder.AddServiceDefaults();
@@ -16,10 +30,18 @@ builder.AddServiceDefaults();
 builder.Services.AddOpenApi();
 
 // ── Tenant context ───────────────────────────────────────────────────────────
-// Dev seam: resolved from X-Tenant-Id header with demo fallback.
-// Replace with JWT-claims resolver in Milestone 5.
+// Dev seam: DevTenantContext resolves X-Tenant-Id with a demo fallback.
+// Non-Development: HeaderTenantContext fails closed (throws TenantResolutionException
+// → 401) when no valid X-Tenant-Id header is supplied.
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, DevTenantContext>();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<ITenantContext, DevTenantContext>();
+}
+else
+{
+    builder.Services.AddScoped<ITenantContext, HeaderTenantContext>();
+}
 
 // ── Infrastructure (EF Core, Postgres, provider wiring, repositories) ────────
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -45,25 +67,121 @@ if (builder.Environment.IsDevelopment())
     builder.Services.AddDatabaseMigrationService();
 }
 
-// ── ProblemDetails ────────────────────────────────────────────────────────────
-builder.Services.AddProblemDetails();
+// ── ProblemDetails (with TenantResolutionException → 401 mapping) ─────────────
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = ctx =>
+    {
+        if (ctx.Exception is TenantResolutionException)
+        {
+            ctx.ProblemDetails.Status = StatusCodes.Status401Unauthorized;
+            ctx.ProblemDetails.Title = "Tenant identification required";
+            ctx.HttpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        }
+    };
+});
+
+// ── API key authentication ────────────────────────────────────────────────────
+// Custom ApiKey scheme (Authorization: Bearer {key} or X-Api-Key: {key}).
+// See docs/adr/0001-auth-openiddict-deferred.md for why full OpenIddict is deferred.
+builder.Services.AddAuthentication(ApiKeyAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName, _ => { });
+
+builder.Services.AddAuthorization(options =>
+{
+    var policy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+        .RequireAuthenticatedUser()
+        .Build();
+
+    // FallbackPolicy protects everything by default — endpoints opt out via AllowAnonymous().
+    options.DefaultPolicy = policy;
+    options.FallbackPolicy = policy;
+});
+
+// ── Api options + data-annotation validation at startup ──────────────────────
+builder.Services.AddOptions<ApiOptions>()
+    .BindConfiguration(ApiOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Process-global fixed windows (self-host: single client). If multi-client is needed,
+// switch to GetPartition keyed by HttpContext.Connection.RemoteIpAddress.
+builder.Services.AddRateLimiter(opts =>
+{
+    opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    opts.AddFixedWindowLimiter("api", l =>
+    {
+        l.Window = TimeSpan.FromMinutes(1);
+        l.PermitLimit = 300;
+        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        l.QueueLimit = 10;
+    });
+
+    opts.AddFixedWindowLimiter("write", l =>
+    {
+        l.Window = TimeSpan.FromMinutes(1);
+        l.PermitLimit = 60;
+        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        l.QueueLimit = 5;
+    });
+
+    opts.AddFixedWindowLimiter("webhook", l =>
+    {
+        l.Window = TimeSpan.FromMinutes(1);
+        l.PermitLimit = 30;
+        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        l.QueueLimit = 0; // No queue; reject immediately.
+    });
+});
 
 var app = builder.Build();
 
-// ── Middleware ───────────────────────────────────────────────────────────────
+// ── Production startup guard (secret hygiene) ────────────────────────────────
+// Refuse to start a non-Development instance with a missing or default API key.
+if (!app.Environment.IsDevelopment())
+{
+    var apiOptions = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
+
+    if (string.IsNullOrWhiteSpace(apiOptions.Key))
+    {
+        throw new InvalidOperationException(
+            "Api:Key must be set to a non-empty value outside Development. " +
+            "Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
+    }
+
+    const string devDefault = "dev-local-key-not-for-production";
+    if (apiOptions.Key.Equals(devDefault, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "Api:Key is the development default in a non-Development environment. " +
+            "Generate a strong random key (e.g. `openssl rand -hex 32`) and set Api__Key.");
+    }
+}
+
+// ── Middleware pipeline ───────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.UseExceptionHandler(); // ProblemDetails for unhandled exceptions in dev
 }
-else
+
+app.UseExceptionHandler();
+app.UseSecureHeaders();
+
+if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler();
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
-// ── Aspire health + liveness endpoints ──────────────────────────────────────
+// ── Aspire health + liveness endpoints (anonymous, all environments) ─────────
 app.MapDefaultEndpoints();
 
 // ── Feature endpoint groups ──────────────────────────────────────────────────

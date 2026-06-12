@@ -9,7 +9,8 @@ internal static class TransactionEndpoints
 {
     internal static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/transactions").WithTags("Transactions");
+        var group = app.MapGroup("/api/transactions").WithTags("Transactions")
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (
             [AsParameters] ListTransactionsQuery query,
@@ -52,7 +53,8 @@ internal static class TransactionEndpoints
             return Results.Created($"/api/transactions/{result.Id}", result);
         })
         .WithName("CreateTransaction")
-        .WithSummary("Record a manual transaction");
+        .WithSummary("Record a manual transaction")
+        .RequireRateLimiting("write");
 
         return app;
     }

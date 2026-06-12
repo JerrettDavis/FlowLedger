@@ -7,7 +7,8 @@ internal static class ForecastEndpoints
 {
     internal static IEndpointRouteBuilder MapForecastEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/forecast").WithTags("Forecast");
+        var group = app.MapGroup("/api/forecast").WithTags("Forecast")
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (
             GetForecastHandler handler,

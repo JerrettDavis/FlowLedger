@@ -16,6 +16,7 @@
     <Project Path="src/FlowLedger.Worker/FlowLedger.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FlowLedger.Api.Tests/FlowLedger.Api.Tests.csproj" />
     <Project Path="tests/FlowLedger.Application.Tests/FlowLedger.Application.Tests.csproj" />
     <Project Path="tests/FlowLedger.Architecture.Tests/FlowLedger.Architecture.Tests.csproj" />
     <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />

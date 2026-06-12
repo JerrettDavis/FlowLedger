@@ -9,7 +9,8 @@ internal static class CategoryEndpoints
 {
     internal static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/categories").WithTags("Categories");
+        var group = app.MapGroup("/api/categories").WithTags("Categories")
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (ListCategoriesHandler handler, CancellationToken ct) =>
             Results.Ok(await handler.HandleAsync(ct)))
@@ -40,7 +41,8 @@ internal static class CategoryEndpoints
             return Results.Created($"/api/categories/{result.Id}", result);
         })
         .WithName("CreateCategory")
-        .WithSummary("Create a new category");
+        .WithSummary("Create a new category")
+        .RequireRateLimiting("write");
 
         group.MapPut("/{id:guid}", async (
             Guid id,
@@ -59,7 +61,8 @@ internal static class CategoryEndpoints
             return result is null ? Results.NotFound() : Results.Ok(result);
         })
         .WithName("UpdateCategory")
-        .WithSummary("Rename a category");
+        .WithSummary("Rename a category")
+        .RequireRateLimiting("write");
 
         group.MapDelete("/{id:guid}", async (Guid id, DeleteCategoryHandler handler, CancellationToken ct) =>
         {
@@ -74,7 +77,8 @@ internal static class CategoryEndpoints
             }
         })
         .WithName("DeleteCategory")
-        .WithSummary("Delete a non-system category");
+        .WithSummary("Delete a non-system category")
+        .RequireRateLimiting("write");
 
         return app;
     }

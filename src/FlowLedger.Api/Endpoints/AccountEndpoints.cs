@@ -9,7 +9,8 @@ internal static class AccountEndpoints
 {
     internal static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/accounts").WithTags("Accounts");
+        var group = app.MapGroup("/api/accounts").WithTags("Accounts")
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (ListAccountsHandler handler, CancellationToken ct) =>
             Results.Ok(await handler.HandleAsync(ct)))
@@ -40,7 +41,8 @@ internal static class AccountEndpoints
             return Results.Created($"/api/accounts/{result.Id}", result);
         })
         .WithName("CreateAccount")
-        .WithSummary("Create a new account");
+        .WithSummary("Create a new account")
+        .RequireRateLimiting("write");
 
         group.MapPut("/{id:guid}", async (
             Guid id,
@@ -59,7 +61,8 @@ internal static class AccountEndpoints
             return result is null ? Results.NotFound() : Results.Ok(result);
         })
         .WithName("UpdateAccount")
-        .WithSummary("Rename an account");
+        .WithSummary("Rename an account")
+        .RequireRateLimiting("write");
 
         group.MapDelete("/{id:guid}", async (Guid id, DeactivateAccountHandler handler, CancellationToken ct) =>
         {
@@ -67,7 +70,8 @@ internal static class AccountEndpoints
             return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeactivateAccount")
-        .WithSummary("Deactivate (soft-delete) an account");
+        .WithSummary("Deactivate (soft-delete) an account")
+        .RequireRateLimiting("write");
 
         return app;
     }

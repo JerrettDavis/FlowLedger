@@ -438,3 +438,7 @@ FodyWeavers.xsd
 docker-compose.override.yml
 /docs/coverage/
 /artifacts/
+
+# Local environment overrides (may contain Api:Key or Mx:WebhookSecret)
+appsettings.*.local.json
+appsettings.local.json

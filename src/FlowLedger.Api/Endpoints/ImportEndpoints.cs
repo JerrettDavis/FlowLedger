@@ -65,7 +65,8 @@ internal static class ImportEndpoints
         })
         .WithName("ImportTransactions")
         .WithTags("Imports")
-        .WithSummary("Import transactions from CSV");
+        .WithSummary("Import transactions from CSV")
+        .RequireRateLimiting("write");
 
         // ── Match suggestions ────────────────────────────────────────────────
 
@@ -78,7 +79,8 @@ internal static class ImportEndpoints
         })
         .WithName("ListMatchSuggestions")
         .WithTags("Imports")
-        .WithSummary("List transactions needing reconciliation review");
+        .WithSummary("List transactions needing reconciliation review")
+        .RequireRateLimiting("api");
 
         // ── Manual match ─────────────────────────────────────────────────────
 
@@ -112,7 +114,8 @@ internal static class ImportEndpoints
         })
         .WithName("MatchTransaction")
         .WithTags("Imports")
-        .WithSummary("Manually match a transaction to a planned occurrence");
+        .WithSummary("Manually match a transaction to a planned occurrence")
+        .RequireRateLimiting("write");
 
         // ── Unmatch ──────────────────────────────────────────────────────────
 
@@ -136,7 +139,8 @@ internal static class ImportEndpoints
         })
         .WithName("UnmatchTransaction")
         .WithTags("Imports")
-        .WithSummary("Remove a match link from a transaction");
+        .WithSummary("Remove a match link from a transaction")
+        .RequireRateLimiting("write");
 
         return app;
     }
