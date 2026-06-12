@@ -1,8 +1,8 @@
+using System.Diagnostics;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FluentAssertions;
-using System.Diagnostics;
 
 namespace FlowLedger.Application.Tests.Features.Forecasting;
 

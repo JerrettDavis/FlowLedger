@@ -162,7 +162,10 @@ public abstract class FinancialProviderContractTests
         var accountId = accounts[0].ProviderId;
 
         var page1 = await provider.GetTransactionsAsync(accountId, SyncCursor.Initial, pageSize: 10);
-        if (!page1.HasMore) return; // Only one page — cursor advancement not testable; skip
+        if (!page1.HasMore)
+        {
+            return; // Only one page — cursor advancement not testable; skip
+        }
 
         var page2 = await provider.GetTransactionsAsync(accountId, page1.NextCursor, pageSize: 10);
 

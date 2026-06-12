@@ -101,7 +101,9 @@ public sealed class Transaction : AggregateRoot
         TransactionFingerprint? fingerprint = null)
     {
         if (string.IsNullOrWhiteSpace(description))
+        {
             throw new EmptyStringException(nameof(description));
+        }
 
         amount.GuardPositive(nameof(amount));
 
@@ -126,7 +128,9 @@ public sealed class Transaction : AggregateRoot
         DateOnly plannedDate)
     {
         if (string.IsNullOrWhiteSpace(description))
+        {
             throw new EmptyStringException(nameof(description));
+        }
 
         amount.GuardPositive(nameof(amount));
 
@@ -145,8 +149,10 @@ public sealed class Transaction : AggregateRoot
     public void Match(PlannedOccurrenceId occurrenceId, ConfidenceScore confidence)
     {
         if (Status is not (TransactionStatus.Posted or TransactionStatus.Pending))
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), TransactionStatus.Matched.ToString(), nameof(Transaction));
+        }
 
         MatchedOccurrenceId = occurrenceId;
         Status = TransactionStatus.Matched;
@@ -158,8 +164,10 @@ public sealed class Transaction : AggregateRoot
     public void Reconcile()
     {
         if (Status is not (TransactionStatus.Matched or TransactionStatus.Posted))
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), TransactionStatus.Reconciled.ToString(), nameof(Transaction));
+        }
 
         Status = TransactionStatus.Reconciled;
     }
@@ -168,8 +176,11 @@ public sealed class Transaction : AggregateRoot
     public void Skip()
     {
         if (Status != TransactionStatus.Planned)
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), TransactionStatus.Skipped.ToString(), nameof(Transaction));
+        }
+
         Status = TransactionStatus.Skipped;
     }
 
@@ -178,7 +189,9 @@ public sealed class Transaction : AggregateRoot
     {
         CategoryId = categoryId;
         if (!string.IsNullOrWhiteSpace(merchantName))
+        {
             MerchantName = merchantName.Trim();
+        }
 
         RaiseEvent(new TransactionCategorized(TransactionId, TenantId, categoryId));
     }
@@ -196,7 +209,9 @@ public sealed class Transaction : AggregateRoot
             (sum, s) => sum + s.Amount);
 
         if (total != Amount)
+        {
             throw new SplitAmountMismatchException(total.Amount, Amount.Amount, Amount.Currency.Code);
+        }
 
         _splits.Clear();
         _splits.AddRange(list);
@@ -205,16 +220,52 @@ public sealed class Transaction : AggregateRoot
     public void AddNote(string note)
     {
         if (string.IsNullOrWhiteSpace(note))
+        {
             throw new EmptyStringException(nameof(note));
+        }
+
         Notes = note.Trim();
+    }
+
+    /// <summary>
+    /// Flags this transaction as needing user review (e.g. ambiguous match candidate
+    /// or uncertain import row). Can be called on Posted or Pending transactions.
+    /// </summary>
+    public void FlagNeedsReview()
+    {
+        if (Status is TransactionStatus.Posted or TransactionStatus.Pending)
+        {
+            Status = TransactionStatus.NeedsReview;
+        }
+    }
+
+    /// <summary>
+    /// Removes a match link, reverting this actual transaction back to Posted
+    /// and releasing the linked planned occurrence for re-matching.
+    /// Returns the previously matched occurrence ID (if any).
+    /// </summary>
+    public PlannedOccurrenceId? Unmatch()
+    {
+        if (Status is not (TransactionStatus.Matched or TransactionStatus.NeedsReview))
+        {
+            throw new InvalidStatusTransitionException(
+                Status.ToString(), TransactionStatus.Posted.ToString(), nameof(Transaction));
+        }
+
+        var previousOccurrenceId = MatchedOccurrenceId;
+        MatchedOccurrenceId = null;
+        Status = TransactionStatus.Posted;
+        return previousOccurrenceId;
     }
 
     /// <summary>Transitions a Pending transaction to Posted once the bank clears it.</summary>
     public void MarkPosted(DateOnly postedDate)
     {
         if (Status != TransactionStatus.Pending)
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), TransactionStatus.Posted.ToString(), nameof(Transaction));
+        }
 
         PostedDate = postedDate;
         Status = TransactionStatus.Posted;

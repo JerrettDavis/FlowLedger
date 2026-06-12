@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Forecasting;
+using FlowLedger.Application.Features.Imports;
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Transactions;
 using FluentValidation;
@@ -41,6 +42,13 @@ public static class DependencyInjection
         services.AddScoped<CreateRecurringFlowHandler>();
         services.AddScoped<UpdateRecurringFlowHandler>();
         services.AddScoped<DeactivateRecurringFlowHandler>();
+
+        // ── Handlers — Imports and Matching ──────────────────────────────────────
+        services.AddScoped<MatchingEngine>();
+        services.AddScoped<ImportTransactionsHandler>();
+        services.AddScoped<MatchTransactionHandler>();
+        services.AddScoped<UnmatchTransactionHandler>();
+        services.AddScoped<ListMatchSuggestionsHandler>();
 
         // ── Handlers — Forecasting ────────────────────────────────────────────────
         services.AddSingleton<IForecastEngine, ForecastEngine>();

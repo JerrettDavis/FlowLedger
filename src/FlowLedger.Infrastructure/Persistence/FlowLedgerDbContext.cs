@@ -93,7 +93,9 @@ public sealed class FlowLedgerDbContext : DbContext
 
         // Dispatch after successful persistence so handlers see committed state.
         if (events.Count > 0)
+        {
             await _eventDispatcher.DispatchAsync(events, cancellationToken);
+        }
 
         return result;
     }
@@ -108,7 +110,9 @@ public sealed class FlowLedgerDbContext : DbContext
 
         // Fire-and-forget dispatch on sync path (sync callers should prefer async).
         if (events.Count > 0)
+        {
             _eventDispatcher.DispatchAsync(events).GetAwaiter().GetResult();
+        }
 
         return result;
     }
@@ -123,7 +127,9 @@ public sealed class FlowLedgerDbContext : DbContext
     private void StampTenantId()
     {
         if (_tenantContext is null)
+        {
             return;
+        }
 
         var tid = _tenantContext.TenantId; // Guid from ITenantContext
 
@@ -141,7 +147,9 @@ public sealed class FlowLedgerDbContext : DbContext
         foreach (var entry in entries)
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            {
                 continue;
+            }
 
             var tenantProp = entry.Property("TenantId");
             if (tenantProp.CurrentValue is TenantId storedId && storedId.Value != currentTenantId)
@@ -166,7 +174,9 @@ public sealed class FlowLedgerDbContext : DbContext
             .ToList();
 
         foreach (var aggregate in aggregates)
+        {
             aggregate.ClearDomainEvents();
+        }
 
         return events;
     }

@@ -256,7 +256,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     private static string NormalizeDescription(string raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return "UNKNOWN";
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "UNKNOWN";
+        }
         // Collapse whitespace, trim, uppercase for stable fingerprinting
         return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
     }

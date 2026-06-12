@@ -16,7 +16,10 @@ public readonly record struct ConfidenceScore
     public ConfidenceScore(decimal value)
     {
         if (value is < 0m or > 1m)
+        {
             throw new ArgumentOutOfRangeException(nameof(value), $"Confidence score must be in [0, 1], got {value}.");
+        }
+
         Value = value;
     }
 

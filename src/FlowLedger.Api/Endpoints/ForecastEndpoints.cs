@@ -31,7 +31,9 @@ internal static class ForecastEndpoints
                     .Select(g => g!.Value)
                     .ToList();
                 if (parsed.Count > 0)
+                {
                     accountIds = parsed;
+                }
             }
 
             var query = new GetForecastQuery

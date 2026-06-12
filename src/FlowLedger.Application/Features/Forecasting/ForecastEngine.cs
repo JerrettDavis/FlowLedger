@@ -33,12 +33,16 @@ public sealed class ForecastEngine : IForecastEngine
         ArgumentNullException.ThrowIfNull(request);
 
         if (!request.Horizon.End.HasValue)
+        {
             throw new ForecastInputException("Forecast horizon must have a finite end date.");
+        }
 
         var horizonEnd = request.Horizon.End.Value;
 
         if (horizonEnd < request.Horizon.Start)
+        {
             throw new ForecastInputException("Forecast horizon end must be on or after start.");
+        }
 
         // Determine which accounts to forecast
         var accountIds = request.AccountIds is { Count: > 0 }
@@ -46,12 +50,16 @@ public sealed class ForecastEngine : IForecastEngine
             : request.StartingBalances.Keys.ToList();
 
         if (accountIds.Count == 0)
+        {
             throw new ForecastInputException("At least one account must be included in the forecast.");
+        }
 
         foreach (var aid in accountIds)
         {
             if (!request.StartingBalances.ContainsKey(aid))
+            {
                 throw new ForecastInputException($"Starting balance not provided for account {aid}.");
+            }
         }
 
         // ── Build per-account series ──────────────────────────────────────────
@@ -71,7 +79,9 @@ public sealed class ForecastEngine : IForecastEngine
 
         // Set of matched occurrence IDs from planned occurrences themselves
         foreach (var occ in request.PlannedOccurrences.Where(o => o.MatchedTransactionId.HasValue))
+        {
             matchedOccurrenceIds.Add(occ.OccurrenceId);
+        }
 
         // Index planned occurrences by account; group by (flowId, date) to deduplicate
         var plannedByAccount = request.PlannedOccurrences
@@ -111,7 +121,10 @@ public sealed class ForecastEngine : IForecastEngine
 
         foreach (var series in accountSeries)
         {
-            if (series.Points.Count == 0) continue;
+            if (series.Points.Count == 0)
+            {
+                continue;
+            }
 
             var minPoint = series.Points.MinBy(p => p.Balance.Amount)!;
             lowWaterMarks.Add(new AccountLowWaterMark
@@ -202,10 +215,14 @@ public sealed class ForecastEngine : IForecastEngine
         {
             if (tx.Status is TransactionStatus.Planned or TransactionStatus.Skipped
                 or TransactionStatus.Ignored or TransactionStatus.NeedsReview)
+            {
                 continue;
+            }
 
             if (tx.EffectiveDate < horizon.Start || tx.EffectiveDate > horizonEnd)
+            {
                 continue;
+            }
 
             var delta = SignedDelta(tx.Amount, tx.Direction);
             events.Add((tx.EffectiveDate, new ForecastLineItem
@@ -274,10 +291,12 @@ public sealed class ForecastEngine : IForecastEngine
             // Currency guard: all flows on an account must share the account currency.
             // We check against startingBalance.Currency.
             if (flow.Amount.Currency != startingBalance.Currency)
+            {
                 throw new ForecastInputException(
                     $"Flow '{flow.FlowId}' currency '{flow.Amount.Currency.Code}' does not match " +
                     $"account '{accountId}' currency '{startingBalance.Currency.Code}'. " +
                     "Cannot mix currencies in a single account forecast.");
+            }
 
             var dates = RecurrenceExpander.Expand(
                 flow.Pattern,
@@ -288,7 +307,9 @@ public sealed class ForecastEngine : IForecastEngine
             foreach (var date in dates)
             {
                 if (coveredByPlan.Contains((flow.FlowId.Value, date)))
+                {
                     continue; // Suppressed — either already matched or a Money Plan row exists
+                }
 
                 var delta = SignedDelta(flow.Amount, flow.Direction);
                 events.Add((date, new ForecastLineItem
@@ -348,7 +369,9 @@ public sealed class ForecastEngine : IForecastEngine
         List<AccountForecastSeries> accountSeries)
     {
         if (accountSeries.Count == 0)
+        {
             return Array.Empty<AggregateForecastPoint>();
+        }
 
         // Collect all distinct dates across all series
         var allDates = accountSeries
@@ -358,7 +381,9 @@ public sealed class ForecastEngine : IForecastEngine
             .ToList();
 
         if (allDates.Count == 0)
+        {
             return Array.Empty<AggregateForecastPoint>();
+        }
 
         // Verify single currency across accounts (guard)
         var currencies = accountSeries

@@ -19,7 +19,9 @@ internal static class TransactionEndpoints
         {
             var validation = await validator.ValidateAsync(query, ct);
             if (!validation.IsValid)
+            {
                 return Results.ValidationProblem(validation.ToDictionary());
+            }
 
             return Results.Ok(await handler.HandleAsync(query, ct));
         })
@@ -42,7 +44,9 @@ internal static class TransactionEndpoints
         {
             var validation = await validator.ValidateAsync(request, ct);
             if (!validation.IsValid)
+            {
                 return Results.ValidationProblem(validation.ToDictionary());
+            }
 
             var result = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/transactions/{result.Id}", result);

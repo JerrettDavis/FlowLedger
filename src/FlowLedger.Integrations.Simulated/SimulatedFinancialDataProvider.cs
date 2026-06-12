@@ -147,7 +147,9 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
             foreach (var prop in meta.EnumerateObject())
             {
                 if (prop.Value.ValueKind == JsonValueKind.String)
+                {
                     metadata[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                }
             }
         }
 
@@ -205,7 +207,9 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
 
         // Latency
         if (_options.LatencyMs > 0)
+        {
             await Task.Delay(_options.LatencyMs, cancellationToken).ConfigureAwait(false);
+        }
 
         // Random transient failure
         if (_options.FailureRate > 0.0)
@@ -226,7 +230,11 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
 
     private static int ParseCursorIndex(SyncCursor cursor)
     {
-        if (cursor.IsInitial) return 0;
+        if (cursor.IsInitial)
+        {
+            return 0;
+        }
+
         return int.TryParse(cursor.Value, out var idx) ? Math.Max(0, idx) : 0;
     }
 

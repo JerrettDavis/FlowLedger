@@ -39,7 +39,9 @@ public sealed class Category : IEntity
         CategoryId? parentId = null)
     {
         if (string.IsNullOrWhiteSpace(displayName))
+        {
             throw new EmptyStringException(nameof(displayName));
+        }
 
         _id = id.Value;
         TenantId = tenantId;
@@ -59,10 +61,14 @@ public sealed class Category : IEntity
     public void Rename(CategoryPath newPath, string newDisplayName)
     {
         if (IsSystem)
+        {
             throw new InvalidOperationException("System categories cannot be renamed.");
+        }
 
         if (string.IsNullOrWhiteSpace(newDisplayName))
+        {
             throw new EmptyStringException(nameof(newDisplayName));
+        }
 
         Path = newPath;
         DisplayName = newDisplayName.Trim();

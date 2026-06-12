@@ -67,7 +67,9 @@ internal static class DockerAvailability
             {
                 var socketPath = "/var/run/docker.sock";
                 if (System.IO.File.Exists(socketPath))
+                {
                     return true;
+                }
             }
             catch
             {
@@ -87,6 +89,8 @@ internal sealed class DockerFactAttribute : FactAttribute
     public DockerFactAttribute()
     {
         if (!DockerAvailability.IsAvailable)
+        {
             Skip = "Docker is not available in this environment. Test skipped.";
+        }
     }
 }

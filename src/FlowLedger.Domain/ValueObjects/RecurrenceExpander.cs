@@ -51,7 +51,9 @@ public static class RecurrenceExpander
         var windowStart = flowStart > horizon.Start ? flowStart : horizon.Start;
 
         if (!horizon.End.HasValue)
+        {
             throw new ArgumentException("A finite horizon end is required for expansion.", nameof(horizon));
+        }
 
         var horizonInclusiveEnd = horizon.End.Value;
 
@@ -66,7 +68,9 @@ public static class RecurrenceExpander
         var end = effectiveEnd;
 
         if (windowStart > end)
+        {
             return Array.Empty<DateOnly>();
+        }
 
         return pattern.Frequency switch
         {
@@ -108,7 +112,10 @@ public static class RecurrenceExpander
         while (current <= end)
         {
             if (current >= windowStart)
+            {
                 dates.Add(current);
+            }
+
             current = current.AddDays(7);
         }
         return dates;
@@ -130,7 +137,10 @@ public static class RecurrenceExpander
         while (current <= end)
         {
             if (current >= windowStart)
+            {
                 dates.Add(current);
+            }
+
             current = current.AddDays(7 * weeks);
         }
         return dates;
@@ -154,8 +164,15 @@ public static class RecurrenceExpander
             var d1 = new DateOnly(month.Year, month.Month, Math.Min(day1, daysInMonth));
             var d2 = new DateOnly(month.Year, month.Month, Math.Min(day2, daysInMonth));
 
-            if (d1 >= windowStart && d1 <= end) dates.Add(d1);
-            if (d2 >= windowStart && d2 <= end && d2 != d1) dates.Add(d2);
+            if (d1 >= windowStart && d1 <= end)
+            {
+                dates.Add(d1);
+            }
+
+            if (d2 >= windowStart && d2 <= end && d2 != d1)
+            {
+                dates.Add(d2);
+            }
 
             month = month.AddMonths(1);
         }
@@ -179,7 +196,9 @@ public static class RecurrenceExpander
             var daysInMonth = DateTime.DaysInMonth(month.Year, month.Month);
             var occurrence = new DateOnly(month.Year, month.Month, Math.Min(day, daysInMonth));
             if (occurrence >= windowStart && occurrence <= end)
+            {
                 dates.Add(occurrence);
+            }
 
             month = month.AddMonths(1);
         }
@@ -196,7 +215,10 @@ public static class RecurrenceExpander
         {
             var lbd = LastBusinessDayOfMonth(month.Year, month.Month);
             if (lbd >= windowStart && lbd <= end)
+            {
                 dates.Add(lbd);
+            }
+
             month = month.AddMonths(1);
         }
         return dates;

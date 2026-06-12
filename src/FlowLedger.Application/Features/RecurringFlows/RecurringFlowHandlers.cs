@@ -111,7 +111,10 @@ public sealed class UpdateRecurringFlowHandler
     public async Task<RecurringFlowDto?> HandleAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default)
     {
         var flow = await _repo.GetByIdAsync(RecurringFlowId.From(id), ct);
-        if (flow is null) return null;
+        if (flow is null)
+        {
+            return null;
+        }
 
         var amountModel = Enum.Parse<AmountModel>(request.AmountModel, ignoreCase: true);
         var newAmount = new Money(request.Amount, flow.Amount.Currency);
@@ -133,7 +136,10 @@ public sealed class DeactivateRecurringFlowHandler
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
         var flow = await _repo.GetByIdAsync(RecurringFlowId.From(id), ct);
-        if (flow is null) return false;
+        if (flow is null)
+        {
+            return false;
+        }
 
         flow.Deactivate();
         await _repo.SaveChangesAsync(ct);

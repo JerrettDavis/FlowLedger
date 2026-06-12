@@ -70,12 +70,18 @@ public sealed class CreateTransactionHandler
             TransactionSource.Manual);
 
         if (request.CategoryId.HasValue)
+        {
             tx.Categorize(CategoryId.From(request.CategoryId.Value), request.MerchantName);
+        }
         else if (!string.IsNullOrWhiteSpace(request.MerchantName))
+        {
             tx.Categorize(CategoryId.New(), request.MerchantName);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Notes))
+        {
             tx.AddNote(request.Notes);
+        }
 
         await _repo.AddAsync(tx, ct);
         await _repo.SaveChangesAsync(ct);

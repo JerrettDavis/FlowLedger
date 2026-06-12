@@ -22,11 +22,19 @@ public sealed class FakeTransactionRepository : ITransactionRepository
     {
         var query = _store.AsEnumerable();
         if (accountId.HasValue)
+        {
             query = query.Where(t => t.AccountId == accountId.Value);
+        }
+
         if (from.HasValue)
+        {
             query = query.Where(t => t.EffectiveDate >= from.Value);
+        }
+
         if (to.HasValue)
+        {
             query = query.Where(t => t.EffectiveDate <= to.Value);
+        }
 
         var result = query.Skip(skip).Take(take).ToList();
         return Task.FromResult<IReadOnlyList<Transaction>>(result);

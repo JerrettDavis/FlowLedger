@@ -67,10 +67,14 @@ public sealed class Account : AggregateRoot
         string? institution = null)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
             throw new EmptyStringException(nameof(name));
+        }
 
         if (creditLimit is not null && creditLimit.Currency != startingBalance.Currency)
+        {
             throw new CurrencyMismatchException(startingBalance.Currency.Code, creditLimit.Currency.Code);
+        }
 
         var account = new Account(
             AccountId.New(),
@@ -99,12 +103,16 @@ public sealed class Account : AggregateRoot
     public void UpdateBalance(Money newBalance)
     {
         if (newBalance.Currency != CurrentBalance.Currency)
+        {
             throw new CurrencyMismatchException(CurrentBalance.Currency.Code, newBalance.Currency.Code);
+        }
 
         // Asset-type accounts must not go below zero unless they have an explicit credit limit.
         if (IsAssetAccount && newBalance.IsNegative && CreditLimit is null)
+        {
             throw new InvalidBalanceException(
                 $"Asset account '{Name}' cannot have a negative balance without an explicit credit limit.");
+        }
 
         var previous = CurrentBalance;
         CurrentBalance = newBalance;
@@ -116,7 +124,10 @@ public sealed class Account : AggregateRoot
     public void Rename(string newName)
     {
         if (string.IsNullOrWhiteSpace(newName))
+        {
             throw new EmptyStringException(nameof(newName));
+        }
+
         Name = newName.Trim();
     }
 

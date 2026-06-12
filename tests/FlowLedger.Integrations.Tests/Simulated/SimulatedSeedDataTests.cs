@@ -188,7 +188,10 @@ public sealed class SimulatedSeedDataTests
             var page = await provider.GetTransactionsAsync(accountId, cursor, pageSize: 100);
             all.AddRange(page.Items);
             cursor = page.NextCursor;
-            if (!page.HasMore) break;
+            if (!page.HasMore)
+            {
+                break;
+            }
         }
         while (true);
 

@@ -42,7 +42,11 @@ public sealed class FlowLedgerApiClient
     public async Task<AccountDto?> UpdateAccountAsync(Guid id, UpdateAccountRequest request, CancellationToken ct = default)
     {
         var response = await _http.PutAsJsonAsync($"/api/accounts/{id}", request, JsonOptions, ct);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<AccountDto>(JsonOptions, ct);
     }
@@ -58,11 +62,31 @@ public sealed class FlowLedgerApiClient
         CancellationToken ct = default)
     {
         var qs = new List<string>();
-        if (accountId.HasValue) qs.Add($"accountId={accountId}");
-        if (from.HasValue) qs.Add($"from={from:yyyy-MM-dd}");
-        if (to.HasValue) qs.Add($"to={to:yyyy-MM-dd}");
-        if (skip > 0) qs.Add($"skip={skip}");
-        if (take != 100) qs.Add($"take={take}");
+        if (accountId.HasValue)
+        {
+            qs.Add($"accountId={accountId}");
+        }
+
+        if (from.HasValue)
+        {
+            qs.Add($"from={from:yyyy-MM-dd}");
+        }
+
+        if (to.HasValue)
+        {
+            qs.Add($"to={to:yyyy-MM-dd}");
+        }
+
+        if (skip > 0)
+        {
+            qs.Add($"skip={skip}");
+        }
+
+        if (take != 100)
+        {
+            qs.Add($"take={take}");
+        }
+
         var url = "/api/transactions" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
         var result = await _http.GetFromJsonAsync<List<TransactionDto>>(url, JsonOptions, ct);
         return result ?? [];
@@ -101,7 +125,11 @@ public sealed class FlowLedgerApiClient
     public async Task<RecurringFlowDto?> UpdateRecurringFlowAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default)
     {
         var response = await _http.PutAsJsonAsync($"/api/recurring-flows/{id}", request, JsonOptions, ct);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<RecurringFlowDto>(JsonOptions, ct);
     }
@@ -110,7 +138,9 @@ public sealed class FlowLedgerApiClient
     {
         var response = await _http.DeleteAsync($"/api/recurring-flows/{id}", ct);
         if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
             response.EnsureSuccessStatusCode();
+        }
     }
 
     // ── Forecast ──────────────────────────────────────────────────────────────
@@ -122,9 +152,21 @@ public sealed class FlowLedgerApiClient
         CancellationToken ct = default)
     {
         var qs = new List<string>();
-        if (from.HasValue) qs.Add($"from={from:yyyy-MM-dd}");
-        if (to.HasValue) qs.Add($"to={to:yyyy-MM-dd}");
-        if (months.HasValue) qs.Add($"months={months}");
+        if (from.HasValue)
+        {
+            qs.Add($"from={from:yyyy-MM-dd}");
+        }
+
+        if (to.HasValue)
+        {
+            qs.Add($"to={to:yyyy-MM-dd}");
+        }
+
+        if (months.HasValue)
+        {
+            qs.Add($"months={months}");
+        }
+
         var url = "/api/forecast" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
         try
         {

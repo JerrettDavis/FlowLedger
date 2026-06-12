@@ -14,13 +14,17 @@ public sealed class CategoryPath : IEquatable<CategoryPath>
     public CategoryPath(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             throw new Exceptions.EmptyStringException(nameof(value));
+        }
 
         Value = value.Trim();
         Segments = Value.Split(Separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (Segments.Count == 0)
+        {
             throw new Exceptions.EmptyStringException(nameof(value));
+        }
     }
 
     public string TopLevel => Segments[0];

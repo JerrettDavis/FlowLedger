@@ -12,7 +12,9 @@ public sealed record DateOnlyRange
     public DateOnlyRange(DateOnly start, DateOnly? end = null)
     {
         if (end.HasValue && end.Value < start)
+        {
             throw new ArgumentException($"End date {end.Value:O} cannot be before start date {start:O}.", nameof(end));
+        }
 
         Start = start;
         End = end;

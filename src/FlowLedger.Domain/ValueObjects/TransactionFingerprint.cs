@@ -25,7 +25,9 @@ public sealed record TransactionFingerprint
         string? providerTransactionId = null)
     {
         if (string.IsNullOrWhiteSpace(normalizedDescription))
+        {
             throw new Exceptions.EmptyStringException(nameof(normalizedDescription));
+        }
 
         var raw = string.IsNullOrWhiteSpace(providerTransactionId)
             ? $"{accountId.Value}|{postedDate:O}|{amount:F4}|{normalizedDescription.ToUpperInvariant()}"

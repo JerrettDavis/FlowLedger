@@ -51,21 +51,31 @@ public sealed class FinancialProviderOptionsValidator : IValidateOptions<Financi
     public ValidateOptionsResult Validate(string? name, FinancialProviderOptions options)
     {
         if (!options.Enabled)
+        {
             return ValidateOptionsResult.Success;
+        }
 
         var failures = new List<string>();
 
         if (string.IsNullOrWhiteSpace(options.ApiKey))
+        {
             failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.ApiKey)} is required when Mx:Enabled is true.");
+        }
 
         if (string.IsNullOrWhiteSpace(options.ClientId))
+        {
             failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.ClientId)} is required when Mx:Enabled is true.");
+        }
 
         if (string.IsNullOrWhiteSpace(options.BaseUrl))
+        {
             failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.BaseUrl)} is required when Mx:Enabled is true.");
+        }
 
         if (string.IsNullOrWhiteSpace(options.WebhookSecret))
+        {
             failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.WebhookSecret)} is required when Mx:Enabled is true.");
+        }
 
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)

@@ -82,7 +82,10 @@ public sealed class UpdateAccountHandler
     public async Task<AccountDto?> HandleAsync(Guid id, UpdateAccountRequest request, CancellationToken ct = default)
     {
         var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
-        if (account is null) return null;
+        if (account is null)
+        {
+            return null;
+        }
 
         account.Rename(request.Name);
         await _repo.SaveChangesAsync(ct);
@@ -102,7 +105,10 @@ public sealed class DeactivateAccountHandler
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
         var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
-        if (account is null) return false;
+        if (account is null)
+        {
+            return false;
+        }
 
         account.Deactivate();
         await _repo.SaveChangesAsync(ct);

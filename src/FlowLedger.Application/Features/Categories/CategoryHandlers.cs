@@ -78,7 +78,10 @@ public sealed class UpdateCategoryHandler
     public async Task<CategoryDto?> HandleAsync(Guid id, UpdateCategoryRequest request, CancellationToken ct = default)
     {
         var cat = await _repo.GetByIdAsync(CategoryId.From(id), ct);
-        if (cat is null) return null;
+        if (cat is null)
+        {
+            return null;
+        }
 
         cat.Rename(new CategoryPath(request.Path), request.DisplayName);
         await _repo.SaveChangesAsync(ct);
@@ -98,10 +101,15 @@ public sealed class DeleteCategoryHandler
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
         var cat = await _repo.GetByIdAsync(CategoryId.From(id), ct);
-        if (cat is null) return false;
+        if (cat is null)
+        {
+            return false;
+        }
 
         if (cat.IsSystem)
+        {
             throw new InvalidOperationException("System categories cannot be deleted.");
+        }
 
         await _repo.RemoveAsync(cat, ct);
         await _repo.SaveChangesAsync(ct);

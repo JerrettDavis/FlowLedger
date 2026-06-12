@@ -32,7 +32,9 @@ internal static class RecurringFlowEndpoints
         {
             var validation = await validator.ValidateAsync(request, ct);
             if (!validation.IsValid)
+            {
                 return Results.ValidationProblem(validation.ToDictionary());
+            }
 
             var result = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/recurring-flows/{result.Id}", result);
@@ -49,7 +51,9 @@ internal static class RecurringFlowEndpoints
         {
             var validation = await validator.ValidateAsync(request, ct);
             if (!validation.IsValid)
+            {
                 return Results.ValidationProblem(validation.ToDictionary());
+            }
 
             var result = await handler.HandleAsync(id, request, ct);
             return result is null ? Results.NotFound() : Results.Ok(result);

@@ -173,4 +173,36 @@ public sealed class LayerDependencyTests
         Assert.True(result.IsSuccessful,
             $"Integrations.Abstractions should not reference Integrations.Mx. Failing types: {string.Join(", ", result.FailingTypeNames ?? [])}");
     }
+
+    [Fact]
+    public void No_scaffold_types_remain()
+    {
+        var scaffoldTypeNames = new[] { "Class1", "UnitTest1", "WeatherForecast", "Counter" };
+
+        var allAssemblies = new[]
+        {
+            Assemblies.Domain,
+            Assemblies.Application,
+            Assemblies.Infrastructure,
+            Assemblies.IntegrationAbstractions,
+            Assemblies.IntegrationSimulated,
+            Assemblies.IntegrationMx
+        };
+
+        foreach (var assemblyName in scaffoldTypeNames)
+        {
+            foreach (var assembly in allAssemblies)
+            {
+                var scaffoldTypes = Types
+                    .InAssembly(assembly)
+                    .That()
+                    .HaveName(assemblyName)
+                    .GetTypes();
+
+                Assert.False(
+                    scaffoldTypes.Any(),
+                    $"Scaffold type '{assemblyName}' should not exist in assembly {assembly.GetName().Name}. Found types: {string.Join(", ", scaffoldTypes.Select(t => t.FullName))}");
+            }
+        }
+    }
 }

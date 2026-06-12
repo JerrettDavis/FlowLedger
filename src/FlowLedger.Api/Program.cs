@@ -63,6 +63,7 @@ app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();
 app.MapForecastEndpoints();
+app.MapImportEndpoints();
 
 app.Run();
 

@@ -65,7 +65,9 @@ public sealed class SimulatedFaultInjectionTests
 
         // Run multiple calls — none should throw
         for (var i = 0; i < 20; i++)
+        {
             await provider.BeginConnectionAsync(TestTenant);
+        }
     }
 
     // ── Rate limiting ─────────────────────────────────────────────────────────
@@ -79,7 +81,9 @@ public sealed class SimulatedFaultInjectionTests
 
         // First {limit} calls should succeed
         for (var i = 0; i < limit; i++)
+        {
             await provider.BeginConnectionAsync(TestTenant);
+        }
 
         // Next call should throw
         Func<Task> act = () => provider.BeginConnectionAsync(TestTenant);
@@ -110,7 +114,9 @@ public sealed class SimulatedFaultInjectionTests
 
         // 20 calls should all succeed
         for (var i = 0; i < 20; i++)
+        {
             await provider.BeginConnectionAsync(TestTenant);
+        }
     }
 
     // ── Transient exception properties ───────────────────────────────────────

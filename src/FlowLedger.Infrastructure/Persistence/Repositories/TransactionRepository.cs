@@ -26,13 +26,19 @@ internal sealed class TransactionRepository : ITransactionRepository
         var query = _db.Transactions.AsQueryable();
 
         if (accountId.HasValue)
+        {
             query = query.Where(t => EF.Property<AccountId>(t, "AccountId") == accountId.Value);
+        }
 
         if (from.HasValue)
+        {
             query = query.Where(t => t.EffectiveDate >= from.Value);
+        }
 
         if (to.HasValue)
+        {
             query = query.Where(t => t.EffectiveDate <= to.Value);
+        }
 
         return await query
             .OrderByDescending(t => t.EffectiveDate)
@@ -47,7 +53,10 @@ internal sealed class TransactionRepository : ITransactionRepository
         CancellationToken ct = default)
     {
         var list = fingerprints.ToList();
-        if (list.Count == 0) return [];
+        if (list.Count == 0)
+        {
+            return [];
+        }
 
         // EF Core owned-entity navigation: Fingerprint.Value is mapped as a shadow-like owned column.
         // We query via EF.Property to reference the mapped column name.

@@ -88,14 +88,20 @@ public sealed class PlannedFlowOccurrence : IEntity
         ConfidenceScore confidence)
     {
         if (Status == OccurrenceStatus.Matched)
+        {
             throw new OccurrenceAlreadyMatchedException(PlannedOccurrenceId.Value);
+        }
 
         if (Status == OccurrenceStatus.Skipped)
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), OccurrenceStatus.Matched.ToString(), nameof(PlannedFlowOccurrence));
+        }
 
         if (actualAmount.Currency != PlannedAmount.Currency)
+        {
             throw new CurrencyMismatchException(PlannedAmount.Currency.Code, actualAmount.Currency.Code);
+        }
 
         _matchedTransactionId = actualTransactionId.Value;
         AmountVariance = actualAmount - PlannedAmount;
@@ -107,9 +113,31 @@ public sealed class PlannedFlowOccurrence : IEntity
     public void Skip()
     {
         if (Status != OccurrenceStatus.Pending)
+        {
             throw new InvalidStatusTransitionException(
                 Status.ToString(), OccurrenceStatus.Skipped.ToString(), nameof(PlannedFlowOccurrence));
+        }
+
         Status = OccurrenceStatus.Skipped;
+    }
+
+    /// <summary>
+    /// Reverts a matched occurrence back to Pending, clearing all match data.
+    /// Called when the user unmatch an actual transaction from this occurrence.
+    /// </summary>
+    public void Unmatch()
+    {
+        if (Status != OccurrenceStatus.Matched)
+        {
+            throw new InvalidStatusTransitionException(
+                Status.ToString(), OccurrenceStatus.Pending.ToString(), nameof(PlannedFlowOccurrence));
+        }
+
+        _matchedTransactionId = null;
+        AmountVariance = null;
+        DateVarianceDays = null;
+        _matchConfidence = null;
+        Status = OccurrenceStatus.Pending;
     }
 }
 

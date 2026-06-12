@@ -90,7 +90,9 @@ public sealed class RecurringFlow : AggregateRoot
         string? counterparty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
             throw new EmptyStringException(nameof(name));
+        }
 
         amount.GuardPositive(nameof(amount));
 
@@ -122,7 +124,9 @@ public sealed class RecurringFlow : AggregateRoot
     public PlannedFlowOccurrence GenerateOccurrence(DateOnly date, Money? overrideAmount = null)
     {
         if (!ActiveWindow.Contains(date))
+        {
             throw new OccurrenceDateOutOfRangeException(date, ActiveWindow.Start, ActiveWindow.End);
+        }
 
         // Create a new Money instance (not a reference copy) so each occurrence owns a distinct
         // value object. EF Core's identity resolution treats owned entities by reference when
@@ -132,7 +136,9 @@ public sealed class RecurringFlow : AggregateRoot
         effectiveAmount.GuardPositive(nameof(effectiveAmount));
 
         if (effectiveAmount.Currency != Amount.Currency)
+        {
             throw new CurrencyMismatchException(Amount.Currency.Code, effectiveAmount.Currency.Code);
+        }
 
         var rfId = RecurringFlowId.From(_id);
         var occurrence = new PlannedFlowOccurrence(
@@ -153,7 +159,9 @@ public sealed class RecurringFlow : AggregateRoot
     {
         newAmount.GuardPositive(nameof(newAmount));
         if (newAmount.Currency != Amount.Currency)
+        {
             throw new CurrencyMismatchException(Amount.Currency.Code, newAmount.Currency.Code);
+        }
 
         Amount = newAmount;
         AmountModel = newModel;

@@ -37,7 +37,9 @@ public static class SimulatedDataFactory
             .FirstOrDefault(d => d.Account.ProviderId == providerAccountId);
 
         if (descriptor is null)
+        {
             return Array.Empty<ProviderTransaction>();
+        }
 
         return GenerateTransactions(descriptor, tenantId, baseSeed, historyMonths)
             .OrderBy(t => t.PostedDate)
@@ -328,7 +330,10 @@ public static class SimulatedDataFactory
         var tenantBytes = tenantId.Value.ToByteArray();
         var tenantHash = 0;
         for (var i = 0; i < tenantBytes.Length; i++)
+        {
             tenantHash = unchecked(tenantHash * 31 + tenantBytes[i]);
+        }
+
         var seed = unchecked(baseSeed ^ tenantHash ^ (slotIndex * (int)0x9E3779B9));
         return new Faker("en") { Random = new Randomizer(seed) };
     }

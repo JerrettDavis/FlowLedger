@@ -52,7 +52,10 @@ public sealed record Money
     public Money GuardPositive(string context)
     {
         if (Amount <= 0m)
+        {
             throw new Exceptions.NegativeOrZeroAmountException(context);
+        }
+
         return this;
     }
 
@@ -99,7 +102,9 @@ public sealed record Money
     private void EnsureSameCurrency(Money other)
     {
         if (!Currency.Equals(other.Currency))
+        {
             throw new Exceptions.CurrencyMismatchException(Currency.Code, other.Currency.Code);
+        }
     }
 
     public override string ToString() => $"{Amount:F2} {Currency.Code}";

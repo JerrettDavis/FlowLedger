@@ -15,11 +15,15 @@ public sealed record Currency
     public Currency(string code)
     {
         if (string.IsNullOrWhiteSpace(code))
+        {
             throw new Exceptions.EmptyStringException(nameof(code));
+        }
 
         var upper = code.Trim().ToUpperInvariant();
         if (upper.Length != 3 || !upper.All(char.IsLetter))
+        {
             throw new ArgumentException($"'{code}' is not a valid ISO 4217 currency code (must be 3 ASCII letters).", nameof(code));
+        }
 
         Code = upper;
     }

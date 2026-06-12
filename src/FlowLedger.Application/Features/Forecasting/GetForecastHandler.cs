@@ -48,7 +48,9 @@ public sealed class GetForecastHandler
             ?? query.AsOf.AddMonths(query.Months ?? 3);
 
         if (horizonEnd < horizonStart)
+        {
             throw new ForecastInputException("Horizon end must be on or after horizon start.");
+        }
 
         var horizon = new DateOnlyRange(horizonStart, horizonEnd);
 
@@ -60,7 +62,9 @@ public sealed class GetForecastHandler
             : allAccounts.ToList();
 
         if (targetAccounts.Count == 0)
+        {
             throw new ForecastInputException("No active accounts found for the forecast.");
+        }
 
         var startingBalances = targetAccounts
             .ToDictionary(a => a.AccountId, a => a.CurrentBalance);

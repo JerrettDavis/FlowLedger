@@ -51,7 +51,10 @@ public sealed record RecurrencePattern
     public static RecurrencePattern EveryNWeeks(int weeks, DayOfWeek dayOfWeek)
     {
         if (weeks < 2)
+        {
             throw new ArgumentOutOfRangeException(nameof(weeks), "Interval must be at least 2 weeks.");
+        }
+
         return new(RecurrenceFrequency.EveryNWeeks, null, null, weeks, dayOfWeek);
     }
 
@@ -60,7 +63,10 @@ public sealed record RecurrencePattern
         GuardDayOfMonth(firstDay, nameof(firstDay));
         GuardDayOfMonth(secondDay, nameof(secondDay));
         if (firstDay >= secondDay)
+        {
             throw new ArgumentException("firstDay must be less than secondDay.", nameof(firstDay));
+        }
+
         return new(RecurrenceFrequency.TwiceMonthly, firstDay, secondDay, null, null);
     }
 
@@ -76,7 +82,9 @@ public sealed record RecurrencePattern
     private static void GuardDayOfMonth(int day, string paramName)
     {
         if (day is < 1 or > 31)
+        {
             throw new ArgumentOutOfRangeException(paramName, $"Day-of-month must be between 1 and 31, got {day}.");
+        }
     }
 
     public override string ToString() => Frequency switch
