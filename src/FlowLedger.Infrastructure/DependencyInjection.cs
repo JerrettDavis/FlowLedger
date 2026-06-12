@@ -1,9 +1,12 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
+using FlowLedger.Infrastructure.Storage;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Simulated;
+using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,8 +53,21 @@ public static class DependencyInjection
         });
 
         // ── Domain event dispatching ────────────────────────────────────────────
-        // Real handlers will replace the no-op in later milestones.
-        services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
+        // DispatchingDomainEventDispatcher resolves all IDomainEventHandler<TEvent>
+        // registrations for each raised event via closed-generic reflection.
+        services.AddScoped<IDomainEventDispatcher, DispatchingDomainEventDispatcher>();
+
+        // Auto-register all IDomainEventHandler<> implementations in this assembly.
+        var infrastructureAssembly = typeof(DependencyInjection).Assembly;
+        foreach (var type in infrastructureAssembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false }))
+        {
+            foreach (var iface in type.GetInterfaces()
+                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDomainEventHandler<>)))
+            {
+                services.AddScoped(iface, type);
+            }
+        }
 
         // ── Repositories ────────────────────────────────────────────────────────
         services.AddScoped<IAccountRepository, AccountRepository>();
@@ -91,6 +107,10 @@ public static class DependencyInjection
 
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<IFinancialSyncService, FinancialSyncService>();
+
+        // ── Object storage ──────────────────────────────────────────────────────
+        services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
+        services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
 
         return services;
     }
