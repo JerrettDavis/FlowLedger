@@ -1,0 +1,19 @@
+# Secret-leak prevention hooks.
+# Install: pip install pre-commit && pre-commit install
+# Run all files manually: pre-commit run --all-files
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/GitGuardian/ggshield
+    rev: v1.51.0
+    hooks:
+      - id: ggshield

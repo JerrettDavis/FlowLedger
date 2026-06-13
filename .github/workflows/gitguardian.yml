@@ -1,0 +1,49 @@
+# GitGuardian secret scanning CI workflow.
+#
+# SETUP REQUIRED: This workflow needs a GitGuardian API key to activate.
+# 1. Sign up free at https://dashboard.gitguardian.com
+# 2. Create a Personal Access Token (with "scan" scope)
+# 3. Add it as a GitHub repository secret named: GITGUARDIAN_API_KEY
+#    Settings → Secrets and variables → Actions → New repository secret
+#
+# Until the secret is added, this workflow will SKIP gracefully (not fail).
+
+name: GitGuardian Secret Scan
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  scanning:
+    name: GitGuardian scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for GitGuardian API key
+        id: check_key
+        run: |
+          if [ -z "${{ secrets.GITGUARDIAN_API_KEY }}" ]; then
+            echo "key_present=false" >> $GITHUB_OUTPUT
+            echo "::warning::GITGUARDIAN_API_KEY secret not set. Skipping GitGuardian scan."
+            echo "::warning::To activate: add GITGUARDIAN_API_KEY to repository secrets (Settings → Secrets → Actions)."
+          else
+            echo "key_present=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: GitGuardian scan
+        if: steps.check_key.outputs.key_present == 'true'
+        uses: GitGuardian/ggshield-action@v1
+        env:
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}

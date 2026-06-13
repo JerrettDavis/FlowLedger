@@ -1,0 +1,12 @@
+# Gitleaks configuration for FlowLedger.
+# Suppressions for known false positives — test/CI placeholder values only.
+
+[allowlist]
+description = "CI smoke-test placeholder values that are not real secrets"
+
+# The docker.yml smoke-test job uses a literal placeholder key value
+# "ci-test-api-key-not-for-production" for curl commands against localhost.
+# This is documented as a non-secret dev/CI test key, not a real credential.
+regexes = [
+  "ci-test-api-key-not-for-production",
+]

@@ -8,6 +8,12 @@ Thank you for considering contributing.
 2. Install Docker Desktop (for Aspire-managed Postgres and Redis).
 3. Install the Aspire workload: `dotnet workload install aspire`.
 4. Clone the repo and run `./eng/scripts/run.ps1` (Windows) or `./eng/scripts/run.sh` (Linux/macOS).
+5. Install pre-commit hooks (required — prevents secret leaks before commits reach the remote):
+   ```bash
+   pip install pre-commit
+   pre-commit install
+   ```
+   See [docs/development/secret-scanning.md](docs/development/secret-scanning.md) for full details.
 
 ## Code style
 

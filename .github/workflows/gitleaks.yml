@@ -1,0 +1,27 @@
+# Gitleaks secret scanning CI workflow.
+# gitleaks-action is FREE for public repositories (no license key needed).
+# The job fails the build if any secret is detected in the commit history or diff.
+
+name: Gitleaks Secret Scan
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    name: Scan for secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -168,6 +168,16 @@ Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
+Before your first commit, install the pre-commit hooks to prevent secrets from being committed:
+
+```bash
+pip install pre-commit && pre-commit install
+```
+
+See [Secret Scanning Setup](docs/development/secret-scanning.md) for how to install the pre-commit hooks required before contributing.
+
 ## Security
 
 See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy.
+
+Secret-leak prevention (pre-commit hooks + CI scanning) is documented in [docs/development/secret-scanning.md](docs/development/secret-scanning.md).
