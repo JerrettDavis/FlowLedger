@@ -38,6 +38,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # ── Lowercase owner (GHCR requires all-lowercase image names) ────────
+      - name: Lowercase owner
+        id: owner
+        run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
       # ── Determine whether to push ────────────────────────────────────────
       # Push only on tagged releases; build-only on PR / branch push.
       - name: Compute push flag
@@ -70,8 +75,8 @@ jobs:
           file:       ${{ matrix.dockerfile }}
           push:       ${{ steps.meta.outputs.push == 'true' }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:latest
           # Inline cache — speeds up PR builds using previously cached layers
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to:   type=gha,scope=${{ matrix.service }},mode=max
@@ -82,7 +87,7 @@ jobs:
       - name: Generate SBOM (Syft)
         uses: anchore/sbom-action@v0
         with:
-          image:             ${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          image:             ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
           artifact-name:     sbom-${{ matrix.service }}.spdx.json
           output-file:       /tmp/sbom-${{ matrix.service }}.spdx.json
           format:            spdx-json
@@ -98,7 +103,7 @@ jobs:
       - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref:         ${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
           format:            sarif
           output:            trivy-${{ matrix.service }}.sarif
           # Fail on CRITICAL and HIGH vulnerabilities
