@@ -4,71 +4,80 @@ using FluentAssertions;
 using Microsoft.Playwright;
 
 /// <summary>
-/// E2E tests for the Recurring Flows page.
-/// Verifies that the page loads and provides UI for managing recurring flows.
+/// E2E smoke tests for the Recurring Flows page.
+/// Verifies page load, heading, grid, and add-flow button.
 /// </summary>
 [Collection("E2E Collection")]
 [Trait("Category", "E2E")]
 public class RecurringFlowsTests : E2ETestBase
 {
-    [Fact(DisplayName = "Recurring Flows page loads and displays title")]
-    public async Task RecurringFlowsPage_LoadsAndDisplaysTitle()
+    [Fact(DisplayName = "RecurringFlows: page title contains 'Recurring Flows'")]
+    public async Task RecurringFlows_PageTitleContainsRecurringFlows()
     {
-        // Arrange & Act
-        await NavigateAsync("/recurring-flows");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/recurring-flows");
         var title = await Page!.TitleAsync();
         title.Should().Contain("Recurring Flows");
     }
 
-    [Fact(DisplayName = "Recurring Flows page displays heading")]
-    public async Task RecurringFlowsPage_DisplaysHeading()
+    [Fact(DisplayName = "RecurringFlows: main heading is visible")]
+    public async Task RecurringFlows_MainHeadingIsVisible()
     {
-        // Arrange & Act
-        await NavigateAsync("/recurring-flows");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/recurring-flows");
         var heading = Page!.GetByRole(AriaRole.Heading, new() { Name = "Recurring Flows" });
         (await heading.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await heading.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        (await heading.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Add Recurring Flow button is present")]
-    public async Task RecurringFlowsPage_AddButtonPresent()
+    [Fact(DisplayName = "RecurringFlows: 'Add Flow' button is present")]
+    public async Task RecurringFlows_AddFlowButtonIsPresent()
     {
-        // Arrange & Act
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/recurring-flows");
-
-        // Assert
-        var addButton = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new recurring flow" });
-        (await addButton.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await addButton.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        // aria-label="Add recurring flow" from RecurringFlows.razor
+        var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Add recurring flow" });
+        (await btn.CountAsync()).Should().BeGreaterThan(0);
+        (await btn.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Recurring Flows grid is present")]
-    public async Task RecurringFlowsPage_GridPresent()
+    [Fact(DisplayName = "RecurringFlows: data grid is rendered")]
+    public async Task RecurringFlows_DataGridIsRendered()
     {
-        // Arrange & Act
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/recurring-flows");
         await WaitForLoadAsync();
-
-        // Assert - Check for table role
+        // MudDataGrid aria-label="Recurring flows table" from RecurringFlows.razor
         var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Recurring flows table" });
         (await table.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await table.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        (await table.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Navigation menu includes Recurring Flows link")]
-    public async Task RecurringFlowsPage_NavigationLinkPresent()
+    [Fact(DisplayName = "RecurringFlows: nav link is present")]
+    public async Task RecurringFlows_NavLinkIsPresent()
     {
-        // Arrange & Act
-        await NavigateAsync("/recurring-flows");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/recurring-flows");
         var link = Page!.GetByRole(AriaRole.Link, new() { Name = "Recurring Flows" });
         (await link.CountAsync()).Should().BeGreaterThan(0);
     }

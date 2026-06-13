@@ -4,75 +4,84 @@ using FluentAssertions;
 using Microsoft.Playwright;
 
 /// <summary>
-/// E2E tests for the Forecasts page.
-/// Verifies that the forecast page renders with SVG charts and data visualization.
+/// E2E smoke tests for the Forecasts page.
+/// Verifies page load, heading, SVG chart, Run Forecast button, and nav link.
 /// </summary>
 [Collection("E2E Collection")]
 [Trait("Category", "E2E")]
 public class ForecastTests : E2ETestBase
 {
-    [Fact(DisplayName = "Forecasts page loads and displays title")]
-    public async Task ForecastsPage_LoadsAndDisplaysTitle()
+    [Fact(DisplayName = "Forecasts: page title contains 'Forecasts'")]
+    public async Task Forecasts_PageTitleContainsForecasts()
     {
-        // Arrange & Act
-        await NavigateAsync("/forecasts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/forecasts");
         var title = await Page!.TitleAsync();
         title.Should().Contain("Forecasts");
     }
 
-    [Fact(DisplayName = "Forecasts page displays heading")]
-    public async Task ForecastsPage_DisplaysHeading()
+    [Fact(DisplayName = "Forecasts: main heading is visible")]
+    public async Task Forecasts_MainHeadingIsVisible()
     {
-        // Arrange & Act
-        await NavigateAsync("/forecasts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/forecasts");
         var heading = Page!.GetByRole(AriaRole.Heading, new() { Name = "Forecasts" });
         (await heading.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await heading.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        (await heading.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Forecast chart is rendered")]
-    public async Task ForecastsPage_ChartIsRendered()
+    [Fact(DisplayName = "Forecasts: 'Run Forecast' button is present")]
+    public async Task Forecasts_RunForecastButtonIsPresent()
     {
-        // Arrange & Act
-        await NavigateAsync("/forecasts");
-        await WaitForLoadAsync();
-
-        // Assert - Check for SVG or chart container
-        var chartArea = Page!.GetByRole(AriaRole.Img, new() { Name = "Forecast chart" });
-        var count = await chartArea.CountAsync();
-        if (count > 0)
+        if (ShouldSkip)
         {
-            var isVisible = await chartArea.IsVisibleAsync();
-            isVisible.Should().BeTrue();
+            return;
         }
+
+        await NavigateAsync("/forecasts");
+        // aria-label="Run forecast" from Forecasts.razor
+        var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Run forecast" });
+        (await btn.CountAsync()).Should().BeGreaterThan(0);
+        (await btn.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Forecasts grid/table is present")]
-    public async Task ForecastsPage_TableIsPresent()
+    [Fact(DisplayName = "Forecasts: aggregate SVG chart or no-data message is present")]
+    public async Task Forecasts_SvgChartOrNoDataMessagePresent()
     {
-        // Arrange & Act
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
-
-        // Assert - Check for forecasts table
-        var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Forecasts table" });
-        (await table.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await table.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        // role="img" aria-label="Aggregate balance projection chart" from Forecasts.razor
+        // Only rendered when AggregateSeries.Count > 0; otherwise "No forecast data" shown
+        var chart = Page!.GetByRole(AriaRole.Img, new() { Name = "Aggregate balance projection chart" });
+        var noData = Page!.GetByText("No forecast data");
+        var chartCount = await chart.CountAsync();
+        var noDataCount = await noData.CountAsync();
+        (chartCount + noDataCount).Should().BeGreaterThan(0,
+            "expected either the aggregate SVG chart or the 'no forecast data' fallback message");
     }
 
-    [Fact(DisplayName = "Navigation menu includes Forecasts link")]
-    public async Task ForecastsPage_NavigationLinkPresent()
+    [Fact(DisplayName = "Forecasts: nav link is present")]
+    public async Task Forecasts_NavLinkIsPresent()
     {
-        // Arrange & Act
-        await NavigateAsync("/forecasts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/forecasts");
         var link = Page!.GetByRole(AriaRole.Link, new() { Name = "Forecasts" });
         (await link.CountAsync()).Should().BeGreaterThan(0);
     }

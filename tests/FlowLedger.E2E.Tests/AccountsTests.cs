@@ -4,91 +4,97 @@ using FluentAssertions;
 using Microsoft.Playwright;
 
 /// <summary>
-/// E2E tests for the Accounts page.
-/// Verifies account management functionality including navigation, dialog, and form submission.
+/// E2E smoke tests for the Accounts page.
+/// Verifies navigation, page heading, grid, and create-account dialog.
 /// </summary>
 [Collection("E2E Collection")]
 [Trait("Category", "E2E")]
 public class AccountsTests : E2ETestBase
 {
-    [Fact(DisplayName = "Accounts page loads and displays title")]
-    public async Task AccountsPage_LoadsAndDisplaysTitle()
+    [Fact(DisplayName = "Accounts: page title contains 'Accounts'")]
+    public async Task Accounts_PageTitleContainsAccounts()
     {
-        // Arrange & Act
-        await NavigateAsync("/accounts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/accounts");
         var title = await Page!.TitleAsync();
         title.Should().Contain("Accounts");
     }
 
-    [Fact(DisplayName = "Accounts page displays heading")]
-    public async Task AccountsPage_DisplaysHeading()
+    [Fact(DisplayName = "Accounts: main heading is visible")]
+    public async Task Accounts_MainHeadingIsVisible()
     {
-        // Arrange & Act
-        await NavigateAsync("/accounts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert
+        await NavigateAsync("/accounts");
         var heading = Page!.GetByRole(AriaRole.Heading, new() { Name = "Accounts" });
         (await heading.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await heading.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        (await heading.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Add Account button is present")]
-    public async Task AccountsPage_AddAccountButtonPresent()
+    [Fact(DisplayName = "Accounts: 'Add Account' button is present")]
+    public async Task Accounts_AddAccountButtonIsPresent()
     {
-        // Arrange & Act
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/accounts");
-
-        // Assert
-        var addButton = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
-        (await addButton.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await addButton.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        // aria-label="Add new account" from Accounts.razor
+        var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
+        (await btn.CountAsync()).Should().BeGreaterThan(0);
+        (await btn.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Accounts grid is present")]
-    public async Task AccountsPage_AccountsGridPresent()
+    [Fact(DisplayName = "Accounts: data grid is rendered")]
+    public async Task Accounts_DataGridIsRendered()
     {
-        // Arrange & Act
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
-
-        // Assert - Check for table role (MudDataGrid renders as a table)
+        // MudDataGrid aria-label="Accounts table" from Accounts.razor
         var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Accounts table" });
         (await table.CountAsync()).Should().BeGreaterThan(0);
-        var isVisible = await table.IsVisibleAsync();
-        isVisible.Should().BeTrue();
+        (await table.IsVisibleAsync()).Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Navigation menu includes Accounts link")]
-    public async Task AccountsPage_NavigationLinkPresent()
+    [Fact(DisplayName = "Accounts: nav link is present")]
+    public async Task Accounts_NavLinkIsPresent()
     {
-        // Arrange & Act
-        await NavigateAsync("/accounts");
+        if (ShouldSkip)
+        {
+            return;
+        }
 
-        // Assert - Check that we can navigate via the menu link
-        var accountsLink = Page!.GetByRole(AriaRole.Link, new() { Name = "Accounts" });
-        (await accountsLink.CountAsync()).Should().BeGreaterThan(0);
+        await NavigateAsync("/accounts");
+        var link = Page!.GetByRole(AriaRole.Link, new() { Name = "Accounts" });
+        (await link.CountAsync()).Should().BeGreaterThan(0);
     }
 
-    [Fact(DisplayName = "Create Account dialog button is clickable")]
-    public async Task AccountsPage_CreateDialogClickable()
+    [Fact(DisplayName = "Accounts: clicking Add Account opens Create Account dialog")]
+    public async Task Accounts_ClickingAddAccountOpensDialog()
     {
-        // Arrange
+        if (ShouldSkip)
+        {
+            return;
+        }
+
         await NavigateAsync("/accounts");
-
-        // Act
-        var addButton = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
-        await addButton.ClickAsync();
-
-        // Give the dialog time to appear
+        var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
+        await btn.ClickAsync();
         await Page!.WaitForTimeoutAsync(500);
-
-        // Assert - The dialog or form should now be visible
-        // Check for presence of form title or close button in dialog
-        var dialogTitle = Page!.GetByText("Create Account");
-        (await dialogTitle.CountAsync()).Should().BeGreaterThan(0);
+        // MudDialog title "Create Account" from DialogService.ShowAsync in Accounts.razor
+        (await Page!.GetByText("Create Account").CountAsync()).Should().BeGreaterThan(0);
     }
 }

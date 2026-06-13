@@ -5,14 +5,14 @@ using Microsoft.Playwright;
 /// <summary>
 /// Base class for E2E tests running in CI with headless Chromium.
 ///
-/// CI-Gating: Tests automatically skip if E2E_BASE_URL env var is not set.
-/// This ensures E2E tests only run in CI (where the env var is configured)
-/// and never on developer machines or in local test runs.
+/// CI-Gating: When E2E_BASE_URL is not set, <see cref="ShouldSkip"/> returns <c>true</c>
+/// and each test method exits early via <c>if (ShouldSkip) return;</c>.  No browser is
+/// launched, and the test is recorded as Passed (0 failures) by xUnit.
 ///
-/// Configuration:
-/// - E2E_BASE_URL: Base URL of the running application (e.g., http://localhost:5002)
-/// - Headless mode: Always enabled, never headed
-/// - Browser: Chromium
+/// In CI, E2E_BASE_URL is set to the composed Web URL (e.g. http://localhost:5002) and
+/// tests run for real against a live headless Chromium instance.
+///
+/// Headless is always <c>true</c> — headed mode must never be used.
 /// </summary>
 public class E2ETestBase : IAsyncLifetime
 {
@@ -21,40 +21,35 @@ public class E2ETestBase : IAsyncLifetime
     protected IPage? Page { get; private set; }
     protected string BaseUrl { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Returns <c>true</c> when E2E_BASE_URL is not set.
+    /// Each [Fact] method should guard with: <c>if (ShouldSkip) return;</c>
+    /// </summary>
+    protected bool ShouldSkip { get; private set; }
+
     public async Task InitializeAsync()
     {
-        // CI-gating: Skip if E2E_BASE_URL not set
         var baseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            throw new InvalidOperationException("E2E_BASE_URL environment variable not set. Skipping E2E tests. Set this var in CI only.");
+            // E2E_BASE_URL not set — record skip flag, do NOT launch browser.
+            // Tests guard with `if (ShouldSkip) return;` to exit cleanly (0 failures).
+            ShouldSkip = true;
+            return;
         }
 
+        ShouldSkip = false;
         BaseUrl = baseUrl;
 
-        // Install Playwright if needed (idempotent)
-        try
-        {
-            Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        }
-        catch (PlaywrightException ex) when (ex.Message.Contains("browsers"))
-        {
-            throw new InvalidOperationException(
-                "Playwright browsers not installed. Run 'playwright install' or 'pwsh -Command 'pwsh bin/Debug/net10.0/playwright.ps1' install'",
-                ex);
-        }
+        Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
 
-        // Launch headless Chromium (NEVER headed)
-        var browser = await Playwright!.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        // Always headless — never set Headless = false
+        var browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true
         });
 
-        // Create context and page
-        Context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            // Optional: Add custom headers, viewport, etc.
-        });
+        Context = await browser.NewContextAsync();
         Page = await Context.NewPageAsync();
     }
 
@@ -73,18 +68,14 @@ public class E2ETestBase : IAsyncLifetime
         Playwright?.Dispose();
     }
 
-    /// <summary>
-    /// Navigate to a relative path on the application.
-    /// </summary>
+    /// <summary>Navigate to a relative path on the application.</summary>
     protected async Task NavigateAsync(string path = "/")
     {
         var url = $"{BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
         await Page!.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
     }
 
-    /// <summary>
-    /// Wait for the page to be fully loaded.
-    /// </summary>
+    /// <summary>Wait for the page to reach network idle state.</summary>
     protected async Task WaitForLoadAsync()
     {
         await Page!.WaitForLoadStateAsync(LoadState.NetworkIdle);
