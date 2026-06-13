@@ -78,6 +78,15 @@ public static class DependencyInjection
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
 
+        // ── Configuration ───────────────────────────────────────────────────
+        // Register IConfiguration so that .BindConfiguration() (used by AddOptions) can resolve
+        // it from DI. ASP.NET Core hosts pre-register this; bare ServiceCollection test setups
+        // do not, so we register it here idempotently.
+        if (!services.Any(d => d.ServiceType == typeof(IConfiguration)))
+        {
+            services.AddSingleton<IConfiguration>(configuration);
+        }
+
         // ── Provider wiring ────────────────────────────────────────────────────
         // Provider selection is config-only:
         //   Mx:Enabled = true  → real MX provider (FlowLedger.Integrations.Mx)

@@ -31,6 +31,15 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        // ── Configuration ────────────────────────────────────────────────────────
+        // Register IConfiguration so that .BindConfiguration() (used by AddOptions) can resolve
+        // it from DI. ASP.NET Core hosts pre-register this; bare ServiceCollection test setups
+        // do not, so we register it here idempotently.
+        if (!services.Any(d => d.ServiceType == typeof(IConfiguration)))
+        {
+            services.AddSingleton<IConfiguration>(configuration);
+        }
+
         // ── Options ──────────────────────────────────────────────────────────────
         // Credentials (Mx:) — AddOptions + fast-fail validator are idempotent if already added
         // by Infrastructure; re-registering is harmless and keeps this extension self-contained.
