@@ -171,7 +171,7 @@
             await ApiClient.ConnectAsync();
             var result = await ApiClient.SyncAsync();
             var msg = result is not null
-                ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped"
+                ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
                 : "Sync complete";
             Snackbar.Add(msg, Severity.Success);
         }

@@ -151,8 +151,8 @@
             var from = today.AddDays(-30); // include some history
             var to = today.AddMonths(_horizonMonths);
 
-            // Actual transactions
-            var transactions = await ApiClient.GetTransactionsAsync(from: from, to: to, take: 5000);
+            // Actual transactions (take capped at API max of 500 per validator)
+            var transactions = await ApiClient.GetTransactionsAsync(from: from, to: to, take: 500);
 
             // Forecast for planned future rows
             var forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);

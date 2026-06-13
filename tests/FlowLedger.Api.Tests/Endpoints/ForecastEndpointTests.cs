@@ -87,6 +87,84 @@ public sealed class ForecastEndpointTests(FlowLedgerApiFactory factory) : IAsync
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    // ── Wire contract: accountSeries[].accountId must be a bare GUID ──────────
+
+    [Fact]
+    public async Task Get_forecast_response_deserializes_into_web_client_dto_without_jsonexception()
+    {
+        // REGRESSION (Dashboard bug): the API used to return the domain ForecastResult
+        // directly, so accountSeries[0].accountId serialized as {"value":"<guid>"} and the
+        // Web client's deserialization into Guid threw:
+        //   "The JSON value could not be converted to System.Guid.
+        //    Path: $.accountSeries[0].accountId"
+        // This deserializes the LIVE response into a DTO mirroring the Web client's
+        // ForecastResultDto (AccountId : Guid) using the same options the client uses.
+        await _client.PostAsync("/api/connect", null);
+        await _client.PostAsync("/api/sync", null);
+
+        var response = await _client.GetAsync("/api/forecast?months=3");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadAsStringAsync();
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // Must NOT throw a JsonException — this is the exact failure path the Dashboard hit.
+        var act = () => JsonSerializer.Deserialize<WireForecastResult>(json, options);
+        var dto = act.Should().NotThrow().Subject;
+
+        dto.Should().NotBeNull();
+        dto!.AccountSeries.Should().NotBeEmpty("sync seeds at least one account");
+        dto.AccountSeries.Should().OnlyContain(
+            s => s.AccountId != Guid.Empty,
+            "every accountId must be a real, bare GUID — not a nested object or empty");
+        // The horizon must be flattened, not a nested range object.
+        dto.HorizonStart.Should().NotBe(default);
+        dto.HorizonEnd.Should().BeOnOrAfter(dto.HorizonStart);
+    }
+
+    [Fact]
+    public async Task Get_forecast_account_series_accountId_is_json_string_not_object()
+    {
+        // Guards the wire shape directly: accountId must be a STRING token (GUID),
+        // never a JSON object like {"value":"..."}.
+        await _client.PostAsync("/api/connect", null);
+        await _client.PostAsync("/api/sync", null);
+
+        var response = await _client.GetAsync("/api/forecast?months=3");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var first = doc.RootElement.GetProperty("accountSeries")[0];
+        var accountId = first.GetProperty("accountId");
+
+        accountId.ValueKind.Should().Be(JsonValueKind.String,
+            "accountId must serialize as a bare GUID string, not a nested object");
+        Guid.TryParse(accountId.GetString(), out _).Should().BeTrue(
+            "accountId string must parse as a Guid");
+    }
+
+    /// <summary>
+    /// Mirror of the Web client's <c>FlowLedger.Web.ApiClient.ForecastResultDto</c> /
+    /// <c>AccountForecastSeriesDto</c> (Api.Tests cannot reference the Web project).
+    /// AccountId is a plain <see cref="Guid"/> — the type that broke before the fix.
+    /// </summary>
+    private sealed class WireForecastResult
+    {
+        public Guid ForecastRunId { get; init; }
+        public DateOnly AsOf { get; init; }
+        public DateOnly HorizonStart { get; init; }
+        public DateOnly HorizonEnd { get; init; }
+        public List<WireAccountSeries> AccountSeries { get; init; } = [];
+    }
+
+    private sealed class WireAccountSeries
+    {
+        public Guid AccountId { get; init; }
+        public decimal StartingBalanceAmount { get; init; }
+        public string StartingBalanceCurrency { get; init; } = "USD";
+    }
+
     // ── Unauthenticated ───────────────────────────────────────────────────────
 
     [Fact]
