@@ -81,9 +81,10 @@ public class AccountsDataTests : E2ETestBase
                 $"Accounts page showed an error alert (likely 401): '{errorText}'. " +
                 "This means the Web is NOT sending X-Api-Key — auth fix regression.");
         }
-        catch (TimeoutException)
+        catch (PlaywrightException)
         {
-            // Good — no error alert appeared
+            // Good — no error alert appeared.
+            // Microsoft.Playwright.PlaywrightException is thrown by WaitForAsync on timeout.
         }
 
         // ── Step 4: Wait for a known seeded account name to appear ────────────
@@ -128,6 +129,8 @@ public class AccountsDataTests : E2ETestBase
         var grid = Page!.Locator("[aria-label='Accounts table']");
         (await grid.CountAsync()).Should().BeGreaterThan(0, "accounts table must be rendered");
         (await grid.IsVisibleAsync()).Should().BeTrue("accounts table must be visible");
+
+        AssertNoPageErrors();
     }
 
     /// <summary>

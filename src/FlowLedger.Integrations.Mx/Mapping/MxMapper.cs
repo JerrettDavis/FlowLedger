@@ -2,6 +2,7 @@ using System.Globalization;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
+using Microsoft.Extensions.Logging;
 using PatternKit.Behavioral.Strategy;
 
 namespace FlowLedger.Integrations.Mx.Mapping;
@@ -114,12 +115,12 @@ internal static class MxMapper
 
     // ── Transactions ──────────────────────────────────────────────────────────
 
-    public static ProviderTransaction ToProviderTransaction(MxTransaction t)
+    public static ProviderTransaction ToProviderTransaction(MxTransaction t, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(t);
 
         var currency = NormalizeCurrency(t.CurrencyCode);
-        var postedDate = ParsePostedDate(t);
+        var postedDate = ParsePostedDate(t, logger);
         var isPending = string.Equals(t.Status, "PENDING", StringComparison.OrdinalIgnoreCase);
 
         // MX `amount` is unsigned; `type` carries the direction (DEBIT/CREDIT).
@@ -166,7 +167,15 @@ internal static class MxMapper
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static DateOnly ParsePostedDate(MxTransaction t)
+    /// <summary>
+    /// Parses the posted date from an MX transaction, preferring the <c>date</c> field and
+    /// falling back to posted_at / transacted_at datetimes. If all date fields are null or
+    /// unparseable, logs a warning and returns <see cref="DateOnly.MinValue"/> (year 0001).
+    /// </summary>
+    /// <param name="t">The MX transaction.</param>
+    /// <param name="logger">Optional logger for warning on unparseable dates.</param>
+    /// <returns>The parsed date or <see cref="DateOnly.MinValue"/> if all fields fail.</returns>
+    private static DateOnly ParsePostedDate(MxTransaction t, ILogger? logger = null)
     {
         // Prefer the `date` field (YYYY-MM-DD); fall back to posted_at / transacted_at datetimes.
         if (TryParseDateOnly(t.Date, out var d))
@@ -182,6 +191,15 @@ internal static class MxMapper
         if (TryParseDateTimeAsDate(t.TransactedAt, out d))
         {
             return d;
+        }
+
+        // All date fields failed — log the fact and return MinValue.
+        if (logger is not null)
+        {
+            logger.LogWarning(
+                "Transaction {TransactionGuid} has no valid date fields (date={Date}, posted_at={PostedAt}, transacted_at={TransactedAt}); " +
+                "defaulting to DateOnly.MinValue.",
+                t.Guid, t.Date, t.PostedAt, t.TransactedAt);
         }
 
         return DateOnly.MinValue;

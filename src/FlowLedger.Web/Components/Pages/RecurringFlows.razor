@@ -3,6 +3,7 @@
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject ILogger<RecurringFlows> Logger
 
 <PageTitle>Recurring Flows — FlowLedger</PageTitle>
 
@@ -99,7 +100,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _accounts = await ApiClient.GetAccountsAsync(); } catch { }
+        try
+        {
+            _accounts = await ApiClient.GetAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load accounts for recurring flows page");
+            Snackbar.Add("Couldn't load account names — account labels may be missing.", Severity.Warning);
+        }
         await LoadAsync();
     }
 
@@ -113,7 +122,10 @@
         }
         catch (Exception ex)
         {
-            _error = $"Failed to load recurring flows: {ex.Message}";
+            Logger.LogError(ex, "Failed to load recurring flows");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
+                ? ace.Message
+                : "Failed to load recurring flows. Please try again.";
         }
         finally
         {
@@ -138,7 +150,11 @@
                 Snackbar.Add("Flow created", Severity.Success);
                 await LoadAsync();
             }
-            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to create recurring flow");
+                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't create flow. Please try again.", Severity.Error);
+            }
         }
     }
 
@@ -159,7 +175,11 @@
                 Snackbar.Add("Flow updated", Severity.Success);
                 await LoadAsync();
             }
-            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to update recurring flow {FlowId}", flow.Id);
+                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't update flow. Please try again.", Severity.Error);
+            }
         }
     }
 
@@ -181,7 +201,11 @@
                 Snackbar.Add("Flow deleted", Severity.Success);
                 await LoadAsync();
             }
-            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to delete recurring flow {FlowId}", flow.Id);
+                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't delete flow. Please try again.", Severity.Error);
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ILogger<Home> Logger
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
@@ -239,7 +240,10 @@
         }
         catch (Exception ex)
         {
-            _error = $"Failed to load dashboard data: {ex.Message}";
+            Logger.LogError(ex, "Failed to load dashboard data");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
+                ? ace.Message
+                : "Failed to load dashboard data. Please try again.";
         }
         finally
         {

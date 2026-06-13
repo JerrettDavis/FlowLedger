@@ -1,6 +1,7 @@
 namespace FlowLedger.E2E.Tests;
 
 using System.Net.Http;
+using FluentAssertions;
 using Microsoft.Playwright;
 
 /// <summary>
@@ -24,7 +25,7 @@ using Microsoft.Playwright;
 ///                           resolved relative to the repo root two levels above the test bin)
 /// </summary>
 [Trait("Category", "Screenshots")]
-public class ScreenshotCaptureTests : IAsyncLifetime
+public class ScreenshotCaptureTests : E2ETestBase
 {
     // ── Environment defaults ──────────────────────────────────────────────────
 
@@ -41,173 +42,89 @@ public class ScreenshotCaptureTests : IAsyncLifetime
     private static string TenantId =>
         Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? DefaultTenantId;
 
-    // ── Playwright state ──────────────────────────────────────────────────────
-
-    private IPlaywright? _playwright;
-    private IBrowser? _browser;
-    private IBrowserContext? _context;
-    private IPage? _page;
-    private string _baseUrl = string.Empty;
-    private bool _shouldSkip;
-    private string _outputDir = string.Empty;
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    public async Task InitializeAsync()
-    {
-        var baseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            _shouldSkip = true;
-            return;
-        }
-
-        _baseUrl = baseUrl;
-        _outputDir = ResolveOutputDir();
-
-        Directory.CreateDirectory(_outputDir);
-
-        _playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-
-        // Always headless — never steal the user's mouse/keyboard focus.
-        _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-        {
-            Headless = true,
-        });
-
-        // 1440×900 @ 2× scale produces crisp 2880×1800 PNGs — good for Retina / HiDPI docs.
-        _context = await _browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            ViewportSize = new ViewportSize { Width = 1440, Height = 900 },
-            DeviceScaleFactor = 2,
-        });
-
-        _page = await _context.NewPageAsync();
-
-        // Increase default Playwright action timeout for slow Blazor SignalR circuits.
-        _page.SetDefaultTimeout(30_000);
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_page is not null) { await _page.CloseAsync(); }
-        if (_context is not null) { await _context.CloseAsync(); }
-        if (_browser is not null) { await _browser.CloseAsync(); }
-        _playwright?.Dispose();
-    }
-
     // ── Screenshot tests ──────────────────────────────────────────────────────
 
     [Fact(DisplayName = "Screenshots: seed data then capture all key pages")]
     public async Task Capture_all_key_pages()
     {
-        if (_shouldSkip) { return; }
+        if (ShouldSkip) { return; }
+
+        // Screenshot-specific page setup: 1440×900 @ 2× for crisp HiDPI PNGs.
+        // E2ETestBase creates the page at the default viewport; we resize here.
+        await Page!.SetViewportSizeAsync(1440, 900);
+        Page.SetDefaultTimeout(30_000);
+
+        var outputDir = ResolveOutputDir();
+        Directory.CreateDirectory(outputDir);
 
         // Step 1 — ensure data is seeded (idempotent: 409 = already connected).
         await SeedDataAsync();
 
         // Step 2 — warm up the app by navigating to the home page once.
-        await NavigateAndWaitAsync("/");
-        await _page!.WaitForTimeoutAsync(2_000);
+        await NavigateAsync("/");
+        await WaitForLoadAsync();
+        await Page!.WaitForTimeoutAsync(2_000);
 
         // Step 3 — capture each page.
-        // Dashboard: wait for either the chart SVG or the "no data" fallback text.
-        await CapturePageWithFallbackSelectorAsync("/", "dashboard.png",
-            primarySelector: "[aria-label='Balance projection chart']",
-            fallbackSelector: "[aria-label='Forecast Low']");
-        await CapturePageAsync("/accounts", "accounts.png", waitForSelector: "[aria-label='Accounts table']");
-        await CapturePageAsync("/transactions", "transactions.png", waitForSelector: "[aria-label='Transactions table']");
-        await CapturePageAsync("/money-plan", "money-plan.png", waitForSelector: null);
-        await CapturePageAsync("/recurring-flows", "recurring-flows.png", waitForSelector: null);
-        await CapturePageAsync("/forecasts", "forecast.png", waitForSelector: null);
+        // Dashboard: wait for the SVG chart — "No forecast data" is not acceptable after seeding.
+        await CapturePageAsync("/", "dashboard.png", outputDir,
+            waitForSelector: "[aria-label='Balance projection chart']");
+        await CapturePageAsync("/accounts", "accounts.png", outputDir,
+            waitForSelector: "[aria-label='Accounts table']");
+        await CapturePageAsync("/transactions", "transactions.png", outputDir,
+            waitForSelector: "[aria-label='Transactions table']");
+        await CapturePageAsync("/money-plan", "money-plan.png", outputDir,
+            waitForSelector: "[aria-label='Money plan spreadsheet']");
+        await CapturePageAsync("/recurring-flows", "recurring-flows.png", outputDir,
+            waitForSelector: "[aria-label='Recurring flows table']");
+        await CapturePageAsync("/forecasts", "forecast.png", outputDir,
+            waitForSelector: "[aria-label='Aggregate balance projection chart']");
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task CapturePageWithFallbackSelectorAsync(
-        string path,
-        string filename,
-        string primarySelector,
-        string fallbackSelector)
-    {
-        await NavigateAndWaitAsync(path);
-
-        // Try primary selector first; if it times out, try the fallback.
-        var found = false;
-        foreach (var sel in new[] { primarySelector, fallbackSelector })
-        {
-            try
-            {
-                await _page!.WaitForSelectorAsync(sel, new PageWaitForSelectorOptions
-                {
-                    State = WaitForSelectorState.Visible,
-                    Timeout = 20_000,
-                });
-                found = true;
-                break;
-            }
-            catch (TimeoutException) { }
-        }
-
-        if (!found)
-        {
-            // Give the page extra time to settle.
-            await _page!.WaitForTimeoutAsync(5_000);
-        }
-
-        await _page!.WaitForTimeoutAsync(1_500);
-
-        await _page.ScreenshotAsync(new PageScreenshotOptions
-        {
-            Path = Path.Combine(_outputDir, filename),
-            FullPage = true,
-        });
-    }
-
+    /// <summary>
+    /// Navigate to <paramref name="path"/>, wait for <paramref name="waitForSelector"/>
+    /// to become visible (required — a timeout is a test failure, not a benign fallback),
+    /// assert there is no visible error alert or console/page/HTTP error, then capture the
+    /// screenshot.
+    /// </summary>
     private async Task CapturePageAsync(
         string path,
         string filename,
+        string outputDir,
         string? waitForSelector)
     {
-        await NavigateAndWaitAsync(path);
+        await NavigateAsync(path);
 
         // If a selector hint is given, wait for it to appear (data loaded / chart rendered).
+        // A timeout here is a FAILURE — the page did not reach the expected ready state.
         if (!string.IsNullOrWhiteSpace(waitForSelector))
         {
-            try
+            await Page!.WaitForSelectorAsync(waitForSelector, new PageWaitForSelectorOptions
             {
-                await _page!.WaitForSelectorAsync(waitForSelector, new PageWaitForSelectorOptions
-                {
-                    State = WaitForSelectorState.Visible,
-                    Timeout = 25_000,
-                });
-            }
-            catch (TimeoutException)
-            {
-                // Tolerate — capture whatever is on screen; the test won't fail on a missing
-                // optional selector (e.g. the chart vs. "no data" fallback).
-            }
+                State = WaitForSelectorState.Visible,
+                Timeout = 25_000,
+            });
         }
 
+        // Assert no visible error alert or JSON-error text before capturing the screenshot.
+        // If an error IS visible the test fails here with the error text — not a broken image.
+        await AssertNoErrorAlertVisible();
+
+        // Assert no console errors, uncaught JS exceptions, or HTTP >= 400 responses were
+        // recorded since the page was created.  Inherited from E2ETestBase.
+        AssertNoPageErrors();
+
         // Extra settle time for chart animations to finish rendering.
-        await _page!.WaitForTimeoutAsync(1_500);
+        await Page!.WaitForTimeoutAsync(1_500);
 
-        var outputPath = Path.Combine(_outputDir, filename);
+        var outputPath = Path.Combine(outputDir, filename);
 
-        await _page.ScreenshotAsync(new PageScreenshotOptions
+        await Page.ScreenshotAsync(new PageScreenshotOptions
         {
             Path = outputPath,
             FullPage = true,
-        });
-    }
-
-    private async Task NavigateAndWaitAsync(string path)
-    {
-        var url = $"{_baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
-        await _page!.GotoAsync(url, new PageGotoOptions
-        {
-            WaitUntil = WaitUntilState.NetworkIdle,
-            Timeout = 30_000,
         });
     }
 
@@ -246,8 +163,8 @@ public class ScreenshotCaptureTests : IAsyncLifetime
     /// Priority:
     ///   1. SCREENSHOT_OUTPUT_DIR env var (absolute path)
     ///   2. docs/assets/screenshots/ relative to the repository root
-    ///      (detected by walking up from the test assembly location until CLAUDE.md is found
-    ///       or until 6 levels are exhausted, falling back to the assembly directory).
+    ///      (detected by walking up from the test assembly location until FlowLedger.slnx is found
+    ///       or until 8 levels are exhausted, falling back to the current working directory).
     /// </summary>
     private static string ResolveOutputDir()
     {

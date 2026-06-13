@@ -179,4 +179,9 @@ public sealed class OverdraftWarningDto
 // ── Sync ──────────────────────────────────────────────────────────────────────
 
 public sealed record ConnectResult(string MemberId, string Provider);
-public sealed record SyncResult(int AccountsSynced, int TransactionsSynced, string Status);
+
+/// <summary>
+/// Matches the API's <c>Application.Abstractions.SyncResult</c> shape:
+/// <c>accountsUpserted</c>, <c>transactionsAdded</c>, <c>transactionsSkipped</c>.
+/// </summary>
+public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped);

@@ -3,6 +3,7 @@
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject ILogger<Accounts> Logger
 
 <PageTitle>Accounts — FlowLedger</PageTitle>
 
@@ -84,7 +85,10 @@
         }
         catch (Exception ex)
         {
-            _error = $"Failed to load accounts: {ex.Message}";
+            Logger.LogError(ex, "Failed to load accounts");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
+                ? ace.Message
+                : "Failed to load accounts. Please try again.";
         }
         finally
         {
@@ -107,7 +111,8 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Failed to create account");
+                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't create account. Please try again.", Severity.Error);
             }
         }
     }
@@ -127,7 +132,8 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Failed to update account {AccountId}", account.Id);
+                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't update account. Please try again.", Severity.Error);
             }
         }
     }

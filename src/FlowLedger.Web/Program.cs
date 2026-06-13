@@ -1,5 +1,6 @@
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components;
+using FlowLedger.Web.Services;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,10 @@ builder.Services.AddRazorComponents()
 
 // ── MudBlazor ───────────────────────────────────────────────────────────────
 builder.Services.AddMudServices();
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+// Scoped so each circuit (browser tab) gets its own independent theme state.
+builder.Services.AddScoped<ThemeService>();
 
 // ── API auth options (Api:Key + Api:TenantId from config / env vars) ─────────
 builder.Services.Configure<ApiAuthOptions>(

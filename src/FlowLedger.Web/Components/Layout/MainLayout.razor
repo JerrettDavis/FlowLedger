@@ -1,8 +1,18 @@
 @inherits LayoutComponentBase
-@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject ILogger<MainLayout> Logger
+@inject IJSRuntime JS
+@inject ThemeService ThemeService
+@implements IDisposable
 
-<MudThemeProvider @bind-IsDarkMode="_isDarkMode" />
+@* ObserveSystemDarkModeChange tells MudBlazor to watch prefers-color-scheme and
+   fire IsDarkModeChanged when the OS preference changes at runtime.
+   IsDarkMode is one-way bound from our ThemeService so we remain the single
+   source of truth; IsDarkModeChanged lets MudBlazor notify us of system changes. *@
+<MudThemeProvider IsDarkMode="ThemeService.IsDarkMode"
+                  ObserveSystemDarkModeChange="true"
+                  IsDarkModeChanged="OnSystemPreferenceChanged" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -30,11 +40,11 @@
                 Connect &amp; Sync
             </MudButton>
         </MudTooltip>
-        <MudTooltip Text="@(_isDarkMode ? "Switch to light mode" : "Switch to dark mode")">
-            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+        <MudTooltip Text="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
+            <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                            Color="Color.Inherit"
                            OnClick="ToggleTheme"
-                           aria-label="@(_isDarkMode ? "Switch to light mode" : "Switch to dark mode")" />
+                           aria-label="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")" />
         </MudTooltip>
     </MudAppBar>
 
@@ -54,11 +64,104 @@
 
 @code {
     private bool _drawerOpen = true;
-    private bool _isDarkMode = false;
     private bool _syncing = false;
 
+    // True once the user has made an explicit choice that we've persisted;
+    // while false, runtime OS-preference changes are applied.
+    private bool _hasUserOverride = false;
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    protected override void OnInitialized()
+    {
+        ThemeService.ThemeChanged += OnThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        // Read persisted preference and system preference from the browser.
+        // All JS calls are wrapped — failures fall back gracefully.
+        bool? persisted = null;
+        bool systemPrefersDark = false;
+
+        try
+        {
+            var raw = await JS.InvokeAsync<string?>("FlowLedgerTheme.getPreference");
+            if (raw is "dark")
+                persisted = true;
+            else if (raw is "light")
+                persisted = false;
+            // anything else (null / unexpected string) → no persisted pref
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "Could not read theme preference from localStorage; falling back to system preference");
+        }
+
+        try
+        {
+            systemPrefersDark = await JS.InvokeAsync<bool>("FlowLedgerTheme.getSystemPrefersDark");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "Could not read system color-scheme preference; defaulting to light mode");
+        }
+
+        _hasUserOverride = persisted.HasValue;
+        ThemeService.Initialize(persisted, systemPrefersDark);
+        // StateHasChanged is called by the ThemeChanged event that Initialize fires.
+    }
+
+    public void Dispose()
+    {
+        ThemeService.ThemeChanged -= OnThemeChanged;
+    }
+
+    // ── Theme helpers ─────────────────────────────────────────────────────────
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>
+    /// Fired by MudThemeProvider when the OS/browser preference changes at runtime
+    /// (requires ObserveSystemDarkModeChange="true").
+    /// </summary>
+    private async Task OnSystemPreferenceChanged(bool systemIsDark)
+    {
+        ThemeService.ApplySystemPreference(systemIsDark, _hasUserOverride);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Explicit user toggle — persists choice to localStorage and sets the
+    /// override flag so future OS-preference changes are ignored.
+    /// </summary>
+    private async Task ToggleTheme()
+    {
+        var newDark = !ThemeService.IsDarkMode;
+        ThemeService.SetDarkMode(newDark);
+        _hasUserOverride = true;
+
+        try
+        {
+            await JS.InvokeAsync<bool>("FlowLedgerTheme.setPreference", newDark ? "dark" : "light");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "Could not persist theme preference to localStorage; preference will not survive reload");
+        }
+    }
+
+    // ── Drawer ───────────────────────────────────────────────────────────────
+
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
-    private void ToggleTheme() => _isDarkMode = !_isDarkMode;
+
+    // ── Connect & Sync ───────────────────────────────────────────────────────
 
     private async Task ConnectAndSync()
     {
@@ -68,12 +171,13 @@
             await ApiClient.ConnectAsync();
             var result = await ApiClient.SyncAsync();
             var msg = result is not null
-                ? $"Sync complete — {result.AccountsSynced} accounts, {result.TransactionsSynced} transactions"
+                ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped"
                 : "Sync complete";
             Snackbar.Add(msg, Severity.Success);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Connect & Sync failed");
             Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
         }
         finally

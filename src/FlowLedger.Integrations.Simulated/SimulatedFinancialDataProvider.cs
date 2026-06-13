@@ -132,13 +132,25 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         await Task.CompletedTask.ConfigureAwait(false);
 
         var json = Encoding.UTF8.GetString(rawBody.Span);
-        var doc = JsonDocument.Parse(json);
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            throw new FatalProviderException(
+                "Simulated webhook payload is not valid JSON.", inner: ex);
+        }
         var root = doc.RootElement;
 
         var eventType = root.TryGetProperty("event_type", out var et) ? et.GetString() ?? "UNKNOWN" : "UNKNOWN";
         var memberId = root.TryGetProperty("member_id", out var mid) ? mid.GetString() ?? SimMemberId : SimMemberId;
-        var occurredAt = root.TryGetProperty("occurred_at", out var oat)
-            ? DateTimeOffset.Parse(oat.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+        var occurredAt = root.TryGetProperty("occurred_at", out var oat) && oat.GetString() is { } dateStr
+            ? (DateTimeOffset.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+                ? parsed
+                : DateTimeOffset.UtcNow)
             : DateTimeOffset.UtcNow;
 
         var metadata = new Dictionary<string, string>();

@@ -1,6 +1,7 @@
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
 using FlowLedger.Integrations.Mx.Mapping;
+using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 
@@ -187,7 +188,82 @@ public sealed class MxMapperTests
         c.RecordsPerPage.Should().Be(25);
     }
 
+    [Fact]
+    public void ToProviderTransaction_with_all_unparseable_dates_returns_MinValue_and_logs_warning()
+    {
+        var logger = new CapturingLogger();
+        var tx = MakeTx("DEBIT", 5m) with
+        {
+            Date = null,
+            PostedAt = "invalid-date",
+            TransactedAt = "also-invalid",
+        };
+
+        var dto = MxMapper.ToProviderTransaction(tx, logger);
+
+        dto.PostedDate.Should().Be(DateOnly.MinValue);
+        logger.HasWarning.Should().BeTrue("a warning must be logged for unparseable dates");
+    }
+
+    [Fact]
+    public void ToProviderTransaction_with_valid_date_prefers_date_field()
+    {
+        var logger = new CapturingLogger();
+        var tx = MakeTx("DEBIT", 5m) with
+        {
+            Date = "2026-03-20",
+            PostedAt = "2026-01-10T12:00:00Z",
+        };
+
+        var dto = MxMapper.ToProviderTransaction(tx, logger);
+
+        dto.PostedDate.Should().Be(new DateOnly(2026, 3, 20), "date field takes precedence");
+        logger.HasWarning.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ToProviderTransaction_falls_back_to_posted_at_when_date_invalid()
+    {
+        var logger = new CapturingLogger();
+        var tx = MakeTx("DEBIT", 5m) with
+        {
+            Date = null,
+            PostedAt = "2026-02-14T08:30:00Z",
+        };
+
+        var dto = MxMapper.ToProviderTransaction(tx, logger);
+
+        dto.PostedDate.Should().Be(new DateOnly(2026, 2, 14));
+        logger.HasWarning.Should().BeFalse();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Minimal <see cref="ILogger"/> that captures whether any Warning-or-above message
+    /// was emitted. Avoids a heavyweight mocking dependency.
+    /// </summary>
+    private sealed class CapturingLogger : ILogger
+    {
+        public bool HasWarning { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel >= LogLevel.Warning)
+            {
+                HasWarning = true;
+            }
+        }
+    }
 
     private static MxTransaction MakeTx(string type, decimal amount, string status = "POSTED") =>
         new(

@@ -1,6 +1,8 @@
 @page "/forecasts"
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<Forecasts> Logger
 
 <PageTitle>Forecasts — FlowLedger</PageTitle>
 
@@ -180,7 +182,15 @@ else if (!_loading)
 
     protected override async Task OnInitializedAsync()
     {
-        try { _accounts = await ApiClient.GetAccountsAsync(); } catch { }
+        try
+        {
+            _accounts = await ApiClient.GetAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load accounts for forecast page");
+            Snackbar.Add("Couldn't load account names — account labels may be missing.", Severity.Warning);
+        }
         await LoadAsync();
     }
 
@@ -194,7 +204,10 @@ else if (!_loading)
         }
         catch (Exception ex)
         {
-            _error = $"Failed to run forecast: {ex.Message}";
+            Logger.LogError(ex, "Failed to load forecast");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
+                ? ace.Message
+                : "Failed to load forecast data. Please try again.";
         }
         finally
         {
@@ -240,7 +253,7 @@ else if (!_loading)
         var lwm = forecast.AggregateLowWaterMark;
         if (lwm is not null)
         {
-            var cy = double.Parse(Ty(lwm.MinBalanceAmount));
+            var cy = 220m - (lwm.MinBalanceAmount - minV) / rng * 200m + 10m;
             sb.Append($"<circle cx=\"{Tx(lwm.Date)}\" cy=\"{cy:F1}\" r=\"5\" fill=\"#ff9800\" stroke=\"white\" stroke-width=\"1.5\"/>");
             sb.Append($"<text x=\"{Tx(lwm.Date)}\" y=\"{(cy - 10):F1}\" font-size=\"10\" fill=\"#ff9800\" text-anchor=\"middle\">Low {FormatCurrency(lwm.MinBalanceAmount)}</text>");
         }

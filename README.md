@@ -80,8 +80,11 @@ Open the Aspire dashboard at `https://localhost:15888` to see all services and t
 ### Full Stack (Docker Compose, self-hosting / E2E)
 
 ```bash
-docker compose -f docker-compose.full.yml up
+cp .env.example .env          # edit POSTGRES_PASSWORD at minimum
+docker compose --profile full up --build
 ```
+
+See [docs/self-hosting/docker-compose.md](docs/self-hosting/docker-compose.md) for the complete guide.
 
 ## Run tests
 
@@ -146,7 +149,20 @@ Integrations -> Application abstractions + Domain contracts (never the reverse)
 
 ## MX Integration
 
-By default, FlowLedger uses simulated (fake) bank data — no credentials needed. To enable real MX.com data, set `Mx:Enabled=true` and provide your API credentials. See [docs/architecture/mx-integration.md](docs/architecture/mx-integration.md) for the full guide.
+By default, FlowLedger uses simulated (fake) bank data — no credentials needed.
+
+To enable real MX.com data:
+
+1. Set `Mx__Enabled=true` in your `.env` (or environment).
+2. Set `Mx__ApiKey`, `Mx__ClientId`, `Mx__BaseUrl`, and `Mx__WebhookSecret`.
+3. Restart the stack.
+
+Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping from the Simulated Provider to Real MX](docs/architecture/mx-integration.md#swapping-from-the-simulated-provider-to-real-mx).
+
+## Self-hosting & production
+
+- Docker Compose setup: [docs/self-hosting/docker-compose.md](docs/self-hosting/docker-compose.md)
+- Production hardening, TLS, and secret rotation: [docs/self-hosting/production.md](docs/self-hosting/production.md)
 
 ## Contributing
 

@@ -135,4 +135,40 @@ public sealed class SimulatedWebhookTests
 
         sig1.Should().NotBe(sig2);
     }
+
+    // ── Error handling ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseWebhook_malformed_json_throws_FatalProviderException_not_JsonException()
+    {
+        var provider = MakeProvider();
+        var badJson = Encoding.UTF8.GetBytes("this is { not valid ] JSON at all");
+
+        Func<Task> act = () => provider.ParseWebhookAsync(badJson);
+
+        // Must surface as FatalProviderException — NOT a raw JsonException.
+        var ex = await act.Should().ThrowAsync<FatalProviderException>();
+        ex.WithInnerException<JsonException>(
+            "inner JsonException must be preserved for diagnostics");
+    }
+
+    [Fact]
+    public async Task ParseWebhook_invalid_occurred_at_date_does_not_throw_and_falls_back_to_UtcNow()
+    {
+        var provider = MakeProvider();
+        var payload = new
+        {
+            event_type = "SYNC_COMPLETE",
+            member_id = "sim-member-001",
+            occurred_at = "not-a-valid-date",
+            metadata = new { source = "test" },
+        };
+        var body = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(payload);
+
+        var evt = await provider.ParseWebhookAsync(body);
+
+        // Must not throw, must return a valid timestamp close to now
+        evt.OccurredAt.Should().BeCloseTo(DateTimeOffset.UtcNow, precision: TimeSpan.FromSeconds(5));
+        evt.EventType.Should().Be("SYNC_COMPLETE");
+    }
 }

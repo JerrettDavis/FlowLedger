@@ -24,6 +24,7 @@
     <Project Path="tests/FlowLedger.E2E.Tests/FlowLedger.E2E.Tests.csproj" />
     <Project Path="tests/FlowLedger.Infrastructure.Tests/FlowLedger.Infrastructure.Tests.csproj" />
     <Project Path="tests/FlowLedger.Integrations.Tests/FlowLedger.Integrations.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Web.Tests/FlowLedger.Web.Tests.csproj" />
     <Project Path="tests/FlowLedger.Worker.Tests/FlowLedger.Worker.Tests.csproj" />
   </Folder>
 </Solution>

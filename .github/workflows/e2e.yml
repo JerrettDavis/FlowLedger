@@ -62,6 +62,9 @@ jobs:
           --results-directory ./artifacts/tests
         env:
           E2E_BASE_URL: http://localhost:5002
+          E2E_API_URL: http://localhost:5001
+          E2E_API_KEY: ci-test-api-key-not-for-production
+          E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
 
       - name: Publish E2E test results
         if: always()

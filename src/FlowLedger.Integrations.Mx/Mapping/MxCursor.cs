@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlowLedger.Integrations.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Integrations.Mx.Mapping;
 
@@ -28,9 +29,13 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
 
     /// <summary>
     /// Decodes a <see cref="SyncCursor"/> into an <see cref="MxCursor"/>.
-    /// An initial/empty/unparseable cursor falls back to page 1 with the supplied page size.
+    /// An initial/empty cursor returns page 1 silently.
+    /// An unparseable (corrupted) cursor also falls back to page 1 — but logs a warning
+    /// via <paramref name="logger"/> so the reset is observable in diagnostics.
+    /// Callers must treat a page-1 result after a non-initial cursor as a pagination restart
+    /// that may produce duplicate imports for the affected sync window.
     /// </summary>
-    public static MxCursor Decode(SyncCursor cursor, int fallbackRecordsPerPage)
+    public static MxCursor Decode(SyncCursor cursor, int fallbackRecordsPerPage, ILogger? logger = null)
     {
         var rpp = NormalizeRecordsPerPage(fallbackRecordsPerPage);
 
@@ -45,6 +50,11 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
             var dto = JsonSerializer.Deserialize(bytes, MxCursorJsonContext.Default.MxCursorState);
             if (dto is null)
             {
+                // Deserialised to null — treat as corrupt and restart pagination.
+                logger?.LogWarning(
+                    "MX sync cursor decoded to null; pagination is restarting from page 1. " +
+                    "This may cause duplicate imports. Cursor value length: {Length}.",
+                    cursor.Value?.Length ?? 0);
                 return new MxCursor(1, rpp);
             }
 
@@ -52,12 +62,22 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
             var records = dto.RecordsPerPage <= 0 ? rpp : dto.RecordsPerPage;
             return new MxCursor(page, NormalizeRecordsPerPage(records));
         }
-        catch (FormatException)
+        catch (FormatException ex)
         {
+            // Cursor value is not valid base-64 — it is corrupted. Restart pagination.
+            logger?.LogWarning(ex,
+                "MX sync cursor could not be base64-decoded; pagination is restarting from page 1. " +
+                "This may cause duplicate imports. Cursor value length: {Length}.",
+                cursor.Value?.Length ?? 0);
             return new MxCursor(1, rpp);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // Cursor contains valid base-64 but the inner JSON is malformed — it is corrupted.
+            logger?.LogWarning(ex,
+                "MX sync cursor JSON is malformed; pagination is restarting from page 1. " +
+                "This may cause duplicate imports. Cursor value length: {Length}.",
+                cursor.Value?.Length ?? 0);
             return new MxCursor(1, rpp);
         }
     }

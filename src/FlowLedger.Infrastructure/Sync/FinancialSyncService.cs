@@ -138,7 +138,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Create new account.
         // We store pa.ProviderId in Institution as the stable provider identifier so that
         // subsequent sync runs can locate the same account (no ExternalAccountRef setter exposed).
-        var accountType = MapProviderAccountType(pa.AccountType);
+        var accountType = this.MapProviderAccountType(pa.AccountType);
         var balance = new Money(pa.Balance.Amount, new Currency(pa.CurrencyCode));
 
         var newAccount = Account.Create(
@@ -263,8 +263,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
     }
 
-    private static AccountType MapProviderAccountType(string providerType) =>
-        providerType.ToUpperInvariant() switch
+    private AccountType MapProviderAccountType(string providerType)
+    {
+        var normalizedType = providerType.ToUpperInvariant();
+        var mapped = normalizedType switch
         {
             "CHECKING" => AccountType.Checking,
             "SAVINGS" => AccountType.Savings,
@@ -275,4 +277,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             "CASH" => AccountType.Cash,
             _ => AccountType.Checking, // safe fallback
         };
+
+        if (mapped == AccountType.Checking && normalizedType != "CHECKING")
+        {
+            _logger.LogWarning(
+                "Unknown provider account type '{ProviderType}'; defaulting to Checking.",
+                providerType);
+        }
+
+        return mapped;
+    }
 }

@@ -20,8 +20,11 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         var title = await Page!.TitleAsync();
         title.Should().Contain("Accounts");
+        AssertNoPageErrors();
     }
 
     [Fact(DisplayName = "Accounts: main heading is visible")]
@@ -33,9 +36,12 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         var heading = Page!.GetByRole(AriaRole.Heading, new() { Name = "Accounts" });
         (await heading.CountAsync()).Should().BeGreaterThan(0);
         (await heading.IsVisibleAsync()).Should().BeTrue();
+        AssertNoPageErrors();
     }
 
     [Fact(DisplayName = "Accounts: 'Add Account' button is present")]
@@ -47,10 +53,13 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         // aria-label="Add new account" from Accounts.razor
         var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
         (await btn.CountAsync()).Should().BeGreaterThan(0);
         (await btn.IsVisibleAsync()).Should().BeTrue();
+        AssertNoPageErrors();
     }
 
     [Fact(DisplayName = "Accounts: data grid is rendered")]
@@ -63,10 +72,12 @@ public class AccountsTests : E2ETestBase
 
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         // MudDataGrid renders as <div aria-label="Accounts table"> (not a <table> element)
         var table = Page!.Locator("[aria-label='Accounts table']");
         (await table.CountAsync()).Should().BeGreaterThan(0);
         (await table.IsVisibleAsync()).Should().BeTrue();
+        AssertNoPageErrors();
     }
 
     [Fact(DisplayName = "Accounts: nav link is present")]
@@ -78,8 +89,11 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         var link = Page!.GetByRole(AriaRole.Link, new() { Name = "Accounts" });
         (await link.CountAsync()).Should().BeGreaterThan(0);
+        AssertNoPageErrors();
     }
 
     [Fact(DisplayName = "Accounts: clicking Add Account opens Create Account dialog")]
@@ -91,6 +105,8 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
         // Blazor Server establishes its SignalR circuit via WebSocket AFTER Playwright's
         // NetworkIdle fires (Playwright does not track WebSocket traffic as network activity).
         // Clicking before the circuit is live is silently ignored by the browser.
@@ -101,5 +117,6 @@ public class AccountsTests : E2ETestBase
         var dialogTitle = Page!.GetByText("Create Account");
         await dialogTitle.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5000 });
         (await dialogTitle.CountAsync()).Should().BeGreaterThan(0);
+        AssertNoPageErrors();
     }
 }

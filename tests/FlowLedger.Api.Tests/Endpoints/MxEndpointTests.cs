@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using FluentAssertions;
+using FlowLedger.Integrations.Simulated;
 
 namespace FlowLedger.Api.Tests.Endpoints;
 
@@ -70,5 +71,27 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         var response = await anon.PostAsync("/api/integrations/mx/webhooks", content);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Post_webhook_with_valid_signature_but_malformed_json_returns_400()
+    {
+        // The factory uses Mx:Enabled=false → Simulated provider.
+        // The Simulated provider verifies HMAC against its test secret, then parses the JSON.
+        // Malformed JSON causes JsonException inside ParseWebhookAsync; the endpoint must
+        // translate that into 400 Bad Request rather than letting it propagate as a 500.
+        using var anon = factory.CreateClient();
+
+        var badJson = Encoding.UTF8.GetBytes("this is { not valid ] json at all");
+        var signature = SimulatedFinancialDataProvider.BuildTestSignature(badJson);
+
+        anon.DefaultRequestHeaders.Add("X-MX-Signature", signature);
+        var content = new ByteArrayContent(badJson);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+        var response = await anon.PostAsync("/api/integrations/mx/webhooks", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "a syntactically invalid webhook payload must return 400, not 500");
     }
 }

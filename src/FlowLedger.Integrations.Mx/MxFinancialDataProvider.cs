@@ -219,14 +219,14 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
 
         // Cursor encodes (page, records_per_page). pageSize from the caller seeds an initial cursor.
         var effectivePageSize = pageSize > 0 ? pageSize : _options.RecordsPerPage;
-        var position = MxCursor.Decode(cursor, effectivePageSize);
+        var position = MxCursor.Decode(cursor, effectivePageSize, _logger);
 
         var response = await _client
             .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken)
             .ConfigureAwait(false);
 
         var items = (response.Transactions ?? [])
-            .Select(MxMapper.ToProviderTransaction)
+            .Select(t => MxMapper.ToProviderTransaction(t, _logger))
             .Select(t => t with { ProviderAccountId = providerAccountId })
             .ToList();
 
@@ -255,9 +255,23 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         ReadOnlyMemory<byte> rawBody,
         CancellationToken cancellationToken = default)
     {
-        var payload = System.Text.Json.JsonSerializer.Deserialize(
-            rawBody.Span, MxJsonContext.Default.MxWebhookPayload)
-            ?? throw new FatalProviderException("MX webhook payload could not be parsed.");
+        MxWebhookPayload? payload;
+        try
+        {
+            payload = System.Text.Json.JsonSerializer.Deserialize(
+                rawBody.Span, MxJsonContext.Default.MxWebhookPayload);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogError(ex, "MX webhook payload is malformed and could not be parsed.");
+            throw new FatalProviderException(
+                "MX webhook payload is malformed and could not be parsed.", inner: ex);
+        }
+
+        if (payload is null)
+        {
+            throw new FatalProviderException("MX webhook payload could not be parsed.");
+        }
 
         var memberId = payload.MemberGuid ?? payload.Member?.Guid ?? string.Empty;
         var eventType = FirstNonEmpty(payload.Type, payload.Action) ?? "UNKNOWN";

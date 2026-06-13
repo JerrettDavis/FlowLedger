@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject ILogger<Transactions> Logger
 
 <PageTitle>Transactions — FlowLedger</PageTitle>
 
@@ -133,7 +134,11 @@
             _accounts = await ApiClient.GetAccountsAsync();
             _categories = await ApiClient.GetCategoriesAsync();
         }
-        catch { /* non-fatal – grid still renders */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load accounts or categories for transaction filters");
+            Snackbar.Add("Couldn't load account and category filters — some dropdowns may be empty.", Severity.Warning);
+        }
         await LoadAsync();
     }
 
@@ -154,7 +159,10 @@
         }
         catch (Exception ex)
         {
-            _error = $"Failed to load transactions: {ex.Message}";
+            Logger.LogError(ex, "Failed to load transactions");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
+                ? ace.Message
+                : "Failed to load transactions. Please try again.";
         }
         finally
         {

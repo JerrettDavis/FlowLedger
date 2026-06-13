@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FlowLedger.Api.Jobs;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
@@ -73,7 +74,29 @@ internal static class MxEndpoints
                 return Results.Unauthorized();
             }
 
-            var evt = await provider.ParseWebhookAsync(rawBody, ct);
+            ProviderWebhookEvent evt;
+            try
+            {
+                evt = await provider.ParseWebhookAsync(rawBody, ct);
+            }
+            catch (FatalProviderException ex)
+            {
+                // Provider translated the malformed payload into its domain exception.
+                return Results.Problem(
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Malformed webhook payload");
+            }
+            catch (JsonException ex)
+            {
+                // Defensive catch: a provider that does not wrap JsonException internally still
+                // produces a 400 here rather than a 500. Prefer FatalProviderException wrapping
+                // in the provider, but this guard prevents unexpected 500s from leaking through.
+                return Results.Problem(
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Malformed webhook payload");
+            }
 
             // Enqueue a background sync via Quartz so the heavy work runs off the request path.
             // Pass the webhook context in the JobDataMap so OnDemandSyncJob can scope the sync
