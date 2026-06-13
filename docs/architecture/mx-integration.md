@@ -49,7 +49,7 @@ The application core only talks to `IFinancialDataProvider`. Swapping providers 
 Configure your MX dashboard to POST events to:
 
 ```
-POST /api/webhooks/mx
+POST /api/integrations/mx/webhooks
 ```
 
 The `Mx:WebhookSecret` is used to verify the HMAC signature on each webhook payload.

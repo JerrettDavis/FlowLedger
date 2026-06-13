@@ -8,14 +8,16 @@
 
 ## Local SDK Note (Windows)
 
-Before running tests on Windows, set these environment variables to work around a JIT regression:
+Before running tests or the dev server on Windows, set these environment variables to work around a known JIT regression in certain .NET 10 SDK images:
 
 ```powershell
 $env:DOTNET_ReadyToRun = "0"
 $env:COMPlus_ReadyToRun = "0"
 ```
 
-CI (Linux) does not need these.
+If `dotnet` crashes, set these before running any commands. CI (Linux) does not need these.
+
+Also ensure **Docker Desktop is running** before starting Aspire.
 
 ## Run Modes
 
@@ -31,7 +33,7 @@ Open the Aspire dashboard at `https://localhost:15888` to see all services and t
 
 ### 2. Docker Compose Full Stack (E2E / Self-Hosting)
 
-A fully containerized stack for self-hosting and Playwright E2E tests.
+A fully containerized stack for self-hosting and Playwright E2E tests. (Ensure Docker Desktop is running.)
 
 ```bash
 docker compose -f docker-compose.full.yml up
