@@ -15,15 +15,21 @@ builder.Services.AddRazorComponents()
 // ── MudBlazor ───────────────────────────────────────────────────────────────
 builder.Services.AddMudServices();
 
-// ── FlowLedger API typed client (Aspire service discovery + tenant header) ──
-const string DevTenantId = "00000000-0000-0000-0000-000000000001";
+// ── API auth options (Api:Key + Api:TenantId from config / env vars) ─────────
+builder.Services.Configure<ApiAuthOptions>(
+    builder.Configuration.GetSection(ApiAuthOptions.SectionName));
+
+// ── FlowLedger API typed client ───────────────────────────────────────────────
+// ApiAuthHeaderHandler adds X-Api-Key and X-Tenant-Id to every outbound request.
+// "api" matches the Aspire resource name in AppHost.cs and the Docker Compose
+// service-discovery env var (services__api__http__0).
+builder.Services.AddTransient<ApiAuthHeaderHandler>();
 
 builder.Services.AddHttpClient<FlowLedgerApiClient>(client =>
 {
-    // "api" matches the Aspire resource name in AppHost.cs
     client.BaseAddress = new Uri("https+http://api");
-    client.DefaultRequestHeaders.Add("X-Tenant-Id", DevTenantId);
 })
+.AddHttpMessageHandler<ApiAuthHeaderHandler>()
 .AddServiceDiscovery();
 
 var app = builder.Build();

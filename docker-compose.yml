@@ -140,6 +140,10 @@ services:
       # Aspire service-discovery env-var convention: services__<name>__<scheme>__<index>
       # This tells the service discovery resolver to map "https+http://api" → http://api:8080
       services__api__http__0: "http://api:8080"
+      # API auth — must match the api service's Api__Key so X-Api-Key passes validation.
+      # Use the same env-var override pattern as the api service.
+      Api__Key: ${API__KEY:-dev-local-key-not-for-production}
+      Api__TenantId: "00000000-0000-0000-0000-000000000001"
     depends_on:
       api-probe:
         condition: service_completed_successfully
