@@ -6,8 +6,9 @@ using Microsoft.Extensions.Options;
 namespace FlowLedger.Integrations.Tests.Simulated;
 
 /// <summary>
-/// Verifies that the Simulated provider generates the demo household described in PLAN §24:
-/// checking, savings, credit card, mortgage with expected transaction categories.
+/// Verifies that the Simulated provider generates the demo household:
+/// checking, savings, two credit cards, an investment account, and a mortgage —
+/// with expected transaction categories across all accounts.
 /// </summary>
 public sealed class SimulatedSeedDataTests
 {
@@ -18,17 +19,17 @@ public sealed class SimulatedSeedDataTests
         new(Options.Create(new SimulatedProviderOptions { HistoryMonths = historyMonths }));
 
     [Fact]
-    public async Task Demo_household_has_four_accounts()
+    public async Task Demo_household_has_six_accounts()
     {
         var provider = MakeProvider();
         var member = await provider.BeginConnectionAsync(TestTenant);
         var accounts = await provider.GetAccountsAsync(member.ProviderId);
 
-        accounts.Should().HaveCount(4);
+        accounts.Should().HaveCount(6);
     }
 
     [Fact]
-    public async Task Demo_household_includes_checking_savings_credit_mortgage()
+    public async Task Demo_household_includes_all_expected_account_types()
     {
         var provider = MakeProvider();
         var member = await provider.BeginConnectionAsync(TestTenant);
@@ -38,7 +39,24 @@ public sealed class SimulatedSeedDataTests
         types.Should().Contain("CHECKING");
         types.Should().Contain("SAVINGS");
         types.Should().Contain("CREDIT");
+        types.Should().Contain("INVESTMENT");
         types.Should().Contain("MORTGAGE");
+    }
+
+    [Fact]
+    public async Task Demo_household_includes_expected_account_names()
+    {
+        var provider = MakeProvider();
+        var member = await provider.BeginConnectionAsync(TestTenant);
+        var accounts = await provider.GetAccountsAsync(member.ProviderId);
+
+        var names = accounts.Select(a => a.Name).ToHashSet();
+        names.Should().Contain("Primary Checking");
+        names.Should().Contain("High-Yield Savings");
+        names.Should().Contain("Everyday Visa");
+        names.Should().Contain("Apex Rewards Card");
+        names.Should().Contain("Horizon Brokerage");
+        names.Should().Contain("Home Mortgage");
     }
 
     [Fact]
@@ -67,7 +85,7 @@ public sealed class SimulatedSeedDataTests
 
         transactions.Should().Contain(t =>
             t.RawDescription.Contains("UTILITY", StringComparison.OrdinalIgnoreCase) ||
-            (t.MerchantName != null && t.MerchantName.Contains("Power", StringComparison.OrdinalIgnoreCase)));
+            t.RawDescription.Contains("INTERNET", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -85,7 +103,7 @@ public sealed class SimulatedSeedDataTests
     }
 
     [Fact]
-    public async Task Checking_account_has_fuel_transactions()
+    public async Task Checking_account_has_fuel_or_transit_transactions()
     {
         var provider = MakeProvider(historyMonths: 3);
         var member = await provider.BeginConnectionAsync(TestTenant);
@@ -95,7 +113,8 @@ public sealed class SimulatedSeedDataTests
         var transactions = await DrainAllAsync(provider, checking.ProviderId);
 
         transactions.Should().Contain(t =>
-            t.RawDescription.Contains("FUEL", StringComparison.OrdinalIgnoreCase));
+            t.RawDescription.Contains("FUEL", StringComparison.OrdinalIgnoreCase) ||
+            t.RawDescription.Contains("TRANSIT", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -104,7 +123,7 @@ public sealed class SimulatedSeedDataTests
         var provider = MakeProvider(historyMonths: 3);
         var member = await provider.BeginConnectionAsync(TestTenant);
         var accounts = await provider.GetAccountsAsync(member.ProviderId);
-        var credit = accounts.Single(a => a.AccountType == "CREDIT");
+        var credit = accounts.First(a => a.AccountType == "CREDIT");
 
         var transactions = await DrainAllAsync(provider, credit.ProviderId);
 
@@ -123,6 +142,22 @@ public sealed class SimulatedSeedDataTests
 
         transactions.Should().Contain(t =>
             t.RawDescription.Contains("INTEREST", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Investment_account_has_contribution_and_dividend_transactions()
+    {
+        var provider = MakeProvider(historyMonths: 6);
+        var member = await provider.BeginConnectionAsync(TestTenant);
+        var accounts = await provider.GetAccountsAsync(member.ProviderId);
+        var investment = accounts.Single(a => a.AccountType == "INVESTMENT");
+
+        var transactions = await DrainAllAsync(provider, investment.ProviderId);
+
+        transactions.Should().Contain(t =>
+            t.RawDescription.Contains("CONTRIBUTION", StringComparison.OrdinalIgnoreCase));
+        transactions.Should().Contain(t =>
+            t.RawDescription.Contains("DIVIDEND", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

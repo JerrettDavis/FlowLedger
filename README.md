@@ -4,6 +4,26 @@
 
 FlowLedger is a FOSS-first, self-hostable, cloud-native personal finance platform for forecasting, budgeting, asset tracking, transaction intelligence, and extensible money workflows.
 
+## What it looks like
+
+> Screenshots use 100% synthetic demo data — no real account numbers, no real names, no PII.
+
+![Dashboard with balance projection and overdraft warning](docs/assets/screenshots/dashboard.png)
+*Dashboard — balance projection chart, summary cards, upcoming flows*
+
+![Accounts grid](docs/assets/screenshots/accounts.png)
+*Accounts — 6 demo accounts across checking, savings, credit, investment, and mortgage*
+
+![Transactions grid](docs/assets/screenshots/transactions.png)
+*Transactions — multi-month history with categories, merchants, and filtering*
+
+![Forecasts chart](docs/assets/screenshots/forecast.png)
+*Forecasts — projected running balance with low-water-mark detection*
+
+See the [full user guide](docs/user-guide.md) for all pages including Money Plan and Recurring Flows.
+
+---
+
 ## What it does
 
 FlowLedger combines four traditionally separate tools into one system:

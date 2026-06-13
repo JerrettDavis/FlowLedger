@@ -6,6 +6,15 @@
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for integration tests and full-stack mode)
 - (Optional) MX API credentials from [dashboard.mx.com](https://dashboard.mx.com)
 
+## What to expect
+
+When you start FlowLedger for the first time and seed the demo data, you will see the
+Dashboard populated with a balance projection chart and summary cards:
+
+![FlowLedger Dashboard](assets/screenshots/dashboard.png)
+*The Dashboard shows your total balance, net worth, forecast low, and a balance
+projection chart. All data shown is synthetic demo data — no real credentials needed.*
+
 ## Quick Start
 
 ```powershell

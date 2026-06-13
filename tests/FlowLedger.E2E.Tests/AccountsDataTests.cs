@@ -88,10 +88,15 @@ public class AccountsDataTests : E2ETestBase
 
         // ── Step 4: Wait for a known seeded account name to appear ────────────
         // The SimulatedFinancialDataProvider seeds accounts with names like
-        // "Primary Checking", "High-Yield Savings", "Everyday Visa", "Home Mortgage".
+        // "Primary Checking", "High-Yield Savings", "Everyday Visa", "Apex Rewards Card",
+        // "Horizon Brokerage", "Home Mortgage".
         // We wait for at least one of these to become visible in the page text.
         // This wait replaces a simple sleep and is robust to Blazor SignalR circuit delays.
-        var accountNames = new[] { "Primary Checking", "High-Yield Savings", "Everyday Visa", "Home Mortgage" };
+        var accountNames = new[]
+        {
+            "Primary Checking", "High-Yield Savings", "Everyday Visa",
+            "Apex Rewards Card", "Horizon Brokerage", "Home Mortgage",
+        };
 
         string? foundName = null;
         var deadline = DateTime.UtcNow.AddSeconds(20);
@@ -114,7 +119,7 @@ public class AccountsDataTests : E2ETestBase
         }
 
         foundName.Should().NotBeNull(
-            "Expected at least one seeded account name (e.g. 'Primary Checking') to appear " +
+            "Expected at least one seeded account name (e.g. 'Primary Checking', 'Horizon Brokerage') to appear " +
             "in the Accounts page within 20 seconds after seeding. " +
             "If null: the Web→API call likely returned 401 (no auth header) or the " +
             "Blazor SignalR circuit did not load data in time.");

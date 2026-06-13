@@ -9,8 +9,15 @@ namespace FlowLedger.Integrations.Simulated;
 /// Determinism contract: same <paramref name="tenantId"/> + <paramref name="baseSeed"/>
 /// always produces byte-identical output regardless of call order or thread.
 ///
+/// Demo household (v2 — richer):
+///   6 accounts: Primary Checking, High-Yield Savings, Everyday Visa, Apex Rewards Card,
+///               Horizon Brokerage, Home Mortgage
+///   Multi-month history across payroll, housing, utilities, groceries, dining, transport,
+///   subscriptions, insurance, healthcare, savings transfers, investment contributions,
+///   and occasional refunds — enough to produce compelling charts and low-water-mark forecasts.
+///
 /// Seeding strategy: each per-account Faker is seeded with
-///   baseSeed XOR tenant.GetHashCode() XOR accountIndex
+///   baseSeed XOR tenant.GetHashCode() XOR (slotIndex * 0x9E3779B9)
 /// so different tenants receive distinct data while the data for a given tenant is stable.
 /// </summary>
 public static class SimulatedDataFactory
@@ -69,32 +76,51 @@ public static class SimulatedDataFactory
         var checkingId = AccountId("chk");
         var savingsId = AccountId("sav");
         var creditId = AccountId("cc");
+        var apexCardId = AccountId("cc2");
+        var brokerageId = AccountId("inv");
         var mortgageId = AccountId("mtg");
 
         var balFaker = MakeFaker(tenantId, baseSeed, slotIndex: 1);
 
-        decimal CheckingBalance() => Math.Round(balFaker.Random.Decimal(1200m, 4800m), 2);
-        decimal SavingsBalance() => Math.Round(balFaker.Random.Decimal(5000m, 25000m), 2);
-        decimal CreditBalance() => -Math.Round(balFaker.Random.Decimal(400m, 2800m), 2);
-        decimal MortgageBalance() => -Math.Round(balFaker.Random.Decimal(180_000m, 350_000m), 2);
+        decimal CheckingBalance() => Math.Round(balFaker.Random.Decimal(2_400m, 5_800m), 2);
+        decimal SavingsBalance() => Math.Round(balFaker.Random.Decimal(14_000m, 32_000m), 2);
+        decimal CreditBalance() => -Math.Round(balFaker.Random.Decimal(380m, 1_800m), 2);
+        decimal ApexBalance() => -Math.Round(balFaker.Random.Decimal(220m, 960m), 2);
+        decimal BrokerageBalance() => Math.Round(balFaker.Random.Decimal(18_500m, 72_000m), 2);
+        decimal MortgageBalance() => -Math.Round(balFaker.Random.Decimal(198_000m, 312_000m), 2);
+
+        var chkBal = CheckingBalance();
+        var savBal = SavingsBalance();
+        var ccBal = CreditBalance();
+        var apxBal = ApexBalance();
+        var invBal = BrokerageBalance();
+        var mtgBal = MortgageBalance();
 
         return new List<AccountDescriptor>
         {
             new(new ProviderAccount(checkingId, "Primary Checking", "CHECKING",
-                new Money(CheckingBalance(), "USD"), new Money(CheckingBalance() - 50m, "USD"), "USD"),
+                new Money(chkBal, "USD"), new Money(chkBal - 75m, "USD"), "USD"),
                 "CHECKING", 0),
 
             new(new ProviderAccount(savingsId, "High-Yield Savings", "SAVINGS",
-                new Money(SavingsBalance(), "USD"), null, "USD"),
+                new Money(savBal, "USD"), null, "USD"),
                 "SAVINGS", 1),
 
             new(new ProviderAccount(creditId, "Everyday Visa", "CREDIT",
-                new Money(CreditBalance(), "USD"), null, "USD"),
+                new Money(ccBal, "USD"), null, "USD"),
                 "CREDIT", 2),
 
+            new(new ProviderAccount(apexCardId, "Apex Rewards Card", "CREDIT",
+                new Money(apxBal, "USD"), null, "USD"),
+                "CREDIT2", 3),
+
+            new(new ProviderAccount(brokerageId, "Horizon Brokerage", "INVESTMENT",
+                new Money(invBal, "USD"), null, "USD"),
+                "INVESTMENT", 4),
+
             new(new ProviderAccount(mortgageId, "Home Mortgage", "MORTGAGE",
-                new Money(MortgageBalance(), "USD"), null, "USD"),
-                "MORTGAGE", 3),
+                new Money(mtgBal, "USD"), null, "USD"),
+                "MORTGAGE", 5),
         };
     }
 
@@ -111,6 +137,8 @@ public static class SimulatedDataFactory
             "CHECKING" => GenerateCheckingTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
             "SAVINGS" => GenerateSavingsTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
             "CREDIT" => GenerateCreditTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
+            "CREDIT2" => GenerateApexCardTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
+            "INVESTMENT" => GenerateInvestmentTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
             "MORTGAGE" => GenerateMortgageTransactions(descriptor.Account.ProviderId, tenantId, baseSeed, historyMonths),
             _ => Enumerable.Empty<ProviderTransaction>(),
         };
@@ -137,30 +165,41 @@ public static class SimulatedDataFactory
             if (d.DayOfWeek == DayOfWeek.Friday && ((d.DayNumber - epochFriday.DayNumber) % 14 == 0))
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
-                    new Money(payroll, "USD"), "PAYROLL DIRECT DEPOSIT", "Employer Payroll", null);
+                    new Money(payroll, "USD"), "PAYROLL DIRECT DEPOSIT", "Meridian Group LLC", "Payroll");
             }
         }
 
-        // ── Rent / mortgage transfer ──────────────────────────────────────
+        // ── Mortgage payment ──────────────────────────────────────────────
         for (var d = start; d <= today; d = d.AddMonths(1))
         {
             var firstOfMonth = new DateOnly(d.Year, d.Month, 1);
             if (firstOfMonth >= start && firstOfMonth <= today)
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), firstOfMonth, false,
-                    new Money(-1_650m, "USD"), "MORTGAGE PAYMENT", "Mortgage Servicer", null);
+                    new Money(-2_180m, "USD"), "MORTGAGE PAYMENT", "Lakeview Mortgage Services", "Housing");
             }
         }
 
-        // ── Utilities (monthly, ~15th) ────────────────────────────────────
+        // ── Utilities — electric (monthly, ~15th) ─────────────────────────
         for (var d = start; d <= today; d = d.AddMonths(1))
         {
             var fifteenth = new DateOnly(d.Year, d.Month, 15);
             if (fifteenth >= start && fifteenth <= today)
             {
-                var amount = -Math.Round(faker.Random.Decimal(95m, 180m), 2);
+                var amount = -Math.Round(faker.Random.Decimal(88m, 165m), 2);
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), fifteenth, false,
-                    new Money(amount, "USD"), "ELECTRIC UTILITY BILL", "Power Company", "Utilities");
+                    new Money(amount, "USD"), "ELECTRIC UTILITY BILL", "Lumen Utilities", "Utilities");
+            }
+        }
+
+        // ── Utilities — internet (monthly, ~12th) ─────────────────────────
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var twelfth = new DateOnly(d.Year, d.Month, 12);
+            if (twelfth >= start && twelfth <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), twelfth, false,
+                    new Money(-79.99m, "USD"), "INTERNET SERVICE", "ClearWave Internet", "Utilities");
             }
         }
 
@@ -171,24 +210,93 @@ public static class SimulatedDataFactory
             if (fifth >= start && fifth <= today)
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), fifth, false,
-                    new Money(-220m, "USD"), "AUTO INSURANCE PAYMENT", "Insurance Co", "Insurance");
+                    new Money(-247m, "USD"), "AUTO INSURANCE PAYMENT", "Ridgeline Insurance", "Insurance");
             }
         }
 
-        // ── Groceries (weekly) ────────────────────────────────────────────
+        // ── Health insurance premium (monthly, ~1st) ──────────────────────
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var second = new DateOnly(d.Year, d.Month, 2);
+            if (second >= start && second <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), second, false,
+                    new Money(-185m, "USD"), "HEALTH INSURANCE PREMIUM", "BluePeak Health", "Healthcare");
+            }
+        }
+
+        // ── Groceries (weekly, Saturdays) ─────────────────────────────────
         for (var d = start; d <= today; d = d.AddDays(7))
         {
-            var amount = -Math.Round(faker.Random.Decimal(80m, 240m), 2);
+            var amount = -Math.Round(faker.Random.Decimal(95m, 230m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
-                new Money(amount, "USD"), "GROCERY STORE PURCHASE", "Local Grocery", "Groceries");
+                new Money(amount, "USD"), "GROCERY STORE PURCHASE", "Bluejay Grocery Co.", "Groceries");
+        }
+
+        // ── Transit pass (monthly) ────────────────────────────────────────
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var eighth = new DateOnly(d.Year, d.Month, 8);
+            if (eighth >= start && eighth <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), eighth, false,
+                    new Money(-98m, "USD"), "METRO TRANSIT MONTHLY PASS", "Metro Transit Authority", "Transport");
+            }
         }
 
         // ── Fuel (every ~10 days) ─────────────────────────────────────────
         for (var d = start; d <= today; d = d.AddDays(10))
         {
-            var amount = -Math.Round(faker.Random.Decimal(40m, 85m), 2);
+            var amount = -Math.Round(faker.Random.Decimal(42m, 88m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
-                new Money(amount, "USD"), "FUEL STATION PURCHASE", "Gas Station", "Fuel");
+                new Money(amount, "USD"), "FUEL STATION PURCHASE", "QuickFuel Stations", "Transport");
+        }
+
+        // ── Healthcare / copay (roughly once every 6 weeks) ───────────────
+        for (var d = start; d <= today; d = d.AddDays(42))
+        {
+            var amount = -Math.Round(faker.Random.Decimal(25m, 75m), 2);
+            yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
+                new Money(amount, "USD"), "MEDICAL COPAY", "Clearview Medical Group", "Healthcare");
+        }
+
+        // ── Investment contribution (monthly, 20th) ───────────────────────
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var twentieth = new DateOnly(d.Year, d.Month, 20);
+            if (twentieth >= start && twentieth <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), twentieth, false,
+                    new Money(-500m, "USD"), "TRANSFER TO BROKERAGE", "Horizon Brokerage", "Investments");
+            }
+        }
+
+        // ── Savings transfer (monthly, 3rd) ───────────────────────────────
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var third = new DateOnly(d.Year, d.Month, 3);
+            if (third >= start && third <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), third, false,
+                    new Money(-600m, "USD"), "TRANSFER TO SAVINGS", "High-Yield Savings", "Savings");
+            }
+        }
+
+        // ── Occasional refund (roughly every 2 months) ────────────────────
+        for (var d = start; d <= today; d = d.AddDays(61))
+        {
+            var amount = Math.Round(faker.Random.Decimal(18m, 120m), 2);
+            yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
+                new Money(amount, "USD"), "MERCHANT REFUND", "Bluejay Grocery Co.", "Refunds");
+        }
+
+        // ── Low-water-mark scenario: large irregular expense (first month only) ──
+        // This creates at least one overdraft-warning scenario for the forecast chart.
+        var lowWaterDate = new DateOnly(start.Year, start.Month, 28);
+        if (lowWaterDate >= start && lowWaterDate <= today)
+        {
+            yield return Tx(accountId, faker.Random.AlphaNumeric(12), lowWaterDate, false,
+                new Money(-1_850m, "USD"), "HOME REPAIR - PLUMBING", "Riverstone Plumbing & Repairs", "Home Maintenance");
         }
     }
 
@@ -202,27 +310,38 @@ public static class SimulatedDataFactory
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var start = today.AddMonths(-historyMonths);
 
-        // Monthly savings transfer from checking
+        // Monthly savings transfer from checking (3rd of each month)
         for (var d = start; d <= today; d = d.AddMonths(1))
         {
             var third = new DateOnly(d.Year, d.Month, 3);
             if (third >= start && third <= today)
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), third, false,
-                    new Money(500m, "USD"), "TRANSFER FROM CHECKING", "Internal Transfer", "Savings");
+                    new Money(600m, "USD"), "TRANSFER FROM CHECKING", "Internal Transfer", "Savings");
             }
         }
 
-        // Monthly interest credit (~last day of month)
+        // Monthly interest credit (~last day of month) at high-yield rate
         for (var d = start; d <= today; d = d.AddMonths(1))
         {
             var lastDay = new DateOnly(d.Year, d.Month,
                 DateTime.DaysInMonth(d.Year, d.Month));
             if (lastDay >= start && lastDay <= today)
             {
-                var interest = Math.Round(faker.Random.Decimal(8m, 35m), 2);
+                var interest = Math.Round(faker.Random.Decimal(42m, 88m), 2);
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), lastDay, false,
                     new Money(interest, "USD"), "INTEREST CREDIT", null, "Interest");
+            }
+        }
+
+        // Goal contribution top-up (quarterly) — makes goals visible in UI
+        for (var d = start; d <= today; d = d.AddMonths(3))
+        {
+            var fifteenth = new DateOnly(d.Year, d.Month, 15);
+            if (fifteenth >= start && fifteenth <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), fifteenth, false,
+                    new Money(1_000m, "USD"), "VACATION FUND CONTRIBUTION", "Internal Transfer", "Goals");
             }
         }
     }
@@ -240,10 +359,11 @@ public static class SimulatedDataFactory
         // Subscriptions (monthly)
         var subscriptions = new[]
         {
-            ("NETFLIX SUBSCRIPTION", "Netflix", -15.99m),
-            ("SPOTIFY PREMIUM", "Spotify", -9.99m),
-            ("AMAZON PRIME", "Amazon", -14.99m),
-            ("CLOUD BACKUP SERVICE", "Backup Service", -6.99m),
+            ("STREAMFLIX SUBSCRIPTION",  "StreamFlix",         -15.99m),
+            ("SOUNDWAVE PREMIUM",         "SoundWave Music",    -9.99m),
+            ("SHOPSWIFT PRIME",           "ShopSwift",         -14.99m),
+            ("CLOUDVAULT BACKUP",         "CloudVault Storage",  -6.99m),
+            ("FITTRACK MEMBERSHIP",       "FitTrack Health",   -12.99m),
         };
 
         foreach (var (desc, merchant, amount) in subscriptions)
@@ -261,24 +381,115 @@ public static class SimulatedDataFactory
             }
         }
 
-        // Restaurants / dining (random, ~3x per week)
+        // Restaurants / dining (random, ~3×/week) using clearly-synthetic names
+        var restaurants = new[]
+        {
+            "The Copper Kettle Bistro",
+            "Hawthorn Noodle Bar",
+            "Bluestone Tacos",
+            "Mapletree Sushi",
+            "Ember & Rye Grill",
+            "Saltwater Poke Co.",
+            "Ironwood Pizza Kitchen",
+            "Clover Leaf Cafe",
+        };
         for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(2, 4)))
         {
-            var amount = -Math.Round(faker.Random.Decimal(12m, 85m), 2);
-            var restaurant = faker.Company.CompanyName();
+            var amount = -Math.Round(faker.Random.Decimal(14m, 92m), 2);
+            var restaurant = restaurants[faker.Random.Int(0, restaurants.Length - 1)];
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), $"RESTAURANT {restaurant.ToUpperInvariant()}", restaurant, "Dining");
         }
 
-        // Monthly payment (credit card autopay)
+        // Monthly payment (credit card autopay, 22nd)
         for (var d = start; d <= today; d = d.AddMonths(1))
         {
             var payDay = new DateOnly(d.Year, d.Month, 22);
             if (payDay >= start && payDay <= today)
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), payDay, false,
-                    new Money(500m, "USD"), "AUTOPAY CREDIT CARD PAYMENT", "Card Issuer", "Payment");
+                    new Money(650m, "USD"), "AUTOPAY CREDIT CARD PAYMENT", "Everyday Visa", "Payment");
             }
+        }
+    }
+
+    private static IEnumerable<ProviderTransaction> GenerateApexCardTransactions(
+        string accountId,
+        TenantId tenantId,
+        int baseSeed,
+        int historyMonths)
+    {
+        var faker = MakeFaker(tenantId, baseSeed, slotIndex: 14);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = today.AddMonths(-historyMonths);
+
+        // Travel / transport on rewards card
+        var travelMerchants = new[]
+        {
+            ("RIDESHARE APEX",    "Apex Rideshare",     -18m,  -55m),
+            ("PARKING CITYPARK",  "CityPark Garages",   -12m,  -38m),
+            ("AIRPORT SHUTTLE",   "Swiftway Shuttle",   -22m,  -65m),
+        };
+
+        foreach (var (desc, merchant, lo, hi) in travelMerchants)
+        {
+            for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(7, 14)))
+            {
+                var amount = Math.Round(faker.Random.Decimal(lo, hi), 2);
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
+                    new Money(amount, "USD"), desc, merchant, "Transport");
+            }
+        }
+
+        // Online shopping (sporadic)
+        var shopMerchants = new[] { "MarketNest Online", "TechDen Electronics", "GreenLeaf Garden Supply" };
+        for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(12, 25)))
+        {
+            var amount = -Math.Round(faker.Random.Decimal(22m, 220m), 2);
+            var merchant = shopMerchants[faker.Random.Int(0, shopMerchants.Length - 1)];
+            yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
+                new Money(amount, "USD"), $"ONLINE PURCHASE {merchant.ToUpperInvariant()}", merchant, "Shopping");
+        }
+
+        // Monthly payment (15th)
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var payDay = new DateOnly(d.Year, d.Month, 15);
+            if (payDay >= start && payDay <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), payDay, false,
+                    new Money(400m, "USD"), "AUTOPAY APEX REWARDS PAYMENT", "Apex Rewards Card", "Payment");
+            }
+        }
+    }
+
+    private static IEnumerable<ProviderTransaction> GenerateInvestmentTransactions(
+        string accountId,
+        TenantId tenantId,
+        int baseSeed,
+        int historyMonths)
+    {
+        var faker = MakeFaker(tenantId, baseSeed, slotIndex: 15);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = today.AddMonths(-historyMonths);
+
+        // Monthly contributions (20th) from checking
+        for (var d = start; d <= today; d = d.AddMonths(1))
+        {
+            var twentieth = new DateOnly(d.Year, d.Month, 20);
+            if (twentieth >= start && twentieth <= today)
+            {
+                yield return Tx(accountId, faker.Random.AlphaNumeric(12), twentieth, false,
+                    new Money(500m, "USD"), "INVESTMENT CONTRIBUTION", "Internal Transfer", "Investments");
+            }
+        }
+
+        // Quarterly dividend reinvestment
+        for (var d = start; d <= today; d = d.AddMonths(3))
+        {
+            var div = Math.Round(faker.Random.Decimal(28m, 145m), 2);
+            yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
+                new Money(div, "USD"), "DIVIDEND REINVESTMENT", "Horizon Brokerage", "Investment Income");
         }
     }
 
@@ -298,7 +509,7 @@ public static class SimulatedDataFactory
             if (payDay >= start && payDay <= today)
             {
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), payDay, false,
-                    new Money(-1_650m, "USD"), "MORTGAGE MONTHLY PAYMENT", "Mortgage Servicer", "Housing");
+                    new Money(-2_180m, "USD"), "MORTGAGE MONTHLY PAYMENT", "Lakeview Mortgage Services", "Housing");
             }
         }
     }
