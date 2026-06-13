@@ -7,7 +7,7 @@
 
 <PageTitle>Accounts — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4">
+<div class="d-flex align-center justify-space-between mb-4 fl-enter">
     <MudText Typo="Typo.h4">Accounts</MudText>
     <MudButton StartIcon="@Icons.Material.Filled.Add"
                Color="Color.Primary"
@@ -20,11 +20,28 @@
 
 @if (_loading)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading accounts" />
+    <CardSkeleton Height="40px" Count="6" />
 }
 @if (_error is not null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (!_loading && _error is null && _accounts.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.AccountBalance"
+                Title="No accounts yet"
+                Description="Add an account or use Connect &amp; Sync to load demo data.">
+        <Action>
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="OpenCreateDialog"
+                       aria-label="Add new account">
+                Add Account
+            </MudButton>
+        </Action>
+    </EmptyState>
 }
 
 <MudDataGrid T="FlowLedger.Web.ApiClient.AccountDto"
@@ -33,8 +50,8 @@
              FilterMode="DataGridFilterMode.ColumnFilterRow"
              SortMode="SortMode.Multiple"
              Hover="true"
-             Striped="true"
-             Dense="false"
+             Striped="false"
+             Dense="true"
              aria-label="Accounts table">
     <Columns>
         <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
@@ -42,7 +59,8 @@
         <PropertyColumn Property="x => x.Institution" Title="Institution" Sortable="true" />
         <TemplateColumn Title="Balance" Sortable="true" SortBy="x => x.BalanceAmount">
             <CellTemplate>
-                <MudText Color="@(context.Item.BalanceAmount >= 0 ? Color.Default : Color.Error)">
+                <MudText Class="fl-num"
+                         Color="@(context.Item.BalanceAmount >= 0 ? Color.Default : Color.Error)">
                     @context.Item.BalanceAmount.ToString("C2")
                 </MudText>
             </CellTemplate>
@@ -50,7 +68,9 @@
         <PropertyColumn Property="x => x.BalanceCurrency" Title="Currency" />
         <TemplateColumn Title="Status">
             <CellTemplate>
-                <MudChip T="string" Size="Size.Small"
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Text"
                          Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
                     @(context.Item.IsActive ? "Active" : "Inactive")
                 </MudChip>

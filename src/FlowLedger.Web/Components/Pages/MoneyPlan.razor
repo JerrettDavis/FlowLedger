@@ -32,30 +32,30 @@
 
 @if (_loading)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading money plan" />
+    <CardSkeleton Count="8" Height="36px" />
 }
 @if (_error is not null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
 }
 
-@if (!_loading && _rows.Count == 0 && _error is null)
-{
-    <MudAlert Severity="Severity.Info">
-        No data yet. Use "Connect &amp; Sync" in the top bar to load demo data.
-    </MudAlert>
-}
-
 <!-- Legend -->
 <div class="d-flex gap-3 mb-3 flex-wrap" style="gap:12px" role="legend" aria-label="Row status legend">
-    @foreach (var (status, color, label) in StatusLegend)
+    @foreach (var (status, cssVar, label) in StatusLegend)
     {
-        <div class="d-flex align-center gap-1" style="gap:4px">
-            <div style="width:12px;height:12px;border-radius:2px;background:@color" aria-hidden="true"></div>
+        <div class="d-flex align-center" style="gap:6px">
+            <div style="width:3px;height:14px;border-radius:2px;background:var(@cssVar);flex-shrink:0" aria-hidden="true"></div>
             <MudText Typo="Typo.caption">@label</MudText>
         </div>
     }
 </div>
+
+@if (!_loading && _rows.Count == 0 && _error is null)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.TableChart"
+                Title="No plan data yet"
+                Description="Use Connect &amp; Sync to load demo data, then refresh." />
+}
 
 <MudDataGrid T="MoneyPlanRow"
              Items="_rows"
@@ -75,12 +75,12 @@
     <Columns>
         <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.Date" InitialDirection="SortDirection.Ascending">
             <CellTemplate>
-                <MudText Typo="Typo.body2">@context.Item.Date.ToString("yyyy-MM-dd")</MudText>
+                <MudText Typo="Typo.body2" Class="fl-num">@Format.DayMonth(context.Item.Date)</MudText>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Status" Filterable="true" SortBy="x => x.Status">
             <CellTemplate>
-                <MudChip T="string" Size="Size.Small" Color="@ChipColor(context.Item.Status)">
+                <MudChip T="string" Size="Size.Small" Color="@ChipColor(context.Item.Status)" Variant="Variant.Text">
                     @context.Item.Status
                 </MudChip>
             </CellTemplate>
@@ -93,9 +93,10 @@
         </TemplateColumn>
         <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
             <CellTemplate>
-                <MudText Color="@(context.Item.IsCredit ? Color.Success : Color.Error)"
+                <MudText Class="fl-num"
+                         Color="@(context.Item.IsCredit ? Color.Success : Color.Error)"
                          Typo="Typo.body2">
-                    @(context.Item.IsCredit ? "+" : "-")@context.Item.Amount.ToString("C2")
+                    @Format.Signed(context.Item.IsCredit ? context.Item.Amount : -context.Item.Amount)
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
@@ -103,9 +104,10 @@
         <TemplateColumn Title="Running Balance" Sortable="true" SortBy="x => x.RunningBalance">
             <CellTemplate>
                 <MudText Typo="Typo.body2"
+                         Class="fl-num"
                          Color="@(context.Item.RunningBalance < 0 ? Color.Error : Color.Default)"
-                         Style="font-variant-numeric:tabular-nums;font-weight:600">
-                    @context.Item.RunningBalance.ToString("C2")
+                         Style="font-weight:600">
+                    @Format.Money(context.Item.RunningBalance)
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
@@ -126,13 +128,16 @@
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
 
-    private static readonly (string Status, string Color, string Label)[] StatusLegend =
+    // Maps each status to its MudBlazor CSS palette variable and display label.
+    // Using CSS vars instead of hard-coded hex means colors adapt automatically
+    // to light/dark theme switching.
+    private static readonly (string Status, string CssVar, string Label)[] StatusLegend =
     [
-        ("Posted",   "#4caf50", "Posted (actual)"),
-        ("Pending",  "#ff9800", "Pending"),
-        ("Matched",  "#2196f3", "Matched"),
-        ("Planned",  "#9e9e9e", "Planned (forecast)"),
-        ("Skipped",  "#bdbdbd", "Skipped"),
+        ("Posted",  "--mud-palette-success",         "Posted (actual)"),
+        ("Pending", "--mud-palette-warning",          "Pending"),
+        ("Matched", "--mud-palette-info",             "Matched"),
+        ("Planned", "--mud-palette-text-secondary",   "Planned (forecast)"),
+        ("Skipped", "--mud-palette-text-disabled",    "Skipped"),
     ];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -238,27 +243,32 @@
 
     private static string RowStyle(MoneyPlanRow row, int index)
     {
-        var opacity = row.Status is "Skipped" ? "opacity:0.5;" : "";
-        return row.Status switch
+        // Left accent border communicates status without painting the whole row.
+        // Skipped rows are also dimmed via opacity to de-emphasize them.
+        // All colors reference MudBlazor CSS custom properties so they
+        // automatically adapt in dark mode without any additional logic.
+        var opacity = row.Status is "Skipped" ? "opacity:0.45;" : "";
+        var border = row.Status switch
         {
-            "Posted" => $"{opacity}background:rgba(76,175,80,0.06)",
-            "Pending" => $"{opacity}background:rgba(255,152,0,0.08)",
-            "Matched" => $"{opacity}background:rgba(33,150,243,0.06)",
-            "Planned" => $"{opacity}background:rgba(158,158,158,0.04)",
-            "Skipped" => $"{opacity}",
-            _ => opacity
+            "Posted"  => "border-left:3px solid var(--mud-palette-success);",
+            "Pending" => "border-left:3px solid var(--mud-palette-warning);",
+            "Matched" => "border-left:3px solid var(--mud-palette-info);",
+            "Planned" => "border-left:3px solid var(--mud-palette-text-secondary);",
+            "Skipped" => "border-left:3px solid var(--mud-palette-text-disabled);",
+            _         => "border-left:3px solid transparent;",
         };
+        return opacity + border;
     }
 
     private static Color ChipColor(string status) => status switch
     {
-        "Posted" => Color.Success,
-        "Pending" => Color.Warning,
-        "Matched" => Color.Info,
-        "Reconciled" => Color.Primary,
-        "Planned" => Color.Default,
-        "Skipped" => Color.Dark,
-        _ => Color.Default
+        "Posted"      => Color.Success,
+        "Pending"     => Color.Warning,
+        "Matched"     => Color.Info,
+        "Reconciled"  => Color.Primary,
+        "Planned"     => Color.Default,
+        "Skipped"     => Color.Dark,
+        _             => Color.Default
     };
 
     private sealed record MoneyPlanRow(
