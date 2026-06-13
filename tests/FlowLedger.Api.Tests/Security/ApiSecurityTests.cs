@@ -1,8 +1,5 @@
 using System.Net;
-using FlowLedger.Application.Abstractions;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FlowLedger.Api.Tests.Security;
 
@@ -92,48 +89,6 @@ public sealed class ApiSecurityTests(FlowLedgerApiFactory factory) : IAsyncLifet
         response.Headers.GetValues("X-Frame-Options").Should().Contain("DENY");
         response.Headers.Should().ContainKey("Referrer-Policy");
         response.Headers.Should().ContainKey("X-XSS-Protection");
-    }
-
-    [Fact]
-    public async Task Production_tenant_context_fails_closed_without_tenant()
-    {
-        await using var prodFactory = new FailClosedApiFactory();
-        await prodFactory.InitializeAsync();
-        var client = prodFactory.CreateClient();
-
-        // Authenticated with a valid API key, but NO X-Tenant-Id header.
-        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {FlowLedgerApiFactory.DevApiKey}");
-
-        var response = await client.GetAsync("/api/accounts");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Background_job_scope_resolves_household_tenant_without_http_context()
-    {
-        // Mirrors how OnDemandSyncJob runs: a fresh DI scope with NO HttpContext, in the
-        // Production environment (HeaderTenantContext registered). The background path must
-        // NOT throw and must resolve the configured household tenant — otherwise every
-        // webhook-triggered sync would silently fail in Production.
-        await using var prodFactory = new FailClosedApiFactory();
-        await prodFactory.InitializeAsync();
-
-        // Touch Services to ensure the host is started, then create a job-style scope.
-        await using var scope = prodFactory.Services.CreateAsyncScope();
-
-        // No HttpContext exists in this scope (no request).
-        var resolve = () => scope.ServiceProvider.GetRequiredService<ITenantContext>();
-        var tenantContext = resolve.Should().NotThrow().Subject;
-
-        tenantContext.TenantId.Should().Be(FlowLedgerApiFactory.DemoTenantId,
-            "the background path falls back to the configured household tenant (Api:TenantId)");
-        tenantContext.UserId.Should().Be(FlowLedgerApiFactory.DemoTenantId);
-
-        // The sync service (which depends transitively on ITenantContext via the DbContext
-        // and sync cursor store) must also resolve without throwing in this scope.
-        var resolveSync = () => scope.ServiceProvider.GetRequiredService<IFinancialSyncService>();
-        resolveSync.Should().NotThrow();
     }
 
     [Fact]

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- TinyBDD 0.19.23 source generator emits #nullable enable code that has nullable
+         violations (CS8602, CS8625) and an unused catch variable (CS0168). Suppress only
+         these codes so the generator output does not fail the build. Remove once upstream
+         fixes the generator. -->
+    <NoWarn>$(NoWarn);CS8602;CS8625;CS0168</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="TinyBDD" />
+    <PackageReference Include="TinyBDD.Xunit" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Respawn" />
+    <PackageReference Include="WireMock.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="FluentAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

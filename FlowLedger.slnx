@@ -19,6 +19,7 @@
     <Project Path="tests/FlowLedger.Api.Tests/FlowLedger.Api.Tests.csproj" />
     <Project Path="tests/FlowLedger.Application.Tests/FlowLedger.Application.Tests.csproj" />
     <Project Path="tests/FlowLedger.Architecture.Tests/FlowLedger.Architecture.Tests.csproj" />
+    <Project Path="tests/FlowLedger.Bdd.Tests/FlowLedger.Bdd.Tests.csproj" />
     <Project Path="tests/FlowLedger.Domain.Tests/FlowLedger.Domain.Tests.csproj" />
     <Project Path="tests/FlowLedger.Infrastructure.Tests/FlowLedger.Infrastructure.Tests.csproj" />
     <Project Path="tests/FlowLedger.Integrations.Tests/FlowLedger.Integrations.Tests.csproj" />

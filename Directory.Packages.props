@@ -113,6 +113,14 @@
   </ItemGroup>
 
   <!-- ============================================================
+       Testing — BDD
+  ============================================================ -->
+  <ItemGroup>
+    <PackageVersion Include="TinyBDD" Version="0.19.23" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.23" />
+  </ItemGroup>
+
+  <!-- ============================================================
        Testing — Integration / Architecture / Fakes (pinned for M2)
   ============================================================ -->
   <ItemGroup>

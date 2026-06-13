@@ -16,7 +16,7 @@ internal sealed class CategoryRepository : ICategoryRepository
         => await _db.Categories.FirstOrDefaultAsync(c => c.Id == id.Value, ct);
 
     public async Task<IReadOnlyList<Category>> ListAsync(CancellationToken ct = default)
-        => await _db.Categories.OrderBy(c => c.Path.Value).ToListAsync(ct);
+        => await _db.Categories.OrderBy(c => c.Path).ToListAsync(ct);
 
     public async Task AddAsync(Category category, CancellationToken ct = default)
         => await _db.Categories.AddAsync(category, ct);

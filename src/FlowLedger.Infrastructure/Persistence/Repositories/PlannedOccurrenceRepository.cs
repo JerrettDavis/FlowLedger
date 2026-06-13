@@ -27,6 +27,7 @@ internal sealed class PlannedOccurrenceRepository : IPlannedOccurrenceRepository
     {
         // Project from the owned collection — EF Core supports LINQ projections over OwnsMany.
         var results = await _db.RecurringFlows
+            .AsNoTracking()
             .SelectMany(rf => rf.Occurrences
                 .Where(o => o.Status == OccurrenceStatus.Pending
                             && o.PlannedDate >= from
@@ -57,6 +58,7 @@ internal sealed class PlannedOccurrenceRepository : IPlannedOccurrenceRepository
         CancellationToken ct = default)
     {
         var result = await _db.RecurringFlows
+            .AsNoTracking()
             .SelectMany(rf => rf.Occurrences
                 .Where(o => o.Id == id.Value)
                 .Select(o => new { rf.Name, Occurrence = o }))
