@@ -8,21 +8,24 @@ should not run simultaneously.
 Aspire orchestrates all services with hot-reload, the Aspire dashboard, and automatic
 service discovery wiring.
 
-**Prerequisites:** .NET 10 SDK, Docker Desktop, Aspire workload
+**Prerequisites:** .NET 10 SDK (10.0.301+), Docker Desktop
 
 ```bash
-# Install the Aspire workload (once)
-dotnet workload install aspire
-
 # Start everything
 ./eng/scripts/run.ps1    # Windows
 ./eng/scripts/run.sh     # Linux / macOS
 ```
 
+Or directly:
+
+```bash
+dotnet run --project src/FlowLedger.AppHost
+```
+
 This starts:
 - **Postgres** and **Redis** as Aspire-managed containers
-- **API** at https://localhost:5001
-- **Web** at https://localhost:5002
+- **API** at a dynamic port (see dashboard)
+- **Web** at a dynamic port (see dashboard)
 - **Worker** (background job host)
 - **Aspire dashboard** at https://localhost:15888
 
@@ -68,6 +71,33 @@ starting the other.
 | Tenant ID        | `00000000-0000-0000-0000-000000000001` | Hard-coded demo tenant                     |
 | Postgres user    | `flowledger`                           | Database: `flowledger`                     |
 | Postgres password | `dev_only_change_in_prod` (compose)   | Or Aspire-generated in Aspire mode         |
+
+## MX Integration Toggle
+
+MX is configured once in the **AppHost** project. Aspire forwards the values to both API
+and Worker automatically — there is no need to set secrets in individual service projects.
+
+**Enable MX (real data):**
+
+```powershell
+cd src/FlowLedger.AppHost
+dotnet user-secrets set "Mx:Enabled"       "true"
+dotnet user-secrets set "Mx:ApiKey"        "your-api-key"
+dotnet user-secrets set "Mx:ClientId"      "your-client-id"
+dotnet user-secrets set "Mx:BaseUrl"       "https://int-api.mx.com"
+dotnet user-secrets set "Mx:WebhookSecret" "your-webhook-secret"
+```
+
+**Restore Simulated mode (default):**
+
+```powershell
+cd src/FlowLedger.AppHost
+dotnet user-secrets clear
+```
+
+> **Fail-fast validation:** If `Mx:Enabled=true` and any credential is missing, the app
+> refuses to start and prints the name of the missing field. This is intentional — there
+> is no silent fallback to fake data when MX is enabled.
 
 ## Running tests
 

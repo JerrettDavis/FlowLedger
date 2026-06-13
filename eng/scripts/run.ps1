@@ -2,9 +2,6 @@
 # FlowLedger — One-Script Run (Windows / PowerShell)
 # Usage: ./eng/scripts/run.ps1
 # Prerequisites: .NET 10 SDK, Docker Desktop (or Podman)
-#
-# NOTE: On some Windows machines, if dotnet crashes with corrupted R2R images,
-# set $env:DOTNET_ReadyToRun="0" before running this script.
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -52,6 +49,9 @@ Write-Host ""
 Write-Host "  Aspire assigns dynamic ports via service discovery." -ForegroundColor Green
 Write-Host "  Open the Aspire dashboard to see the actual resource URLs and login token:" -ForegroundColor Green
 Write-Host "  https://localhost:15888" -ForegroundColor Green
+Write-Host ""
+Write-Host "  MX toggle: set Mx:* user-secrets on the AppHost project to enable real MX data." -ForegroundColor Green
+Write-Host "  Leave unset (default) to use the Simulated provider — no credentials required." -ForegroundColor Green
 Write-Host ""
 Write-Host "  Press Ctrl+C to stop all services." -ForegroundColor DarkGray
 Write-Host ""

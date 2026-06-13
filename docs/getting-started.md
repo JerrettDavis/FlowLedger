@@ -2,20 +2,31 @@
 
 ## Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (10.0.301 or later)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for integration tests and full-stack mode)
 - (Optional) MX API credentials from [dashboard.mx.com](https://dashboard.mx.com)
 
-## Local SDK Note (Windows)
-
-Before running tests or the dev server on Windows, set these environment variables to work around a known JIT regression in certain .NET 10 SDK images:
+## Quick Start
 
 ```powershell
-$env:DOTNET_ReadyToRun = "0"
-$env:COMPlus_ReadyToRun = "0"
+# Windows
+./eng/scripts/run.ps1
 ```
 
-If `dotnet` crashes, set these before running any commands. CI (Linux) does not need these.
+```bash
+# Linux / macOS
+./eng/scripts/run.sh
+```
+
+This is the single command that brings up the full stack. Aspire orchestrates Postgres,
+Redis, API, Worker, and Web, then opens the dashboard.
+
+Open the Aspire dashboard at `https://localhost:15888` — it shows all service URLs, logs,
+and the login token required on first access.
+
+> **Troubleshooting:** If `dotnet` crashes with exit code 0xC0000005, your .NET SDK has
+> a corrupted ReadyToRun image. Reinstall the .NET 10 SDK from https://dot.net to fix it.
+> This is a one-time repair; no environment variable workaround is needed.
 
 Also ensure **Docker Desktop is running** before starting Aspire.
 
@@ -43,26 +54,33 @@ docker compose -f docker-compose.full.yml up
 
 By default, FlowLedger uses simulated (fake) bank data — no credentials needed.
 
-To switch to real MX.com data:
+To switch to real MX.com data, set the `Mx:*` configuration keys in the **AppHost** project
+using `dotnet user-secrets`. This is the single place to set — Aspire forwards the values
+to both the API and Worker automatically.
 
-1. Get credentials from [dashboard.mx.com](https://dashboard.mx.com)
-2. Set the following in `appsettings.json` or environment variables:
-
-```json
-{
-  "Mx": {
-    "Enabled": true,
-    "ApiKey": "your-api-key",
-    "ClientId": "your-client-id",
-    "BaseUrl": "https://int.mx.com",
-    "WebhookSecret": "your-webhook-secret"
-  }
-}
+```powershell
+cd src/FlowLedger.AppHost
+dotnet user-secrets set "Mx:Enabled"       "true"
+dotnet user-secrets set "Mx:ApiKey"        "your-api-key"
+dotnet user-secrets set "Mx:ClientId"      "your-client-id"
+dotnet user-secrets set "Mx:BaseUrl"       "https://int-api.mx.com"
+dotnet user-secrets set "Mx:WebhookSecret" "your-webhook-secret"
 ```
 
-3. Restart the app
+Then run `aspire run` (or `./eng/scripts/run.ps1`) as normal. The app will use real MX data.
 
-Use `https://int.mx.com` for sandbox and `https://api.mx.com` for production.
+Use `https://int-api.mx.com` for sandbox and `https://api.mx.com` for production.
+
+To restore Simulated mode:
+
+```powershell
+cd src/FlowLedger.AppHost
+dotnet user-secrets clear
+```
+
+> **Fail-fast:** If `Mx:Enabled` is `true` but any credential is missing, the app refuses
+> to start and names the missing field. Supply all four credentials (ApiKey, ClientId,
+> BaseUrl, WebhookSecret) before enabling.
 
 See [docs/architecture/mx-integration.md](architecture/mx-integration.md) for the full integration guide.
 
