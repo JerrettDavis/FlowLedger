@@ -1,6 +1,6 @@
-using FluentAssertions;
 using FlowLedger.Api.Logging;
 using FlowLedger.Api.Tests.Logging;
+using FluentAssertions;
 using Serilog;
 using Serilog.Events;
 

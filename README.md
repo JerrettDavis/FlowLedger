@@ -29,48 +29,61 @@ FlowLedger combines four traditionally separate tools into one system:
 | Cache / locks | Redis |
 | Scheduler | Quartz.NET |
 | Identity / Auth | ASP.NET Core Identity + OpenIddict |
+| Testing | xUnit, FluentAssertions, Testcontainers, Playwright E2E, TinyBDD, PatternKit.Core (dogfooded) |
 | Observability | OpenTelemetry, Serilog, Aspire dashboard |
-| Testing | xUnit, FluentAssertions, Testcontainers, Playwright |
-| CI | GitHub Actions |
+| Security | CodeQL, Dependabot, SCA via dotnet list package --vulnerable |
+| CI / CD | GitHub Actions |
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dot.net/download)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (or Podman) — Aspire manages PostgreSQL and Redis containers
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (or Podman)
 - Aspire workload: `dotnet workload install aspire`
+
+**Windows SDK Note:** Before running tests locally on Windows, set these environment variables to work around a JIT regression:
+
+```powershell
+$env:DOTNET_ReadyToRun = "0"
+$env:COMPlus_ReadyToRun = "0"
+```
+
+CI (Linux) does not need these.
 
 ## Quick start
 
+### Development (Aspire inner loop)
+
+The fast inner loop. Orchestrates API, Worker, Web, Postgres, and Redis with service discovery and a dashboard.
+
 ```powershell
-# Windows
-./eng/scripts/run.ps1
+dotnet run --project src/FlowLedger.AppHost
 ```
 
-```bash
-# Linux / macOS / WSL
-chmod +x eng/scripts/run.sh
-./eng/scripts/run.sh
-```
-
-The script validates prerequisites, restores packages, builds, and launches the Aspire AppHost which orchestrates all services.
+Open the Aspire dashboard at `https://localhost:15888` to see all services and their logs.
 
 | URL | Purpose |
 |---|---|
-| https://localhost:15888 | Aspire dashboard (logs, traces, metrics, resources) |
+| https://localhost:15888 | Aspire dashboard |
 | https://localhost:5001 | FlowLedger API |
 | https://localhost:5002 | FlowLedger Web |
 
-## Run tests
-
-```powershell
-# Windows
-./eng/scripts/test.ps1
-```
+### Full Stack (Docker Compose, self-hosting / E2E)
 
 ```bash
-# Linux / macOS / WSL
-./eng/scripts/test.sh
+docker compose -f docker-compose.full.yml up
 ```
+
+## Run tests
+
+All tests except E2E (which require the full stack running):
+
+```bash
+dotnet test FlowLedger.slnx --filter "Category!=E2E" --configuration Release
+```
+
+**Test suite:** ~499+ passing tests across unit, integration, BDD, and performance categories.
+
+See [docs/development/testing.md](docs/development/testing.md) for detailed testing guide.
 
 ## Architecture
 
@@ -105,20 +118,25 @@ Infrastructure -> Application abstractions + Domain
 Integrations -> Application abstractions + Domain contracts (never the reverse)
 ```
 
-## Milestones
+## Status
 
-| Milestone | Status | Description |
+**Phases 1–8 complete.** All core features implemented and verified green.
+
+| Phase | Status | Coverage |
 |---|---|---|
-| 0 — Repo foundation | In progress | Solution scaffold, Aspire, CI, one-script run |
-| 1 — Core domain | Planned | Money, Account, Transaction, RecurringFlow domain model |
-| 2 — Persistence & APIs | Planned | EF Core, migrations, account/transaction CRUD |
-| 3 — Money Plan | Planned | Spreadsheet view, running balances, row statuses |
-| 4 — Forecasting | Planned | Deterministic forecast engine, scenarios |
-| 5 — Imports & matching | Planned | CSV import, duplicate detection, plan reconciliation |
-| 6 — Goals & reports | Planned | Savings goals, trends, net-worth dashboard |
-| 7 — MX integration | Planned | Bank aggregation behind feature flag |
-| 8 — Self-hosted RC | Planned | Docker Compose, backup docs, full E2E |
-| 9 — SaaS foundation | Planned | Multi-tenancy, admin console, billing abstraction |
+| 0 — Repo foundation | ✅ Complete | Aspire, CI, multi-run modes |
+| 1 — Core domain | ✅ Complete | Money, Account, Transaction, RecurringFlow domain model |
+| 2 — Persistence & APIs | ✅ Complete | EF Core, Npgsql, CRUD endpoints |
+| 3 — Money Plan | ✅ Complete | Spreadsheet view, running balances, row statuses |
+| 4 — Forecasting | ✅ Complete | Deterministic forecast engine, goal affordability |
+| 5 — Imports & matching | ✅ Complete | RFC-4180 CSV, transaction matching |
+| 6 — Goals & reports | ✅ Complete | Savings goal tracking, low-water marks, overdraft warnings |
+| 7 — MX integration | ✅ Complete | Bank aggregation, feature-flagged, webhook sync |
+| 8 — Final release | ✅ Complete | Performance gates, security CI, docs, full green sweep |
+
+## MX Integration
+
+By default, FlowLedger uses simulated (fake) bank data — no credentials needed. To enable real MX.com data, set `Mx:Enabled=true` and provide your API credentials. See [docs/architecture/mx-integration.md](docs/architecture/mx-integration.md) for the full guide.
 
 ## Contributing
 

@@ -73,7 +73,7 @@ public sealed class ForecastEngineTests
         // AsOf: Jan 1, 2025
 
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 2, 28);
+        var end = new DateOnly(2025, 2, 28);
 
         var payroll = Flow(Checking, 2000m, TransactionDirection.Credit,
             RecurrencePattern.EveryNWeeks(2, DayOfWeek.Friday),
@@ -129,7 +129,7 @@ public sealed class ForecastEngineTests
     public void LowWaterMark_identifies_minimum_projected_balance_and_date()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 2, 28);
+        var end = new DateOnly(2025, 2, 28);
 
         // Large rent hits Jan 1 → dips deeply negative, then payrolls recover
         var payroll = Flow(Checking, 2000m, TransactionDirection.Credit,
@@ -152,7 +152,7 @@ public sealed class ForecastEngineTests
     public void OverdraftWarning_emitted_with_correct_first_breach_date()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
 
         // Start $200. Single large debit on Jan 5 of $500 → breach Jan 5
         var largeBill = Flow(Checking, 500m, TransactionDirection.Debit,
@@ -171,7 +171,7 @@ public sealed class ForecastEngineTests
     public void No_overdraft_warning_when_balance_stays_positive()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
 
         var subscription = Flow(Checking, 15m, TransactionDirection.Debit,
             RecurrencePattern.Monthly(10), flowStart: asOf);
@@ -193,7 +193,7 @@ public sealed class ForecastEngineTests
         // and must NOT apply both (which would be -$395).
 
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
         var flowId = RecurringFlowId.New();
         var occurrenceId = PlannedOccurrenceId.New();
         var actualTxId = TransactionId.New();
@@ -240,7 +240,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(1000m, new Currency("USD")) },
+            { [Checking] = new Money(1000m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [flow],
             PlannedOccurrences = [planned],
@@ -266,7 +266,7 @@ public sealed class ForecastEngineTests
     public void Unmatched_planned_occurrence_is_included_in_forecast()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
         var flowId = RecurringFlowId.New();
         var occurrenceId = PlannedOccurrenceId.New();
 
@@ -287,7 +287,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(1000m, new Currency("USD")) },
+            { [Checking] = new Money(1000m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [],
             PlannedOccurrences = [planned],
@@ -313,7 +313,7 @@ public sealed class ForecastEngineTests
     {
         // Two flows hit the same day: payroll credit + rent debit on Jan 1
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 1);
+        var end = new DateOnly(2025, 1, 1);
 
         var payroll = Flow(Checking, 2000m, TransactionDirection.Credit,
             RecurrencePattern.Monthly(1), flowStart: asOf, name: "Payroll");
@@ -341,7 +341,7 @@ public sealed class ForecastEngineTests
     public void Goal_affordable_when_projected_balance_exceeds_remaining()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 6, 30);
+        var end = new DateOnly(2025, 6, 30);
         var goalId = Guid.NewGuid();
 
         // Payroll every 2 weeks, no expenses → balance grows steadily
@@ -363,7 +363,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(0m, new Currency("USD")) },
+            { [Checking] = new Money(0m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [payroll],
             Goals = [goal]
@@ -382,7 +382,7 @@ public sealed class ForecastEngineTests
     public void Goal_not_affordable_when_projected_surplus_never_covers_amount()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 3, 31);
+        var end = new DateOnly(2025, 3, 31);
         var goalId = Guid.NewGuid();
 
         // Tiny payroll, large goal
@@ -404,7 +404,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(0m, new Currency("USD")) },
+            { [Checking] = new Money(0m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [payroll],
             Goals = [goal]
@@ -423,7 +423,7 @@ public sealed class ForecastEngineTests
     public void Goal_already_funded_returns_affordable_immediately()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
         var goalId = Guid.NewGuid();
 
         var goal = new GoalAffordabilityInput
@@ -441,7 +441,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(5000m, new Currency("USD")) },
+            { [Checking] = new Money(5000m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [],
             Goals = [goal]
@@ -461,7 +461,7 @@ public sealed class ForecastEngineTests
     public void Aggregate_series_sums_balances_across_accounts()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 15);
+        var end = new DateOnly(2025, 1, 15);
 
         // Checking: starts $1000, payroll Jan 3 (+$500)
         var checkingPayroll = new ForecastFlowInput
@@ -494,7 +494,7 @@ public sealed class ForecastEngineTests
             StartingBalances = new Dictionary<AccountId, Money>
             {
                 [Checking] = new Money(1000m, new Currency("USD")),
-                [Savings]  = new Money(500m, new Currency("USD"))
+                [Savings] = new Money(500m, new Currency("USD"))
             },
             AccountIds = [Checking, Savings],
             RecurringFlows = [checkingPayroll, savingsDeposit],
@@ -541,7 +541,7 @@ public sealed class ForecastEngineTests
             AsOf = new DateOnly(2025, 1, 1),
             Horizon = new DateOnlyRange(new DateOnly(2025, 1, 1)),  // no end
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(1000m, new Currency("USD")) },
+            { [Checking] = new Money(1000m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = []
         };
@@ -554,7 +554,7 @@ public sealed class ForecastEngineTests
     public void Throws_ForecastInputException_for_currency_mismatch_in_flow()
     {
         var asOf = new DateOnly(2025, 1, 1);
-        var end  = new DateOnly(2025, 1, 31);
+        var end = new DateOnly(2025, 1, 31);
 
         // Account balance in USD but flow in GBP
         var gbpFlow = new ForecastFlowInput
@@ -572,7 +572,7 @@ public sealed class ForecastEngineTests
             AsOf = asOf,
             Horizon = new DateOnlyRange(asOf, end),
             StartingBalances = new Dictionary<AccountId, Money>
-                { [Checking] = new Money(1000m, new Currency("USD")) },
+            { [Checking] = new Money(1000m, new Currency("USD")) },
             AccountIds = [Checking],
             RecurringFlows = [gbpFlow]
         };
@@ -587,7 +587,7 @@ public sealed class ForecastEngineTests
     public void Engine_is_deterministic_same_inputs_produce_identical_results()
     {
         var asOf = new DateOnly(2025, 3, 1);
-        var end  = new DateOnly(2025, 5, 31);
+        var end = new DateOnly(2025, 5, 31);
 
         var payroll = Flow(Checking, 2500m, TransactionDirection.Credit,
             RecurrencePattern.EveryNWeeks(2, DayOfWeek.Friday), flowStart: asOf);

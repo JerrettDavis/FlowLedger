@@ -1,4 +1,4 @@
-﻿namespace FlowLedger.Plugins.Abstractions;
+namespace FlowLedger.Plugins.Abstractions;
 
 // Plugin surface interfaces: import providers, export providers,
 // categorization providers, alert channels, report widgets.

@@ -74,11 +74,11 @@ public static class RecurrenceExpander
 
         return pattern.Frequency switch
         {
-            RecurrenceFrequency.Daily          => ExpandDaily(windowStart, end),
-            RecurrenceFrequency.Weekly         => ExpandWeekly(pattern, flowStart, windowStart, end),
-            RecurrenceFrequency.EveryNWeeks    => ExpandEveryNWeeks(pattern, flowStart, windowStart, end),
-            RecurrenceFrequency.TwiceMonthly   => ExpandTwiceMonthly(pattern, windowStart, end),
-            RecurrenceFrequency.Monthly        => ExpandMonthly(pattern, windowStart, end),
+            RecurrenceFrequency.Daily => ExpandDaily(windowStart, end),
+            RecurrenceFrequency.Weekly => ExpandWeekly(pattern, flowStart, windowStart, end),
+            RecurrenceFrequency.EveryNWeeks => ExpandEveryNWeeks(pattern, flowStart, windowStart, end),
+            RecurrenceFrequency.TwiceMonthly => ExpandTwiceMonthly(pattern, windowStart, end),
+            RecurrenceFrequency.Monthly => ExpandMonthly(pattern, windowStart, end),
             RecurrenceFrequency.LastBusinessDay => ExpandLastBusinessDay(windowStart, end),
             _ => throw new ArgumentOutOfRangeException(nameof(pattern), pattern.Frequency, "Unknown recurrence frequency.")
         };
@@ -237,8 +237,8 @@ public static class RecurrenceExpander
         return last.DayOfWeek switch
         {
             DayOfWeek.Saturday => last.AddDays(-1),
-            DayOfWeek.Sunday   => last.AddDays(-2),
-            _                  => last
+            DayOfWeek.Sunday => last.AddDays(-2),
+            _ => last
         };
     }
 

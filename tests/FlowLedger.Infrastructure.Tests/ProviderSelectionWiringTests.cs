@@ -1,7 +1,7 @@
-using FluentAssertions;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
 using FlowLedger.Integrations.Simulated;
+using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
