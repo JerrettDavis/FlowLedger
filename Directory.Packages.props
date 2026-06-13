@@ -156,7 +156,7 @@
          LZ4 out-of-bounds read vulnerability. Aspire.Hosting 13.4.3 pulls 2.5.192
          transitively. 2.5.301 is the patched release on the 2.5.x line (3.1.7 on 3.x).
          Forced via a direct PackageReference in FlowLedger.AppHost.csproj. -->
-    <PackageVersion Include="MessagePack" Version="2.5.301" />
-    <PackageVersion Include="MessagePack.Annotations" Version="2.5.301" />
+    <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <PackageVersion Include="MessagePack.Annotations" Version="3.1.7" />
   </ItemGroup>
 </Project>
