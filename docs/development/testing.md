@@ -1,16 +1,5 @@
 # Testing Guide
 
-## Environment Setup (Windows Local SDK)
-
-Before running any tests on Windows, set these environment variables:
-
-```powershell
-$env:DOTNET_ReadyToRun = "0"
-$env:COMPlus_ReadyToRun = "0"
-```
-
-This works around a JIT regression in the local Windows SDK. CI (Linux) does not need these.
-
 ## Test Categories
 
 ### Unit Tests

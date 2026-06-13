@@ -32,10 +32,11 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         // ── Options ──────────────────────────────────────────────────────────────
-        // Credentials (Mx:) — Configure + fast-fail validator are idempotent if already added
+        // Credentials (Mx:) — AddOptions + fast-fail validator are idempotent if already added
         // by Infrastructure; re-registering is harmless and keeps this extension self-contained.
-        services.Configure<FinancialProviderOptions>(
-            configuration.GetSection(FinancialProviderOptions.SectionName));
+        services.AddOptions<FinancialProviderOptions>()
+            .BindConfiguration(FinancialProviderOptions.SectionName)
+            .ValidateOnStart();
         services.AddSingleton<IValidateOptions<FinancialProviderOptions>, FinancialProviderOptionsValidator>();
 
         services.Configure<MxProviderOptions>(configuration.GetSection(MxProviderOptions.SectionName));

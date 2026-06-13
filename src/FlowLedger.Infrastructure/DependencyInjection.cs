@@ -87,7 +87,9 @@ public static class DependencyInjection
         // required credential (ApiKey/ClientId/BaseUrl/WebhookSecret) is missing. That loud
         // failure is the intended "plug in the key and roll" behaviour — there is deliberately
         // NO silent fallback to fake data when MX is enabled.
-        services.Configure<FinancialProviderOptions>(configuration.GetSection(FinancialProviderOptions.SectionName));
+        services.AddOptions<FinancialProviderOptions>()
+            .BindConfiguration(FinancialProviderOptions.SectionName)
+            .ValidateOnStart();
         services.AddSingleton<IValidateOptions<FinancialProviderOptions>, FinancialProviderOptionsValidator>();
 
         var mxOptions = configuration.GetSection(FinancialProviderOptions.SectionName).Get<FinancialProviderOptions>()

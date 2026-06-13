@@ -38,16 +38,6 @@ FlowLedger combines four traditionally separate tools into one system:
 
 - [.NET 10 SDK](https://dot.net/download)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) (or Podman)
-- Aspire workload: `dotnet workload install aspire`
-
-**Windows SDK Note:** Before running tests locally on Windows, set these environment variables to work around a JIT regression:
-
-```powershell
-$env:DOTNET_ReadyToRun = "0"
-$env:COMPlus_ReadyToRun = "0"
-```
-
-CI (Linux) does not need these.
 
 ## Quick start
 
