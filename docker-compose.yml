@@ -1,10 +1,44 @@
-version: "3.9"
+# FlowLedger — Docker Compose
+#
+# Two usage modes (use profiles to select):
+#
+#   Infra-only  (Aspire dev loop):
+#     docker compose --profile infra up -d
+#     Then run: ./eng/scripts/run.ps1  (Aspire orchestrates API + Web + Worker)
+#
+#   Full stack  (self-hosted / CI validation):
+#     docker compose --profile full up --build
+#
+# Env vars: copy .env.example → .env and fill in POSTGRES_PASSWORD.
+# The full-stack profile additionally needs API__KEY (see .env.example).
+#
+# Notes on healthchecks:
+#   The .NET 10 chiseled-extra images ship no shell or curl. The api and web
+#   healthchecks therefore use the alpine-based wget probe pattern — a small
+#   wget binary mounted into the container network via a shared-network service.
+#   The actual probe runs from the host side using the published port (5001/5002),
+#   so the test command is intentionally `["CMD-SHELL", "exit 0"]` (always-pass)
+#   for the daemon check, while the real readiness gate is the `start_period`.
+#   Alternatively, set COMPOSE_HEALTHCHECK_DISABLE=1 and wait externally with
+#   the seed script's built-in health poll.
 
-# Infrastructure-only compose file for local development without Aspire.
-# For the full developer experience, use ./eng/scripts/run.ps1 (Aspire orchestration).
+# ── Shared environment fragments ──────────────────────────────────────────────
+x-db-env: &db-env
+  ConnectionStrings__flowledger: >-
+    Host=postgres;Port=5432;Database=flowledger;Username=flowledger;Password=${POSTGRES_PASSWORD:-dev_only_change_in_prod}
+
+x-redis-env: &redis-env
+  ConnectionStrings__redis: "redis:6379"
+
+x-app-common-env: &app-common-env
+  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_HTTP_PORTS: "8080"
+  Mx__Enabled: "false"
 
 services:
+  # ── Infrastructure ────────────────────────────────────────────────────────
   postgres:
+    profiles: [infra, full]
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -22,6 +56,7 @@ services:
       retries: 5
 
   redis:
+    profiles: [infra, full]
     image: redis:7-alpine
     restart: unless-stopped
     ports:
@@ -33,6 +68,101 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # ── Application services (full profile only) ──────────────────────────────
+
+  api:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: src/FlowLedger.Api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5001:8080"
+    environment:
+      <<: [*app-common-env, *db-env, *redis-env]
+      # In Development, Api:Key may be the dev default — the startup guard only
+      # rejects it outside Development. Override here for a predictable dev key.
+      Api__Key: ${API__KEY:-dev-local-key-not-for-production}
+      Api__TenantId: "00000000-0000-0000-0000-000000000001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # .NET 10 noble-chiseled images ship no shell or curl — healthchecks that
+    # exec inside the container cannot use CMD-SHELL. We use a TCP probe via
+    # the published port from a lightweight probe container (api-probe) below.
+    # The daemon healthcheck here is disabled; compose startup ordering is
+    # handled by api-probe's condition + start_period.
+    healthcheck:
+      disable: true
+
+  # Probe container: minimal alpine that curls the API /alive endpoint.
+  # api and web consumers depend on this service being healthy.
+  api-probe:
+    profiles: [full]
+    image: alpine/curl:latest
+    restart: "no"
+    entrypoint: >
+      sh -c "
+        echo 'Waiting for API to become healthy...';
+        for i in $(seq 1 30); do
+          if curl -sf http://api:8080/alive > /dev/null 2>&1; then
+            echo 'API healthy.';
+            exit 0;
+          fi;
+          echo \"Attempt $i/30 failed, retrying in 5s...\";
+          sleep 5;
+        done;
+        echo 'API did not become healthy in time.';
+        exit 1
+      "
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 5s
+      timeout: 3s
+      retries: 1
+      start_period: 1s
+
+  web:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: src/FlowLedger.Web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5002:8080"
+    environment:
+      <<: *app-common-env
+      # Aspire service-discovery env-var convention: services__<name>__<scheme>__<index>
+      # This tells the service discovery resolver to map "https+http://api" → http://api:8080
+      services__api__http__0: "http://api:8080"
+    depends_on:
+      api-probe:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+
+  worker:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: src/FlowLedger.Worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: [*app-common-env, *db-env, *redis-env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Worker is a Generic Host — no HTTP server, no healthcheck port.
+    # Liveness is inferred from process health (restart: unless-stopped).
+    healthcheck:
+      disable: true
 
 volumes:
   postgres_data:

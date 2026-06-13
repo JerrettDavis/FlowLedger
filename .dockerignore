@@ -1,0 +1,46 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Build outputs
+**/bin/
+**/obj/
+**/artifacts/
+
+# Test projects — excluded from app images
+tests/
+
+# IDE / editor
+.vs/
+.vscode/
+*.user
+*.suo
+.idea/
+
+# Local secrets & env overrides (never bake into images)
+.env
+.env.*
+**/appsettings.*.local.json
+
+# Node modules (if any tooling present)
+**/node_modules/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Docker files themselves (no need to copy into image)
+**/Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Aspire AppHost — dev orchestration only, not part of app images
+src/FlowLedger.AppHost/
+
+# Docs & scripts (not needed in runtime image)
+docs/
+eng/
+
+# Readme / markdown
+*.md

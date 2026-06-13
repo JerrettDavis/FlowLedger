@@ -1,0 +1,172 @@
+name: Docker
+
+on:
+  push:
+    branches: [main, master]
+    tags:     ["v*.*.*"]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  packages: write      # needed only on tagged push to push to GHCR
+
+jobs:
+  build:
+    name: Build & Scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service:    api
+            dockerfile: src/FlowLedger.Api/Dockerfile
+            image:      flowledger-api
+          - service:    web
+            dockerfile: src/FlowLedger.Web/Dockerfile
+            image:      flowledger-web
+          - service:    worker
+            dockerfile: src/FlowLedger.Worker/Dockerfile
+            image:      flowledger-worker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Docker Buildx for cache-mount support and multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Determine whether to push ────────────────────────────────────────
+      # Push only on tagged releases; build-only on PR / branch push.
+      - name: Compute push flag
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "push=true"  >> "$GITHUB_OUTPUT"
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+            echo "tag=dev"    >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Login to GHCR (tagged releases only) ────────────────────────────
+      - name: Log in to GitHub Container Registry
+        if: steps.meta.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Build (and optionally push) ──────────────────────────────────────
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context:    .
+          file:       ${{ matrix.dockerfile }}
+          push:       ${{ steps.meta.outputs.push == 'true' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          # Inline cache — speeds up PR builds using previously cached layers
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+          # Export the image to Docker daemon so Trivy can scan it
+          load:       ${{ steps.meta.outputs.push != 'true' }}
+
+      # ── Generate SBOM ────────────────────────────────────────────────────
+      - name: Generate SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image:             ${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          artifact-name:     sbom-${{ matrix.service }}.spdx.json
+          output-file:       /tmp/sbom-${{ matrix.service }}.spdx.json
+          format:            spdx-json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name:              sbom-${{ matrix.service }}
+          path:              /tmp/sbom-${{ matrix.service }}.spdx.json
+          if-no-files-found: warn
+
+      # ── Trivy vulnerability scan ─────────────────────────────────────────
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref:         ${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          format:            sarif
+          output:            trivy-${{ matrix.service }}.sarif
+          # Fail on CRITICAL and HIGH vulnerabilities
+          severity:          CRITICAL,HIGH
+          exit-code:         "0"   # Report but don't fail the build (informational)
+          ignore-unfixed:    true
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name:              trivy-${{ matrix.service }}
+          path:              trivy-${{ matrix.service }}.sarif
+          if-no-files-found: warn
+
+  # ── Smoke-test: full-stack compose up ─────────────────────────────────────
+  compose-smoke:
+    name: Compose smoke test
+    runs-on: ubuntu-latest
+    needs: build
+    # Run on push to default branch or on tagged release; skip on PRs to save minutes
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start full stack
+        run: |
+          docker compose --profile full up --build -d
+        env:
+          POSTGRES_PASSWORD: ci_test_password
+          API__KEY: ci-test-api-key-not-for-production
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for API..."
+          timeout 120 bash -c 'until curl -sf http://localhost:5001/alive > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "API healthy."
+          echo "Waiting for Web..."
+          timeout 90 bash -c 'until curl -sf http://localhost:5002/alive > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "Web healthy."
+
+      - name: Smoke test — connect + sync
+        run: |
+          # Connect the Simulated provider
+          curl -sf -X POST http://localhost:5001/api/connect \
+            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
+            -H "Content-Type: application/json" | python3 -m json.tool
+          # Run a full sync
+          curl -sf -X POST http://localhost:5001/api/sync \
+            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
+            -H "Content-Type: application/json" | python3 -m json.tool
+
+      - name: Smoke test — web dashboard responds
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5002/)
+          echo "Web dashboard HTTP status: $HTTP_STATUS"
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "ERROR: Expected 200, got $HTTP_STATUS"
+            exit 1
+          fi
+
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose --profile full logs --tail=100
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile full down -v

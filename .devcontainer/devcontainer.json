@@ -1,0 +1,47 @@
+{
+  "name": "FlowLedger Dev",
+
+  // .NET 10 SDK image — matches global.json SDK requirement
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+
+  "features": {
+    // Docker-outside-of-Docker: mounts the host Docker socket so Testcontainers
+    // and Aspire's container orchestration work inside the devcontainer.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+
+    // Git (latest)
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+
+  "postCreateCommand": "dotnet workload install aspire && dotnet restore",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // C# Dev Kit (includes C#, IntelliCode, solution explorer)
+        "ms-dotnettools.csdevkit",
+        // .NET MAUI / Aspire dashboard support
+        "ms-dotnettools.dotnet-maui",
+        // Docker integration
+        "ms-azuretools.vscode-docker",
+        // EditorConfig support
+        "EditorConfig.EditorConfig"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "FlowLedger.slnx"
+      }
+    }
+  },
+
+  // Forward ports used by Aspire and the app services
+  "forwardPorts": [15888, 5001, 5002, 5432, 6379],
+  "portsAttributes": {
+    "15888": { "label": "Aspire Dashboard" },
+    "5001":  { "label": "API" },
+    "5002":  { "label": "Web" },
+    "5432":  { "label": "PostgreSQL" },
+    "6379":  { "label": "Redis" }
+  },
+
+  "remoteUser": "root"
+}
