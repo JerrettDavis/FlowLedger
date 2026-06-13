@@ -31,7 +31,7 @@ public static class SvgChart
         }
 
         // ViewBox 800x220, compute min/max with padding
-        const int W = 800, H = 220, padL = 70, padR = 20, padT = 20, padB = 35;
+        const int W = 800, H = 220, padL = 70, padR = 70, padT = 20, padB = 35;
         int plotW = W - padL - padR;
         int plotH = H - padT - padB;
 

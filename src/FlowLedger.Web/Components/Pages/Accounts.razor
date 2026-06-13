@@ -61,7 +61,7 @@
             <CellTemplate>
                 <MudText Class="fl-num"
                          Color="@(context.Item.BalanceAmount >= 0 ? Color.Default : Color.Error)">
-                    @context.Item.BalanceAmount.ToString("C2")
+                    @Format.Money(context.Item.BalanceAmount)
                 </MudText>
             </CellTemplate>
         </TemplateColumn>

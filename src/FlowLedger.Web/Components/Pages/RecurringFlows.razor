@@ -230,13 +230,30 @@
     {
         return flow.RecurrenceFrequency switch
         {
-            "Monthly" when flow.DayOfMonth.HasValue => $"On the {flow.DayOfMonth}th",
+            "Monthly" when flow.DayOfMonth.HasValue => $"On the {flow.DayOfMonth}{OrdinalSuffix(flow.DayOfMonth.Value)}",
             "Monthly" => "Monthly",
             "Weekly" when flow.AnchorDayOfWeek is not null => $"Every {flow.AnchorDayOfWeek}",
             "Weekly" => "Weekly",
             "BiWeekly" when flow.IntervalWeeks.HasValue => $"Every {flow.IntervalWeeks} weeks",
             "Daily" => "Daily",
             _ => flow.RecurrenceFrequency
+        };
+    }
+
+    private static string OrdinalSuffix(int day)
+    {
+        // Handle teens (11th, 12th, 13th) first — they never take 1st/2nd/3rd.
+        int lastTwo = day % 100;
+        if (lastTwo is >= 11 and <= 13)
+        {
+            return "th";
+        }
+        return (day % 10) switch
+        {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th"
         };
     }
 }

@@ -8,18 +8,20 @@ namespace FlowLedger.Web.Shared;
 /// </summary>
 public static class Format
 {
+    private static readonly CultureInfo UsCulture = CultureInfo.GetCultureInfo("en-US");
+
     /// <summary>
     /// Format a decimal as currency (e.g., "$1,234.56").
     /// </summary>
     public static string Money(decimal v) =>
-        v.ToString("C2", CultureInfo.CurrentCulture);
+        v.ToString("C2", UsCulture);
 
     /// <summary>
     /// Format a decimal as signed currency (e.g., "+$1,234.56" or "−$1,234.56").
     /// Uses a proper minus sign (−, U+2212) for negative values.
     /// </summary>
     public static string Signed(decimal v) =>
-        (v >= 0 ? "+" : "−") + Math.Abs(v).ToString("C2", CultureInfo.CurrentCulture);
+        (v >= 0 ? "+" : "−") + Math.Abs(v).ToString("C2", UsCulture);
 
     /// <summary>
     /// Format an absolute amount as signed currency based on direction.
