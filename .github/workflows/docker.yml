@@ -88,7 +88,7 @@ jobs:
           format:            spdx-json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name:              sbom-${{ matrix.service }}
           path:              /tmp/sbom-${{ matrix.service }}.spdx.json
@@ -107,7 +107,7 @@ jobs:
           ignore-unfixed:    true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name:              trivy-${{ matrix.service }}
           path:              trivy-${{ matrix.service }}.sarif
