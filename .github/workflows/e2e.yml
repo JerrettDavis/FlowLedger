@@ -1,0 +1,86 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore packages
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Start full stack
+        run: |
+          docker compose --profile full up --build -d
+        env:
+          POSTGRES_PASSWORD: ci_test_password
+          API__KEY: ci-test-api-key-not-for-production
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for API..."
+          timeout 120 bash -c 'until curl -sf http://localhost:5001/alive > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "API healthy."
+          echo "Waiting for Web..."
+          timeout 90 bash -c 'until curl -sf http://localhost:5002/ > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "Web healthy."
+
+      - name: Install Playwright browsers
+        run: |
+          cd tests/FlowLedger.E2E.Tests
+          pwsh -Command "& { Invoke-WebRequest -Uri https://aka.ms/playwright-ps1 -OutFile playwright.ps1 } ; & ./playwright.ps1 install chromium"
+
+      - name: Run E2E tests
+        run: >
+          dotnet test tests/FlowLedger.E2E.Tests
+          --no-build
+          --configuration Release
+          --logger "trx;LogFileName=e2e-results.trx"
+          --results-directory ./artifacts/tests
+          -- xunit.parallelizeAssembly=true
+        env:
+          E2E_BASE_URL: http://localhost:5002
+
+      - name: Publish E2E test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: E2E Test Results
+          path: artifacts/tests/**/*.trx
+          reporter: dotnet-trx
+
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          if-no-files-found: ignore
+
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose --profile full logs --tail=100
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile full down -v
