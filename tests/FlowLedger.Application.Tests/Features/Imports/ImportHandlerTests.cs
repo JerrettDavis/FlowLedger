@@ -265,4 +265,77 @@ public sealed class ImportHandlerTests
 
         summary.ImportedCount.Should().Be(1);
     }
+
+    // ── CSV robustness: quoted fields, clean input, messy unquoted ───────────
+
+    /// <summary>
+    /// RFC-4180 quoted field containing an embedded comma.
+    /// "Groceries, Inc." must be treated as a single description field, not split into two.
+    /// The TryCoalesceField heuristic must not consume the quoted comma as a field delimiter.
+    /// </summary>
+    [Fact]
+    public async Task Import_QuotedFieldWithEmbeddedComma_TreatedAsSingleField()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        // All three fields are properly quoted; the description contains a literal comma.
+        var csv = "Date,Amount,Description\n\"2024-01-10\",\"-50.00\",\"Groceries, Inc.\"";
+
+        var summary = await handler.HandleAsync(
+            new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
+
+        summary.ImportedCount.Should().Be(1, "fully-quoted RFC-4180 row should import without errors");
+        summary.FailedRowCount.Should().Be(0);
+        txRepo.All[0].Description.Should().Be("Groceries, Inc.",
+            "embedded comma inside quotes must not split the description field");
+        txRepo.All[0].EffectiveDate.Should().Be(new DateOnly(2024, 1, 10));
+        txRepo.All[0].Amount.Amount.Should().Be(50.00m);
+    }
+
+    /// <summary>
+    /// Standard clean CSV with no special characters — the baseline happy path.
+    /// Verifies that date, amount, and description all round-trip correctly for a
+    /// typical bank export row.
+    /// </summary>
+    [Fact]
+    public async Task Import_CleanCsv_AllFieldsParsedCorrectly()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        var csv = "Date,Amount,Description\n2024-06-15,-250.75,Online Transfer";
+
+        var summary = await handler.HandleAsync(
+            new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
+
+        summary.ImportedCount.Should().Be(1, "a clean standard CSV row should import without errors");
+        summary.FailedRowCount.Should().Be(0);
+        txRepo.All[0].EffectiveDate.Should().Be(new DateOnly(2024, 6, 15));
+        txRepo.All[0].Amount.Amount.Should().Be(250.75m);
+        txRepo.All[0].Direction.Should().Be(TransactionDirection.Debit);
+        txRepo.All[0].Description.Should().Be("Online Transfer");
+    }
+
+    /// <summary>
+    /// Messy unquoted CSV where the date contains a comma ("Jan 15, 2024") and the
+    /// amount uses a thousands separator ("-1,234.56").  Neither field is quoted.
+    /// TryCoalesceField must coalesce adjacent fragments to recover both values correctly.
+    /// </summary>
+    [Fact]
+    public async Task Import_MessyUnquotedDateAndAmount_CoalescedCorrectly()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        // Raw bank export: date and amount both contain commas but are not quoted.
+        // The CsvParser splits on every comma, producing raw fragments:
+        //   col0="Jan 15"  col1=" 2024"  col2="-1"  col3="234.56"  col4="Coffee Shop"
+        // TryCoalesceField must stitch col0+col1 → "Jan 15, 2024" and col2+col3 → "-1,234.56".
+        var csv = "Date,Amount,Description\nJan 15, 2024,-1234.56,Coffee Shop";
+
+        var summary = await handler.HandleAsync(
+            new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
+
+        summary.ImportedCount.Should().Be(1, "messy unquoted CSV should coalesce date and amount fragments");
+        summary.FailedRowCount.Should().Be(0);
+        txRepo.All[0].EffectiveDate.Should().Be(new DateOnly(2024, 1, 15));
+        txRepo.All[0].Amount.Amount.Should().Be(1234.56m);
+        txRepo.All[0].Direction.Should().Be(TransactionDirection.Debit);
+        txRepo.All[0].Description.Should().Be("Coffee Shop");
+    }
 }

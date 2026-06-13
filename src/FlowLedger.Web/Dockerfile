@@ -30,8 +30,13 @@ WORKDIR /src
 
 COPY src/ src/
 
+# Note: --no-restore is intentionally absent here. When a separate `dotnet restore` stage
+# precedes `dotnet publish`, the Blazor static-asset pipeline (microsoft.aspnetcore.app.internal.assets)
+# resolves blazor.web.js only during the publish target resolution phase — not during the plain
+# NuGet restore pass. Omitting --no-restore lets publish redo the asset-aware package resolution,
+# which is a no-op for most packages (they're already cached) but ensures framework JS files
+# (blazor.web.js, blazor.server.js) are copied into /app/publish/wwwroot/_framework/.
 RUN dotnet publish src/FlowLedger.Web/FlowLedger.Web.csproj \
-        --no-restore \
         -c Release \
         -o /app/publish \
         /p:UseAppHost=false

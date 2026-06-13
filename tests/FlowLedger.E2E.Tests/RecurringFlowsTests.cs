@@ -63,8 +63,8 @@ public class RecurringFlowsTests : E2ETestBase
 
         await NavigateAsync("/recurring-flows");
         await WaitForLoadAsync();
-        // MudDataGrid aria-label="Recurring flows table" from RecurringFlows.razor
-        var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Recurring flows table" });
+        // MudDataGrid renders as <div aria-label="Recurring flows table"> (not a <table> element)
+        var table = Page!.Locator("[aria-label='Recurring flows table']");
         (await table.CountAsync()).Should().BeGreaterThan(0);
         (await table.IsVisibleAsync()).Should().BeTrue();
     }

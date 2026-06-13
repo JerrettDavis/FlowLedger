@@ -80,4 +80,48 @@ public class E2ETestBase : IAsyncLifetime
     {
         await Page!.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
+
+    /// <summary>
+    /// Click a button and wait for a text to become visible, retrying the click
+    /// until the condition is met or the timeout expires.
+    ///
+    /// Blazor Web pre-renders components server-side (SSR), so <c>NetworkIdle</c> fires on the
+    /// static HTML before <c>blazor.web.js</c> has established the SignalR circuit and wired up
+    /// interactive event handlers. Playwright's <c>NetworkIdle</c> does not track WebSockets,
+    /// so it fires before the Blazor Server SignalR circuit is live. Clicking immediately after
+    /// <c>NetworkIdle</c> may fire before the circuit wires up interactive event handlers, so
+    /// the click is silently ignored by the browser.
+    ///
+    /// This helper retries the click at short intervals until <paramref name="expectedText"/>
+    /// becomes visible on the page, which confirms the interactive handler fired.
+    /// </summary>
+    protected async Task ClickUntilVisibleAsync(
+        ILocator clickTarget,
+        string expectedText,
+        int intervalMs = 500,
+        int timeoutMs = 15000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            var visible = await Page!.GetByText(expectedText).IsVisibleAsync();
+            if (visible)
+            {
+                return;
+            }
+
+            try
+            {
+                await clickTarget.ClickAsync();
+            }
+            catch
+            {
+                // Ignore transient Playwright errors during retry loop
+            }
+
+            await Page!.WaitForTimeoutAsync(intervalMs);
+        }
+
+        // Final assertion — let the caller's WaitForAsync produce a clear error
+    }
 }

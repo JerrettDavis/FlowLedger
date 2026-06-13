@@ -48,8 +48,8 @@ public class MoneyPlanTests : E2ETestBase
 
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
-        // MudDataGrid aria-label="Money plan spreadsheet" from MoneyPlan.razor
-        var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Money plan spreadsheet" });
+        // MudDataGrid renders as <div aria-label="Money plan spreadsheet"> (not a <table> element)
+        var table = Page!.Locator("[aria-label='Money plan spreadsheet']");
         (await table.CountAsync()).Should().BeGreaterThan(0);
         (await table.IsVisibleAsync()).Should().BeTrue();
     }

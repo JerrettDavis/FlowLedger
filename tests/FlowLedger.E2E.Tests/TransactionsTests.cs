@@ -48,8 +48,8 @@ public class TransactionsTests : E2ETestBase
 
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
-        // MudDataGrid aria-label="Transactions table" from Transactions.razor
-        var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Transactions table" });
+        // MudDataGrid renders as <div aria-label="Transactions table"> (not a <table> element)
+        var table = Page!.Locator("[aria-label='Transactions table']");
         (await table.CountAsync()).Should().BeGreaterThan(0);
         (await table.IsVisibleAsync()).Should().BeTrue();
     }

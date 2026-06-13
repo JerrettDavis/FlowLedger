@@ -63,8 +63,8 @@ public class AccountsTests : E2ETestBase
 
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
-        // MudDataGrid aria-label="Accounts table" from Accounts.razor
-        var table = Page!.GetByRole(AriaRole.Table, new() { Name = "Accounts table" });
+        // MudDataGrid renders as <div aria-label="Accounts table"> (not a <table> element)
+        var table = Page!.Locator("[aria-label='Accounts table']");
         (await table.CountAsync()).Should().BeGreaterThan(0);
         (await table.IsVisibleAsync()).Should().BeTrue();
     }
@@ -91,10 +91,15 @@ public class AccountsTests : E2ETestBase
         }
 
         await NavigateAsync("/accounts");
+        // Blazor Server establishes its SignalR circuit via WebSocket AFTER Playwright's
+        // NetworkIdle fires (Playwright does not track WebSocket traffic as network activity).
+        // Clicking before the circuit is live is silently ignored by the browser.
+        // Use the retry helper to keep clicking until the dialog appears.
         var btn = Page!.GetByRole(AriaRole.Button, new() { Name = "Add new account" });
-        await btn.ClickAsync();
-        await Page!.WaitForTimeoutAsync(500);
+        await ClickUntilVisibleAsync(btn, "Create Account", intervalMs: 600, timeoutMs: 15000);
         // MudDialog title "Create Account" from DialogService.ShowAsync in Accounts.razor
-        (await Page!.GetByText("Create Account").CountAsync()).Should().BeGreaterThan(0);
+        var dialogTitle = Page!.GetByText("Create Account");
+        await dialogTitle.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5000 });
+        (await dialogTitle.CountAsync()).Should().BeGreaterThan(0);
     }
 }
