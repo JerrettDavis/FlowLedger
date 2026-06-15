@@ -1,7 +1,13 @@
+using System.Globalization;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components;
 using FlowLedger.Web.Services;
 using MudBlazor.Services;
+
+// Ensure monetary formatting always uses en-US ($ symbol) regardless of host culture.
+var usCulture = CultureInfo.GetCultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = usCulture;
+CultureInfo.DefaultThreadCurrentUICulture = usCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
