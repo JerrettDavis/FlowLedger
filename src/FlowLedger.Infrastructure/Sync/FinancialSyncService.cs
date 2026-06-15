@@ -3,6 +3,7 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -80,11 +81,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         int transactionsAdded = 0;
         int transactionsSkipped = 0;
 
-        // Step 3: upsert domain accounts
+        // Step 3: upsert domain accounts; build a map so recurring flow seeding can resolve
+        // provider account ids → domain Account objects.
+        var providerIdToAccount = new Dictionary<string, Account>(StringComparer.Ordinal);
         foreach (var pa in providerAccounts)
         {
             var domainAccount = await UpsertAccountAsync(pa, tenantId, ct);
             accountsUpserted++;
+            providerIdToAccount[pa.ProviderId] = domainAccount;
 
             // Step 4: sync transactions for this account
             var (added, skipped) = await SyncTransactionsAsync(domainAccount, pa.ProviderId, tenantId, ct);
@@ -92,13 +96,16 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             transactionsSkipped += skipped;
         }
 
+        // Step 5: seed recurring flows from the simulated provider (idempotent — skips existing).
+        var recurringFlowsAdded = await SeedRecurringFlowsAsync(providerIdToAccount, tenantId, ct);
+
         // Flush all outstanding changes once after the full loop
         await _db.SaveChangesAsync(ct);
 
-        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped);
+        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded);
         _logger.LogInformation(
-            "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped",
-            result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+            "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added",
+            result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped, result.RecurringFlowsAdded);
 
         return result;
     }
@@ -251,6 +258,116 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             postedDate: pt.IsPending ? null : pt.PostedDate,
             source: TransactionSource.MxAggregation,
             fingerprint: fingerprint);
+    }
+
+    /// <summary>
+    /// Seeds recurring flows for the simulated provider. Idempotent: flows with the same
+    /// Name on the same account are skipped (not duplicated on repeated sync runs).
+    /// Returns the number of new flows created.
+    /// </summary>
+    private async Task<int> SeedRecurringFlowsAsync(
+        Dictionary<string, Account> providerIdToAccount,
+        TenantId tenantId,
+        CancellationToken ct)
+    {
+        // Recurring flow seeding is only performed for the simulated provider.
+        if (_provider is not SimulatedFinancialDataProvider)
+        {
+            return 0;
+        }
+
+        if (providerIdToAccount.Count == 0)
+        {
+            return 0;
+        }
+
+        // Determine the provider account ids for checking (first CHECKING-type account) and
+        // credit card (first CREDIT-type account) so seeds can be resolved to domain accounts.
+        var checkingEntry = providerIdToAccount
+            .FirstOrDefault(kv => kv.Value.AccountType == AccountType.Checking);
+        var creditEntry = providerIdToAccount
+            .FirstOrDefault(kv => kv.Value.AccountType == AccountType.CreditCard);
+
+        if (checkingEntry.Value is null)
+        {
+            _logger.LogWarning("Simulated recurring flow seeding skipped: no Checking account found.");
+            return 0;
+        }
+
+        var seeds = SimulatedDataFactory.GetRecurringFlowSeeds(
+            checkingEntry.Key,
+            creditEntry.Value is not null ? creditEntry.Key : checkingEntry.Key);
+
+        // Load existing recurring flow names for this tenant to de-duplicate.
+        var existingNames = await _db.RecurringFlows
+            .Select(rf => rf.Name)
+            .ToListAsync(ct);
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.Ordinal);
+
+        int added = 0;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        foreach (var seed in seeds)
+        {
+            // Skip if a flow with this name already exists (idempotency guard).
+            if (existingNameSet.Contains(seed.Name))
+            {
+                continue;
+            }
+
+            // Resolve domain account; skip seeds whose provider account wasn't synced.
+            if (!providerIdToAccount.TryGetValue(seed.ProviderAccountId, out var account))
+            {
+                _logger.LogWarning(
+                    "Skipping recurring flow seed '{Name}': provider account '{ProviderId}' not found.",
+                    seed.Name, seed.ProviderAccountId);
+                continue;
+            }
+
+            var direction = seed.Direction == "Credit"
+                ? TransactionDirection.Credit
+                : TransactionDirection.Debit;
+
+            var amount = new Money(seed.Amount, new Currency(seed.CurrencyCode));
+
+            var pattern = BuildRecurrencePattern(seed);
+
+            var flow = RecurringFlow.Create(
+                tenantId,
+                account.AccountId,
+                seed.Name,
+                amount,
+                direction,
+                pattern,
+                startDate: today,
+                endDate: null,
+                amountModel: AmountModel.Fixed,
+                counterparty: seed.Counterparty);
+
+            await _db.RecurringFlows.AddAsync(flow, ct);
+            existingNameSet.Add(seed.Name); // guard against duplicates within the same batch
+            added++;
+        }
+
+        _logger.LogInformation("Recurring flow seeding: {Added} new flows created.", added);
+        return added;
+    }
+
+    private static RecurrencePattern BuildRecurrencePattern(SimulatedRecurringFlowSeed seed)
+    {
+        return seed.FrequencyName switch
+        {
+            "Monthly" => RecurrencePattern.Monthly(seed.DayOfMonth ?? 1),
+            "EveryNWeeks" => RecurrencePattern.EveryNWeeks(
+                seed.IntervalWeeks ?? 2,
+                Enum.Parse<DayOfWeek>(seed.AnchorDayOfWeek ?? nameof(DayOfWeek.Friday))),
+            "Weekly" => RecurrencePattern.Weekly(
+                Enum.Parse<DayOfWeek>(seed.AnchorDayOfWeek ?? nameof(DayOfWeek.Monday))),
+            "TwiceMonthly" => RecurrencePattern.TwiceMonthly(
+                seed.DayOfMonth ?? 1,
+                seed.IntervalWeeks ?? 15), // IntervalWeeks reused as secondDay for TwiceMonthly seeds
+            _ => RecurrencePattern.Monthly(1),
+        };
     }
 
     private static string NormalizeDescription(string raw)

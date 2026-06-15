@@ -1,0 +1,21 @@
+@namespace FlowLedger.Web.Components.Shared
+
+<MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="3" Class="pa-8">
+    <MudIcon Icon="@Icon" Size="Size.Large" Color="Color.Secondary" />
+    <MudText Typo="Typo.h6" Align="Align.Center">@Title</MudText>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">@Description</MudText>
+    }
+    @if (Action != null)
+    {
+        @Action
+    }
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public string Icon { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = default!;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? Action { get; set; }
+}
