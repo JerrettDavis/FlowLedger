@@ -44,10 +44,11 @@ public sealed class SyncEndpointTests(FlowLedgerApiFactory factory) : IAsyncLife
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<SyncResultDto>();
         body.Should().NotBeNull();
-        // The simulated provider upserts accounts + transactions on sync.
+        // The simulated provider upserts accounts + transactions + recurring flows on sync.
         body!.AccountsUpserted.Should().BeGreaterThanOrEqualTo(0);
         body.TransactionsAdded.Should().BeGreaterThanOrEqualTo(0);
         body.TransactionsSkipped.Should().BeGreaterThanOrEqualTo(0);
+        body.RecurringFlowsAdded.Should().BeGreaterThan(0, "simulated sync always seeds recurring flows on first run");
     }
 
     [Fact]
@@ -75,5 +76,5 @@ public sealed class SyncEndpointTests(FlowLedgerApiFactory factory) : IAsyncLife
 
     private sealed record ConnectResult(string MemberId, string Provider);
 
-    private sealed record SyncResultDto(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped);
+    private sealed record SyncResultDto(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
 }

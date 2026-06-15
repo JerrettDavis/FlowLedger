@@ -49,7 +49,10 @@ internal static class ForecastEndpoints
             try
             {
                 var result = await handler.HandleAsync(query, ct);
-                return Results.Ok(result);
+                // Map the domain model to the flattened wire contract. Returning the
+                // domain ForecastResult directly serializes strongly-typed IDs / Money
+                // as nested objects, which the Web client cannot deserialize into Guid/decimal.
+                return Results.Ok(result.ToResponse());
             }
             catch (ForecastInputException ex)
             {
