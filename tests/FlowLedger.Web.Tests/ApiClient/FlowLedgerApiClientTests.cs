@@ -208,12 +208,13 @@ public sealed class FlowLedgerApiClientTests
     [Fact]
     public void SyncResult_DeserializesApiPropertyNames_Correctly()
     {
-        // The API returns camelCase: accountsUpserted, transactionsAdded, transactionsSkipped.
+        // The API returns camelCase: accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded.
         var json = """
             {
                 "accountsUpserted": 3,
                 "transactionsAdded": 42,
-                "transactionsSkipped": 7
+                "transactionsSkipped": 7,
+                "recurringFlowsAdded": 9
             }
             """;
 
@@ -224,6 +225,7 @@ public sealed class FlowLedgerApiClientTests
         result!.AccountsUpserted.Should().Be(3);
         result.TransactionsAdded.Should().Be(42);
         result.TransactionsSkipped.Should().Be(7);
+        result.RecurringFlowsAdded.Should().Be(9);
     }
 
     [Fact]
@@ -247,12 +249,13 @@ public sealed class FlowLedgerApiClientTests
         result!.AccountsUpserted.Should().Be(0);
         result.TransactionsAdded.Should().Be(0);
         result.TransactionsSkipped.Should().Be(0);
+        result.RecurringFlowsAdded.Should().Be(0);
     }
 
     [Fact]
     public async Task SyncAsync_WhenResponseHasApiContractShape_ReturnsSyncResultWithCorrectValues()
     {
-        var json = """{"accountsUpserted":2,"transactionsAdded":18,"transactionsSkipped":1}""";
+        var json = """{"accountsUpserted":2,"transactionsAdded":18,"transactionsSkipped":1,"recurringFlowsAdded":9}""";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
@@ -266,6 +269,115 @@ public sealed class FlowLedgerApiClientTests
         result!.AccountsUpserted.Should().Be(2);
         result.TransactionsAdded.Should().Be(18);
         result.TransactionsSkipped.Should().Be(1);
+        result.RecurringFlowsAdded.Should().Be(9);
+    }
+
+    // ── Forecast contract shape (accountSeries[].accountId) ───────────────────
+
+    /// <summary>
+    /// The flattened wire shape the API emits AFTER mapping the domain model:
+    /// accountId is a bare GUID string, balances are flat amount/currency, and the
+    /// horizon is flattened into horizonStart/horizonEnd. This is exactly what
+    /// <see cref="ForecastResultDto"/> expects, so it must deserialize cleanly.
+    /// </summary>
+    private const string FlatForecastJson = """
+        {
+          "forecastRunId": "11111111-1111-1111-1111-111111111111",
+          "asOf": "2026-06-13",
+          "horizonStart": "2026-06-13",
+          "horizonEnd": "2026-09-13",
+          "accountSeries": [
+            {
+              "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+              "startingBalanceAmount": 1500.00,
+              "startingBalanceCurrency": "USD",
+              "points": [
+                {
+                  "date": "2026-06-13",
+                  "balanceAmount": 1500.00,
+                  "balanceCurrency": "USD",
+                  "netChangeAmount": 0.00,
+                  "contributingItems": []
+                }
+              ]
+            }
+          ],
+          "aggregateSeries": [ { "date": "2026-06-13", "balanceAmount": 1500.00 } ],
+          "lowWaterMarks": [
+            { "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "minBalanceAmount": 1500.00, "date": "2026-06-13" }
+          ],
+          "aggregateLowWaterMark": { "minBalanceAmount": 1500.00, "date": "2026-06-13" },
+          "overdraftWarnings": []
+        }
+        """;
+
+    /// <summary>
+    /// The BROKEN wire shape the API emitted BEFORE the fix: the domain model was
+    /// serialized directly, so accountId rendered as a nested object {"value":"..."}.
+    /// This reproduces the exact Dashboard error and must surface as ApiClientException
+    /// (wrapping a JsonException), never a successful parse.
+    /// </summary>
+    private const string NestedDomainForecastJson = """
+        {
+          "forecastRunId": "11111111-1111-1111-1111-111111111111",
+          "asOf": "2026-06-13",
+          "horizon": { "start": "2026-06-13", "end": "2026-09-13" },
+          "accountSeries": [
+            {
+              "accountId": { "value": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+              "startingBalance": { "amount": 1500.00, "currency": { "code": "USD" } },
+              "points": []
+            }
+          ],
+          "aggregateSeries": [],
+          "lowWaterMarks": [],
+          "aggregateLowWaterMark": { "minBalance": { "amount": 0, "currency": { "code": "USD" } }, "date": "2026-06-13" },
+          "overdraftWarnings": [],
+          "goalOutcomes": []
+        }
+        """;
+
+    [Fact]
+    public async Task GetForecastAsync_WithFlatContractShape_DeserializesWithoutThrowing()
+    {
+        // REGRESSION: the API now maps the domain model to a flat DTO before serializing,
+        // so accountSeries[0].accountId is a bare GUID string the client parses into Guid.
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(FlatForecastJson, Encoding.UTF8, "application/json")
+        };
+
+        var client = BuildClient(response);
+
+        var result = await client.GetForecastAsync(months: 3);
+
+        result.Should().NotBeNull();
+        result!.AccountSeries.Should().ContainSingle();
+        result.AccountSeries[0].AccountId
+            .Should().Be(Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6"));
+        result.AccountSeries[0].StartingBalanceAmount.Should().Be(1500.00m);
+        result.HorizonStart.Should().Be(new DateOnly(2026, 6, 13));
+        result.HorizonEnd.Should().Be(new DateOnly(2026, 9, 13));
+        result.AggregateSeries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task GetForecastAsync_WithNestedDomainShape_ThrowsApiClientException()
+    {
+        // This is the ORIGINAL bug: accountId serialized as {"value":"<guid>"} cannot be
+        // parsed into Guid. Documents why the API must NOT serialize the domain model directly.
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(NestedDomainForecastJson, Encoding.UTF8, "application/json")
+        };
+
+        var client = BuildClient(response);
+
+        var act = () => client.GetForecastAsync(months: 3);
+
+        var exception = await act.Should().ThrowAsync<ApiClientException>();
+        exception.Which.InnerException.Should().BeOfType<JsonException>(
+            "the nested {\"value\":...} accountId cannot be converted to System.Guid");
     }
 
     // ── Logger receives error on failure ──────────────────────────────────────

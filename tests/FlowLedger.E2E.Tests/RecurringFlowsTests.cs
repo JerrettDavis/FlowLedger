@@ -99,10 +99,11 @@ public class RecurringFlowsTests : E2ETestBase
             Timeout = 20_000,
         });
 
-        // MudDataGrid data rows contain cells with role="gridcell"
-        var rows = table.Locator("[role='gridcell']");
+        // MudBlazor 9 renders MudDataGrid rows as standard HTML table elements (tbody/tr/td).
+        // Poll tbody td elements — header th cells are in thead and are not counted here.
+        var rows = table.Locator("tbody td");
         var rowCount = 0;
-        var deadline = DateTime.UtcNow.AddSeconds(20);
+        var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline && rowCount == 0)
         {
             rowCount = await rows.CountAsync();

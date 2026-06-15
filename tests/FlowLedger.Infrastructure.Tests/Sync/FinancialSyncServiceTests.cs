@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Domain.Aggregates;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
@@ -177,6 +178,69 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
         var finalTxCount = await verifyDb.Transactions.CountAsync();
         finalTxCount.Should().Be(firstResult.TransactionsAdded,
             "transaction count should be unchanged after second sync");
+    }
+
+    [DockerFact]
+    public async Task SyncAsync_FirstRun_CreatesRecurringFlows()
+    {
+        // Arrange
+        var tenant = TestTenantContext.New();
+        await using var db = _fixture.CreateDbContext(tenant);
+        var syncService = CreateSyncService(db, tenant);
+
+        // Act
+        var result = await syncService.SyncAsync();
+
+        // Assert — recurring flows are created and reported in the result.
+        result.RecurringFlowsAdded.Should().BeGreaterThan(0,
+            "simulated sync always seeds recurring flows on the first run");
+
+        // Verify DB state — recurring flows are persisted with valid fields.
+        await using var verifyDb = _fixture.CreateDbContext(tenant);
+        var flows = await verifyDb.RecurringFlows.ToListAsync();
+        flows.Should().NotBeEmpty("recurring flows must be persisted after sync");
+        flows.Count.Should().Be(result.RecurringFlowsAdded);
+
+        foreach (var flow in flows)
+        {
+            flow.Name.Should().NotBeNullOrWhiteSpace("every recurring flow must have a name");
+            flow.Amount.Amount.Should().BeGreaterThan(0, "amounts must be positive");
+            flow.IsActive.Should().BeTrue("newly seeded flows start active");
+            flow.TenantId.Value.Should().Be(tenant.TenantId, "flows must be owned by the syncing tenant");
+        }
+
+        // At least one income (Credit) and one expense (Debit) flow must exist.
+        flows.Should().Contain(f => f.Direction == TransactionDirection.Credit,
+            "simulated data includes payroll as an income recurring flow");
+        flows.Should().Contain(f => f.Direction == TransactionDirection.Debit,
+            "simulated data includes expenses such as mortgage and utilities");
+    }
+
+    [DockerFact]
+    public async Task SyncAsync_SecondRun_DoesNotDuplicateRecurringFlows()
+    {
+        // Arrange: first sync to seed flows.
+        var tenant = TestTenantContext.New();
+        await using var db1 = _fixture.CreateDbContext(tenant);
+        var syncService1 = CreateSyncService(db1, tenant);
+        var firstResult = await syncService1.SyncAsync();
+        firstResult.RecurringFlowsAdded.Should().BeGreaterThan(0,
+            "precondition: first sync must create recurring flows");
+
+        // Act: second sync using a new service instance.
+        await using var db2 = _fixture.CreateDbContext(tenant);
+        var syncService2 = CreateSyncService(db2, tenant);
+        var secondResult = await syncService2.SyncAsync();
+
+        // Assert: no new recurring flows on repeated sync.
+        secondResult.RecurringFlowsAdded.Should().Be(0,
+            "recurring flows with the same names already exist — second sync must not create duplicates");
+
+        // Total count in DB must equal the first sync's count.
+        await using var verifyDb = _fixture.CreateDbContext(tenant);
+        var finalCount = await verifyDb.RecurringFlows.CountAsync();
+        finalCount.Should().Be(firstResult.RecurringFlowsAdded,
+            "DB recurring flow count must be unchanged after the second sync");
     }
 
     [DockerFact]
