@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
-using FluentAssertions;
 using FlowLedger.Integrations.Simulated;
+using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
 
