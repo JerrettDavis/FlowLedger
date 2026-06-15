@@ -74,29 +74,15 @@ public class MoneyPlanTests : E2ETestBase
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
 
-        var table = Page!.Locator("[aria-label='Money plan spreadsheet']");
-        await table.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 20_000,
-        });
-
-        // MudDataGrid data rows contain cells with role="gridcell"
-        var rows = table.Locator("[role='gridcell']");
-        var rowCount = 0;
-        var deadline = DateTime.UtcNow.AddSeconds(20);
-        while (DateTime.UtcNow < deadline && rowCount == 0)
-        {
-            rowCount = await rows.CountAsync();
-            if (rowCount == 0)
-            {
-                await Page!.WaitForTimeoutAsync(500);
-            }
-        }
+        // WaitForGridDataAsync handles the Blazor InteractiveServer render cycle: it
+        // re-waits for NetworkIdle, waits for the grid container, then polls for
+        // [role='gridcell'] with a 30 s Docker-friendly budget that absorbs the full
+        // SignalR circuit + API round-trip latency before asserting data is present.
+        var rowCount = await WaitForGridDataAsync("[aria-label='Money plan spreadsheet']");
 
         rowCount.Should().BeGreaterThan(0,
             "expected seeded data rows to appear in the Money Plan spreadsheet. " +
-            "If 0 rows: the Web→API call may have failed or Blazor did not load data in time.");
+            "If 0 rows: the Web→API call may have failed or Blazor did not render data within 30 s.");
 
         AssertNoPageErrors();
     }

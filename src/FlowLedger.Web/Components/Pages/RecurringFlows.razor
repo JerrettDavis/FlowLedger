@@ -20,11 +20,28 @@
 
 @if (_loading)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="Loading recurring flows" />
+    <CardSkeleton />
 }
 @if (_error is not null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (!_loading && _error is null && _flows.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.Repeat"
+                Title="No recurring flows"
+                Description="Add a recurring flow or use Connect & Sync to load demo data.">
+        <Action>
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="OpenCreateDialog"
+                       aria-label="Add recurring flow">
+                Add Flow
+            </MudButton>
+        </Action>
+    </EmptyState>
 }
 
 <MudDataGrid T="FlowLedger.Web.ApiClient.RecurringFlowDto"
@@ -33,8 +50,8 @@
              FilterMode="DataGridFilterMode.ColumnFilterRow"
              SortMode="SortMode.Multiple"
              Hover="true"
-             Striped="true"
-             Dense="false"
+             Striped="false"
+             Dense="true"
              aria-label="Recurring flows table">
     <Columns>
         <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
@@ -48,8 +65,8 @@
         </TemplateColumn>
         <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
             <CellTemplate>
-                <MudText Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
-                    @(context.Item.Direction == "Credit" ? "+" : "-")@context.Item.Amount.ToString("C2") @context.Item.Currency
+                <MudText Class="fl-num" Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
+                    @Format.Signed(context.Item.Amount, context.Item.Direction == "Credit") @context.Item.Currency
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
@@ -62,8 +79,8 @@
         <TemplateColumn Title="Window">
             <CellTemplate>
                 <MudText Typo="Typo.caption">
-                    @context.Item.StartDate.ToString("yyyy-MM-dd")
-                    @(context.Item.EndDate.HasValue ? $" → {context.Item.EndDate:yyyy-MM-dd}" : " (ongoing)")
+                    @Format.DayMonth(context.Item.StartDate)
+                    @(context.Item.EndDate.HasValue ? $" → {Format.FullDate(context.Item.EndDate.Value)}" : " (ongoing)")
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
@@ -213,13 +230,30 @@
     {
         return flow.RecurrenceFrequency switch
         {
-            "Monthly" when flow.DayOfMonth.HasValue => $"On the {flow.DayOfMonth}th",
+            "Monthly" when flow.DayOfMonth.HasValue => $"On the {flow.DayOfMonth}{OrdinalSuffix(flow.DayOfMonth.Value)}",
             "Monthly" => "Monthly",
             "Weekly" when flow.AnchorDayOfWeek is not null => $"Every {flow.AnchorDayOfWeek}",
             "Weekly" => "Weekly",
             "BiWeekly" when flow.IntervalWeeks.HasValue => $"Every {flow.IntervalWeeks} weeks",
             "Daily" => "Daily",
             _ => flow.RecurrenceFrequency
+        };
+    }
+
+    private static string OrdinalSuffix(int day)
+    {
+        // Handle teens (11th, 12th, 13th) first — they never take 1st/2nd/3rd.
+        int lastTwo = day % 100;
+        if (lastTwo is >= 11 and <= 13)
+        {
+            return "th";
+        }
+        return (day % 10) switch
+        {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th"
         };
     }
 }
