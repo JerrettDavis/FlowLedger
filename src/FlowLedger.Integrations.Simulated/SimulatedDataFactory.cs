@@ -548,4 +548,140 @@ public static class SimulatedDataFactory
         var seed = unchecked(baseSeed ^ tenantHash ^ (slotIndex * (int)0x9E3779B9));
         return new Faker("en") { Random = new Randomizer(seed) };
     }
+
+    // ── Recurring flow seeds ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the canonical set of recurring-flow seeds for the demo household.
+    /// These map directly to patterns visible in the generated transaction history
+    /// (payroll, mortgage, utilities, subscriptions, insurance, etc.).
+    ///
+    /// All amounts are positive; the caller supplies <see cref="TransactionDirection"/>.
+    /// <paramref name="checkingProviderAccountId"/> must be the provider account id for the
+    /// Primary Checking account (used only so callers can correlate which domain account
+    /// to attach these flows to — the factory does not resolve domain AccountIds).
+    /// </summary>
+    public static IReadOnlyList<SimulatedRecurringFlowSeed> GetRecurringFlowSeeds(
+        string checkingProviderAccountId,
+        string creditProviderAccountId)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        return new List<SimulatedRecurringFlowSeed>
+        {
+            // ── Income ────────────────────────────────────────────────────────
+            new(
+                checkingProviderAccountId,
+                "Payroll – Meridian Group LLC",
+                3_400m,
+                "USD",
+                "Credit",
+                "EveryNWeeks",
+                IntervalWeeks: 2,
+                AnchorDayOfWeek: "Friday",
+                DayOfMonth: null,
+                Counterparty: "Meridian Group LLC"),
+
+            // ── Housing ───────────────────────────────────────────────────────
+            new(
+                checkingProviderAccountId,
+                "Home Mortgage – Lakeview",
+                2_180m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 1,
+                Counterparty: "Lakeview Mortgage Services"),
+
+            // ── Utilities ─────────────────────────────────────────────────────
+            new(
+                checkingProviderAccountId,
+                "Electric – Lumen Utilities",
+                127m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 15,
+                Counterparty: "Lumen Utilities"),
+
+            new(
+                checkingProviderAccountId,
+                "Internet – ClearWave",
+                79.99m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 12,
+                Counterparty: "ClearWave Internet"),
+
+            // ── Insurance ─────────────────────────────────────────────────────
+            new(
+                checkingProviderAccountId,
+                "Auto Insurance – Ridgeline",
+                247m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 5,
+                Counterparty: "Ridgeline Insurance"),
+
+            new(
+                checkingProviderAccountId,
+                "Health Insurance Premium – BluePeak",
+                185m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 2,
+                Counterparty: "BluePeak Health"),
+
+            // ── Subscriptions ─────────────────────────────────────────────────
+            new(
+                creditProviderAccountId,
+                "Streaming Subscriptions",
+                60.95m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 1,
+                Counterparty: "Various Streaming Services"),
+
+            // ── Savings & investments ─────────────────────────────────────────
+            new(
+                checkingProviderAccountId,
+                "Savings Transfer – High-Yield",
+                600m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 3,
+                Counterparty: "High-Yield Savings"),
+
+            new(
+                checkingProviderAccountId,
+                "Brokerage Contribution – Horizon",
+                500m,
+                "USD",
+                "Debit",
+                "Monthly",
+                IntervalWeeks: null,
+                AnchorDayOfWeek: null,
+                DayOfMonth: 20,
+                Counterparty: "Horizon Brokerage"),
+        }.AsReadOnly();
+    }
 }

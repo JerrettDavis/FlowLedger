@@ -26,4 +26,5 @@ public interface IFinancialSyncService
 public sealed record SyncResult(
     int AccountsUpserted,
     int TransactionsAdded,
-    int TransactionsSkipped);
+    int TransactionsSkipped,
+    int RecurringFlowsAdded);
