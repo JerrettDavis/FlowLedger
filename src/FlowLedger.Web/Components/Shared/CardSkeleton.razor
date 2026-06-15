@@ -1,0 +1,11 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@for (int i = 0; i < Count; i++)
+{
+    <div class="fl-skeleton" style="height:@Height;margin-bottom:8px;border-radius:6px;"></div>
+}
+
+@code {
+    [Parameter] public string Height { get; set; } = "80px";
+    [Parameter] public int Count { get; set; } = 1;
+}

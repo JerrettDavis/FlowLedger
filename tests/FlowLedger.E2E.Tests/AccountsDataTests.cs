@@ -66,25 +66,33 @@ public class AccountsDataTests : E2ETestBase
         // ── Step 3: Assert NO auth-failure error is visible ──────────────────
         // If auth failed (401), Accounts.razor renders:
         //   <MudAlert aria-live="assertive">Failed to load accounts: ...</MudAlert>
-        // We verify that error text is NOT present with a short timeout.
-        try
+        // We verify that error text is NOT present using CountAsync() — never throws —
+        // instead of WaitForAsync + catch, which is fragile across Microsoft.Playwright
+        // versions (WaitForAsync may throw PlaywrightException or TimeoutException depending
+        // on the version, and catching the wrong type propagates a false failure on clean pages).
+        var errorAlert = Page!.Locator("[aria-live='assertive']");
+        const int pollIntervalMs = 250;
+        const int maxPollMs = 1500;
+        var alertDeadline = DateTime.UtcNow.AddMilliseconds(maxPollMs);
+
+        while (true)
         {
-            var errorAlert = Page!.Locator("[aria-live='assertive']");
-            await errorAlert.WaitForAsync(new LocatorWaitForOptions
+            var alertCount = await errorAlert.CountAsync();
+            if (alertCount > 0 && await errorAlert.First.IsVisibleAsync())
             {
-                State = WaitForSelectorState.Visible,
-                Timeout = 2000
-            });
-            var errorText = await errorAlert.First.InnerTextAsync();
-            // If we get here, an error was shown — fail with a clear message
-            false.Should().BeTrue(
-                $"Accounts page showed an error alert (likely 401): '{errorText}'. " +
-                "This means the Web is NOT sending X-Api-Key — auth fix regression.");
-        }
-        catch (PlaywrightException)
-        {
-            // Good — no error alert appeared.
-            // Microsoft.Playwright.PlaywrightException is thrown by WaitForAsync on timeout.
+                var errorText = await errorAlert.First.InnerTextAsync();
+                false.Should().BeTrue(
+                    $"Accounts page showed an error alert (likely 401): '{errorText}'. " +
+                    "This means the Web is NOT sending X-Api-Key — auth fix regression.");
+                break; // unreachable after Should().BeTrue(false), but keeps the compiler happy
+            }
+
+            if (DateTime.UtcNow >= alertDeadline)
+            {
+                break; // No error alert appeared — page is clean, continue.
+            }
+
+            await Page!.WaitForTimeoutAsync(pollIntervalMs);
         }
 
         // ── Step 4: Wait for a known seeded account name to appear ────────────
