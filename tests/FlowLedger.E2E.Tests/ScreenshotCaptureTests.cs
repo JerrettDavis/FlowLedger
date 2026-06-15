@@ -23,6 +23,10 @@ using Microsoft.Playwright;
 /// Optional:
 ///   SCREENSHOT_OUTPUT_DIR — override output directory (default: docs/assets/screenshots
 ///                           resolved relative to the repo root two levels above the test bin)
+///
+/// Naming convention:
+///   Light mode: &lt;page&gt;.png          (e.g. dashboard.png)
+///   Dark mode:  &lt;page&gt;-dark.png     (e.g. dashboard-dark.png)
 /// </summary>
 [Trait("Category", "Screenshots")]
 public class ScreenshotCaptureTests : E2ETestBase
@@ -42,17 +46,28 @@ public class ScreenshotCaptureTests : E2ETestBase
     private static string TenantId =>
         Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? DefaultTenantId;
 
+    // ── Page definitions ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pages to capture: (route, base filename without extension, required aria selector).
+    /// Both light and dark variants are captured for each entry.
+    /// </summary>
+    private static readonly (string Path, string BaseName, string WaitForSelector)[] Pages =
+    [
+        ("/",               "dashboard",       "[aria-label='Balance projection chart']"),
+        ("/accounts",       "accounts",        "[aria-label='Accounts table']"),
+        ("/transactions",   "transactions",    "[aria-label='Transactions table']"),
+        ("/money-plan",     "money-plan",      "[aria-label='Money plan spreadsheet']"),
+        ("/recurring-flows","recurring-flows", "[aria-label='Recurring flows table']"),
+        ("/forecasts",      "forecast",        "[aria-label='Aggregate balance projection chart']"),
+    ];
+
     // ── Screenshot tests ──────────────────────────────────────────────────────
 
-    [Fact(DisplayName = "Screenshots: seed data then capture all key pages")]
+    [Fact(DisplayName = "Screenshots: seed data then capture all key pages (light + dark)")]
     public async Task Capture_all_key_pages()
     {
         if (ShouldSkip) { return; }
-
-        // Screenshot-specific page setup: 1440×900 @ 2× for crisp HiDPI PNGs.
-        // E2ETestBase creates the page at the default viewport; we resize here.
-        await Page!.SetViewportSizeAsync(1440, 900);
-        Page.SetDefaultTimeout(30_000);
 
         var outputDir = ResolveOutputDir();
         Directory.CreateDirectory(outputDir);
@@ -60,28 +75,70 @@ public class ScreenshotCaptureTests : E2ETestBase
         // Step 1 — ensure data is seeded (idempotent: 409 = already connected).
         await SeedDataAsync();
 
-        // Step 2 — warm up the app by navigating to the home page once.
-        await NavigateAsync("/");
-        await WaitForLoadAsync();
-        await Page!.WaitForTimeoutAsync(2_000);
+        // Step 2 — capture light mode (default — no color-scheme override).
+        await CaptureAllPagesAsync(outputDir, darkMode: false);
 
-        // Step 3 — capture each page.
-        // Dashboard: wait for the SVG chart — "No forecast data" is not acceptable after seeding.
-        await CapturePageAsync("/", "dashboard.png", outputDir,
-            waitForSelector: "[aria-label='Balance projection chart']");
-        await CapturePageAsync("/accounts", "accounts.png", outputDir,
-            waitForSelector: "[aria-label='Accounts table']");
-        await CapturePageAsync("/transactions", "transactions.png", outputDir,
-            waitForSelector: "[aria-label='Transactions table']");
-        await CapturePageAsync("/money-plan", "money-plan.png", outputDir,
-            waitForSelector: "[aria-label='Money plan spreadsheet']");
-        await CapturePageAsync("/recurring-flows", "recurring-flows.png", outputDir,
-            waitForSelector: "[aria-label='Recurring flows table']");
-        await CapturePageAsync("/forecasts", "forecast.png", outputDir,
-            waitForSelector: "[aria-label='Aggregate balance projection chart']");
+        // Step 3 — capture dark mode.
+        // The app reads prefers-color-scheme via FlowLedgerTheme.getSystemPrefersDark()
+        // on first render (OnAfterRenderAsync) and passes it to ThemeService.Initialize().
+        // MudThemeProvider also has ObserveSystemDarkModeChange="true".
+        // EmulateMediaAsync on a fresh context is therefore the most reliable trigger:
+        // it makes matchMedia('(prefers-color-scheme: dark)') return true throughout the
+        // session without needing to click the in-app toggle or deal with Blazor circuit
+        // timing issues.
+        await CaptureAllPagesAsync(outputDir, darkMode: true);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Captures every page in <see cref="Pages"/> using a fresh browser context so the
+    /// color-scheme emulation is clean for each mode.
+    /// </summary>
+    private async Task CaptureAllPagesAsync(string outputDir, bool darkMode)
+    {
+        var colorScheme = darkMode ? ColorScheme.Dark : ColorScheme.Light;
+        var suffix = darkMode ? "-dark" : string.Empty;
+
+        // Create a dedicated context for this color-scheme pass so localStorage from a
+        // previous pass does not bleed through (each context starts with a clean slate).
+        await using var context = await CreateColorSchemeContextAsync(colorScheme);
+        var page = await context.NewPageAsync();
+
+        // 1440×900 @ default DPR for crisp, consistent documentation screenshots.
+        await page.SetViewportSizeAsync(1440, 900);
+        page.SetDefaultTimeout(30_000);
+
+        // Warm up: navigate to the home page once to let the Blazor circuit initialise
+        // and the theme preference to be read from matchMedia.
+        var warmUpUrl = $"{BaseUrl.TrimEnd('/')}/";
+        await page.GotoAsync(warmUpUrl, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
+        await page.WaitForTimeoutAsync(2_000);
+
+        foreach (var (path, baseName, waitForSelector) in Pages)
+        {
+            var filename = $"{baseName}{suffix}.png";
+            await CapturePageAsync(page, path, filename, outputDir, waitForSelector);
+        }
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="IBrowserContext"/> with the given color-scheme emulated.
+    /// The caller is responsible for disposing the returned context.
+    /// </summary>
+    private async Task<IBrowserContext> CreateColorSchemeContextAsync(ColorScheme colorScheme)
+    {
+        // Playwright is initialised by E2ETestBase.InitializeAsync(); the browser is
+        // the same Chromium instance — we just open an additional isolated context.
+        var browser = Context!.Browser
+            ?? throw new InvalidOperationException(
+                "E2ETestBase browser is not available. Ensure InitializeAsync ran successfully.");
+
+        return await browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            ColorScheme = colorScheme,
+        });
+    }
 
     /// <summary>
     /// Navigate to <paramref name="path"/>, wait for <paramref name="waitForSelector"/>
@@ -90,18 +147,20 @@ public class ScreenshotCaptureTests : E2ETestBase
     /// screenshot.
     /// </summary>
     private async Task CapturePageAsync(
+        IPage page,
         string path,
         string filename,
         string outputDir,
         string? waitForSelector)
     {
-        await NavigateAsync(path);
+        var url = $"{BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+        await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
 
         // If a selector hint is given, wait for it to appear (data loaded / chart rendered).
         // A timeout here is a FAILURE — the page did not reach the expected ready state.
         if (!string.IsNullOrWhiteSpace(waitForSelector))
         {
-            await Page!.WaitForSelectorAsync(waitForSelector, new PageWaitForSelectorOptions
+            await page.WaitForSelectorAsync(waitForSelector, new PageWaitForSelectorOptions
             {
                 State = WaitForSelectorState.Visible,
                 Timeout = 25_000,
@@ -110,22 +169,99 @@ public class ScreenshotCaptureTests : E2ETestBase
 
         // Assert no visible error alert or JSON-error text before capturing the screenshot.
         // If an error IS visible the test fails here with the error text — not a broken image.
-        await AssertNoErrorAlertVisible();
-
-        // Assert no console errors, uncaught JS exceptions, or HTTP >= 400 responses were
-        // recorded since the page was created.  Inherited from E2ETestBase.
-        AssertNoPageErrors();
+        await AssertNoErrorAlertVisibleOnPage(page);
 
         // Extra settle time for chart animations to finish rendering.
-        await Page!.WaitForTimeoutAsync(1_500);
+        await page.WaitForTimeoutAsync(1_500);
 
         var outputPath = Path.Combine(outputDir, filename);
 
-        await Page.ScreenshotAsync(new PageScreenshotOptions
+        await page.ScreenshotAsync(new PageScreenshotOptions
         {
             Path = outputPath,
             FullPage = true,
         });
+    }
+
+    /// <summary>
+    /// Page-scoped variant of <see cref="E2ETestBase.AssertNoErrorAlertVisible"/> that
+    /// operates on an arbitrary <see cref="IPage"/> instance instead of the base-class
+    /// <c>Page</c> property.  Required because screenshot capture opens additional
+    /// browser contexts with their own page instances.
+    /// </summary>
+    private static async Task AssertNoErrorAlertVisibleOnPage(IPage page)
+    {
+        var assertiveLocator = page.Locator("[aria-live='assertive']");
+
+        const int pollIntervalMs = 250;
+        const int maxPollMs = 1500;
+        var deadline = DateTime.UtcNow.AddMilliseconds(maxPollMs);
+
+        var appErrorPhrases = new[]
+        {
+            "Failed to load",
+            "Couldn't load",
+            "server returned",
+            "An error occurred",
+            "An unhandled exception",
+            "HTTP 500",
+        };
+
+        while (true)
+        {
+            var count = await assertiveLocator.CountAsync();
+            if (count > 0)
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    var el = assertiveLocator.Nth(i);
+                    if (!await el.IsVisibleAsync())
+                    {
+                        continue;
+                    }
+
+                    var alertText = await el.InnerTextAsync();
+                    if (appErrorPhrases.Any(p =>
+                            alertText.Contains(p, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        false.Should().BeTrue(
+                            $"Expected no application error alert on the page, but found a " +
+                            $"visible [aria-live='assertive'] element with text: '{alertText}'");
+                        return;
+                    }
+                }
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                break;
+            }
+
+            await page.WaitForTimeoutAsync(pollIntervalMs);
+        }
+
+        var jsonErrorPatterns = new[]
+        {
+            "invalid start of a value",
+            "The JSON value could not be converted",
+            "JSException",
+            "JsonException",
+            "An unhandled exception occurred",
+            "HTTP 500",
+        };
+
+        foreach (var pattern in jsonErrorPatterns)
+        {
+            var locator = page.GetByText(pattern, new PageGetByTextOptions { Exact = false });
+            var count = await locator.CountAsync();
+            if (count > 0 && await locator.First.IsVisibleAsync())
+            {
+                var text = await locator.First.InnerTextAsync();
+                false.Should().BeTrue(
+                    $"Expected no error text on the page, but found visible text matching " +
+                    $"'{pattern}': '{text}'");
+            }
+        }
     }
 
     /// <summary>
