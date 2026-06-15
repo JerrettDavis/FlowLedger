@@ -68,7 +68,7 @@ jobs:
 
       - name: Publish E2E test results
         if: always()
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         with:
           name: E2E Test Results
           path: artifacts/tests/**/*.trx
