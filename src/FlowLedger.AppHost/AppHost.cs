@@ -61,4 +61,17 @@ var worker = builder.AddProject<Projects.FlowLedger_Worker>("worker")
 
 WithMxConfig(worker, builder.Configuration);
 
+// Force unoptimized JIT on debugged service processes so the Rider/Aspire debugger can read locals.
+// Without this the CLR runs ReadyToRun/tiered code and throws CORDBG_E_IL_VAR_NOT_AVAILABLE (0x80131304).
+// IsRunMode is true only for local run/debug — never during publish or CI.
+if (builder.ExecutionContext.IsRunMode)
+{
+    foreach (var svc in new[] { api, web, worker })
+    {
+        svc.WithEnvironment("DOTNET_TieredCompilation", "0")
+           .WithEnvironment("DOTNET_ReadyToRun", "0")
+           .WithEnvironment("DOTNET_TieredPGO", "0");
+    }
+}
+
 builder.Build().Run();
