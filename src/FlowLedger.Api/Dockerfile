@@ -4,7 +4,7 @@
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
 # Copy only the manifest files first so the restore layer is cached until a
 # .csproj or central-package file changes.
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.301 AS restore
 WORKDIR /src
 
 # Central build / package management files
@@ -41,7 +41,7 @@ RUN dotnet publish src/FlowLedger.Api/FlowLedger.Api.csproj \
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds curl + a minimal shell so Docker healthchecks work
 # while keeping the image hardened (non-root, distroless-like).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-noble-chiseled-extra AS runtime
 WORKDIR /app
 
 # chiseled images run as non-root (uid=65532) by default
