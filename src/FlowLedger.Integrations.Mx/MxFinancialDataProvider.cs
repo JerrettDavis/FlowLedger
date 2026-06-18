@@ -100,7 +100,16 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
     {
         var (memberRef, widgetUrl) = await ProvisionMxConnectionAsync(
             tenantId, fetchWidgetUrl: true, cancellationToken).ConfigureAwait(false);
-        return (memberRef, widgetUrl!);
+
+        // ProvisionMxConnectionAsync guarantees a non-null widget URL when fetchWidgetUrl is true
+        // (it throws FatalProviderException otherwise). Assert here so the contract is explicit
+        // rather than relying on a null-forgiving operator.
+        if (widgetUrl is null)
+        {
+            throw new FatalProviderException("MX widget URL was unexpectedly null after provisioning.");
+        }
+
+        return (memberRef, widgetUrl);
     }
 
     /// <summary>
@@ -117,18 +126,23 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
     }
 
     /// <summary>
-    /// Core provisioning: create/find the MX user, provision a member, and optionally obtain
-    /// the Connect widget URL. Both public begin-connection methods delegate here so the three
-    /// MX API calls and status-mapping logic stay in one place (DRY).
+    /// Core provisioning: create/find the MX user, discover the member, and optionally obtain
+    /// the Connect widget URL. Both public begin-connection methods delegate here so the MX API
+    /// calls and status-mapping logic stay in one place (DRY).
+    ///
+    /// Members are NEVER created server-side (MX's POST /members requires the user's bank
+    /// credentials, and rejects the call when the Connect widget already created the member).
     /// </summary>
     /// <param name="tenantId">Tenant for whom the connection is provisioned.</param>
     /// <param name="fetchWidgetUrl">
-    ///   When <see langword="true"/>, calls <c>GetConnectWidgetUrlAsync</c> and returns the URL;
-    ///   when <see langword="false"/>, skips the billable widget call (widget URL only needed
-    ///   by <c>/api/integrations/mx/connect-token</c>).
+    ///   When <see langword="true"/> (widget path), adopts an existing widget-created member or
+    ///   returns a PENDING placeholder, and calls <c>GetConnectWidgetUrlAsync</c>. When
+    ///   <see langword="false"/> (sync path), discovers the widget-created member via
+    ///   <c>GET /users/{guid}/members</c> and waits for it to finish aggregating
+    ///   (see <see cref="DiscoverAndWaitForReadyMemberAsync"/>); skips the billable widget call.
     /// </param>
     /// <returns>
-    ///   The provisioned <see cref="ProviderMemberRef"/> and, when
+    ///   The <see cref="ProviderMemberRef"/> and, when
     ///   <paramref name="fetchWidgetUrl"/> is <see langword="true"/>, the Connect widget URL
     ///   (otherwise <see langword="null"/>).
     /// </returns>
@@ -147,23 +161,28 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         var userGuid = user.Guid
             ?? throw new FatalProviderException("MX returned a user without a guid.");
 
-        // 2. Members cannot be created server-side: MX's POST /members requires the user's bank
-        //    credentials. The Connect widget (step 3) collects them and creates the member. Adopt a
-        //    member if the widget already produced one; otherwise return a PENDING placeholder that is
-        //    resolved to the real member the first time accounts/status are read.
+        if (!fetchWidgetUrl)
+        {
+            // 2. Sync path: discover the member the Connect widget created and wait until it is
+            //    ready. No members / CHALLENGED / terminal / poll cap → NeedsUserAction (not fatal).
+            var syncRef = await DiscoverAndWaitForReadyMemberAsync(userGuid, cancellationToken)
+                .ConfigureAwait(false);
+            return (syncRef, null);
+        }
+
+        // 2. Widget path: members cannot be created server-side: the Connect widget (step 3)
+        //    collects credentials and creates the member. Adopt a member if the widget already
+        //    produced one; otherwise return a PENDING placeholder that is resolved to the real
+        //    member the first time accounts/status are read.
         var existingMembers = await _client.ListMembersAsync(userGuid, cancellationToken).ConfigureAwait(false);
         var member = existingMembers.FirstOrDefault(m => m.Guid is not null);
         var memberGuid = member?.Guid ?? PendingMember;
 
-        // 3. Optionally obtain the Connect widget URL (billable call — only request when needed).
-        string? widgetUrl = null;
-        if (fetchWidgetUrl)
-        {
-            var widget = await _client
-                .GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
-            widgetUrl = widget.Url
-                ?? throw new FatalProviderException("MX widget response contained no URL.");
-        }
+        // 3. Obtain the Connect widget URL (billable call — only requested on the widget path).
+        var widget = await _client
+            .GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
+        var widgetUrl = widget.Url
+            ?? throw new FatalProviderException("MX widget response contained no URL.");
 
         var institution = string.IsNullOrWhiteSpace(member?.Name) ? "MX Institution" : member!.Name!;
 
@@ -180,6 +199,176 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             refStatus);
 
         return (memberRef, widgetUrl);
+    }
+
+    // ── Member readiness (post-widget sync) ─────────────────────────────────────
+
+    private enum MemberReadiness
+    {
+        /// <summary>Connected (or degraded) and not aggregating — accounts can be read.</summary>
+        Ready,
+        /// <summary>CHALLENGED: MFA / extra verification needed in the Connect widget.</summary>
+        Challenged,
+        /// <summary>Dead-end status (needs reconnect, error, disabled).</summary>
+        Terminal,
+        /// <summary>Still connecting or aggregating — poll again.</summary>
+        Transient,
+    }
+
+    private const string ChallengedStatus = "CHALLENGED";
+
+    /// <summary>
+    /// Classifies a member via <see cref="MxMapper.ToConnectionStatus"/> (single source of truth
+    /// for MX status semantics) plus the <c>is_being_aggregated</c> flag.
+    /// </summary>
+    private static MemberReadiness Classify(MxMember member)
+    {
+        if (string.Equals(member.ConnectionStatus?.Trim(), ChallengedStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            return MemberReadiness.Challenged;
+        }
+
+        return MxMapper.ToConnectionStatus(member.ConnectionStatus) switch
+        {
+            ConnectionStatus.NeedsUserAction or ConnectionStatus.Error or ConnectionStatus.Disabled
+                => MemberReadiness.Terminal,
+            ConnectionStatus.Healthy or ConnectionStatus.Degraded when member.IsBeingAggregated != true
+                => MemberReadiness.Ready,
+            _ => MemberReadiness.Transient,
+        };
+    }
+
+    /// <summary>
+    /// Discovers widget-created members for <paramref name="userGuid"/> via
+    /// <c>GET /users/{guid}/members</c>, gates on their aggregation status, and returns a
+    /// <see cref="ProviderMemberRef"/> for the first READY member, polling the status endpoint for
+    /// a member that is still aggregating. Throws <see cref="NeedsUserActionProviderException"/>
+    /// (never <see cref="FatalProviderException"/>) for the non-fatal conditions: no members,
+    /// CHALLENGED, terminal, still connecting after <see cref="MxProviderOptions.MaxPollAttempts"/>.
+    /// </summary>
+    private async Task<ProviderMemberRef> DiscoverAndWaitForReadyMemberAsync(
+        string userGuid, CancellationToken ct)
+    {
+        var members = (await _client.ListMembersAsync(userGuid, ct).ConfigureAwait(false))
+            .Where(m => m.Guid is not null)
+            .ToList();
+
+        if (members.Count == 0)
+        {
+            throw new NeedsUserActionProviderException(
+                "No financial institution connected yet. Use Connect to add one.",
+                userHint: "Connect a bank account using the Connect button.",
+                providerCode: "NoMembers");
+        }
+
+        var ready = members.FirstOrDefault(m => Classify(m) == MemberReadiness.Ready);
+        if (ready is not null)
+        {
+            return BuildMemberRef(userGuid, ready);
+        }
+
+        var transient = members.FirstOrDefault(m => Classify(m) == MemberReadiness.Transient);
+        if (transient is null)
+        {
+            // Every member is challenged or terminal.
+            ThrowForUnusableMember(members.FirstOrDefault(m => Classify(m) == MemberReadiness.Challenged)
+                                   ?? members[0]);
+        }
+
+        var readyMember = await WaitForMemberReadyAsync(userGuid, transient!, ct).ConfigureAwait(false);
+        return BuildMemberRef(userGuid, readyMember);
+    }
+
+    /// <summary>
+    /// Polls <c>GET /users/{u}/members/{m}/status</c> until the member is ready, up to
+    /// <see cref="MxProviderOptions.MaxPollAttempts"/> times, <see cref="MxProviderOptions.PollIntervalMs"/>
+    /// apart. Returns immediately (no call) when <paramref name="member"/> is already ready.
+    /// </summary>
+    private async Task<MxMember> WaitForMemberReadyAsync(string userGuid, MxMember member, CancellationToken ct)
+    {
+        switch (Classify(member))
+        {
+            case MemberReadiness.Ready:
+                return member;
+            case MemberReadiness.Challenged:
+            case MemberReadiness.Terminal:
+                ThrowForUnusableMember(member);
+                break;
+        }
+
+        var memberGuid = member.Guid ?? throw new FatalProviderException("MX member has no guid.");
+        var pollInterval = TimeSpan.FromMilliseconds(Math.Max(0, _options.PollIntervalMs));
+        var maxAttempts = Math.Max(1, _options.MaxPollAttempts);
+
+        _logger.LogInformation(
+            "MX member {MemberGuid} is aggregating or transient (status={Status}, isAggregating={IsAgg}). " +
+            "Polling status up to {MaxAttempts} times with {IntervalMs}ms interval.",
+            memberGuid, member.ConnectionStatus, member.IsBeingAggregated, maxAttempts, _options.PollIntervalMs);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (pollInterval > TimeSpan.Zero)
+            {
+                await Task.Delay(pollInterval, ct).ConfigureAwait(false);
+            }
+
+            var current = await _client.GetMemberStatusAsync(userGuid, memberGuid, ct).ConfigureAwait(false);
+            switch (Classify(current))
+            {
+                case MemberReadiness.Ready:
+                    _logger.LogInformation("MX member {MemberGuid} is ready after {Attempt} poll(s).", memberGuid, attempt);
+                    // The status endpoint may omit name; keep the listed member's identity fields.
+                    return current with
+                    {
+                        Guid = current.Guid ?? memberGuid,
+                        Name = string.IsNullOrWhiteSpace(current.Name) ? member.Name : current.Name,
+                    };
+                case MemberReadiness.Challenged:
+                case MemberReadiness.Terminal:
+                    ThrowForUnusableMember(current);
+                    break;
+            }
+
+            _logger.LogDebug(
+                "MX member {MemberGuid} poll {Attempt}/{MaxAttempts}: status={Status}, isAggregating={IsAgg}.",
+                memberGuid, attempt, maxAttempts, current.ConnectionStatus, current.IsBeingAggregated);
+        }
+
+        throw new NeedsUserActionProviderException(
+            "Account is still connecting; data will appear shortly.",
+            userHint: "Your bank connection is in progress. Please try syncing again in a moment.",
+            providerCode: "StillAggregating");
+    }
+
+    [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+    private static void ThrowForUnusableMember(MxMember member)
+    {
+        if (Classify(member) == MemberReadiness.Challenged)
+        {
+            throw new NeedsUserActionProviderException(
+                "Additional verification needed. Please reconnect to continue.",
+                userHint: "Your bank requires additional verification. Re-open the Connect widget to complete it.",
+                providerCode: ChallengedStatus);
+        }
+
+        throw new NeedsUserActionProviderException(
+            "Connection needs to be re-established. Please reconnect.",
+            userHint: member.ConnectionStatusMessage ?? "Your bank connection was lost. Please reconnect your account.",
+            providerCode: member.ConnectionStatus ?? "Terminal");
+    }
+
+    private static ProviderMemberRef BuildMemberRef(string userGuid, MxMember member)
+    {
+        var memberGuid = member.Guid
+            ?? throw new FatalProviderException("MX member has no guid.");
+        var institution = string.IsNullOrWhiteSpace(member.Name) ? "MX Institution" : member.Name;
+        var status = MxMapper.ToConnectionStatus(member.ConnectionStatus) == ConnectionStatus.Degraded
+            ? ConnectionStatus.Degraded
+            : ConnectionStatus.Connected;
+        return new ProviderMemberRef(
+            MxCompositeId.Pack(userGuid, memberGuid),
+            institution,
+            status);
     }
 
     public async Task<ConnectionStatus> GetConnectionStatusAsync(
@@ -219,6 +408,17 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         var member = await _client
             .GetMemberStatusAsync(userGuid, memberGuid, cancellationToken)
             .ConfigureAwait(false);
+
+        // First sync after a Connect-widget flow (the persisted id was still the PENDING placeholder):
+        // the widget-created member may still be aggregating. Wait for it (bounded by
+        // MaxPollAttempts) instead of reading a half-built account list; CHALLENGED / terminal /
+        // poll-cap surface as NeedsUserAction. Steady-state syncs (real member id) are unaffected.
+        if (string.Equals(pendingOrMemberGuid, PendingMember, StringComparison.Ordinal))
+        {
+            member = await WaitForMemberReadyAsync(
+                userGuid, member with { Guid = member.Guid ?? memberGuid }, cancellationToken).ConfigureAwait(false);
+        }
+
         if (MxMapper.RequiresUserAction(member.ConnectionStatus))
         {
             throw new NeedsUserActionProviderException(
