@@ -8,8 +8,8 @@
   ============================================================ -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.4.3" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.3" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.3" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.6" />
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.3" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.3" />
   </ItemGroup>
@@ -119,8 +119,8 @@
        Testing — BDD
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="TinyBDD" Version="0.19.23" />
-    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.23" />
+    <PackageVersion Include="TinyBDD" Version="0.19.26" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.26" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -138,7 +138,7 @@
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.2" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.5" />
   </ItemGroup>
 
   <!-- ============================================================
