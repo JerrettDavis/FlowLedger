@@ -88,9 +88,13 @@ public sealed class FlowLedgerApiClient
 
             if (!response.IsSuccessStatusCode)
             {
+                // Do not log the raw URL here — it may contain account identifiers
+                // embedded as query parameters (e.g. ?accountId=...) that constitute
+                // PII in a financial application. The operation description is sufficient
+                // to identify the failed call without exposing account-scoped data.
                 _logger.LogError(
-                    "Non-success status {StatusCode} from {Url} during {Operation}",
-                    (int)response.StatusCode, url, operationDescription);
+                    "Non-success status {StatusCode} during {Operation}",
+                    (int)response.StatusCode, operationDescription);
                 throw new ApiClientException(
                     $"Couldn't {operationDescription} (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
