@@ -318,9 +318,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             // Resolve domain account; skip seeds whose provider account wasn't synced.
             if (!providerIdToAccount.TryGetValue(seed.ProviderAccountId, out var account))
             {
+                // Do not log the raw provider account ID — it is an account-scoped
+                // identifier that should not appear in log output (financial app PII policy).
+                // The seed name provides enough context for diagnostics.
                 _logger.LogWarning(
-                    "Skipping recurring flow seed '{Name}': provider account '{ProviderId}' not found.",
-                    seed.Name, seed.ProviderAccountId);
+                    "Skipping recurring flow seed '{Name}': associated provider account not found in synced set.",
+                    seed.Name);
                 continue;
             }
 
