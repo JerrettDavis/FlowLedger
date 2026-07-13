@@ -29,7 +29,7 @@
        MudBlazor
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="MudBlazor" Version="9.6.0" />
+    <PackageVersion Include="MudBlazor" Version="9.7.0" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -40,7 +40,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -82,7 +82,7 @@
        Serilog
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Serilog" Version="4.3.1" />
+    <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
@@ -96,7 +96,7 @@
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
@@ -119,26 +119,26 @@
        Testing — BDD
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="TinyBDD" Version="0.19.27" />
-    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.27" />
+    <PackageVersion Include="TinyBDD" Version="0.19.28" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.28" />
   </ItemGroup>
 
   <!-- ============================================================
        Testing — Integration / Architecture / Fakes (pinned for M2)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
-    <PackageVersion Include="WireMock.Net" Version="2.11.0" />
+    <PackageVersion Include="WireMock.Net" Version="2.12.0" />
   </ItemGroup>
 
   <!-- ============================================================
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.7" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.10" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -156,10 +156,10 @@
          LZ4 out-of-bounds read vulnerability. Aspire.Hosting 13.4.3 pulls 2.5.192
          transitively. 2.5.301 is the patched release on the 2.5.x line (3.1.7 on 3.x).
          Forced via a direct PackageReference in FlowLedger.AppHost.csproj. -->
-    <PackageVersion Include="MessagePack" Version="3.1.7" />
-    <PackageVersion Include="MessagePack.Annotations" Version="3.1.7" />
+    <PackageVersion Include="MessagePack" Version="3.1.8" />
+    <PackageVersion Include="MessagePack.Annotations" Version="3.1.8" />
     <!-- GHSA-v5pm-xwqc-g5wc: Microsoft.OpenApi 2.0.0 has a high-severity vulnerability.
          2.7.5 is the patched version. -->
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="3.8.0" />
   </ItemGroup>
 </Project>
