@@ -2,7 +2,7 @@
 # Build context: repo root  (docker build -f src/FlowLedger.Worker/Dockerfile .)
 
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0.301 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS restore
 WORKDIR /src
 
 # Central build / package management files
@@ -40,7 +40,7 @@ RUN dotnet publish src/FlowLedger.Worker/FlowLedger.Worker.csproj \
 # Aspire.StackExchange.Redis and other packages that transitively depend on the
 # Microsoft.AspNetCore.App shared framework.  Use the aspnet image so that
 # framework is present; the smaller dotnet/runtime image would be missing it.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-noble-chiseled-extra AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.10-noble-chiseled-extra AS runtime
 WORKDIR /app
 
 COPY --from=publish /app/publish .
