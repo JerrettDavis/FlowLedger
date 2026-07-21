@@ -39,6 +39,12 @@ updates:
       nuget-dependencies:
         patterns:
           - "*"
+    ignore:
+      # Microsoft.OpenApi 3.x breaks Microsoft.AspNetCore.OpenApi 10.0.x source generation
+      # (CS0200 on IOpenApiMediaType.Example). See Directory.Packages.props comment. Revisit
+      # once a stable AspNetCore.OpenApi release supports Microsoft.OpenApi 3.x.
+      - dependency-name: "Microsoft.OpenApi"
+        versions: [">=3.0.0"]
 
   - package-ecosystem: "docker"
     directories:
