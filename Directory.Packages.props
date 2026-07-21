@@ -158,8 +158,14 @@
          Forced via a direct PackageReference in FlowLedger.AppHost.csproj. -->
     <PackageVersion Include="MessagePack" Version="3.1.8" />
     <PackageVersion Include="MessagePack.Annotations" Version="3.1.8" />
-    <!-- GHSA-v5pm-xwqc-g5wc: Microsoft.OpenApi 2.0.0 has a high-severity vulnerability.
-         2.7.5 is the patched version. -->
+    <!-- Microsoft.OpenApi pinned to 2.7.5 (>= 2.7.5 clears GHSA-v5pm-xwqc-g5wc).
+         DO NOT bump to Microsoft.OpenApi 3.x while on Microsoft.AspNetCore.OpenApi 10.0.x:
+         AspNetCore.OpenApi 10.0.10's OpenApiXmlCommentSupport source generator targets the
+         mutable (pre-3.x) IOpenApiMediaType.Example setter, and Microsoft.OpenApi 3.x makes
+         Example read-only, causing CS0200 in generated code. The only AspNetCore.OpenApi
+         release compatible with Microsoft.OpenApi 3.x is 11.0.0-preview+ (net11.0, requires
+         .NET 11 preview SDK/runtime) — revisit this pin when .NET 11 GA ships a stable
+         release with matching Microsoft.OpenApi 3.x support. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
 </Project>
