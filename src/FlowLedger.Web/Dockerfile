@@ -2,7 +2,7 @@
 # Build context: repo root  (docker build -f src/FlowLedger.Web/Dockerfile .)
 
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0.301 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS restore
 WORKDIR /src
 
 # Central build / package management files
@@ -44,7 +44,7 @@ RUN dotnet publish src/FlowLedger.Web/FlowLedger.Web.csproj \
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds curl + a minimal shell so Docker healthchecks work
 # while keeping the image hardened (non-root, distroless-like).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-noble-chiseled-extra AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.10-noble-chiseled-extra AS runtime
 WORKDIR /app
 
 COPY --from=publish /app/publish .
