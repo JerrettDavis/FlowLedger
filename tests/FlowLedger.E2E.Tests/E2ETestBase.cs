@@ -61,6 +61,11 @@ public class E2ETestBase : IAsyncLifetime
         // this is normal and must not cause a test failure.
         "_blazor/disconnect",
         "_blazor?id=",
+        // Google Fonts CDN: third-party asset load, not app functionality. CI runners
+        // occasionally see transient DNS/connection failures reaching external hosts —
+        // these are network noise, not FlowLedger bugs, and must not fail the test.
+        "fonts.googleapis.com",
+        "fonts.gstatic.com",
     ];
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
