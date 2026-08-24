@@ -8,8 +8,8 @@
   ============================================================ -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.4.3" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.2" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.2" />
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.3" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.3" />
   </ItemGroup>
@@ -93,11 +93,11 @@
        OpenTelemetry (versions aligned with ServiceDefaults template)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.9.0" />
   </ItemGroup>
@@ -119,8 +119,8 @@
        Testing — BDD
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="TinyBDD" Version="0.19.33" />
-    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.33" />
+    <PackageVersion Include="TinyBDD" Version="0.19.34" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.34" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -138,7 +138,7 @@
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.19" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.20" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -166,6 +166,6 @@
          release compatible with Microsoft.OpenApi 3.x is 11.0.0-preview+ (net11.0, requires
          .NET 11 preview SDK/runtime) — revisit this pin when .NET 11 GA ships a stable
          release with matching Microsoft.OpenApi 3.x support. -->
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
   </ItemGroup>
 </Project>
