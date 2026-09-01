@@ -29,7 +29,7 @@
        MudBlazor
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="MudBlazor" Version="9.8.0" />
+    <PackageVersion Include="MudBlazor" Version="9.9.0" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -55,8 +55,8 @@
        Scheduler
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Quartz" Version="3.19.1" />
-    <PackageVersion Include="Quartz.AspNetCore" Version="3.19.1" />
+    <PackageVersion Include="Quartz" Version="3.20.0" />
+    <PackageVersion Include="Quartz.AspNetCore" Version="3.20.0" />
   </ItemGroup>
 
   <!-- ============================================================
