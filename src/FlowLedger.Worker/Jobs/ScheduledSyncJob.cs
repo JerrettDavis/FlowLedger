@@ -36,7 +36,7 @@ public sealed class ScheduledSyncJob : IJob
     }
 
     /// <inheritdoc/>
-    public async Task Execute(IJobExecutionContext context)
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         if (!_options.Enabled)
         {
@@ -55,7 +55,7 @@ public sealed class ScheduledSyncJob : IJob
 
         try
         {
-            var result = await syncService.SyncAsync(context.CancellationToken);
+            var result = await syncService.SyncAsync(cancellationToken);
             _logger.LogInformation(
                 "ScheduledSyncJob: sync complete — {AccountsUpserted} accounts, " +
                 "{TransactionsAdded} added, {TransactionsSkipped} skipped.",

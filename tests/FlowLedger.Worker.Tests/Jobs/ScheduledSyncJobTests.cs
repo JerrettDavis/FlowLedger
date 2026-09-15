@@ -49,7 +49,7 @@ public sealed class ScheduledSyncJobTests
         var job = BuildJob(syncSpy);
 
         // Act
-        await job.Execute(FakeContext());
+        await job.Execute(FakeContext(), CancellationToken.None);
 
         // Assert
         syncSpy.SyncCallCount.Should().Be(1, "the job should call SyncAsync exactly once per fire");
@@ -63,7 +63,7 @@ public sealed class ScheduledSyncJobTests
         var job = BuildJob(syncSpy, enabled: false);
 
         // Act
-        await job.Execute(FakeContext());
+        await job.Execute(FakeContext(), CancellationToken.None);
 
         // Assert — sync must NOT have been called
         syncSpy.SyncCallCount.Should().Be(0,
@@ -78,7 +78,7 @@ public sealed class ScheduledSyncJobTests
         var job = BuildJob(faultingService);
 
         // Act & Assert — the job must swallow the exception and not crash the worker
-        var act = () => job.Execute(FakeContext());
+        Func<Task> act = async () => await job.Execute(FakeContext(), CancellationToken.None);
         await act.Should().NotThrowAsync(
             "transient provider errors must be caught and logged, not rethrown");
     }
@@ -120,6 +120,7 @@ public sealed class ScheduledSyncJobTests
         public bool Recovering => false;
         public TriggerKey RecoveringTriggerKey => throw new NotImplementedException();
         public int RefireCount => 0;
+        public int RetryAttempt => 0;
         public JobDataMap MergedJobDataMap => new();
         public IJobDetail JobDetail => throw new NotImplementedException();
         public IJob JobInstance => throw new NotImplementedException();

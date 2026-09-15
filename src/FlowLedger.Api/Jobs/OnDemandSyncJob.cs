@@ -38,7 +38,7 @@ public sealed class OnDemandSyncJob : IJob
         _logger = logger;
     }
 
-    public async Task Execute(IJobExecutionContext context)
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         var data = context.MergedJobDataMap;
         var memberId = data.ContainsKey(MemberIdKey) ? data.GetString(MemberIdKey) : null;
@@ -55,7 +55,7 @@ public sealed class OnDemandSyncJob : IJob
         {
             // TODO: when IFinancialSyncService gains a targeted per-member overload, pass memberId
             // here so only the affected member's accounts/transactions are refreshed.
-            var result = await syncService.SyncAsync(context.CancellationToken);
+            var result = await syncService.SyncAsync(cancellationToken);
             _logger.LogInformation(
                 "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.",
                 result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
