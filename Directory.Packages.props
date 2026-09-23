@@ -8,8 +8,8 @@
   ============================================================ -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.4.3" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.4" />
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.3" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.4.3" />
   </ItemGroup>
@@ -29,7 +29,7 @@
        MudBlazor
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="MudBlazor" Version="9.9.0" />
+    <PackageVersion Include="MudBlazor" Version="9.10.0" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -55,8 +55,8 @@
        Scheduler
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Quartz" Version="4.0.1" />
-    <PackageVersion Include="Quartz.AspNetCore" Version="4.0.1" />
+    <PackageVersion Include="Quartz" Version="4.1.1" />
+    <PackageVersion Include="Quartz.AspNetCore" Version="4.1.1" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -93,11 +93,11 @@
        OpenTelemetry (versions aligned with ServiceDefaults template)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.10.0" />
   </ItemGroup>
@@ -106,11 +106,11 @@
        Testing
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="FluentAssertions" Version="8.10.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.11.0" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
     <PackageVersion Include="Microsoft.Playwright.Xunit" Version="1.62.0" />
   </ItemGroup>
@@ -119,8 +119,8 @@
        Testing — BDD
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="TinyBDD" Version="0.19.39" />
-    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.39" />
+    <PackageVersion Include="TinyBDD" Version="0.19.40" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.40" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -131,14 +131,14 @@
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
-    <PackageVersion Include="WireMock.Net" Version="2.15.0" />
+    <PackageVersion Include="WireMock.Net" Version="2.16.0" />
   </ItemGroup>
 
   <!-- ============================================================
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.24" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.26" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -156,8 +156,8 @@
          LZ4 out-of-bounds read vulnerability. Aspire.Hosting 13.4.3 pulls 2.5.192
          transitively. 2.5.301 is the patched release on the 2.5.x line (3.1.7 on 3.x).
          Forced via a direct PackageReference in FlowLedger.AppHost.csproj. -->
-    <PackageVersion Include="MessagePack" Version="3.1.8" />
-    <PackageVersion Include="MessagePack.Annotations" Version="3.1.8" />
+    <PackageVersion Include="MessagePack" Version="3.1.9" />
+    <PackageVersion Include="MessagePack.Annotations" Version="3.1.9" />
     <!-- Microsoft.OpenApi pinned to 2.7.5 (>= 2.7.5 clears GHSA-v5pm-xwqc-g5wc).
          DO NOT bump to Microsoft.OpenApi 3.x while on Microsoft.AspNetCore.OpenApi 10.0.x:
          AspNetCore.OpenApi 10.0.10's OpenApiXmlCommentSupport source generator targets the
