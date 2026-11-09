@@ -55,8 +55,8 @@
        Scheduler
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Quartz" Version="4.6.2" />
-    <PackageVersion Include="Quartz.AspNetCore" Version="4.6.2" />
+    <PackageVersion Include="Quartz" Version="4.7.2" />
+    <PackageVersion Include="Quartz.AspNetCore" Version="4.7.2" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -94,8 +94,8 @@
   ============================================================ -->
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.2" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
@@ -138,7 +138,7 @@
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.31" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.34" />
   </ItemGroup>
 
   <!-- ============================================================
