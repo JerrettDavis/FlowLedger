@@ -85,6 +85,9 @@ services:
       # rejects it outside Development. Override here for a predictable dev key.
       Api__Key: ${API__KEY:-dev-local-key-not-for-production}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
+    # Raw provider payload archive — MUST be a persistent volume (see ADR 0007).
+    volumes:
+      - objects_data:/data/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,6 +161,8 @@ services:
     restart: unless-stopped
     environment:
       <<: [*app-common-env, *db-env, *redis-env]
+    volumes:
+      - objects_data:/data/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,3 +176,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  objects_data:

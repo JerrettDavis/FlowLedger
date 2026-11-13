@@ -20,6 +20,8 @@ namespace FlowLedger.Integrations.Mx.Contracts;
 [JsonSerializable(typeof(MxMemberResponse))]
 [JsonSerializable(typeof(MxWidgetRequest))]
 [JsonSerializable(typeof(MxWidgetResponse))]
+[JsonSerializable(typeof(MxUsersResponse))]
+[JsonSerializable(typeof(MxMembersResponse))]
 [JsonSerializable(typeof(MxAccountsResponse))]
 [JsonSerializable(typeof(MxAccount))]
 [JsonSerializable(typeof(MxTransactionsResponse))]

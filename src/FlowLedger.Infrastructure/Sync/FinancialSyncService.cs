@@ -2,6 +2,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
@@ -52,15 +53,44 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     public async Task<string> ConnectAsync(CancellationToken ct = default)
     {
         var tenantId = TenantId.From(_tenant.TenantId);
-        _logger.LogInformation("Starting provider connection for tenant {TenantId}", tenantId);
+        var record = await GetOrProvisionConnectionAsync(tenantId, ct);
+        return record.MemberProviderId;
+    }
 
+    /// <summary>
+    /// Returns the persisted provider connection for this tenant, provisioning one (a billable
+    /// provider call) ONLY if none exists. Re-provisioning on every sync would create an orphan
+    /// provider user/member per run.
+    /// </summary>
+    private async Task<ProviderConnectionRecord> GetOrProvisionConnectionAsync(
+        TenantId tenantId, CancellationToken ct, bool allowProvision = true)
+    {
+        var existing = await _db.ProviderConnections
+            .FirstOrDefaultAsync(c => c.ProviderName == _provider.ProviderName, ct);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        if (!allowProvision)
+        {
+            // Unattended syncs (scheduler, webhooks) must never create billable provider resources.
+            throw new NeedsUserActionProviderException(
+                $"No {_provider.ProviderName} connection exists for this tenant. Connect an institution first " +
+                "(POST /api/integrations/mx/connect-token); syncs never provision implicitly for real providers.");
+        }
+
+        _logger.LogInformation("Provisioning provider connection for tenant {TenantId} via {Provider}",
+            tenantId, _provider.ProviderName);
         var memberRef = await _provider.BeginConnectionAsync(tenantId, ct);
 
-        _logger.LogInformation(
-            "Provider {Provider} connection initiated. MemberId={MemberId}, Status={Status}",
-            _provider.ProviderName, memberRef.ProviderId, memberRef.Status);
-
-        return memberRef.ProviderId;
+        // Persist immediately: if the process dies after this point the member is never re-created.
+        var record = ProviderConnectionRecord.Create(
+            _tenant.TenantId, _provider.ProviderName, memberRef.ProviderId,
+            memberRef.InstitutionName, memberRef.Status.ToString(), DateTimeOffset.UtcNow);
+        await _db.ProviderConnections.AddAsync(record, ct);
+        await _db.SaveChangesAsync(ct);
+        return record;
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────────
@@ -70,11 +100,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
-        // Step 1: discover the member ref (simulated: always returns a fixed member)
-        var memberRef = await _provider.BeginConnectionAsync(tenantId, ct);
+        // Step 1: reuse the persisted member (provision only on the very first sync).
+        var memberRef = await GetOrProvisionConnectionAsync(
+            tenantId, ct, allowProvision: _provider.ProviderName == "Simulated");
 
         // Step 2: fetch provider accounts
-        var providerAccounts = await _provider.GetAccountsAsync(memberRef.ProviderId, ct);
+        var providerAccounts = await _provider.GetAccountsAsync(memberRef.MemberProviderId, ct);
         _logger.LogDebug("Provider returned {Count} accounts", providerAccounts.Count);
 
         int accountsUpserted = 0;
@@ -89,6 +120,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             var domainAccount = await UpsertAccountAsync(pa, tenantId, ct);
             accountsUpserted++;
             providerIdToAccount[pa.ProviderId] = domainAccount;
+
+            // Append-only history: CurrentBalance is overwritten each sync, the snapshot is not.
+            await _db.BalanceSnapshots.AddAsync(AccountBalanceSnapshotRecord.Create(
+                _tenant.TenantId, domainAccount.AccountId.Value, _provider.ProviderName, pa.ProviderId,
+                pa.Balance.Amount, pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
 
             // Step 4: sync transactions for this account
             var (added, skipped) = await SyncTransactionsAsync(domainAccount, pa.ProviderId, tenantId, ct);

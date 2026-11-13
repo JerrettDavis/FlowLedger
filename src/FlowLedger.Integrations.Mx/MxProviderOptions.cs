@@ -40,4 +40,18 @@ public sealed class MxProviderOptions
     /// Defaults to 100, which accommodates up to 100 × <see cref="RecordsPerPage"/> accounts.
     /// </summary>
     public int MaxPages { get; set; } = 100;
+
+    /// <summary>
+    /// Days of overlap re-read on every incremental sync (cursor watermark = today - this).
+    /// Covers late-posting and pending→posted changes; fingerprint dedupe makes re-reads free of
+    /// duplicates. Larger = safer, slightly more API pages per sync. Default 30.
+    /// </summary>
+    public int IncrementalOverlapDays { get; set; } = 30;
+
+    /// <summary>
+    /// When set to an archived MX directory (e.g. <c>~/.flowledger/objects/raw/MX</c>), the provider replays
+    /// archived responses instead of calling MX: zero API cost, no network. Unset (default) = live MX.
+    /// Config key: <c>Mx:Provider:ReplayArchivePath</c>.
+    /// </summary>
+    public string? ReplayArchivePath { get; set; }
 }

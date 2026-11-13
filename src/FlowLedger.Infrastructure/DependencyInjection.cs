@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
+        services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
 
         // ── Configuration ───────────────────────────────────────────────────
         // Register IConfiguration so that .BindConfiguration() (used by AddOptions) can resolve
@@ -119,6 +120,7 @@ public static class DependencyInjection
         // ── Object storage ──────────────────────────────────────────────────────
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
         services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
+        services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
 
         return services;
     }

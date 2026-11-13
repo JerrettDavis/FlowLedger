@@ -28,7 +28,12 @@ static IResourceBuilder<T> WithMxConfig<T>(
     IResourceBuilder<T> resource,
     IConfiguration configuration) where T : IResourceWithEnvironment
 {
-    var mxKeys = new[] { "Enabled", "ApiKey", "ClientId", "BaseUrl", "WebhookSecret", "Environment" };
+    // SAFE BY DEFAULT: service-level user-secrets (src/FlowLedger.Api|Worker) may hold MX creds with
+    // Mx:Enabled=true. Env vars outrank secrets, so pin Simulated unless the AppHost config says
+    // otherwise. Going live is a deliberate act: `dotnet user-secrets set Mx:Enabled true` on the AppHost.
+    resource = resource.WithEnvironment("Mx__Enabled", configuration["Mx:Enabled"] ?? "false");
+
+    var mxKeys = new[] { "ApiKey", "ClientId", "BaseUrl", "WebhookSecret", "Environment" };
     foreach (var key in mxKeys)
     {
         var value = configuration[$"Mx:{key}"];
@@ -40,6 +45,15 @@ static IResourceBuilder<T> WithMxConfig<T>(
     return resource;
 }
 
+// ── Raw provider payload archive ────────────────────────────────────────────
+// Real provider data is billable and irreplaceable, so the archive lives OUTSIDE the repo/bin
+// at a stable per-user path shared by api and worker. Override with FlowLedger:DataDir.
+// Never point this at a temp directory. See docs/adr/0007-raw-payload-retention.md.
+var dataDir = builder.Configuration["FlowLedger:DataDir"]
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".flowledger");
+var objectsDir = Path.Combine(dataDir, "objects");
+Directory.CreateDirectory(objectsDir);
+
 // ── Application services ────────────────────────────────────────────────────
 var api = builder.AddProject<Projects.FlowLedger_Api>("api")
     .WithReference(postgres)
@@ -48,6 +62,7 @@ var api = builder.AddProject<Projects.FlowLedger_Api>("api")
     .WaitFor(redis);
 
 WithMxConfig(api, builder.Configuration);
+api.WithEnvironment("ObjectStorage__RootPath", objectsDir);
 
 var web = builder.AddProject<Projects.FlowLedger_Web>("web")
     .WithReference(api)
@@ -60,6 +75,14 @@ var worker = builder.AddProject<Projects.FlowLedger_Worker>("worker")
     .WaitFor(redis);
 
 WithMxConfig(worker, builder.Configuration);
+worker.WithEnvironment("ObjectStorage__RootPath", objectsDir);
+
+// Optional: point the worker at a dedicated tenant (e.g. an MX-sandbox tenant) so sandbox data never
+// blends with the simulated demo tenant. API callers select the same tenant via X-Tenant-Id.
+if (!string.IsNullOrEmpty(builder.Configuration["FlowLedger:WorkerTenantId"]))
+{
+    worker.WithEnvironment("Worker__TenantId", builder.Configuration["FlowLedger:WorkerTenantId"]!);
+}
 
 // Force unoptimized JIT on debugged service processes so the Rider/Aspire debugger can read locals.
 // Without this the CLR runs ReadyToRun/tiered code and throws CORDBG_E_IL_VAR_NOT_AVAILABLE (0x80131304).

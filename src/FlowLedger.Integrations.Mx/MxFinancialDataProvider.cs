@@ -42,6 +42,24 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
 
     public string ProviderName => "MX";
 
+    /// <summary>Member guid placeholder stored until the Connect widget has created the real member.</summary>
+    internal const string PendingMember = "PENDING";
+
+    /// <summary>
+    /// Resolves the PENDING placeholder to the real member created by the Connect widget.
+    /// Returns null when the user has not completed the widget yet.
+    /// </summary>
+    private async Task<string?> ResolveMemberGuidAsync(string userGuid, string memberGuid, CancellationToken ct)
+    {
+        if (!string.Equals(memberGuid, PendingMember, StringComparison.Ordinal))
+        {
+            return memberGuid;
+        }
+
+        var members = await _client.ListMembersAsync(userGuid, ct).ConfigureAwait(false);
+        return members.FirstOrDefault(m => m.Guid is not null)?.Guid;
+    }
+
     public ProviderCapabilities Capabilities =>
         ProviderCapabilities.Accounts |
         ProviderCapabilities.IncrementalTransactions |
@@ -74,6 +92,19 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
     }
 
     /// <summary>
+    /// Returns a Connect widget URL for an already-provisioned member WITHOUT creating another
+    /// MX user or member (only the widget call is made).
+    /// </summary>
+    public async Task<string> GetConnectWidgetUrlForMemberAsync(
+        string memberProviderId,
+        CancellationToken cancellationToken = default)
+    {
+        var (userGuid, _) = MxCompositeId.Unpack(memberProviderId);
+        var widget = await _client.GetConnectWidgetUrlAsync(userGuid, cancellationToken).ConfigureAwait(false);
+        return widget.Url ?? throw new FatalProviderException("MX widget response contained no URL.");
+    }
+
+    /// <summary>
     /// Core provisioning: create/find the MX user, provision a member, and optionally obtain
     /// the Connect widget URL. Both public begin-connection methods delegate here so the three
     /// MX API calls and status-mapping logic stay in one place (DRY).
@@ -94,18 +125,23 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         bool fetchWidgetUrl,
         CancellationToken cancellationToken)
     {
+        // Recovery-first: every step looks for what a previous (possibly half-failed) attempt already
+        // created before POSTing, so a crash between CreateUser and CreateMember can never strand the
+        // tenant or leave a second user/member behind. POSTs are also never auto-retried.
         // 1. Ensure an MX user exists for this tenant (idempotent external id).
         var externalId = $"flowledger-{tenantId.Value:N}";
-        var user = await _client.CreateUserAsync(externalId, cancellationToken).ConfigureAwait(false);
+        var user = await _client.FindUserByExternalIdAsync(externalId, cancellationToken).ConfigureAwait(false)
+                   ?? await _client.CreateUserAsync(externalId, cancellationToken).ConfigureAwait(false);
         var userGuid = user.Guid
-            ?? throw new FatalProviderException("MX CreateUser returned a user without a guid.");
+            ?? throw new FatalProviderException("MX returned a user without a guid.");
 
-        // 2. Provision a member for the institution.
-        var member = await _client
-            .CreateMemberAsync(userGuid, _options.DefaultInstitutionCode, cancellationToken)
-            .ConfigureAwait(false);
-        var memberGuid = member.Guid
-            ?? throw new FatalProviderException("MX CreateMember returned a member without a guid.");
+        // 2. Members cannot be created server-side: MX's POST /members requires the user's bank
+        //    credentials. The Connect widget (step 3) collects them and creates the member. Adopt a
+        //    member if the widget already produced one; otherwise return a PENDING placeholder that is
+        //    resolved to the real member the first time accounts/status are read.
+        var existingMembers = await _client.ListMembersAsync(userGuid, cancellationToken).ConfigureAwait(false);
+        var member = existingMembers.FirstOrDefault(m => m.Guid is not null);
+        var memberGuid = member?.Guid ?? PendingMember;
 
         // 3. Optionally obtain the Connect widget URL (billable call — only request when needed).
         string? widgetUrl = null;
@@ -117,11 +153,11 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
                 ?? throw new FatalProviderException("MX widget response contained no URL.");
         }
 
-        var institution = string.IsNullOrWhiteSpace(member.Name) ? "MX Institution" : member.Name;
+        var institution = string.IsNullOrWhiteSpace(member?.Name) ? "MX Institution" : member!.Name!;
 
         // A freshly provisioned member is pending until the user completes Connect, unless MX
         // already reports it connected (e.g. test/sandbox auto-connect).
-        var status = MxMapper.ToConnectionStatus(member.ConnectionStatus);
+        var status = member is null ? ConnectionStatus.ConnectionPending : MxMapper.ToConnectionStatus(member.ConnectionStatus);
         var refStatus = status == ConnectionStatus.Healthy
             ? ConnectionStatus.Connected
             : ConnectionStatus.ConnectionPending;
@@ -139,8 +175,14 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         CancellationToken cancellationToken = default)
     {
         var (userGuid, memberGuid) = MxCompositeId.Unpack(memberProviderId);
+        var resolved = await ResolveMemberGuidAsync(userGuid, memberGuid, cancellationToken).ConfigureAwait(false);
+        if (resolved is null)
+        {
+            return ConnectionStatus.ConnectionPending;
+        }
+
         var member = await _client
-            .GetMemberStatusAsync(userGuid, memberGuid, cancellationToken)
+            .GetMemberStatusAsync(userGuid, resolved, cancellationToken)
             .ConfigureAwait(false);
 
         return MxMapper.ToConnectionStatus(member.ConnectionStatus);
@@ -152,7 +194,11 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         string memberProviderId,
         CancellationToken cancellationToken = default)
     {
-        var (userGuid, memberGuid) = MxCompositeId.Unpack(memberProviderId);
+        var (userGuid, pendingOrMemberGuid) = MxCompositeId.Unpack(memberProviderId);
+        var memberGuid = await ResolveMemberGuidAsync(userGuid, pendingOrMemberGuid, cancellationToken).ConfigureAwait(false)
+            ?? throw new NeedsUserActionProviderException(
+                "No MX member exists yet: complete the Connect widget (POST /api/integrations/mx/connect-token) first.",
+                userHint: "Finish connecting your institution in the Connect widget.");
 
         // Guard: a member needing user action cannot serve account data. This is an intentional
         // defence-in-depth check: a fresh GetMemberStatus call costs one MX API round-trip but
@@ -222,7 +268,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
         var position = MxCursor.Decode(cursor, effectivePageSize, _logger);
 
         var response = await _client
-            .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken)
+            .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken, position.FromDate)
             .ConfigureAwait(false);
 
         var items = (response.Transactions ?? [])
@@ -232,10 +278,14 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
 
         var hasMore = HasMorePages(response.Pagination, position.Page);
 
-        // Always advance the cursor to the next page, even on the final page: the persisted
-        // cursor represents the next position to fetch on a future incremental sync, and the
-        // contract requires the cursor to keep advancing between successive pages.
-        var nextCursor = position.Next().Encode();
+        // Mid-pass: advance to the next page (same date window) so a crash resumes here.
+        // End of pass: persist a date WATERMARK (page 1, from = today - overlap), never "last page + 1".
+        // MX is newest-first, so a parked page cursor would silently skip everything posted later.
+        var nextCursor = hasMore
+            ? position.Next().Encode()
+            : MxCursor.Watermark(
+                position.RecordsPerPage,
+                DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-Math.Max(0, _options.IncrementalOverlapDays))).Encode();
 
         return new TransactionPage(items, nextCursor, hasMore);
     }

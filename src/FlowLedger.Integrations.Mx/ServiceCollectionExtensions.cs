@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Http.Resilience;
 using System.Net.Http.Headers;
 using System.Text;
 using FlowLedger.Integrations.Abstractions;
@@ -87,7 +88,14 @@ public static class ServiceCollectionExtensions
             http.DefaultRequestHeaders.Accept.Clear();
             http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(MxMediaType));
         })
-        .AddStandardResilienceHandler();
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+        {
+            var replay = sp.GetRequiredService<IOptions<MxProviderOptions>>().Value.ReplayArchivePath;
+            return string.IsNullOrWhiteSpace(replay)
+                ? new SocketsHttpHandler()
+                : (HttpMessageHandler)new MxArchiveReplayHandler(replay);
+        })
+        .AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
 
         // ── Provider ───────────────────────────────────────────────────────────────
         // Factory registration (not ActivatorUtilities) so the provider can keep an internal

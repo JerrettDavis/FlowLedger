@@ -89,6 +89,14 @@ internal sealed record MxAccount(
     [property: JsonPropertyName("member_guid")] string? MemberGuid,
     [property: JsonPropertyName("user_guid")] string? UserGuid);
 
+internal sealed record MxUsersResponse(
+    [property: JsonPropertyName("users")] IReadOnlyList<MxUser>? Users,
+    [property: JsonPropertyName("pagination")] MxPagination? Pagination);
+
+internal sealed record MxMembersResponse(
+    [property: JsonPropertyName("members")] IReadOnlyList<MxMember>? Members,
+    [property: JsonPropertyName("pagination")] MxPagination? Pagination);
+
 internal sealed record MxAccountsResponse(
     [property: JsonPropertyName("accounts")] IReadOnlyList<MxAccount>? Accounts,
     [property: JsonPropertyName("pagination")] MxPagination? Pagination);

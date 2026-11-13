@@ -17,15 +17,23 @@ namespace FlowLedger.Integrations.Mx.Mapping;
 ///
 /// <see cref="SyncCursor.Initial"/> (empty value) is interpreted as page 1.
 /// </summary>
-internal readonly record struct MxCursor(int Page, int RecordsPerPage)
+internal readonly record struct MxCursor(int Page, int RecordsPerPage, string? FromDate = null)
 {
     private const int DefaultRecordsPerPage = 100;
 
     public static MxCursor First(int recordsPerPage) =>
         new(1, NormalizeRecordsPerPage(recordsPerPage));
 
-    /// <summary>Returns the cursor for the next page, preserving page size.</summary>
+    /// <summary>Returns the cursor for the next page, preserving page size and date window.</summary>
     public MxCursor Next() => this with { Page = Page + 1 };
+
+    /// <summary>
+    /// Cursor to persist once a full pass finishes: page 1 of a window starting at
+    /// <paramref name="fromDate"/> (yyyy-MM-dd). MX lists newest-first, so a bare "next page"
+    /// cursor would skip any transaction posted after the pass — the date window is the watermark.
+    /// </summary>
+    public static MxCursor Watermark(int recordsPerPage, DateOnly fromDate) =>
+        new(1, NormalizeRecordsPerPage(recordsPerPage), fromDate.ToString("yyyy-MM-dd"));
 
     /// <summary>
     /// Decodes a <see cref="SyncCursor"/> into an <see cref="MxCursor"/>.
@@ -60,7 +68,7 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
 
             var page = dto.Page <= 0 ? 1 : dto.Page;
             var records = dto.RecordsPerPage <= 0 ? rpp : dto.RecordsPerPage;
-            return new MxCursor(page, NormalizeRecordsPerPage(records));
+            return new MxCursor(page, NormalizeRecordsPerPage(records), dto.FromDate);
         }
         catch (FormatException ex)
         {
@@ -85,7 +93,7 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
     /// <summary>Encodes this position back into an opaque <see cref="SyncCursor"/>.</summary>
     public SyncCursor Encode()
     {
-        var state = new MxCursorState(Page, RecordsPerPage);
+        var state = new MxCursorState(Page, RecordsPerPage, FromDate);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(state, MxCursorJsonContext.Default.MxCursorState);
         return new SyncCursor(Convert.ToBase64String(bytes));
     }
@@ -97,7 +105,8 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage)
 /// <summary>Serialisable cursor state. Stable JSON property order → deterministic encoding.</summary>
 internal sealed record MxCursorState(
     [property: JsonPropertyName("p")] int Page,
-    [property: JsonPropertyName("r")] int RecordsPerPage);
+    [property: JsonPropertyName("r")] int RecordsPerPage,
+    [property: JsonPropertyName("f"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FromDate = null);
 
 [JsonSourceGenerationOptions]
 [JsonSerializable(typeof(MxCursorState))]

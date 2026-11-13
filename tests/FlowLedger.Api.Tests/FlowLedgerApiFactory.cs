@@ -36,6 +36,12 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     public const string DevApiKey = "integration-test-key-not-for-production";
 
     /// <summary>The demo tenant ID used when tests need a valid tenant header.</summary>
+    // Static ctor: env vars outrank user-secrets and are read when the host builder is created
+    // (unlike ConfigureAppConfiguration, which Program's eager config reads can miss). Without
+    // this, a developer's Api user-secrets (Mx:Enabled=true + real creds) leak into tests and
+    // could make real, billable MX calls.
+    static FlowLedgerApiFactory() => Environment.SetEnvironmentVariable("Mx__Enabled", "false");
+
     public static readonly Guid DemoTenantId = new("00000000-0000-0000-0000-000000000001");
 
     public async Task InitializeAsync()

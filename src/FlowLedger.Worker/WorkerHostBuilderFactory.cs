@@ -2,6 +2,7 @@ using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Worker.Jobs;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -26,6 +27,13 @@ public static class WorkerHostBuilderFactory
         // ── Application + Infrastructure (identical to API) ───────────────────
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure(builder.Configuration);
+
+        // ── Tenant (background jobs have no request to resolve one from) ──────
+        // TryAdd: tests and future multi-tenant fan-out can register their own first/after.
+        var workerTenant = Guid.TryParse(builder.Configuration["Worker:TenantId"], out var configuredTenant)
+            ? configuredTenant
+            : ConfiguredTenantContext.DemoTenantId;
+        builder.Services.TryAddScoped<FlowLedger.SharedKernel.ITenantContext>(_ => new ConfiguredTenantContext(workerTenant));
 
         // ── Job schedule options ──────────────────────────────────────────────
         builder.Services.Configure<JobScheduleOptions>(

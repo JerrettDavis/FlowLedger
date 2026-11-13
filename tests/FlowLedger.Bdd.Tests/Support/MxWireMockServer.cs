@@ -51,6 +51,16 @@ public sealed class MxWireMockServer : IDisposable
 
     private void ConfigureStubs()
     {
+        // Recovery-first provisioning lists before it creates; nothing exists yet.
+        _server
+            .Given(Request.Create().WithPath("/users").UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", Vnd)
+                .WithBody("{\"users\":[],\"pagination\":{\"current_page\":1,\"total_pages\":1}}"));
+        _server
+            .Given(Request.Create().WithPath($"/users/{UserGuid}/members").UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", Vnd)
+                .WithBody("{\"members\":[{\"guid\":\"" + MemberGuid + "\",\"name\":\"Bdd Bank\",\"connection_status\":\"CONNECTED\"}],\"pagination\":{\"current_page\":1,\"total_pages\":1}}"));
+
         _server
             .Given(Request.Create().WithPath("/users").UsingPost())
             .RespondWith(Response.Create()
