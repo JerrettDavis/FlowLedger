@@ -31,6 +31,8 @@ public sealed class FlowLedgerDbContext : DbContext
     public DbSet<RecurringFlow> RecurringFlows => Set<RecurringFlow>();
     public DbSet<Category> Categories => Set<Category>();
     internal DbSet<SyncCursorRecord> SyncCursors => Set<SyncCursorRecord>();
+    internal DbSet<ProviderConnectionRecord> ProviderConnections => Set<ProviderConnectionRecord>();
+    internal DbSet<AccountBalanceSnapshotRecord> BalanceSnapshots => Set<AccountBalanceSnapshotRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -59,6 +61,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new RecurringFlowConfiguration());
         modelBuilder.ApplyConfiguration(new CategoryConfiguration());
         modelBuilder.ApplyConfiguration(new SyncCursorRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ProviderConnectionRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AccountBalanceSnapshotRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // If _tenantContext is null (design-time or test override), filters are
@@ -83,6 +87,12 @@ public sealed class FlowLedgerDbContext : DbContext
                 .HasQueryFilter(c => EF.Property<TenantId>(c, "TenantId") == TenantId.From(_tenantContext!.TenantId));
 
             modelBuilder.Entity<SyncCursorRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
+
+            modelBuilder.Entity<ProviderConnectionRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
+
+            modelBuilder.Entity<AccountBalanceSnapshotRecord>()
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
         }
     }

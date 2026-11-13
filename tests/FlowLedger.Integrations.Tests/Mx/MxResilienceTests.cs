@@ -51,6 +51,7 @@ public sealed class MxResilienceTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IRawPayloadArchive>(new InMemoryRawPayloadArchive());
         services.AddMxProvider(config);
         _provider = services.BuildServiceProvider();
         _scope = _provider.CreateScope();
@@ -79,7 +80,7 @@ public sealed class MxResilienceTests : IDisposable
             new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", basic);
         http.DefaultRequestHeaders.Accept.Add(
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue(Vnd));
-        return new MxApiClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<MxApiClient>.Instance);
+        return new MxApiClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<MxApiClient>.Instance, new InMemoryRawPayloadArchive());
     }
 
     private IFinancialDataProvider CreateProvider() =>

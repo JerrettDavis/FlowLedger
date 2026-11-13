@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FlowLedger.Api.Jobs;
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
@@ -24,6 +25,7 @@ internal static class MxEndpoints
         group.MapPost("/connect-token", async (
             IFinancialDataProvider provider,
             ITenantContext tenant,
+            IProviderConnectionStore connections,
             CancellationToken ct) =>
         {
             if (provider is not MxFinancialDataProvider mx)
@@ -33,8 +35,20 @@ internal static class MxEndpoints
                     statusCode: StatusCodes.Status409Conflict);
             }
 
-            var (member, widgetUrl) = await mx.BeginConnectionWithWidgetAsync(
-                TenantId.From(tenant.TenantId), ct);
+            // Reuse the persisted member if one exists: provisioning is billable and orphans members.
+            var existing = await connections.GetMemberProviderIdAsync(mx.ProviderName, ct);
+            ProviderMemberRef member;
+            string widgetUrl;
+            if (existing is not null)
+            {
+                widgetUrl = await mx.GetConnectWidgetUrlForMemberAsync(existing, ct);
+                member = new ProviderMemberRef(existing, "Existing connection", ConnectionStatus.Connected);
+            }
+            else
+            {
+                (member, widgetUrl) = await mx.BeginConnectionWithWidgetAsync(TenantId.From(tenant.TenantId), ct);
+                await connections.SaveAsync(mx.ProviderName, member.ProviderId, member.InstitutionName, member.Status.ToString(), ct);
+            }
 
             return Results.Ok(new
             {
@@ -53,6 +67,7 @@ internal static class MxEndpoints
         group.MapPost("/webhooks", async (
             HttpRequest request,
             IFinancialDataProvider provider,
+            IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
             CancellationToken ct) =>
         {
@@ -73,6 +88,11 @@ internal static class MxEndpoints
             {
                 return Results.Unauthorized();
             }
+
+            // Signature verified: retain the exact body before doing anything else with it.
+            // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
+            // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
+            await archive.ArchiveAsync("MX", "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
 
             ProviderWebhookEvent evt;
             try

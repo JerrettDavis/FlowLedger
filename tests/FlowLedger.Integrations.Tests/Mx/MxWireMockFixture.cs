@@ -1,3 +1,4 @@
+using FlowLedger.Integrations.Abstractions;
 using System.Globalization;
 using System.Text;
 using FlowLedger.Integrations.Mx;
@@ -74,7 +75,7 @@ public sealed class MxWireMockFixture : IDisposable
     }
 
     /// <summary>Builds just the typed API client against the WireMock server.</summary>
-    internal MxApiClient CreateApiClient()
+    internal MxApiClient CreateApiClient(IRawPayloadArchive? archive = null)
     {
         var http = new HttpClient { BaseAddress = new Uri(BaseUrl, UriKind.Absolute) };
         var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes("test-client:test-key"));
@@ -83,7 +84,7 @@ public sealed class MxWireMockFixture : IDisposable
         http.DefaultRequestHeaders.Accept.Add(
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue(Vnd));
 
-        return new MxApiClient(http, NullLogger<MxApiClient>.Instance);
+        return new MxApiClient(http, NullLogger<MxApiClient>.Instance, archive ?? new InMemoryRawPayloadArchive());
     }
 
     /// <summary>Convenience: a fresh in-memory-backed cooldown gate for cost-control tests.</summary>
@@ -99,6 +100,22 @@ public sealed class MxWireMockFixture : IDisposable
 
     private void ConfigureStubs()
     {
+        // GET /users → none exist yet (provisioning proceeds to POST)
+        _server
+            .Given(Request.Create().WithPath("/users").UsingGet())
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithHeader("Content-Type", Vnd)
+                .WithBody("""{"users":[],"pagination":{"current_page":1,"per_page":100,"total_entries":0,"total_pages":1}}"""));
+
+        // GET /users/{user}/members → the member the Connect widget created (MX cannot create members server-side)
+        _server
+            .Given(Request.Create().WithPath($"/users/{UserGuid}/members").UsingGet())
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithHeader("Content-Type", Vnd)
+                .WithBody("{\"members\":[{\"guid\":\"" + MemberGuid + "\",\"name\":\"" + InstitutionName + "\",\"connection_status\":\"CONNECTED\"}],\"pagination\":{\"current_page\":1,\"per_page\":100,\"total_entries\":1,\"total_pages\":1}}"));
+
         // POST /users → create user
         _server
             .Given(Request.Create().WithPath("/users").UsingPost())

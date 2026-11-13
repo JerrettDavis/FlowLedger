@@ -54,6 +54,8 @@ public partial class MxSyncScenarios : TinyBddXunitBase
         {
             using var scope = _fixture.CreateScope(t, MxConfig(mx.BaseUrl));
             var sync = scope.Resolve<IFinancialSyncService>();
+            // Real providers are never provisioned implicitly by a sync: connect explicitly first.
+            await sync.ConnectAsync();
             return await sync.SyncAsync();
         }
 

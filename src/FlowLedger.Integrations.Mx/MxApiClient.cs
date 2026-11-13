@@ -18,9 +18,11 @@ internal sealed class MxApiClient
 {
     private readonly HttpClient _http;
     private readonly ILogger<MxApiClient> _logger;
+    private readonly IRawPayloadArchive _archive;
 
-    public MxApiClient(HttpClient http, ILogger<MxApiClient> logger)
+    public MxApiClient(HttpClient http, ILogger<MxApiClient> logger, IRawPayloadArchive archive)
     {
+        _archive = archive ?? throw new ArgumentNullException(nameof(archive));
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -39,6 +41,46 @@ internal sealed class MxApiClient
             .ConfigureAwait(false);
 
         return body.User ?? throw new FatalProviderException("MX CreateUser returned no user.");
+    }
+
+    /// <summary>
+    /// GET /users — pages through users looking for one whose external <c>id</c> matches. Used to
+    /// recover from a partially failed provision instead of POSTing a duplicate user.
+    /// </summary>
+    public async Task<MxUser?> FindUserByExternalIdAsync(string externalId, CancellationToken ct)
+    {
+        for (var page = 1; page <= 50; page++)
+        {
+            var response = await SendAsync(
+                HttpMethod.Get, $"/users?page={page}&records_per_page=100", request: (object?)null,
+                jsonTypeInfo: null, "ListUsers", ct).ConfigureAwait(false);
+            var body = await ReadAsync(response, MxJsonContext.Default.MxUsersResponse, "ListUsers", ct)
+                .ConfigureAwait(false);
+
+            var match = body.Users?.FirstOrDefault(u => string.Equals(u.Id, externalId, StringComparison.Ordinal));
+            if (match is not null)
+            {
+                return match;
+            }
+
+            if (body.Pagination?.TotalPages is not { } total || page >= total)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>GET /users/{userGuid}/members — existing members (first page; a tenant has very few).</summary>
+    public async Task<IReadOnlyList<MxMember>> ListMembersAsync(string userGuid, CancellationToken ct)
+    {
+        var response = await SendAsync(
+            HttpMethod.Get, $"/users/{userGuid}/members?page=1&records_per_page=100", request: (object?)null,
+            jsonTypeInfo: null, "ListMembers", ct).ConfigureAwait(false);
+        var body = await ReadAsync(response, MxJsonContext.Default.MxMembersResponse, "ListMembers", ct)
+            .ConfigureAwait(false);
+        return body.Members ?? [];
     }
 
     // ── Members ────────────────────────────────────────────────────────────────
@@ -111,10 +153,11 @@ internal sealed class MxApiClient
     /// page / records_per_page.
     /// </summary>
     public async Task<MxTransactionsResponse> GetTransactionsAsync(
-        string userGuid, string accountGuid, int page, int recordsPerPage, CancellationToken ct)
+        string userGuid, string accountGuid, int page, int recordsPerPage, CancellationToken ct, string? fromDate = null)
     {
         var path =
-            $"/users/{userGuid}/accounts/{accountGuid}/transactions?page={page}&records_per_page={recordsPerPage}";
+            $"/users/{userGuid}/accounts/{accountGuid}/transactions?page={page}&records_per_page={recordsPerPage}" +
+            (fromDate is null ? string.Empty : $"&from_date={fromDate}");
         var response = await SendAsync(
             HttpMethod.Get, path, request: (object?)null, jsonTypeInfo: null, "GetTransactions", ct)
             .ConfigureAwait(false);
@@ -157,6 +200,20 @@ internal sealed class MxApiClient
 
         if (!response.IsSuccessStatusCode)
         {
+            // Keep the provider's error body too: it is the only evidence of why a billable call failed.
+            // Best-effort — never mask the original failure with an archive problem.
+            try
+            {
+                var errBytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                await _archive.ArchiveAsync("MX", operation + "-Error", errBytes,
+                    new RawPayloadContext(method.Method, message.RequestUri?.PathAndQuery ?? path, (int)response.StatusCode), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception archiveEx)
+            {
+                _logger.LogError(archiveEx, "Failed to archive MX error body for '{Operation}'.", operation);
+            }
+
             var ex = MxErrorMapper.FromResponse(response, operation);
             response.Dispose();
             _logger.LogWarning(
@@ -168,7 +225,7 @@ internal sealed class MxApiClient
         return response;
     }
 
-    private static async Task<T> ReadAsync<T>(
+    private async Task<T> ReadAsync<T>(
         HttpResponseMessage response,
         System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> jsonTypeInfo,
         string operation,
@@ -177,9 +234,17 @@ internal sealed class MxApiClient
     {
         try
         {
-            var value = await response.Content
-                .ReadFromJsonAsync(jsonTypeInfo, ct)
-                .ConfigureAwait(false);
+            // Archive the exact bytes BEFORE parsing. A failed archive write propagates and fails
+            // the call: we must never consume billable provider data without retaining it.
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+            var req = response.RequestMessage;
+            var context = new RawPayloadContext(
+                req?.Method.Method ?? "GET",
+                req?.RequestUri?.PathAndQuery ?? string.Empty,
+                (int)response.StatusCode);
+            await _archive.ArchiveAsync("MX", operation, bytes, context, ct).ConfigureAwait(false);
+
+            var value = System.Text.Json.JsonSerializer.Deserialize(bytes, jsonTypeInfo);
 
             return value ?? throw new FatalProviderException($"MX '{operation}' returned an empty body.");
         }

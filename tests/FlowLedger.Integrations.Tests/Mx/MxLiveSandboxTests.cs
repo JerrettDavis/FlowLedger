@@ -35,6 +35,7 @@ public sealed class MxLiveSandboxTests
 
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IRawPayloadArchive>(new InMemoryRawPayloadArchive());
         services.AddMxProvider(config);
         return services.BuildServiceProvider();
     }
