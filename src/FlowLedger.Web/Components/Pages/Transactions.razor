@@ -3,11 +3,22 @@
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
 @inject ILogger<Transactions> Logger
+@inject IJSRuntime JS
 
 <PageTitle>Transactions — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4">
+<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
     <MudText Typo="Typo.h4">Transactions</MudText>
+    <div class="d-flex align-center gap-2">
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="AutoCategorize" Disabled="_categorizing"
+                   aria-label="Auto-categorize transactions">
+            @(_categorizing ? "Categorizing…" : "Auto-categorize")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCsv"
+                   aria-label="Export visible transactions as CSV">
+            Export CSV
+        </MudButton>
+    </div>
 </div>
 
 <!-- Filter bar -->
@@ -29,6 +40,14 @@
                     <MudSelectItem Value="@((Guid?)a.Id)">@a.Name</MudSelectItem>
                 }
             </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="8" md="6">
+            <MudTextField @bind-Value="_search" Immediate="true" Label="Search description or merchant" Clearable="true"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          aria-label="Search transactions" />
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
+            <MudCheckBox T="bool" @bind-Value="_applyToMerchant" Label="Apply category changes to same merchant" Dense="true" />
         </MudItem>
         <MudItem xs="12" sm="12" md="3" Class="d-flex align-end">
             <MudButton StartIcon="@Icons.Material.Filled.Search"
@@ -66,7 +85,7 @@
 }
 
 <MudDataGrid T="FlowLedger.Web.ApiClient.TransactionDto"
-             Items="_transactions"
+             Items="Visible"
              Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow"
              SortMode="SortMode.Multiple"
@@ -77,7 +96,7 @@
              RowsPerPage="50"
              aria-label="Transactions table">
     <ToolBarContent>
-        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary">@_transactions.Count transaction(s)</MudText>
+        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary">@Visible.Count of @_transactions.Count transaction(s)@(_transactions.Count >= TakeLimit ? $" (showing the newest {TakeLimit}; narrow the dates to see older ones)" : "")</MudText>
     </ToolBarContent>
     <Columns>
         <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.EffectiveDate">
@@ -101,17 +120,21 @@
                 </MudChip>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Category">
+        <TemplateColumn Title="Category" Sortable="false">
             <CellTemplate>
-                @if (context.Item.CategoryId.HasValue)
-                {
-                    var cat = _categories.FirstOrDefault(c => c.Id == context.Item.CategoryId);
-                    <MudText Typo="Typo.body2">@(cat?.DisplayName ?? "–")</MudText>
+                @{
+                    var cat = context.Item.CategoryId.HasValue ? _categories.FirstOrDefault(c => c.Id == context.Item.CategoryId) : null;
+                    var item = context.Item;
                 }
-                else
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Uncategorized</MudText>
-                }
+                <MudMenu Dense="true" Label="@(cat?.DisplayName ?? "Uncategorized")" Variant="Variant.Text" Size="Size.Small"
+                         Color="@(cat is null ? Color.Default : Color.Primary)" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                         aria-label="@($"Change category for {item.Description}")">
+                    @foreach (var c in _categories.OrderBy(c => c.Path))
+                    {
+                        var target = c;
+                        <MudMenuItem OnClick="@(() => SetCategory(item, target))">@target.Path</MudMenuItem>
+                    }
+                </MudMenu>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Account" Sortable="false">
@@ -139,6 +162,17 @@
     private DateTime? _fromDate;
     private DateTime? _toDate;
     private Guid? _filterAccountId;
+    private string? _search;
+    private bool _applyToMerchant = true;
+    private bool _categorizing;
+    private const int TakeLimit = 5000;
+
+    private List<FlowLedger.Web.ApiClient.TransactionDto> Visible =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _transactions
+            : _transactions.Where(t =>
+                t.Description.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (t.MerchantName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
 
     /// <summary>Deep link from the dashboard account strip: /transactions?account={id}.</summary>
     [SupplyParameterFromQuery(Name = "account")] public Guid? AccountQuery { get; set; }
@@ -172,7 +206,7 @@
                 accountId: _filterAccountId,
                 from: from,
                 to: to,
-                take: 500);
+                take: TakeLimit);
         }
         catch (Exception ex)
         {
@@ -185,6 +219,61 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task SetCategory(FlowLedger.Web.ApiClient.TransactionDto tx, FlowLedger.Web.ApiClient.CategoryDto category)
+    {
+        try
+        {
+            var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, _applyToMerchant);
+            Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task AutoCategorize()
+    {
+        _categorizing = true;
+        try
+        {
+            var r = await ApiClient.RunCategorizationAsync();
+            Snackbar.Add(r is null ? "Done" : $"Categorized {r.Categorized} ({r.Transfers} transfers); {r.StillUncategorized} left for you to review", Severity.Success);
+            _categories = await ApiClient.GetCategoriesAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _categorizing = false;
+        }
+    }
+
+    private static string Csv(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+
+    private async Task ExportCsv()
+    {
+        var sb = new System.Text.StringBuilder("date,description,merchant,amount,direction,status,category,account\n");
+        foreach (var t in Visible)
+        {
+            var cat = t.CategoryId.HasValue ? _categories.FirstOrDefault(c => c.Id == t.CategoryId)?.Path : null;
+            var acct = _accounts.FirstOrDefault(a => a.Id == t.AccountId)?.Name;
+            var signed = t.Direction == "Credit" ? t.Amount : -t.Amount;
+            sb.Append(t.EffectiveDate.ToString("yyyy-MM-dd")).Append(',').Append(Csv(t.Description)).Append(',').Append(Csv(t.MerchantName))
+              .Append(',').Append(signed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(',').Append(t.Direction)
+              .Append(',').Append(t.Status).Append(',').Append(Csv(cat)).Append(',').Append(Csv(acct)).Append('\n');
+        }
+
+        var bytes = new System.Text.UTF8Encoding(true).GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        using var ms = new MemoryStream(bytes);
+        using var reference = new DotNetStreamReference(ms);
+        await JS.InvokeVoidAsync("flowledgerDownload", $"transactions-{DateTime.Now:yyyyMMdd-HHmm}.csv", reference);
     }
 
     private void ClearFilters()
