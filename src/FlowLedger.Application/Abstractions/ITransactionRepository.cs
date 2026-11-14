@@ -19,6 +19,12 @@ public interface ITransactionRepository
         CancellationToken ct = default);
 
     /// <summary>
+    /// Read-only snapshot of up to <paramref name="max"/> transactions in a stable total order
+    /// (newest first, ties broken by id). One query, so analytics never see a page-boundary duplicate or gap.
+    /// </summary>
+    Task<IReadOnlyList<Transaction>> ListAllAsync(int max, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the fingerprint values already stored for the given set of fingerprints
     /// (for deduplication during import).
     /// </summary>

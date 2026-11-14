@@ -48,6 +48,14 @@ internal sealed class TransactionRepository : ITransactionRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Transaction>> ListAllAsync(int max, CancellationToken ct = default)
+        => await _db.Transactions.AsNoTracking()
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenByDescending(t => t.CreatedAt)
+            .ThenBy(t => t.Id)
+            .Take(max)
+            .ToListAsync(ct);
+
     public async Task<HashSet<string>> GetExistingFingerprintsAsync(
         IEnumerable<string> fingerprints,
         CancellationToken ct = default)

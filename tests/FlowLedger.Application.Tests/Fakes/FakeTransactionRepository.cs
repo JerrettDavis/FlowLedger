@@ -12,6 +12,9 @@ public sealed class FakeTransactionRepository : ITransactionRepository
     public Task<Transaction?> GetByIdAsync(TransactionId id, CancellationToken ct = default)
         => Task.FromResult(_store.FirstOrDefault(t => t.Id == id.Value));
 
+    public Task<IReadOnlyList<Transaction>> ListAllAsync(int max, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Transaction>>(_store.OrderByDescending(t => t.EffectiveDate).Take(max).ToList());
+
     public Task<IReadOnlyList<Transaction>> ListAsync(
         AccountId? accountId = null,
         DateOnly? from = null,

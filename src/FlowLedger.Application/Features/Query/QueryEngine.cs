@@ -8,6 +8,9 @@ public sealed class QueryTable(IReadOnlyList<string> columns, List<object?[]> ro
 {
     public IReadOnlyList<string> Columns { get; } = columns;
     public List<object?[]> Rows { get; } = rows;
+
+    /// <summary>True when the dataset itself was capped (more data exists than was loaded).</summary>
+    public bool InputTruncated { get; init; }
 }
 
 public sealed record QueryColumn(string Name, string Type);
@@ -62,12 +65,20 @@ public static class QueryEngine
         var names = source.Columns.ToList();
         var rows = source.Rows;
 
-        foreach (var op in parsed.Operators)
+        try
         {
-            (names, rows) = Apply(op, names, rows, ctx);
+            foreach (var op in parsed.Operators)
+            {
+                (names, rows) = Apply(op, names, rows, ctx);
+            }
+        }
+        catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException or ArgumentException or FormatException or InvalidCastException)
+        {
+            // Hostile or sloppy input (ago(99999999d), huge multiplications…) is a user error, not a server fault.
+            throw new QueryException("A value in the query is out of range or has the wrong type.");
         }
 
-        var truncated = rows.Count > MaxResultRows;
+        var truncated = source.InputTruncated || rows.Count > MaxResultRows;
         if (truncated)
         {
             rows = rows.Take(MaxResultRows).ToList();

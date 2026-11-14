@@ -95,6 +95,9 @@ public sealed class QueryEngineTests
     [InlineData("transactions | summarize x = sum(category)", "numeric")]
     [InlineData("transactions | where sum(amount) > 1", "aggregate")]
     [InlineData("transactions take 1", "forget a '|'")]
+    [InlineData("transactions | where date > ago(99999999d)", "out of range")]
+    [InlineData("transactions | extend x = amount * 99999999999999999999 * 99999999999999999999", "out of range")]
+    [InlineData("transactions | where date > today() - 999999999999", "out of range")]
     public void Bad_queries_raise_readable_errors(string query, string expected)
     {
         var act = () => Run(query);
