@@ -158,6 +158,82 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         (await Summary()).NetWorth.NetWorth.Should().Be(320000m);
     }
 
+    private async Task<decimal> Balance(Guid accountId)
+        => (await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{accountId}"))!.BalanceAmount;
+
+    private static UpdateAssetRequest ToUpdate(AssetDto a, Guid? link) =>
+        new(a.Name, a.Category, a.PurchaseDate, a.PurchasePrice, a.Manufacturer, a.Model, a.SerialNumber, a.Notes,
+            a.ValuationMethod, a.AnnualRate, a.SalvageValue, a.UsefulLifeYears, link, new Dictionary<string, string>(a.Attributes));
+
+    [Fact]
+    public async Task Unlinking_a_manual_asset_account_zeroes_it_so_net_worth_is_not_doubled()
+    {
+        var acct = await CreateAccount("House value", "ManualAsset", 0m);
+        var house = await Create(NewAsset("House", "RealEstate", 300000m, link: acct.Id));
+        (await Balance(acct.Id)).Should().Be(300000m);
+
+        (await _client.PutAsJsonAsync($"/api/assets/{house.Id}", ToUpdate(house, null))).EnsureSuccessStatusCode();
+
+        (await Balance(acct.Id)).Should().Be(0m);
+        var s = await Summary();
+        s.NetWorth.NetWorth.Should().Be(300000m);
+        s.NetWorth.PhysicalAssets.Should().Be(300000m);
+    }
+
+    [Fact]
+    public async Task Relinking_between_manual_asset_accounts_moves_the_value()
+    {
+        var a = await CreateAccount("A", "ManualAsset", 0m);
+        var b = await CreateAccount("B", "ManualAsset", 0m);
+        var house = await Create(NewAsset("House", "RealEstate", 300000m, link: a.Id));
+
+        (await _client.PutAsJsonAsync($"/api/assets/{house.Id}", ToUpdate(house, b.Id))).EnsureSuccessStatusCode();
+
+        (await Balance(a.Id)).Should().Be(0m);
+        (await Balance(b.Id)).Should().Be(300000m);
+        (await Summary()).NetWorth.NetWorth.Should().Be(300000m);
+    }
+
+    [Fact]
+    public async Task Deleting_a_linked_asset_removes_its_value_from_the_account_and_net_worth()
+    {
+        var acct = await CreateAccount("House value", "ManualAsset", 0m);
+        var house = await Create(NewAsset("House", "RealEstate", 300000m, link: acct.Id));
+
+        (await _client.DeleteAsync($"/api/assets/{house.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await Balance(acct.Id)).Should().Be(0m);
+        (await Summary()).NetWorth.NetWorth.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Two_assets_on_one_manual_asset_account_sum_instead_of_overwriting()
+    {
+        var acct = await CreateAccount("Vehicles", "ManualAsset", 0m);
+        var car = await Create(NewAsset("Car", "Vehicle", 20000m, link: acct.Id));
+        await Create(NewAsset("Boat", "Vehicle", 30000m, link: acct.Id));
+        (await Balance(acct.Id)).Should().Be(50000m);
+        (await Summary()).NetWorth.NetWorth.Should().Be(50000m);
+
+        (await _client.PostAsJsonAsync($"/api/assets/{car.Id}/valuations", new RecordValuationRequest(18000m, null, null, null)))
+            .EnsureSuccessStatusCode();
+        (await Balance(acct.Id)).Should().Be(48000m);
+        (await Summary()).NetWorth.NetWorth.Should().Be(48000m);
+    }
+
+    [Fact]
+    public async Task Two_assets_sharing_a_mortgage_subtract_the_debt_once_in_the_summary()
+    {
+        var mortgage = await CreateAccount("Mortgage", "Mortgage", 200000m);
+        await Create(NewAsset("House", "RealEstate", 300000m, link: mortgage.Id));
+        await Create(NewAsset("Garage", "RealEstate", 50000m, link: mortgage.Id));
+
+        var s = await Summary();
+        s.LinkedLiabilities.Should().Be(200000m);
+        s.TotalEquity.Should().Be(150000m);
+        s.NetWorth.NetWorth.Should().Be(150000m);
+    }
+
     [Fact]
     public async Task Asset_linked_to_mortgage_shows_equity_without_double_subtracting_the_liability()
     {
