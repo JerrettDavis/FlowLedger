@@ -627,4 +627,16 @@ public sealed class FlowLedgerApiClient
             return body.TryGetProperty("changed", out var c) ? c.GetInt32() : 1;
         });
     }
+
+    /// <summary>Spending by category, 6-month cash flow and net-worth trend for the dashboard.</summary>
+    public async Task<DashboardInsightsDto?> GetDashboardInsightsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read dashboard insights", async () =>
+        {
+            var response = await _http.GetAsync("/api/dashboard/insights", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<DashboardInsightsDto>(JsonOptions, ct)
+                : null;
+        });
+    }
 }

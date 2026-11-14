@@ -143,6 +143,68 @@ else
     </MudGrid>
 
     <div class="fl-masonry">
+        <!-- Insights: spending by category -->
+        @if (_insights is { SpendingByCategory.Count: > 0 })
+        {
+            <div class="fl-masonry-item">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Spending this month</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">By category, excluding transfers between your accounts</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <tbody>
+                                @foreach (var c in _insights.SpendingByCategory)
+                                {
+                                    <tr><td>@c.Category</td><td class="text-right fl-num">@Format.Money(c.Amount)</td></tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        }
+
+        <!-- Insights: income vs spending -->
+        @if (_insights is { CashFlow.Count: > 0 })
+        {
+            <div class="fl-masonry-item">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Income vs spending</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last 6 months, excluding transfers</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        }
+
+        <!-- Insights: net worth trend -->
+        @if (_insights is { NetWorth.Count: > 1 })
+        {
+            <div class="fl-masonry-item">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Net worth trend</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Account balances captured at each sync (assets are valued separately)</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        }
+
         <!-- Balance Projection Chart -->
         <div class="fl-masonry-item">
             <MudCard>
@@ -427,6 +489,13 @@ else
     private string? _error;
 
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
+    private List<MudBlazor.ChartSeries<double>> _spendSeries = [];
+    private string[] _spendLabels = [];
+    private List<MudBlazor.ChartSeries<double>> _flowSeries = [];
+    private string[] _flowLabels = [];
+    private List<MudBlazor.ChartSeries<double>> _netWorthSeries = [];
+    private string[] _netWorthLabels = [];
     private decimal _cash;
     private decimal _credit;
     private decimal _loans;
@@ -481,6 +550,27 @@ else
             // Activity feed is best-effort: a failure here must not blank the rest of the dashboard.
             try { _activity = await ApiClient.GetDashboardActivityAsync(); }
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard activity"); }
+
+            // Insight widgets are best-effort: a failure must not blank the rest of the dashboard.
+            try
+            {
+                _insights = await ApiClient.GetDashboardInsightsAsync();
+                if (_insights is not null)
+                {
+                    _spendSeries = [new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.SpendingByCategory.Select(c => (double)c.Amount).ToArray() }];
+                    _spendLabels = _insights.SpendingByCategory.Select(c => c.Category).ToArray();
+                    _flowSeries =
+                    [
+                        new MudBlazor.ChartSeries<double> { Name = "Income", Data = _insights.CashFlow.Select(m => (double)m.Income).ToArray() },
+                        new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.CashFlow.Select(m => (double)m.Spending).ToArray() },
+                    ];
+                    _flowLabels = _insights.CashFlow.Select(m => m.Month.Length >= 7 ? m.Month[..7] : m.Month).ToArray();
+                    var nw = _insights.NetWorth.TakeLast(60).ToList();
+                    _netWorthSeries = [new MudBlazor.ChartSeries<double> { Name = "Net worth", Data = nw.Select(p => (double)p.Value).ToArray() }];
+                    _netWorthLabels = nw.Select(p => p.Date).ToArray();
+                }
+            }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
 
             // Forecast
             var forecast = await ApiClient.GetForecastAsync(months: 3);

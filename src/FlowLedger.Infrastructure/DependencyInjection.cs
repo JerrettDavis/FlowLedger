@@ -126,6 +126,7 @@ public static class DependencyInjection
 
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<FinancialSyncService>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
         services.AddScoped<IFinancialSyncService>(sp =>

@@ -215,6 +215,15 @@ public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, P
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized);
 
+public sealed record CategorySpendDto(string Category, decimal Amount);
+
+public sealed record MonthCashFlowDto(string Month, decimal Income, decimal Spending);
+
+public sealed record NetWorthPointDto(string Date, decimal Value);
+
+public sealed record DashboardInsightsDto(
+    List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth);
+
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
