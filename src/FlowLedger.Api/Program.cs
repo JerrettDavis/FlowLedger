@@ -187,6 +187,7 @@ app.MapDefaultEndpoints();
 // ── Feature endpoint groups ──────────────────────────────────────────────────
 app.MapStatusEndpoints();
 app.MapAccountEndpoints();
+app.MapAssetEndpoints();
 app.MapTransactionEndpoints();
 app.MapDashboardEndpoints();
 app.MapCategoryEndpoints();

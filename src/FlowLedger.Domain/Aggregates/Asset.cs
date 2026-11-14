@@ -180,7 +180,16 @@ public sealed class Asset : AggregateRoot
         return valuation;
     }
 
-    public void LinkAccount(AccountId? accountId) => LinkedAccountId = accountId?.Value;
+    /// <summary>Links (or, with null, unlinks) an account. The account must belong to the same tenant.</summary>
+    public void LinkAccount(Account? account)
+    {
+        if (account is not null && account.TenantId != TenantId)
+        {
+            throw new InvalidAssetException("Cannot link an account from a different tenant.");
+        }
+
+        LinkedAccountId = account?.Id;
+    }
 
     public void Deactivate() => IsActive = false;
 

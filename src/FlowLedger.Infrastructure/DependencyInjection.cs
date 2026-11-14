@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
@@ -113,6 +114,13 @@ public static class DependencyInjection
         {
             services.AddSimulatedProvider(configuration);
         }
+
+        // ── Asset valuation feeds (generic HTTP JSON feed; disabled unless AssetFeeds:Http:Enabled) ──
+        services.Configure<FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeedOptions>(
+            configuration.GetSection(FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeedOptions.SectionName));
+        services.AddHttpClient(FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeed.HttpClientName,
+            c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddSingleton<IAssetValuationFeed, FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeed>();
 
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<IFinancialSyncService, FinancialSyncService>();

@@ -30,6 +30,7 @@ public sealed class FlowLedgerDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<RecurringFlow> RecurringFlows => Set<RecurringFlow>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Asset> Assets => Set<Asset>();
     internal DbSet<SyncCursorRecord> SyncCursors => Set<SyncCursorRecord>();
     internal DbSet<ProviderConnectionRecord> ProviderConnections => Set<ProviderConnectionRecord>();
     internal DbSet<AccountBalanceSnapshotRecord> BalanceSnapshots => Set<AccountBalanceSnapshotRecord>();
@@ -60,6 +61,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new TransactionConfiguration());
         modelBuilder.ApplyConfiguration(new RecurringFlowConfiguration());
         modelBuilder.ApplyConfiguration(new CategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new AssetConfiguration());
         modelBuilder.ApplyConfiguration(new SyncCursorRecordConfiguration());
         modelBuilder.ApplyConfiguration(new ProviderConnectionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AccountBalanceSnapshotRecordConfiguration());
@@ -85,6 +87,9 @@ public sealed class FlowLedgerDbContext : DbContext
 
             modelBuilder.Entity<Category>()
                 .HasQueryFilter(c => EF.Property<TenantId>(c, "TenantId") == TenantId.From(_tenantContext!.TenantId));
+
+            modelBuilder.Entity<Asset>()
+                .HasQueryFilter(a => EF.Property<TenantId>(a, "TenantId") == TenantId.From(_tenantContext!.TenantId));
 
             modelBuilder.Entity<SyncCursorRecord>()
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
@@ -153,6 +158,7 @@ public sealed class FlowLedgerDbContext : DbContext
         ValidateTenantBoundary(ChangeTracker.Entries<Transaction>(), tid);
         ValidateTenantBoundary(ChangeTracker.Entries<RecurringFlow>(), tid);
         ValidateTenantBoundary(ChangeTracker.Entries<Category>(), tid);
+        ValidateTenantBoundary(ChangeTracker.Entries<Asset>(), tid);
     }
 
     private static void ValidateTenantBoundary<T>(

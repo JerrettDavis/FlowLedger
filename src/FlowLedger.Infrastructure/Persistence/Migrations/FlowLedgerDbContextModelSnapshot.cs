@@ -76,6 +76,104 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Domain.Aggregates.Asset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AnnualRate")
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("annual_rate");
+
+                    b.Property<string>("Attributes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("attributes");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid?>("LinkedAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_account_id");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("manufacturer");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("valuation_method");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateOnly?>("PurchaseDate")
+                        .HasColumnType("date")
+                        .HasColumnName("purchase_date");
+
+                    b.Property<decimal?>("SalvageValue")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("salvage_value");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("serial_number");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int?>("UsefulLifeYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("useful_life_years");
+
+                    b.Property<DateOnly>("ValuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("valued_on");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedAccountId")
+                        .HasDatabaseName("ix_assets_linked_account_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_assets_tenant_id");
+
+                    b.ToTable("assets", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Domain.Aggregates.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -460,6 +558,105 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
 
                     b.Navigation("CurrentBalance")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FlowLedger.Domain.Aggregates.Asset", b =>
+                {
+                    b.OwnsOne("FlowLedger.Domain.ValueObjects.Money", "CurrentValue", b1 =>
+                        {
+                            b1.Property<Guid>("AssetId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("value_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("value_currency");
+
+                            b1.HasKey("AssetId");
+
+                            b1.ToTable("assets");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AssetId");
+                        });
+
+                    b.OwnsOne("FlowLedger.Domain.ValueObjects.Money", "PurchasePrice", b1 =>
+                        {
+                            b1.Property<Guid>("AssetId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("purchase_price_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("purchase_price_currency");
+
+                            b1.HasKey("AssetId");
+
+                            b1.ToTable("assets");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AssetId");
+                        });
+
+                    b.OwnsMany("FlowLedger.Domain.Aggregates.AssetValuation", "Valuations", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("amount");
+
+                            b1.Property<DateOnly>("AsOf")
+                                .HasColumnType("date")
+                                .HasColumnName("as_of");
+
+                            b1.Property<string>("Note")
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)")
+                                .HasColumnName("note");
+
+                            b1.Property<DateTimeOffset>("RecordedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("recorded_at");
+
+                            b1.Property<string>("Source")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("source");
+
+                            b1.Property<Guid>("asset_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("asset_id", "AsOf")
+                                .HasDatabaseName("ix_asset_valuations_asset_as_of");
+
+                            b1.ToTable("asset_valuations", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("asset_id");
+                        });
+
+                    b.Navigation("CurrentValue")
+                        .IsRequired();
+
+                    b.Navigation("PurchasePrice");
+
+                    b.Navigation("Valuations");
                 });
 
             modelBuilder.Entity("FlowLedger.Domain.Aggregates.RecurringFlow", b =>
