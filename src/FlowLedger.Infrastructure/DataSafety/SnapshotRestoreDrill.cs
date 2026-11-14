@@ -19,7 +19,7 @@ public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool Sc
 /// </summary>
 public static class SnapshotRestoreDrill
 {
-    private static readonly string[] SkippedTables = ["__EFMigrationsHistory"];
+    internal static readonly string[] SkippedTables = ["__EFMigrationsHistory"];
 
     public static async Task<RestoreDrillResult> RunAsync(
         string liveConnectionString,
@@ -62,39 +62,7 @@ public static class SnapshotRestoreDrill
             await MigrateAsync(scratch.ConnectionString, manifest.AppliedMigrations.LastOrDefault(), ct);
             await EnsureAdHocTablesAsync(scratch.ConnectionString, ct);
 
-            await using var conn = new NpgsqlConnection(scratch.ConnectionString);
-            await conn.OpenAsync(ct);
-            await using (var rep = new NpgsqlCommand("SET session_replication_role = replica", conn))
-            {
-                await rep.ExecuteNonQueryAsync(ct); // skip FK checks while loading; counts verify completeness
-            }
-
-            foreach (var t in manifest.Tables.Where(t => !SkippedTables.Contains(t.Table)))
-            {
-                var file = Path.Combine(snapshotDir, t.Table + ".csv");
-                var header = (await File.ReadLinesAsync(file, ct).FirstAsync(ct))
-                    .Split(',').Select(c => "\"" + c.Trim('"') + "\"");
-                await using (var import = await conn.BeginTextImportAsync(
-                    $"COPY \"{t.Table}\" ({string.Join(",", header)}) FROM STDIN (FORMAT csv, HEADER true)", ct))
-                {
-                    var buf = new char[81920];
-                    using var reader = new StreamReader(file);
-                    int n;
-                    while ((n = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
-                    {
-                        await import.WriteAsync(buf.AsMemory(0, n), ct);
-                    }
-                }
-
-                await using var count = new NpgsqlCommand($"SELECT count(*) FROM \"{t.Table}\"", conn);
-                var restored = (long)(await count.ExecuteScalarAsync(ct))!;
-                var ok = restored == t.Rows;
-                results.Add(new DrillTableResult(t.Table, t.Rows, restored, ok));
-                if (!ok)
-                {
-                    problems.Add($"{t.Table}: expected {t.Rows} rows, restored {restored}");
-                }
-            }
+            results.AddRange(await LoadTablesAsync(scratch.ConnectionString, snapshotDir, manifest, problems, ct));
         }
         catch (Exception ex)
         {
@@ -114,7 +82,49 @@ public static class SnapshotRestoreDrill
         return new RestoreDrillResult(problems.Count == 0, scratchDatabase, keep, results, problems);
     }
 
-    private static async Task MigrateAsync(string connectionString, string? targetMigration, CancellationToken ct)
+    /// <summary>COPYs every manifest table (except migration history/settings) from CSV into the target and checks row counts.</summary>
+    internal static async Task<List<DrillTableResult>> LoadTablesAsync(
+        string connectionString, string snapshotDir, SnapshotManifest manifest, List<string> problems, CancellationToken ct)
+    {
+        var results = new List<DrillTableResult>();
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        await using (var rep = new NpgsqlCommand("SET session_replication_role = replica", conn))
+        {
+            await rep.ExecuteNonQueryAsync(ct); // skip FK checks while loading; counts verify completeness
+        }
+
+        foreach (var t in manifest.Tables.Where(t => !SkippedTables.Contains(t.Table)))
+        {
+            var file = Path.Combine(snapshotDir, t.Table + ".csv");
+            var header = (await File.ReadLinesAsync(file, ct).FirstAsync(ct))
+                .Split(',').Select(c => "\"" + c.Trim('"') + "\"");
+            await using (var import = await conn.BeginTextImportAsync(
+                $"COPY \"{t.Table}\" ({string.Join(",", header)}) FROM STDIN (FORMAT csv, HEADER true)", ct))
+            {
+                var buf = new char[81920];
+                using var reader = new StreamReader(file);
+                int n;
+                while ((n = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
+                {
+                    await import.WriteAsync(buf.AsMemory(0, n), ct);
+                }
+            }
+
+            await using var count = new NpgsqlCommand($"SELECT count(*) FROM \"{t.Table}\"", conn);
+            var restored = (long)(await count.ExecuteScalarAsync(ct))!;
+            var ok = restored == t.Rows;
+            results.Add(new DrillTableResult(t.Table, t.Rows, restored, ok));
+            if (!ok)
+            {
+                problems.Add($"{t.Table}: expected {t.Rows} rows, restored {restored}");
+            }
+        }
+
+        return results;
+    }
+
+    internal static async Task MigrateAsync(string connectionString, string? targetMigration, CancellationToken ct)
     {
         var options = new DbContextOptionsBuilder<FlowLedgerDbContext>()
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
@@ -125,7 +135,7 @@ public static class SnapshotRestoreDrill
     }
 
     /// <summary>Tables created outside EF migrations (system_settings, provider_api_calls) so they can be restored too.</summary>
-    private static async Task EnsureAdHocTablesAsync(string connectionString, CancellationToken ct)
+    internal static async Task EnsureAdHocTablesAsync(string connectionString, CancellationToken ct)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);

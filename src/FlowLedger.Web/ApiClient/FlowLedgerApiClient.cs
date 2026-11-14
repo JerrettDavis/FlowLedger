@@ -580,4 +580,19 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<BackupRunDto>(JsonOptions, ct);
         });
     }
+
+    /// <summary>Downloads the full-data export zip (CSV per table + manifest).</summary>
+    public async Task<byte[]?> ExportAllAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("export data", async () =>
+        {
+            var response = await _http.GetAsync("/api/data/export", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Export failed (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return await response.Content.ReadAsByteArrayAsync(ct);
+        });
+    }
 }
