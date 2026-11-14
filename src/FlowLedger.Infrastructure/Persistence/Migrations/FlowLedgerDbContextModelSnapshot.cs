@@ -506,6 +506,159 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("saved_reports", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SheetBillRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountRef")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("account_ref");
+
+                    b.Property<decimal?>("Actual")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("actual");
+
+                    b.Property<bool>("AutoPay")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_pay");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DueDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("due_day");
+
+                    b.Property<decimal>("Estimated")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("estimated");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsBusiness")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_business");
+
+                    b.Property<bool>("IsDebt")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_debt");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_optional");
+
+                    b.Property<bool>("IsPerpetual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_perpetual");
+
+                    b.Property<string>("MatchText")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("match_text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Payer")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("payer");
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("section");
+
+                    b.Property<string>("Service")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("service");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sheet_bills_tenant_id");
+
+                    b.ToTable("sheet_bills", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SheetPaymentRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bill_id");
+
+                    b.Property<bool>("IsPaid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_paid");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date")
+                        .HasColumnName("month");
+
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sheet_payments_tenant_id");
+
+                    b.HasIndex("BillId", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sheet_payments_bill_month");
+
+                    b.HasIndex("TenantId", "TransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sheet_payments_transaction")
+                        .HasFilter("transaction_id IS NOT NULL");
+
+                    b.ToTable("sheet_payments", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SyncCursorRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1017,6 +1170,15 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.Navigation("Fingerprint");
 
                     b.Navigation("Splits");
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SheetPaymentRecord", b =>
+                {
+                    b.HasOne("FlowLedger.Infrastructure.Persistence.Entities.SheetBillRecord", null)
+                        .WithMany()
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

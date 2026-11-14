@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Imports;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Api.Endpoints;
 
@@ -21,6 +22,8 @@ internal static class ImportEndpoints
         app.MapPost("/api/imports", async (
             [FromBody] ImportRequest request,
             ImportTransactionsHandler handler,
+            FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
+            ILogger<ImportTransactionsHandler> logger,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.CsvContent))
@@ -53,6 +56,18 @@ internal static class ImportEndpoints
 
                 var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
                 var summary = await handler.HandleAsync(command, ct);
+                if (summary.ImportedCount > 0)
+                {
+                    try
+                    {
+                        await sheetMarker.RefreshAsync(ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Bill sheet refresh after import failed.");
+                    }
+                }
+
                 return Results.Ok(summary);
             }
             catch (InvalidOperationException ex)

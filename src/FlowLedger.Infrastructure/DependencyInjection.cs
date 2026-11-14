@@ -80,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IBillSheetStore, FlowLedger.Infrastructure.Reports.EfBillSheetStore>();
 
         // ── Configuration ───────────────────────────────────────────────────
         // Register IConfiguration so that .BindConfiguration() (used by AddOptions) can resolve
@@ -124,7 +125,12 @@ public static class DependencyInjection
         services.AddSingleton<IAssetValuationFeed, FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeed>();
 
         // ── Sync service ────────────────────────────────────────────────────────
-        services.AddScoped<IFinancialSyncService, FinancialSyncService>();
+        services.AddScoped<FinancialSyncService>();
+        // Decorator: after any sync (API, on-demand job, Worker) the bill sheet is auto-marked.
+        services.AddScoped<IFinancialSyncService>(sp => new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+            sp.GetRequiredService<FinancialSyncService>(),
+            sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>()));
 
         // ── Object storage ──────────────────────────────────────────────────────
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
