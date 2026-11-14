@@ -171,10 +171,6 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         if (existing is not null)
         {
-            // Providers can refine/correct the type over time (and SimpleFIN infers it from names);
-            // keep it in step so liabilities never sit in the liquid-cash/overdraft calculations.
-            existing.ChangeType(this.MapProviderAccountType(pa.AccountType));
-
             // Update balance if changed (account may carry a stale balance from last sync)
             if (existing.CurrentBalance.Amount != pa.Balance.Amount ||
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)
@@ -190,6 +186,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         existing.Id);
                 }
             }
+
+            // Providers refine the type over time (SimpleFIN infers it from names). Keep it in step so a card or
+            // loan never sits in the liquid-cash / overdraft calculations. Guard rails: only for types the provider
+            // actually maps (not the Checking fallback), and never silently downgrade a liability to an asset.
+            if (TryMapProviderAccountType(pa.AccountType, out var mappedType)
+                && !(Account.IsLiabilityType(existing.AccountType) && !Account.IsLiabilityType(mappedType)))
+            {
+                var previousType = existing.AccountType;
+                if (existing.ChangeType(mappedType))
+                {
+                    _logger.LogInformation(
+                        "Account {AccountId} reclassified {Previous} -> {Current} from provider data.",
+                        existing.Id, previousType, mappedType);
+                }
+            }
+
             return existing;
         }
 
@@ -478,6 +490,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
         // Collapse whitespace, trim, uppercase for stable fingerprinting
         return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
+    }
+
+    /// <summary>Maps a canonical provider type token; false (no change) when the type is unknown/unmapped.</summary>
+    private static bool TryMapProviderAccountType(string providerType, out AccountType type)
+    {
+        switch (providerType.ToUpperInvariant())
+        {
+            case "CHECKING": type = AccountType.Checking; return true;
+            case "SAVINGS": type = AccountType.Savings; return true;
+            case "CREDIT_CARD" or "CREDITCARD" or "CREDIT CARD" or "CREDIT": type = AccountType.CreditCard; return true;
+            case "MORTGAGE": type = AccountType.Mortgage; return true;
+            case "LOAN": type = AccountType.Loan; return true;
+            case "INVESTMENT" or "BROKERAGE": type = AccountType.Investment; return true;
+            case "CASH": type = AccountType.Cash; return true;
+            default: type = default; return false;
+        }
     }
 
     private AccountType MapProviderAccountType(string providerType)

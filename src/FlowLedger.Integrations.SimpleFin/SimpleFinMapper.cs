@@ -14,9 +14,13 @@ internal static class SimpleFinMapper
     // Word-boundary matches so short tokens (IRA, SPS) cannot hit inside other words (e.g. "Miramar").
     private static readonly Regex MortgageRx = new(@"\bMORTGAGE\b|\bHELOC\b|\bHOME EQUITY\b", RegexOptions.Compiled);
     private static readonly Regex LoanRx = new(@"\bLOAN\b|\bSTUDENT\b|\bAUTO FIN|\bINSTALLMENT\b", RegexOptions.Compiled);
-    private static readonly Regex CardRx = new(
-        @"\bCREDIT\b(?! UNION)|\bCARD\b|\bVISA\b|\bMASTERCARD\b|\bAMEX\b|\bAMERICAN EXPRESS\b|\bDISCOVER\b|\bFREEDOM\b|\bSAPPHIRE\b|\bSLATE\b|\bCUSTOM CASH\b|\bDOUBLE CASH\b|\bQUICKSILVER\b|\bSAVOR\b|\bREWARDS\b|\bPLATINUM\b",
+    // Generic card words may appear in the institution OR account name ("Arvest Bank - Personal Credit Card").
+    private static readonly Regex CardGenericRx = new(@"\bCREDIT\b(?! UNION)|\bCARD\b", RegexOptions.Compiled);
+    // Network/product brand words are only trusted in the ACCOUNT name: they are also bank names ("Discover Bank").
+    private static readonly Regex CardBrandRx = new(
+        @"\bVISA\b|\bMASTERCARD\b|\bAMEX\b|\bAMERICAN EXPRESS\b|\bDISCOVER\b|\bFREEDOM\b|\bSAPPHIRE\b|\bSLATE\b|\bCUSTOM CASH\b|\bDOUBLE CASH\b|\bQUICKSILVER\b",
         RegexOptions.Compiled);
+    private static readonly Regex CheckingRx = new(@"\bCHECKING\b", RegexOptions.Compiled);
     private static readonly Regex SavingsRx = new(@"\bSAVINGS?\b|\bMONEY MARKET\b", RegexOptions.Compiled);
     private static readonly Regex InvestmentRx = new(
         @"\b401\(?K\)?\b|\bIRA\b|\bROTH\b|\bBROKERAGE\b|\bINVEST|\bAMERIPRISE\b|\bWEALTH\b|\bSPS\b|\bADVISOR\b|\bVANGUARD\b|\bFIDELITY\b",
@@ -24,12 +28,17 @@ internal static class SimpleFinMapper
 
     public static string InferType(SfAccount a)
     {
-        var s = $"{a.Org?.Name} {a.Name}".ToUpperInvariant();
-        if (MortgageRx.IsMatch(s)) { return "MORTGAGE"; }
-        if (LoanRx.IsMatch(s)) { return "LOAN"; }
-        if (CardRx.IsMatch(s)) { return "CREDIT_CARD"; }
-        if (SavingsRx.IsMatch(s)) { return "SAVINGS"; }
-        if (InvestmentRx.IsMatch(s)) { return "INVESTMENT"; }
+        var name = (a.Name ?? string.Empty).ToUpperInvariant();
+        var full = $"{a.Org?.Name} {name}".ToUpperInvariant();
+
+        if (MortgageRx.IsMatch(full)) { return "MORTGAGE"; }
+        if (LoanRx.IsMatch(full)) { return "LOAN"; }
+        // An explicit product word in the account name beats any brand heuristic ("Rewards Checking", "Discover Savings").
+        if (SavingsRx.IsMatch(name)) { return "SAVINGS"; }
+        if (CheckingRx.IsMatch(name)) { return "CHECKING"; }
+        if (CardGenericRx.IsMatch(full) || CardBrandRx.IsMatch(name)) { return "CREDIT_CARD"; }
+        if (InvestmentRx.IsMatch(full)) { return "INVESTMENT"; }
+        if (SavingsRx.IsMatch(full)) { return "SAVINGS"; }
         return "CHECKING";
     }
 
