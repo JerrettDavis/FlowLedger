@@ -193,6 +193,7 @@ app.MapDefaultEndpoints();
 app.MapStatusEndpoints();
 app.MapEnvironmentEndpoints();
 app.MapDataEndpoints();
+app.MapCategorizationEndpoints();
 app.MapAccountEndpoints();
 app.MapAssetEndpoints();
 app.MapSheetEndpoints();

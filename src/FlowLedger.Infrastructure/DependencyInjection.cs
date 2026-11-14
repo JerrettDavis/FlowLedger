@@ -126,6 +126,7 @@ public static class DependencyInjection
 
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<FinancialSyncService>();
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
         services.AddScoped<IFinancialSyncService>(sp =>
         {
@@ -146,8 +147,14 @@ public static class DependencyInjection
                     db.SyncCursors.Where(c => c.TenantId == tenant && c.ProviderName == providerName),
                     c => (DateTimeOffset?)c.LastSyncedAt, ct));
 
-            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+            // After every successful sync, fill in missing categories (never overwrites existing ones).
+            var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
                 guarded,
+                sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
+
+            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+                categorizing,
                 sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
         });
