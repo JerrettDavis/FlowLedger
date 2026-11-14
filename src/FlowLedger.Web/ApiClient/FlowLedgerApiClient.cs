@@ -676,4 +676,21 @@ public sealed class FlowLedgerApiClient
             return true;
         });
     }
+
+    /// <summary>Begins (or resumes) the real bank connection and returns the provider widget URL. Billable on first use.</summary>
+    public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("connect bank", async () =>
+        {
+            var response = await _http.PostAsync("/api/integrations/mx/connect-token", null, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException(
+                    $"Couldn't start the bank connection (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
+            return body.TryGetProperty("widgetUrl", out var u) ? u.GetString() : null;
+        });
+    }
 }

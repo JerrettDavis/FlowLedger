@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject ILogger<MainLayout> Logger
 @inject IJSRuntime JS
+@inject IDialogService DialogService
 @inject ThemeService ThemeService
 @implements IDisposable
 
@@ -43,6 +44,16 @@
         }
         @if (_environment == "production")
         {
+            <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
+                <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
+                           Color="Color.Inherit"
+                           Variant="Variant.Text"
+                           OnClick="ConnectBank"
+                           Disabled="_syncing"
+                           aria-label="Connect bank">
+                    Connect bank
+                </MudButton>
+            </MudTooltip>
             <MudTooltip Text="Fetch new data from your connected institutions">
                 <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
                            Color="Color.Inherit"
@@ -201,6 +212,36 @@
             : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
             : !data.Backup.OffsiteConfigured && _environment == "production" ? "No off-site backup configured"
             : null;
+    }
+
+    private async Task ConnectBank()
+    {
+        var ok = await DialogService.ShowMessageBoxAsync(
+            "Connect a bank",
+            "This opens your provider's secure connection widget. Creating the connection is a billable provider call, and it is only made once. Continue?",
+            yesText: "Continue", cancelText: "Cancel");
+        if (ok != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var url = await ApiClient.BeginBankConnectionAsync();
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                Snackbar.Add("The provider did not return a connection link.", Severity.Warning);
+                return;
+            }
+
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            Snackbar.Add("Finish linking in the new tab, then press Sync now.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Connect bank failed");
+            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task SyncNow()
