@@ -126,12 +126,39 @@ public static class DependencyInjection
 
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<FinancialSyncService>();
-        // Decorator: after any sync (API, on-demand job, Worker) the bill sheet is auto-marked.
-        services.AddScoped<IFinancialSyncService>(sp => new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
-            sp.GetRequiredService<FinancialSyncService>(),
-            sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>()));
+        // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
+        services.AddScoped<IFinancialSyncService>(sp =>
+        {
+            var provider = sp.GetRequiredService<FlowLedger.Integrations.Abstractions.IFinancialDataProvider>();
+            var tenant = sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId;
+            var cfg = sp.GetRequiredService<IConfiguration>();
+            // Real providers default to 30 min between syncs; the free Simulated provider is unthrottled.
+            var defaultMinutes = provider.ProviderName == "Simulated" ? 0 : 30;
+            var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
+            var db = sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>();
+            var providerName = provider.ProviderName;
 
+            var guarded = new FlowLedger.Infrastructure.Sync.GuardedSyncService(
+                sp.GetRequiredService<FinancialSyncService>(),
+                tenant,
+                TimeSpan.FromMinutes(Math.Max(0, minutes)),
+                async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
+                    db.SyncCursors.Where(c => c.TenantId == tenant && c.ProviderName == providerName),
+                    c => (DateTimeOffset?)c.LastSyncedAt, ct));
+
+            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+                guarded,
+                sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
+        });
+
+        // -- Provider call ledger (append-only; feeds budgets + the usage page) --
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
+            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
         // ── Object storage ──────────────────────────────────────────────────────
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
         services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
