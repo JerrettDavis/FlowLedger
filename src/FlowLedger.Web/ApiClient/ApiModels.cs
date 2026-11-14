@@ -43,6 +43,18 @@ public sealed record TransactionDto(
     string? Fingerprint,
     DateTimeOffset CreatedAt);
 
+public sealed record FlaggedTransactionDto(TransactionDto Transaction, List<string> Reasons);
+
+public sealed record DashboardActivityDto(
+    List<TransactionDto> RecentPosted,
+    List<TransactionDto> Pending,
+    decimal PendingNetAmount,
+    List<TransactionDto> Large,
+    decimal LargeThreshold,
+    List<FlaggedTransactionDto> Suspicious,
+    decimal MoneyInLast30Days,
+    decimal MoneyOutLast30Days);
+
 public sealed record CreateTransactionRequest(
     Guid AccountId,
     decimal Amount,
