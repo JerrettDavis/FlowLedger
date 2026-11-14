@@ -1,0 +1,188 @@
+<MudDialog aria-labelledby="asset-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="asset-dialog-title">@(Asset is null ? "Add Asset" : "Edit Asset")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" aria-label="Asset form">
+            <MudGrid>
+                <MudItem xs="12" sm="7">
+                    <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                                  MaxLength="200" aria-label="Asset name" />
+                </MudItem>
+                <MudItem xs="12" sm="5">
+                    <MudSelect T="string" Value="_category" ValueChanged="OnCategoryChanged" Label="Category" aria-label="Asset category">
+                        @foreach (var t in Templates)
+                        {
+                            <MudSelectItem Value="@t.Category">@t.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @if (Asset is null)
+                {
+                    <MudItem xs="6" sm="4">
+                        <MudNumericField @bind-Value="_value" Label="Current value" Format="F2" Min="0m" aria-label="Current value" />
+                    </MudItem>
+                    <MudItem xs="6" sm="2">
+                        <MudTextField @bind-Value="_currency" Label="Currency" MaxLength="3" aria-label="Currency code" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_valuedOn" Label="Value as of" aria-label="Value as of date" />
+                    </MudItem>
+                }
+
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_purchaseDate" Label="Purchase date (optional)" aria-label="Purchase date" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_purchasePrice" Label="Purchase price (optional)" Format="F2" Min="0m" aria-label="Purchase price" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4"><MudTextField @bind-Value="_manufacturer" Label="Manufacturer" MaxLength="200" aria-label="Manufacturer" /></MudItem>
+                <MudItem xs="12" sm="4"><MudTextField @bind-Value="_model" Label="Model" MaxLength="200" aria-label="Model" /></MudItem>
+                <MudItem xs="12" sm="4"><MudTextField @bind-Value="_serial" Label="Serial number" MaxLength="200" aria-label="Serial number"
+                                                      HelperText="Stored privately; never sent to valuation feeds" /></MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_notes" Label="Notes" Lines="2" MaxLength="4000" aria-label="Notes" /></MudItem>
+
+                <MudItem xs="12"><MudText Typo="Typo.subtitle2">Value over time</MudText></MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" @bind-Value="_method" Label="Valuation model" aria-label="Valuation model">
+                        <MudSelectItem Value="@("Manual")">Manual (only changes when I update it)</MudSelectItem>
+                        <MudSelectItem Value="@("DecliningBalance")">Depreciates (% per year)</MudSelectItem>
+                        <MudSelectItem Value="@("StraightLine")">Straight-line depreciation</MudSelectItem>
+                        <MudSelectItem Value="@("Appreciation")">Appreciates (% per year)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                @if (_method is "DecliningBalance" or "Appreciation")
+                {
+                    <MudItem xs="6" sm="4">
+                        <MudNumericField @bind-Value="_ratePercent" Label="Annual rate (%)" Min="0m" Max="100m" Format="F1" aria-label="Annual rate percent" />
+                    </MudItem>
+                }
+                @if (_method == "StraightLine")
+                {
+                    <MudItem xs="6" sm="4"><MudNumericField @bind-Value="_lifeYears" Label="Useful life (years)" Min="1" aria-label="Useful life years" /></MudItem>
+                    <MudItem xs="6" sm="4"><MudNumericField @bind-Value="_salvage" Label="Salvage value" Format="F2" Min="0m" aria-label="Salvage value" /></MudItem>
+                }
+
+                <MudItem xs="12">
+                    <MudSelect T="Guid?" @bind-Value="_linkedAccountId" Clearable="true" Label="Linked account (optional)"
+                               HelperText="Loan or mortgage financing it, or a Manual Asset account that should carry its value"
+                               aria-label="Linked account">
+                        @foreach (var a in Accounts)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)a.Id)">@a.Name (@a.AccountType)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12"><MudText Typo="Typo.subtitle2">Details</MudText></MudItem>
+                @foreach (var row in _rows)
+                {
+                    <MudItem xs="5"><MudTextField @bind-Value="row.Key" Label="Field" MaxLength="100" aria-label="Custom field name" /></MudItem>
+                    <MudItem xs="6"><MudTextField @bind-Value="row.Value" Label="Value" MaxLength="500" aria-label="@($"Value for {row.Key}")" /></MudItem>
+                    <MudItem xs="1" Class="d-flex align-center">
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="() => _rows.Remove(row)"
+                                       aria-label="@($"Remove field {row.Key}")" />
+                    </MudItem>
+                }
+                <MudItem xs="12">
+                    <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="AddRow" aria-label="Add custom field">Add field</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   aria-label="@(Asset is null ? "Add asset" : "Save changes")">@(Asset is null ? "Add" : "Save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public FlowLedger.Web.ApiClient.AssetDto? Asset { get; set; }
+    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+    [Parameter] public List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> Templates { get; set; } = [];
+
+    private sealed class Row { public string Key { get; set; } = ""; public string Value { get; set; } = ""; }
+
+    private MudForm _form = default!;
+    private string _name = "";
+    private string _category = "Other";
+    private decimal? _value = 0m;
+    private string _currency = "USD";
+    private DateTime? _valuedOn = DateTime.Today;
+    private DateTime? _purchaseDate;
+    private decimal? _purchasePrice;
+    private string? _manufacturer, _model, _serial, _notes;
+    private string _method = "Manual";
+    private decimal? _ratePercent = 0m;
+    private int? _lifeYears;
+    private decimal? _salvage;
+    private Guid? _linkedAccountId;
+    private readonly List<Row> _rows = [];
+
+    protected override void OnParametersSet()
+    {
+        if (Asset is { } a)
+        {
+            _name = a.Name; _category = a.Category; _currency = a.Currency;
+            _purchaseDate = a.PurchaseDate?.ToDateTime(TimeOnly.MinValue);
+            _purchasePrice = a.PurchasePrice;
+            _manufacturer = a.Manufacturer; _model = a.Model; _serial = a.SerialNumber; _notes = a.Notes;
+            _method = a.ValuationMethod; _ratePercent = a.AnnualRate * 100m;
+            _lifeYears = a.UsefulLifeYears; _salvage = a.SalvageValue; _linkedAccountId = a.LinkedAccountId;
+            _rows.Clear();
+            _rows.AddRange(a.Attributes.Select(kv => new Row { Key = kv.Key, Value = kv.Value }));
+        }
+    }
+
+    private void OnCategoryChanged(string category)
+    {
+        _category = category;
+        var t = Templates.FirstOrDefault(x => x.Category == category);
+        if (t is null) return;
+
+        // Suggest the category's fields (blank rows are dropped on save) and, for a new asset, its usual valuation model.
+        foreach (var f in t.SuggestedFields.Where(f => !_rows.Any(r => string.Equals(r.Key, f, StringComparison.OrdinalIgnoreCase))))
+        {
+            _rows.Add(new Row { Key = f });
+        }
+
+        if (Asset is null)
+        {
+            _method = t.DefaultMethod;
+            _ratePercent = t.DefaultAnnualRate * 100m;
+            _lifeYears = t.DefaultUsefulLifeYears;
+        }
+    }
+
+    private void AddRow() => _rows.Add(new Row());
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        var attrs = _rows.Where(r => !string.IsNullOrWhiteSpace(r.Key) && !string.IsNullOrWhiteSpace(r.Value))
+            .GroupBy(r => r.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Last().Value.Trim());
+        var rate = _method is "DecliningBalance" or "Appreciation" ? (_ratePercent ?? 0m) / 100m : 0m;
+        var life = _method == "StraightLine" ? _lifeYears : null;
+        var salvage = _method == "StraightLine" ? _salvage : null;
+        DateOnly? purchase = _purchaseDate is { } p ? DateOnly.FromDateTime(p) : null;
+
+        object result = Asset is null
+            ? new FlowLedger.Web.ApiClient.CreateAssetRequest(
+                _name, _category, _value ?? 0m, _currency,
+                _valuedOn is { } v ? DateOnly.FromDateTime(v) : null, purchase, _purchasePrice,
+                _manufacturer, _model, _serial, _notes, _method, rate, salvage, life, _linkedAccountId, attrs)
+            : new FlowLedger.Web.ApiClient.UpdateAssetRequest(
+                _name, _category, purchase, _purchasePrice, _manufacturer, _model, _serial, _notes,
+                _method, rate, salvage, life, _linkedAccountId, attrs);
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+}

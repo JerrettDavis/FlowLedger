@@ -1,0 +1,144 @@
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<AssetDetailDialog> Logger
+
+<MudDialog aria-labelledby="asset-detail-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="asset-detail-title">@(_asset?.Name ?? "Asset")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_asset is null)
+        {
+            <MudProgressCircular Indeterminate="true" aria-label="Loading asset" />
+        }
+        else
+        {
+            <MudGrid Class="mb-2">
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Estimated value</MudText>
+                    <MudText Typo="Typo.h6" Class="fl-num">@Format.Money(_asset.EstimatedValue)</MudText>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Last recorded</MudText>
+                    <MudText Typo="Typo.body1" Class="fl-num">@Format.Money(_asset.CurrentValue)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.FullDate(_asset.ValuedOn)</MudText>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Gain / loss</MudText>
+                    @if (_asset.GainLoss is { } g) { <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(g)">@Format.Signed(g)</MudText> }
+                    else { <MudText Color="Color.Secondary">—</MudText> }
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">Linked account</MudText>
+                    <MudText Typo="Typo.body2">@(_asset.LinkedAccountName ?? "—")</MudText>
+                    @if (_asset.Equity is { } e) { <MudText Typo="Typo.caption" Color="Color.Secondary">Equity @Format.Money(e)</MudText> }
+                </MudItem>
+            </MudGrid>
+
+            @if (_asset.Attributes.Count > 0 || !string.IsNullOrWhiteSpace(_asset.SerialNumber))
+            {
+                <MudSimpleTable Dense="true" Class="mb-3" aria-label="Asset details">
+                    <tbody>
+                        @if (!string.IsNullOrWhiteSpace(_asset.SerialNumber))
+                        {
+                            <tr><td>Serial number</td><td>@_asset.SerialNumber</td></tr>
+                        }
+                        @foreach (var kv in _asset.Attributes)
+                        {
+                            <tr><td>@kv.Key</td><td>@kv.Value</td></tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Record a valuation</MudText>
+            <MudGrid Class="mb-2">
+                <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_amount" Label="Value" Format="F2" Min="0m" aria-label="New valuation amount" /></MudItem>
+                <MudItem xs="6" sm="3"><MudDatePicker @bind-Date="_asOf" Label="As of" aria-label="Valuation date" /></MudItem>
+                <MudItem xs="6" sm="3"><MudTextField @bind-Value="_source" Label="Source" Placeholder="Appraiser, receipt…" aria-label="Valuation source" /></MudItem>
+                <MudItem xs="6" sm="3" Class="d-flex align-center">
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Record" Disabled="_busy" aria-label="Record valuation">Record</MudButton>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex align-center gap-2 mb-3">
+                <MudSelect T="string" @bind-Value="_feed" Label="Feed" Dense="true" Style="max-width:200px" aria-label="Valuation feed">
+                    <MudSelectItem Value="@("model")">Model estimate</MudSelectItem>
+                    <MudSelectItem Value="@("appraiser")">Appraiser feed</MudSelectItem>
+                </MudSelect>
+                <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined" OnClick="Refresh" Disabled="_busy"
+                           aria-label="Refresh valuation from feed">Refresh from feed</MudButton>
+            </div>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Valuation history</MudText>
+            <MudTable Items="_asset.Valuations ?? []" Dense="true" Hover="true" aria-label="Valuation history">
+                <HeaderContent>
+                    <MudTh>Date</MudTh><MudTh>Value</MudTh><MudTh>Source</MudTh><MudTh>Note</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@Format.FullDate(context.AsOf)</MudTd>
+                    <MudTd Class="fl-num">@Format.Money(context.Amount)</MudTd>
+                    <MudTd>@context.Source</MudTd>
+                    <MudTd>@context.Note</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Filled" Color="Color.Primary" aria-label="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid AssetId { get; set; }
+
+    private FlowLedger.Web.ApiClient.AssetDto? _asset;
+    private decimal? _amount;
+    private DateTime? _asOf = DateTime.Today;
+    private string? _source;
+    private string _feed = "model";
+    private bool _busy;
+    private bool _changed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _asset = await ApiClient.GetAssetAsync(AssetId); }
+        catch (Exception ex) { Fail(ex, "Couldn't load asset"); }
+    }
+
+    private async Task Record()
+    {
+        if (_amount is null) { Snackbar.Add("Enter a value first", Severity.Warning); return; }
+        await Busy(async () =>
+        {
+            _asset = await ApiClient.RecordAssetValuationAsync(AssetId, new FlowLedger.Web.ApiClient.RecordValuationRequest(
+                _amount.Value, _asOf is { } d ? DateOnly.FromDateTime(d) : null, _source, null));
+            _amount = null;
+            Snackbar.Add("Valuation recorded", Severity.Success);
+        });
+    }
+
+    private async Task Refresh() => await Busy(async () =>
+    {
+        var result = await ApiClient.RefreshAssetAsync(AssetId, _feed);
+        if (result?.Asset is not null) _asset = result.Asset;
+        Snackbar.Add(result?.Message ?? "No result", result?.Updated == true ? Severity.Success : Severity.Info);
+    });
+
+    private async Task Busy(Func<Task> work)
+    {
+        _busy = true;
+        try { await work(); _changed = true; }
+        catch (Exception ex) { Fail(ex, "Something went wrong"); }
+        finally { _busy = false; }
+    }
+
+    private void Fail(Exception ex, string fallback)
+    {
+        Logger.LogError(ex, "Asset dialog operation failed");
+        Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : fallback, Severity.Error);
+    }
+
+    private void Close() => MudDialog.Close(_changed ? DialogResult.Ok(true) : DialogResult.Cancel());
+}

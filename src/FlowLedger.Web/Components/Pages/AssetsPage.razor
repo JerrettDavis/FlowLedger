@@ -1,0 +1,238 @@
+@page "/assets"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ILogger<AssetsPage> Logger
+
+<PageTitle>Assets — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4 fl-enter">
+    <MudText Typo="Typo.h4">Assets</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" Variant="Variant.Filled"
+               OnClick="OpenCreateDialog" aria-label="Add new asset">Add Asset</MudButton>
+</div>
+
+@if (_loading)
+{
+    <CardSkeleton Height="40px" Count="6" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (_summary is { AssetCount: > 0 })
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Total value</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num" aria-label="Total asset value">@Format.Money(_summary.TotalValue)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@_summary.AssetCount asset(s)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Gain / loss vs cost</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_summary.UnrealizedGainLoss)">@Format.Signed(_summary.UnrealizedGainLoss)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Cost basis @Format.Money(_summary.TotalCost)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Equity in financed assets</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num">@Format.Money(_summary.TotalEquity)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">After @Format.Money(_summary.LinkedLiabilities) linked debt</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Net worth (incl. assets)</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_summary.NetWorth.NetWorth)">@Format.Money(_summary.NetWorth.NetWorth)</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Assets count once, even when linked to accounts</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@if (!_loading && _error is null && _assets.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.Inventory2"
+                Title="No assets yet"
+                Description="Track vehicles, electronics, firearms, property and more — with depreciation, appraisals and linked accounts.">
+        <Action>
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="OpenCreateDialog" aria-label="Add new asset">Add Asset</MudButton>
+        </Action>
+    </EmptyState>
+}
+
+<MudDataGrid T="FlowLedger.Web.ApiClient.AssetDto" Items="_assets" Filterable="true"
+             FilterMode="DataGridFilterMode.ColumnFilterRow" SortMode="SortMode.Multiple"
+             Hover="true" Dense="true" aria-label="Assets table">
+    <Columns>
+        <TemplateColumn Title="Name" SortBy="x => x.Name">
+            <CellTemplate>
+                <MudLink OnClick="() => OpenDetailDialog(context.Item)" Typo="Typo.body2">@context.Item.Name</MudLink>
+                @if (!string.IsNullOrWhiteSpace(context.Item.Manufacturer) || !string.IsNullOrWhiteSpace(context.Item.Model))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{context.Item.Manufacturer} {context.Item.Model}".Trim())</MudText>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Category" Title="Category" />
+        <TemplateColumn Title="Value" SortBy="x => x.EstimatedValue">
+            <CellTemplate>
+                <MudText Class="fl-num">@Format.Money(context.Item.EstimatedValue)</MudText>
+                @if (context.Item.ValuationMethod != "Manual")
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@MethodHint(context.Item)</MudText>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Gain / loss" SortBy="x => x.GainLoss">
+            <CellTemplate>
+                @if (context.Item.GainLoss is { } g)
+                {
+                    <MudText Class="fl-num" Color="@Format.Delta(g)">@Format.Signed(g)</MudText>
+                }
+                else { <MudText Color="Color.Secondary">—</MudText> }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Linked account" SortBy="x => x.LinkedAccountName">
+            <CellTemplate>
+                @if (context.Item.LinkedAccountName is not null)
+                {
+                    <MudText Typo="Typo.body2">@context.Item.LinkedAccountName</MudText>
+                    @if (context.Item.Equity is { } e)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Equity @Format.Money(e)</MudText>
+                    }
+                }
+                else { <MudText Color="Color.Secondary">—</MudText> }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudIconButton Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Color="Color.Primary"
+                               OnClick="() => OpenDetailDialog(context.Item)" aria-label="@($"Valuations for {context.Item.Name}")" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                               OnClick="() => OpenEditDialog(context.Item)" aria-label="@($"Edit asset {context.Item.Name}")" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Default"
+                               OnClick="() => Remove(context.Item)" aria-label="@($"Remove asset {context.Item.Name}")" />
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<FlowLedger.Web.ApiClient.AssetDto> _assets = [];
+    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> _templates = [];
+    private FlowLedger.Web.ApiClient.AssetSummaryDto? _summary;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _assets = await ApiClient.GetAssetsAsync();
+            _accounts = (await ApiClient.GetAccountsAsync()).Where(a => a.IsActive).ToList();
+            if (_templates.Count == 0)
+            {
+                _templates = await ApiClient.GetAssetCategoriesAsync();
+            }
+
+            _summary = await ApiClient.GetAssetSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load assets");
+            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace ? ace.Message : "Failed to load assets. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string MethodHint(FlowLedger.Web.ApiClient.AssetDto a) => a.ValuationMethod switch
+    {
+        "DecliningBalance" => $"−{a.AnnualRate:P0}/yr",
+        "Appreciation" => $"+{a.AnnualRate:P0}/yr",
+        "StraightLine" => $"{a.UsefulLifeYears}-yr straight line",
+        _ => ""
+    };
+
+    private DialogParameters<AssetFormDialog> FormParams(FlowLedger.Web.ApiClient.AssetDto? asset) => new()
+    {
+        { x => x.Asset, asset },
+        { x => x.Accounts, _accounts },
+        { x => x.Templates, _templates },
+    };
+
+    private static readonly DialogOptions Wide = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    private async Task OpenCreateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Add Asset", FormParams(null), Wide);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.CreateAssetRequest req })
+        {
+            await Run("Asset added", () => ApiClient.CreateAssetAsync(req));
+        }
+    }
+
+    private async Task OpenEditDialog(FlowLedger.Web.ApiClient.AssetDto asset)
+    {
+        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Edit Asset", FormParams(asset), Wide);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.UpdateAssetRequest req })
+        {
+            await Run("Asset updated", () => ApiClient.UpdateAssetAsync(asset.Id, req));
+        }
+    }
+
+    private async Task OpenDetailDialog(FlowLedger.Web.ApiClient.AssetDto asset)
+    {
+        var dialog = await DialogService.ShowAsync<AssetDetailDialog>(asset.Name,
+            new DialogParameters<AssetDetailDialog> { { x => x.AssetId, asset.Id } }, Wide);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task Remove(FlowLedger.Web.ApiClient.AssetDto asset)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync("Remove asset",
+            $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.",
+            yesText: "Remove", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await Run("Asset removed", async () => { await ApiClient.DeleteAssetAsync(asset.Id); return (object?)null; });
+        }
+    }
+
+    private async Task Run<T>(string successMessage, Func<Task<T>> action)
+    {
+        try
+        {
+            await action();
+            Snackbar.Add(successMessage, Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Asset operation failed");
+            Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Something went wrong. Please try again.", Severity.Error);
+        }
+    }
+}

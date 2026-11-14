@@ -197,3 +197,102 @@ public sealed record ConnectResult(string MemberId, string Provider);
 /// <c>accountsUpserted</c>, <c>transactionsAdded</c>, <c>transactionsSkipped</c>, <c>recurringFlowsAdded</c>.
 /// </summary>
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
+
+// ── Assets ────────────────────────────────────────────────────────────────────
+
+public sealed record AssetValuationDto(Guid Id, decimal Amount, DateOnly AsOf, string Source, string? Note, DateTimeOffset RecordedAt);
+
+public sealed record AssetDto(
+    Guid Id,
+    string Name,
+    string Category,
+    string? Manufacturer,
+    string? Model,
+    string? SerialNumber,
+    string? Notes,
+    DateOnly? PurchaseDate,
+    decimal? PurchasePrice,
+    string Currency,
+    decimal CurrentValue,
+    DateOnly ValuedOn,
+    decimal EstimatedValue,
+    string ValuationMethod,
+    decimal AnnualRate,
+    decimal? SalvageValue,
+    int? UsefulLifeYears,
+    Guid? LinkedAccountId,
+    string? LinkedAccountName,
+    decimal? LinkedLiability,
+    decimal? Equity,
+    decimal? GainLoss,
+    Dictionary<string, string> Attributes,
+    bool IsActive,
+    DateTimeOffset CreatedAt,
+    List<AssetValuationDto>? Valuations);
+
+public sealed record CreateAssetRequest(
+    string Name,
+    string Category,
+    decimal CurrentValue,
+    string Currency,
+    DateOnly? ValuedOn,
+    DateOnly? PurchaseDate,
+    decimal? PurchasePrice,
+    string? Manufacturer,
+    string? Model,
+    string? SerialNumber,
+    string? Notes,
+    string? ValuationMethod,
+    decimal? AnnualRate,
+    decimal? SalvageValue,
+    int? UsefulLifeYears,
+    Guid? LinkedAccountId,
+    Dictionary<string, string>? Attributes);
+
+public sealed record UpdateAssetRequest(
+    string Name,
+    string Category,
+    DateOnly? PurchaseDate,
+    decimal? PurchasePrice,
+    string? Manufacturer,
+    string? Model,
+    string? SerialNumber,
+    string? Notes,
+    string? ValuationMethod,
+    decimal? AnnualRate,
+    decimal? SalvageValue,
+    int? UsefulLifeYears,
+    Guid? LinkedAccountId,
+    Dictionary<string, string>? Attributes);
+
+public sealed record RecordValuationRequest(decimal Amount, DateOnly? AsOf, string? Source, string? Note);
+
+public sealed record AssetCategoryTemplateDto(
+    string Category,
+    string Label,
+    string DefaultMethod,
+    decimal DefaultAnnualRate,
+    int? DefaultUsefulLifeYears,
+    List<string> SuggestedFields);
+
+public sealed record AssetCategoryBreakdownDto(string Category, int Count, decimal Value);
+
+public sealed record NetWorthDto(
+    decimal AccountAssets,
+    decimal AccountLiabilities,
+    decimal PhysicalAssets,
+    decimal NetWorth,
+    decimal CarriedByAccounts);
+
+public sealed record AssetSummaryDto(
+    int AssetCount,
+    decimal TotalValue,
+    decimal TotalCost,
+    decimal UnrealizedGainLoss,
+    decimal LinkedLiabilities,
+    decimal TotalEquity,
+    List<AssetCategoryBreakdownDto> ByCategory,
+    List<AssetDto> TopAssets,
+    NetWorthDto NetWorth);
+
+public sealed record AssetRefreshResultDto(bool Updated, string Message, AssetDto? Asset);
