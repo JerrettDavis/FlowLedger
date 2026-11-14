@@ -1,0 +1,57 @@
+@using FlowLedger.Web.ApiClient
+
+<MudDialog aria-labelledby="save-report-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="save-report-title">@(AsPanel ? "Add to report" : "Save view")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (AsPanel)
+        {
+            <MudSelect T="string" @bind-Value="_target" Label="Report" aria-label="Target report">
+                <MudSelectItem Value="@("")">New report…</MudSelectItem>
+                @foreach (var r in Reports.Where(r => !r.IsPreset && r.Kind == "Report"))
+                {
+                    <MudSelectItem Value="@r.Id">@r.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        @if (!AsPanel || _target == "")
+        {
+            <MudTextField @bind-Value="_name" Label="@(AsPanel ? "New report name" : "View name")" Required="true" MaxLength="100"
+                          Immediate="true" aria-label="Name" />
+            <MudTextField @bind-Value="_description" Label="Description (optional)" MaxLength="500" Lines="2" aria-label="Description" />
+        }
+        <MudTextField @bind-Value="_panelTitle" Label="Panel title" MaxLength="100" Class="mt-2" aria-label="Panel title" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => MudDialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(_target == "" && string.IsNullOrWhiteSpace(_name))">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    public sealed record Outcome(string Name, string? Description, string PanelTitle, string? ExistingReportId);
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public bool AsPanel { get; set; }
+    [Parameter] public List<SavedReportDto> Reports { get; set; } = [];
+    [Parameter] public string SuggestedName { get; set; } = "";
+
+    private string _target = "";
+    private string _name = "";
+    private string? _description;
+    private string _panelTitle = "";
+
+    protected override void OnInitialized()
+    {
+        _name = SuggestedName;
+        _panelTitle = SuggestedName;
+    }
+
+    private void Submit()
+    {
+        var title = string.IsNullOrWhiteSpace(_panelTitle) ? _name : _panelTitle.Trim();
+        MudDialog.Close(DialogResult.Ok(new Outcome(_name.Trim(), _description, title, _target == "" ? null : _target)));
+    }
+}

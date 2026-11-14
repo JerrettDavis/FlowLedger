@@ -1,0 +1,131 @@
+@page "/reports/{Id}"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@using FlowLedger.Web.Components.Shared
+@inject FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_report?.Name ?? "Report") — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4 fl-enter">
+    <div>
+        <MudButton Href="reports" StartIcon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" Class="mb-1">All reports</MudButton>
+        <MudText Typo="Typo.h4">@(_report?.Name ?? "Report")</MudText>
+        @if (_report?.Description is { Length: > 0 } d)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@d</MudText>
+        }
+    </div>
+    <MudButton OnClick="LoadAsync" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading">Refresh</MudButton>
+</div>
+
+@if (_loading)
+{
+    <CardSkeleton Height="220px" Count="2" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (_report is not null)
+{
+    <MudGrid>
+        @for (var i = 0; i < _results.Count; i++)
+        {
+            var index = i;
+            var panel = _results[i];
+            <MudItem xs="12" md="@(panel.Viz.Kind == "table" ? 12 : 6)">
+                <MudPaper Elevation="0" Class="pa-3" Style="border: 1px solid var(--mud-palette-divider); height: 100%;">
+                    <div class="d-flex align-center justify-space-between mb-2">
+                        <MudText Typo="Typo.subtitle1">@panel.Title</MudText>
+                        <div>
+                            <MudIconButton Icon="@Icons.Material.Filled.QueryStats" Size="Size.Small" aria-label="@($"Open {panel.Title} in query")"
+                                           Href="@($"query?report={Uri.EscapeDataString(_report.Id)}&panel={index}")" />
+                            @if (!_report.IsPreset)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="@($"Remove {panel.Title}")"
+                                               OnClick="() => RemovePanelAsync(index)" Disabled="@(_results.Count <= 1)" />
+                            }
+                        </div>
+                    </div>
+                    @if (panel.Error is not null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@panel.Error</MudAlert>
+                    }
+                    else
+                    {
+                        <QueryChart Result="panel.Result" Viz="panel.Viz" />
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private SavedReportDto? _report;
+    private List<PanelResultDto> _results = [];
+    private bool _loading = true;
+    private string? _error;
+    private string? _loadedId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId != Id)
+        {
+            _loadedId = Id;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var definition = await ApiClient.GetReportAsync(Id);
+            var run = await ApiClient.RunReportAsync(Id);
+            if (definition is null || run is null)
+            {
+                _error = "That report no longer exists.";
+                _report = null;
+                return;
+            }
+
+            _results = run.Panels;
+            _report = definition;
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RemovePanelAsync(int index)
+    {
+        if (_report is null || _report.IsPreset || _report.Panels.Count <= 1)
+        {
+            return;
+        }
+
+        var panels = _report.Panels.Where((_, i) => i != index).ToList();
+        try
+        {
+            await ApiClient.SaveReportAsync(new SaveReportRequest(_report.Name, _report.Description, _report.Kind, panels), Guid.Parse(_report.Id));
+            await LoadAsync();
+            Snackbar.Add("Panel removed", Severity.Success);
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

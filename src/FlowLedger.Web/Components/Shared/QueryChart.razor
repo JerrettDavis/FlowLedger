@@ -1,0 +1,72 @@
+@using FlowLedger.Web.ApiClient
+@using FlowLedger.Web.Shared
+@inject FlowLedger.Web.Services.ThemeService Theme
+@implements IDisposable
+
+@* Renders a query result as a table or an inline-SVG chart. Colours come from CSS variables
+   (see .fl-viz in app.css) so the chart follows the active theme. *@
+@if (Result is null)
+{
+    return;
+}
+
+<div class="fl-viz @(Theme.IsDarkMode ? "fl-viz-dark" : "")">
+    @if (Viz.Kind == "table" || _showTable)
+    {
+        <ResultTable Result="Result" />
+    }
+    else if (_model.Problem is not null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">@_model.Problem Showing the table instead.</MudAlert>
+        <ResultTable Result="Result" />
+    }
+    else
+    {
+        @QueryChartSvg.Render(_model, Viz.Kind, Viz.Stacked)
+        @if (Viz.Kind != "pie" && _model.Series.Count > 1)
+        {
+            <div class="fl-viz-legend" role="list" aria-label="Legend">
+                @for (var i = 0; i < _model.Series.Count; i++)
+                {
+                    <span role="listitem" class="fl-viz-legend-item">
+                        <span class="fl-viz-swatch" style="background:@QueryChartSvg.SeriesVar(i)"></span>@_model.Series[i].Name
+                    </span>
+                }
+            </div>
+        }
+    }
+
+    @if (Viz.Kind != "table" && _model.Problem is null)
+    {
+        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => _showTable = !_showTable"
+                   StartIcon="@(_showTable ? Icons.Material.Filled.BarChart : Icons.Material.Filled.TableRows)">
+            @(_showTable ? "Show chart" : "Show data table")
+        </MudButton>
+    }
+    @if (Result.Truncated)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Warning">Showing the first 5,000 rows only.</MudText>
+    }
+</div>
+
+@code {
+    [Parameter] public QueryResultDto? Result { get; set; }
+    [Parameter] public VizSpecDto Viz { get; set; } = new("table");
+
+    private ChartModel _model = new([], [], false, null);
+    private bool _showTable;
+
+    protected override void OnInitialized() => Theme.ThemeChanged += OnTheme;
+
+    protected override void OnParametersSet()
+    {
+        if (Result is not null && Viz.Kind != "table")
+        {
+            _model = ChartModel.Build(Result, Viz);
+        }
+    }
+
+    private void OnTheme() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Theme.ThemeChanged -= OnTheme;
+}
