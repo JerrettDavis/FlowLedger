@@ -82,7 +82,7 @@ public static class RecurringFlowDetector
 
         // Weekly (≥4 occurrences). Variable amounts only for income: weekly expense with varying amounts is shopping.
         var weekly = Share(gaps, 6, 8);
-        if (weekly >= 0.7 && days.Count >= 4 && (isFixed || stableShare >= 0.7 && isCredit || stableShare >= 0.85))
+        if (weekly >= 0.7 && days.Count >= 4 && (isFixed || stableShare >= 0.7 && isCredit))
         {
             var dow = ModeDayOfWeek(days.Select(d => d.Date));
             return Build(key, accountId, isCredit, label, median, isFixed, "Weekly", null, null, null, dow,
