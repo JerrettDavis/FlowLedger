@@ -595,4 +595,36 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadAsByteArrayAsync(ct);
         });
     }
+
+    /// <summary>Fills in missing categories (never overwrites existing ones).</summary>
+    public async Task<CategorizationResultDto?> RunCategorizationAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("categorize transactions", async () =>
+        {
+            var response = await _http.PostAsync("/api/categorization/run", null, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't categorize (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return await response.Content.ReadFromJsonAsync<CategorizationResultDto>(JsonOptions, ct);
+        });
+    }
+
+    /// <summary>Sets a transaction's category; optionally applies it to every uncategorized transaction of the same merchant.</summary>
+    public async Task<int> SetTransactionCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("set category", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/category",
+                new { categoryId, applyToMerchant }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't set category (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
+            return body.TryGetProperty("changed", out var c) ? c.GetInt32() : 1;
+        });
+    }
 }

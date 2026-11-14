@@ -213,6 +213,8 @@ public sealed record ProviderUsageDto(
 
 public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, ProviderUsageDto ProviderUsage);
 
+public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized);
+
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
