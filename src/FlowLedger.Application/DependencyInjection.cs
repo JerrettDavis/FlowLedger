@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<ListRecurringFlowsHandler>();
         services.AddScoped<GetRecurringFlowHandler>();
         services.AddScoped<CreateRecurringFlowHandler>();
+        services.AddScoped<RecurringSuggestionService>();
         services.AddScoped<UpdateRecurringFlowHandler>();
         services.AddScoped<DeactivateRecurringFlowHandler>();
 

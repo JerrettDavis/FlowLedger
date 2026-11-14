@@ -18,6 +18,54 @@
     </MudButton>
 </div>
 
+@if (_suggestions.Count > 0)
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true" aria-label="Suggested recurring flows">
+        <div class="d-flex align-center justify-space-between mb-2">
+            <div>
+                <MudText Typo="Typo.h6">Suggested recurring flows</MudText>
+                <MudText Typo="Typo.caption" Class="fl-muted">
+                    Found in your transactions. Add the ones you want so forecasts and upcoming-bill alerts include them.
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.PlaylistAddCheck"
+                       Disabled="_busy" OnClick="AcceptAllSuggestions"
+                       aria-label="Add all suggested recurring flows">
+                Add all (@_suggestions.Count)
+            </MudButton>
+        </div>
+        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto;">
+            <thead>
+                <tr><th>Name</th><th>Account</th><th>Amount</th><th>Repeats</th><th>Next</th><th>Confidence</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var s in _suggestions)
+            {
+                <tr>
+                    <td>@s.Name</td>
+                    <td><MudText Typo="Typo.caption">@s.AccountName</MudText></td>
+                    <td>
+                        <MudText Class="fl-num" Color="@(s.Direction == "Credit" ? Color.Success : Color.Error)">
+                            @Format.Signed(s.Amount, s.Direction == "Credit")@(s.AmountModel == "Estimated" ? " ≈" : "")
+                        </MudText>
+                    </td>
+                    <td>@DescribeSuggestion(s)</td>
+                    <td>@Format.DayMonth(s.NextExpected)</td>
+                    <td><MudChip T="string" Size="Size.Small" Color="@(s.Confidence >= 0.85 ? Color.Success : Color.Warning)">@($"{s.Confidence:P0}") · @s.Occurrences×</MudChip></td>
+                    <td style="white-space:nowrap;">
+                        <MudButton Size="Size.Small" Color="Color.Primary" Disabled="_busy"
+                                   OnClick="() => AcceptSuggestion(s)" aria-label="@($"Add {s.Name} as a recurring flow")">Add</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Default" Disabled="_busy"
+                                   OnClick="() => DismissSuggestion(s)" aria-label="@($"Dismiss suggestion {s.Name}")">Dismiss</MudButton>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
 @if (_loading)
 {
     <CardSkeleton />
@@ -114,6 +162,93 @@
     private string? _error;
     private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flows = [];
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Web.ApiClient.RecurringSuggestionDto> _suggestions = [];
+    private bool _busy;
+
+    private static string DescribeSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s) => s.Frequency switch
+    {
+        "Weekly" => $"Weekly on {s.AnchorDayOfWeek}",
+        "EveryNWeeks" => $"Every {s.IntervalWeeks} weeks on {s.AnchorDayOfWeek}",
+        "TwiceMonthly" => $"Twice a month ({s.DayOfMonth} & {s.SecondDayOfMonth})",
+        "Monthly" => $"Monthly on the {s.DayOfMonth}{Ordinal(s.DayOfMonth ?? 0)}",
+        _ => s.Frequency,
+    };
+
+    private static string Ordinal(int n) => (n % 100) is >= 11 and <= 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+
+    private async Task LoadSuggestionsAsync()
+    {
+        try
+        {
+            _suggestions = await ApiClient.GetRecurringSuggestionsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Suggestions are a convenience: never block the page if detection fails.
+            Logger.LogWarning(ex, "Failed to load recurring suggestions");
+            _suggestions = [];
+        }
+    }
+
+    private async Task AcceptSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s)
+    {
+        _busy = true;
+        try
+        {
+            if (await ApiClient.AcceptRecurringSuggestionAsync(s.Key))
+            {
+                Snackbar.Add($"Added “{s.Name}”.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Couldn't add that flow.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DismissSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s)
+    {
+        _busy = true;
+        try
+        {
+            if (await ApiClient.DismissRecurringSuggestionAsync(s.Key))
+            {
+                _suggestions.Remove(s);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AcceptAllSuggestions()
+    {
+        _busy = true;
+        var added = 0;
+        try
+        {
+            foreach (var s in _suggestions.ToList())
+            {
+                if (await ApiClient.AcceptRecurringSuggestionAsync(s.Key))
+                {
+                    added++;
+                }
+            }
+
+            Snackbar.Add($"Added {added} recurring flow(s).", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -136,6 +271,7 @@
         try
         {
             _flows = await ApiClient.GetRecurringFlowsAsync();
+            await LoadSuggestionsAsync();
         }
         catch (Exception ex)
         {
