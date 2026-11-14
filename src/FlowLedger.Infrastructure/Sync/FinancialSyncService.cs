@@ -104,6 +104,17 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         var memberRef = await GetOrProvisionConnectionAsync(
             tenantId, ct, allowProvision: _provider.ProviderName == "Simulated");
 
+        // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
+        if (_provider is IMemberIdResolver resolver)
+        {
+            var resolved = await resolver.TryResolveMemberProviderIdAsync(memberRef.MemberProviderId, ct);
+            if (resolved is not null && resolved != memberRef.MemberProviderId)
+            {
+                memberRef.ResolveMember(resolved, DateTimeOffset.UtcNow);
+                await _db.SaveChangesAsync(ct);
+            }
+        }
+
         // Step 2: fetch provider accounts
         var providerAccounts = await _provider.GetAccountsAsync(memberRef.MemberProviderId, ct);
         _logger.LogDebug("Provider returned {Count} accounts", providerAccounts.Count);
@@ -227,25 +238,66 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     .Select(x => x.Fingerprint.Value)
                     .ToList();
 
-                // Batch-check existing fingerprints to avoid N+1 queries
-                var existing = await _db.Transactions
+                // Batch-load existing rows (tracked) so pending rows can be settled in place.
+                var existingRows = await _db.Transactions
                     .Where(t => t.Fingerprint != null && candidateFingerprints.Contains(t.Fingerprint.Value))
-                    .Select(t => t.Fingerprint!.Value)
+                    .ToListAsync(ct);
+                var existingByFp = existingRows.ToDictionary(t => t.Fingerprint!.Value);
+
+                // Pending rows that may have been replaced by a posted record under a new provider id.
+                var settleCandidates = await _db.Transactions
+                    .Where(t => t.AccountId == account.AccountId && t.Status == TransactionStatus.Pending)
                     .ToListAsync(ct);
 
-                var existingSet = new HashSet<string>(existing);
+                var toInsert = new List<Transaction>();
+                var settled = 0;
+                foreach (var x in fingerprintMap)
+                {
+                    if (existingByFp.TryGetValue(x.Fingerprint.Value, out var row))
+                    {
+                        // Same provider id seen before: pending -> posted transition in place.
+                        if (!x.ProviderTx.IsPending && row.Settle(x.ProviderTx.PostedDate))
+                        {
+                            settled++;
+                        }
+                        continue;
+                    }
 
-                var toInsert = fingerprintMap
-                    .Where(x => !existingSet.Contains(x.Fingerprint.Value))
-                    .Select(x => MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint))
-                    .ToList();
+                    if (!x.ProviderTx.IsPending)
+                    {
+                        // Posted record with a new id: absorb the matching pending row (same amount
+                        // and direction, pending date within a week before posting) instead of duplicating.
+                        var amount = Math.Abs(x.ProviderTx.Amount.Amount);
+                        var direction = x.ProviderTx.Amount.Amount < 0m
+                            ? TransactionDirection.Debit : TransactionDirection.Credit;
+                        var pending = settleCandidates
+                            .Where(t => t.Direction == direction
+                                && t.Amount.Amount == amount
+                                && t.EffectiveDate <= x.ProviderTx.PostedDate
+                                && t.EffectiveDate >= x.ProviderTx.PostedDate.AddDays(-7))
+                            .OrderByDescending(t => t.EffectiveDate)
+                            .FirstOrDefault();
+                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint))
+                        {
+                            settleCandidates.Remove(pending);
+                            settled++;
+                            continue;
+                        }
+                    }
+
+                    toInsert.Add(MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint));
+                }
 
                 if (toInsert.Count > 0)
                 {
                     await _db.Transactions.AddRangeAsync(toInsert, ct);
                     added += toInsert.Count;
                 }
-                skipped += page.Items.Count - toInsert.Count;
+                if (settled > 0)
+                {
+                    _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
+                }
+                skipped += page.Items.Count - toInsert.Count - settled;
             }
 
             cursor = page.NextCursor;

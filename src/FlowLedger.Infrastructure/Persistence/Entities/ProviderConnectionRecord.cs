@@ -32,6 +32,12 @@ internal sealed class ProviderConnectionRecord
         UpdatedAt = now,
     };
 
+    public void ResolveMember(string memberProviderId, DateTimeOffset now)
+    {
+        MemberProviderId = memberProviderId;
+        UpdatedAt = now;
+    }
+
     public void UpdateStatus(string status, DateTimeOffset now)
     {
         Status = status;
