@@ -79,6 +79,21 @@ public sealed class AssetTests
     // ── Estimator ────────────────────────────────────────────────────────────
 
     [Fact]
+    public void LinkAccount_rejects_other_tenants_account_and_allows_unlink()
+    {
+        var a = NewAsset();
+        var mine = Account.Create(Tenant, "Mortgage", AccountType.Mortgage, Money.Zero("USD"));
+        var theirs = Account.Create(TenantId.New(), "Other", AccountType.Mortgage, Money.Zero("USD"));
+
+        a.LinkAccount(mine);
+        a.LinkedAccountId.Should().Be(mine.Id);
+        ((Action)(() => a.LinkAccount(theirs))).Should().Throw<InvalidAssetException>();
+        a.LinkedAccountId.Should().Be(mine.Id);
+        a.LinkAccount(null);
+        a.LinkedAccountId.Should().BeNull();
+    }
+
+    [Fact]
     public void Estimate_manual_returns_anchor()
     {
         var a = NewAsset();

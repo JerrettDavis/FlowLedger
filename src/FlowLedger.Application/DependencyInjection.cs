@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Accounts;
+using FlowLedger.Application.Features.Assets;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Application.Features.Imports;
@@ -29,6 +30,17 @@ public static class DependencyInjection
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<CreateTransactionHandler>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
+
+        // Assets
+        services.AddScoped<ListAssetsHandler>();
+        services.AddScoped<GetAssetHandler>();
+        services.AddScoped<CreateAssetHandler>();
+        services.AddScoped<UpdateAssetHandler>();
+        services.AddScoped<RecordAssetValuationHandler>();
+        services.AddScoped<DeactivateAssetHandler>();
+        services.AddScoped<GetAssetSummaryHandler>();
+        services.AddScoped<RefreshAssetValuationHandler>();
+        services.AddSingleton<FlowLedger.Application.Abstractions.IAssetValuationFeed, ModelEstimateFeed>();
 
         // ── Handlers — Categories ────────────────────────────────────────────────
         services.AddScoped<ListCategoriesHandler>();
