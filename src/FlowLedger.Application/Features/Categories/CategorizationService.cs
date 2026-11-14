@@ -46,8 +46,8 @@ public sealed class CategorizationService(
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
         var transferIds = TransferDetector.Detect(real.Select(TransactionMapper.ToDto).ToList(), accountTypes);
 
-        // merchant -> most common existing category
-        var learned = real.Where(t => t.CategoryId is not null)
+        // merchant -> the category the USER chose most often (auto-filled rows are not evidence of intent)
+        var learned = real.Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual)
             .GroupBy(t => AutoCategorizer.MerchantKey(t.MerchantName, t.Description))
             .Where(g => g.Key.Length > 0)
             .ToDictionary(g => g.Key, g => g.GroupBy(t => t.CategoryId!.Value).OrderByDescending(x => x.Count()).First().Key);
@@ -73,17 +73,17 @@ public sealed class CategorizationService(
             var key = AutoCategorizer.MerchantKey(t.MerchantName, t.Description);
             if (transferIds.Contains(t.Id))
             {
-                t.Categorize(await EnsureAsync(AutoCategorizer.TransferCategory));
+                t.Categorize(await EnsureAsync(AutoCategorizer.TransferCategory), null, CategorySource.Auto);
                 transfers++;
             }
             else if (learned.TryGetValue(key, out var learnedId))
             {
-                t.Categorize(learnedId);
+                t.Categorize(learnedId, null, CategorySource.Auto);
                 byLearned++;
             }
             else if (AutoCategorizer.Categorize(t.MerchantName, t.Description, t.Direction.ToString()) is { } path)
             {
-                t.Categorize(await EnsureAsync(path));
+                t.Categorize(await EnsureAsync(path), null, CategorySource.Auto);
                 byKeyword++;
             }
             else
@@ -99,7 +99,8 @@ public sealed class CategorizationService(
 
     /// <summary>
     /// Sets one transaction's category (a manual choice, never overwritten later). With <paramref name="applyToMerchant"/>
-    /// every still-UNCATEGORIZED transaction of the same merchant gets it too; already-categorized ones are left alone.
+    /// every other transaction of the same merchant that is uncategorized OR was categorized automatically gets it too
+    /// (they become Auto, so a later correction can still replace them); categories the user chose by hand are left alone.
     /// </summary>
     public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
     {
@@ -113,16 +114,26 @@ public sealed class CategorizationService(
         if (applyToMerchant)
         {
             var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
-            foreach (var t in txs.Where(t => t.Id != target.Id && t.CategoryId is null
+            foreach (var t in txs.Where(t => t.Id != target.Id
+                         && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
                          && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped
                          && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key))
             {
-                t.Categorize(id);
+                t.Categorize(id, null, CategorySource.Auto);
                 changed++;
             }
         }
 
         await store.SaveAsync(ct);
         return changed;
+    }
+
+    /// <summary>Clears every category the auto-categorizer set (manual categories are untouched) so it can be re-run with better rules.</summary>
+    public async Task<int> ClearAutoCategoriesAsync(CancellationToken ct = default)
+    {
+        var txs = await store.LoadTrackedAsync(Max, ct);
+        var cleared = txs.Count(t => t.ClearAutoCategory());
+        await store.SaveAsync(ct);
+        return cleared;
     }
 }

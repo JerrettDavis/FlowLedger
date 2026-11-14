@@ -42,6 +42,15 @@ Other settings: `Backup__Enabled` (default true), `Backup__CronExpression` (defa
 `Backup__Directory`, `Backup__KeepLocalSnapshots` (default 30; pruning happens only after a confirmed off-site copy and never
 touches `premigrate-*` snapshots or the raw archive), `Backup__DrillAfterBackup` (default true).
 
+## Migrations
+
+* Aspire/dev: a verified `premigrate-*` snapshot is taken automatically before any pending migration is applied to a database that has data; startup aborts if it fails.
+* Compose/production: `eng/scripts/migrate.sh|ps1` now takes a `pg_dump` first (via `docker compose exec postgres`) and aborts if it fails or is empty. Use `SKIP_BACKUP=1` / `-SkipBackup` only for a brand-new empty database. (These scripts have not been run end-to-end yet.)
+
+## Data administration endpoints
+
+`GET /api/data/export`, `POST /api/data/import` and `POST /api/data/backup-now` act on the whole database, so they only accept requests from the host itself (loopback). Set `DataAdmin__AllowRemote=true` to allow other addresses (for example Docker bridge networking). The export zip is deleted from the server as soon as it has been sent.
+
 ## Disaster recovery (new machine, empty database)
 
 1. Install the stack and let it start against an **empty** database (migrations run, the environment marker is stamped).
@@ -60,7 +69,7 @@ marker and `Mx:Enabled` / `Mx:Environment` disagree across the production bounda
 data can never be adopted as production (unless you set `DataEnvironment__AdoptExistingAsProduction=true` on purpose).
 
 1. Run **Back up now** (and confirm it is off-site).
-2. Create a **fresh database** for real data (new Aspire volume / new database name).
+2. Create a **fresh database** for real data. Under Aspire set on the AppHost `FlowLedger:DatabaseName` (e.g. `flowledger_prod`) and `FlowLedger:DataDir` (a separate raw-payload archive folder, e.g. `~/.flowledger-prod`), so production never shares a database or archive folder with the demo/sandbox data. Under compose use a new `POSTGRES_DB`/volume.
 3. Set `Mx__Enabled=true`, `Mx__Environment=production`, the MX credentials, and the off-site backup variables.
 4. Start. The header shows no DEMO/SANDBOX chip, "Connect & Sync" is replaced by **Sync now**, and the demo connect
    endpoint returns 409.

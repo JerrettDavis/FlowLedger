@@ -136,4 +136,49 @@ public sealed class CategorizationServiceTests
         keep.CategoryId.Should().Be(existing.CategoryId);
         other.CategoryId.Should().BeNull();
     }
+
+    [Fact]
+    public async Task A_manual_correction_replaces_auto_categories_for_the_merchant_but_not_other_manual_ones()
+    {
+        var svc = await SetUpAsync();
+        var a = Add(_checking, 10, TransactionDirection.Debit, "Bluejay Grocery Co.", day: 1);
+        var b = Add(_checking, 12, TransactionDirection.Debit, "Bluejay Grocery Co.", day: 2);
+        var manualOther = Add(_checking, 14, TransactionDirection.Debit, "Bluejay Grocery Co.", day: 3);
+        var household = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Household"), "Household");
+        var keep = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Keep"), "Keep");
+        await _categories.AddAsync(household);
+        await _categories.AddAsync(keep);
+        manualOther.Categorize(keep.CategoryId);
+
+        await svc.RunAsync(); // auto-fills a and b as Food/Groceries
+        a.CategorySource.Should().Be(CategorySource.Auto);
+
+        await svc.SetCategoryAsync(a.Id, household.CategoryId.Value, applyToMerchant: true);
+
+        a.CategoryId.Should().Be(household.CategoryId);
+        a.CategorySource.Should().Be(CategorySource.Manual);
+        b.CategoryId.Should().Be(household.CategoryId);
+        b.CategorySource.Should().Be(CategorySource.Auto, "spread rows stay replaceable");
+        manualOther.CategoryId.Should().Be(keep.CategoryId, "a category the user chose by hand is never overwritten");
+    }
+
+    [Fact]
+    public async Task Learning_ignores_auto_rows_and_clear_auto_leaves_manual_rows()
+    {
+        var svc = await SetUpAsync();
+        var auto = Add(_checking, 10, TransactionDirection.Debit, "Bluejay Grocery Co.", day: 1);
+        var manual = Add(_checking, 12, TransactionDirection.Debit, "Zzyzx Holdings", day: 2);
+        var mine = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine"), "Mine");
+        await _categories.AddAsync(mine);
+        manual.Categorize(mine.CategoryId);
+
+        await svc.RunAsync();
+        auto.CategoryId.Should().NotBeNull();
+
+        var cleared = await svc.ClearAutoCategoriesAsync();
+
+        cleared.Should().Be(1);
+        auto.CategoryId.Should().BeNull();
+        manual.CategoryId.Should().Be(mine.CategoryId);
+    }
 }
