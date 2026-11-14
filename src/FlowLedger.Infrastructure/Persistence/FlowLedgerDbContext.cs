@@ -34,6 +34,7 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<SyncCursorRecord> SyncCursors => Set<SyncCursorRecord>();
     internal DbSet<ProviderConnectionRecord> ProviderConnections => Set<ProviderConnectionRecord>();
     internal DbSet<AccountBalanceSnapshotRecord> BalanceSnapshots => Set<AccountBalanceSnapshotRecord>();
+    internal DbSet<SavedReportRecord> SavedReports => Set<SavedReportRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SyncCursorRecordConfiguration());
         modelBuilder.ApplyConfiguration(new ProviderConnectionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AccountBalanceSnapshotRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SavedReportRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // If _tenantContext is null (design-time or test override), filters are
@@ -98,6 +100,9 @@ public sealed class FlowLedgerDbContext : DbContext
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
 
             modelBuilder.Entity<AccountBalanceSnapshotRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
+
+            modelBuilder.Entity<SavedReportRecord>()
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
         }
     }
