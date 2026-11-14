@@ -391,3 +391,25 @@ public sealed record ImportSheetRequest(string Csv, bool Replace);
 public sealed record SheetImportResult(int Sections, int Bills, int PaidMarks);
 
 public sealed record SheetRefreshResult(int Marked, int Cleared, int Added = 0);
+
+public sealed record RecurringSuggestionDto(
+    string Key,
+    Guid AccountId,
+    string AccountName,
+    string Name,
+    string Direction,
+    decimal Amount,
+    string Currency,
+    string AmountModel,
+    string Frequency,
+    int? DayOfMonth,
+    int? SecondDayOfMonth,
+    int? IntervalWeeks,
+    string? AnchorDayOfWeek,
+    DateOnly LastSeen,
+    DateOnly NextExpected,
+    int Occurrences,
+    double Confidence,
+    bool WouldAutoAdd);
+
+public sealed record AutoAddResultDto(int Added, List<string> Names);

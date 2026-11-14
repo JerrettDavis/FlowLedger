@@ -169,11 +169,25 @@ public static class DependencyInjection
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
 
-            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+            // Then detect recurring income/bills (after categories exist, so transfers/trades are excluded).
+            // Config: RecurringFlows:AutoAdd (default true) adds only fixed-amount, very regular patterns.
+            var recurring = new FlowLedger.Infrastructure.Sync.RecurringFlowSyncService(
                 categorizing,
+                sp.GetRequiredService<FlowLedger.Application.Features.RecurringFlows.RecurringSuggestionService>(),
+                !bool.TryParse(cfg["RecurringFlows:AutoAdd"], out var autoAdd) || autoAdd,
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.RecurringFlowSyncService>>());
+
+            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+                recurring,
                 sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
         });
+
+        services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlRecurringDismissalStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>

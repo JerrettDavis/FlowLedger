@@ -419,6 +419,36 @@ public sealed class FlowLedgerApiClient
         return result ?? [];
     }
 
+    public async Task<List<RecurringSuggestionDto>> GetRecurringSuggestionsAsync(CancellationToken ct = default)
+    {
+        var result = await GetJsonAsync<List<RecurringSuggestionDto>>(
+            "/api/recurring-flows/suggestions", "load recurring suggestions", ct: ct);
+        return result ?? [];
+    }
+
+    public async Task<bool> AcceptRecurringSuggestionAsync(string key, CancellationToken ct = default) =>
+        await ExecuteAsync("accept recurring suggestion", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/recurring-flows/suggestions/accept", new { key }, JsonOptions, ct);
+            return response.IsSuccessStatusCode;
+        });
+
+    public async Task<bool> DismissRecurringSuggestionAsync(string key, CancellationToken ct = default) =>
+        await ExecuteAsync("dismiss recurring suggestion", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/recurring-flows/suggestions/dismiss", new { key }, JsonOptions, ct);
+            return response.IsSuccessStatusCode;
+        });
+
+    public async Task<AutoAddResultDto?> AutoAddRecurringFlowsAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("detect recurring flows", async () =>
+        {
+            var response = await _http.PostAsync("/api/recurring-flows/detect", null, ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<AutoAddResultDto>(JsonOptions, ct)
+                : null;
+        });
+
     public async Task<RecurringFlowDto?> CreateRecurringFlowAsync(CreateRecurringFlowRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync("create recurring flow", async () =>
