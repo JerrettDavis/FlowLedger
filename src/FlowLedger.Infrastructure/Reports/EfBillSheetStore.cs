@@ -9,8 +9,8 @@ namespace FlowLedger.Infrastructure.Reports;
 
 internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext tenant) : IBillSheetStore
 {
-    public async Task<IReadOnlyList<SheetBillData>> ListBillsAsync(CancellationToken ct = default)
-        => (await db.SheetBills.AsNoTracking().Where(b => b.IsActive)
+    public async Task<IReadOnlyList<SheetBillData>> ListBillsAsync(bool includeInactive = false, CancellationToken ct = default)
+        => (await db.SheetBills.AsNoTracking().Where(b => includeInactive || b.IsActive)
             .OrderBy(b => b.Section).ThenBy(b => b.SortOrder).ThenBy(b => b.Name).ToListAsync(ct))
             .Select(ToData).ToList();
 
@@ -27,6 +27,18 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
         {
             record = new SheetBillRecord { Id = bill.Id, TenantId = tenant.TenantId, CreatedAt = DateTimeOffset.UtcNow };
             await db.SheetBills.AddAsync(record, ct);
+            Apply(record, bill);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException) when (bill.Section == "Detected")
+            {
+                // A concurrent refresh already created this detected row; drop ours and carry on.
+                db.Entry(record).State = EntityState.Detached;
+            }
+
+            return;
         }
 
         Apply(record, bill);
@@ -35,13 +47,15 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
 
     public async Task<bool> DeleteBillAsync(Guid id, CancellationToken ct = default)
     {
-        var record = await db.SheetBills.FirstOrDefaultAsync(b => b.Id == id, ct);
+        var record = await db.SheetBills.FirstOrDefaultAsync(b => b.Id == id && b.IsActive, ct);
         if (record is null)
         {
             return false;
         }
 
-        db.SheetBills.Remove(record);
+        // Soft delete: the row stays (inactive) so auto-detection does not bring it back after a sync.
+        record.IsActive = false;
+        db.SheetPayments.RemoveRange(await db.SheetPayments.Where(p => p.BillId == id).ToListAsync(ct));
         await db.SaveChangesAsync(ct);
         return true;
     }

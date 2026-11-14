@@ -13,6 +13,7 @@ public sealed class BillSheetService(
     ITransactionRepository transactions) : ISheetAutoMarker
 {
     public const int DefaultMonthCount = 6;
+    public const string DetectedSection = "Detected";
     private const int TransactionScanLimit = 20_000;
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
@@ -25,7 +26,7 @@ public sealed class BillSheetService(
         var count = Math.Clamp(monthCount ?? DefaultMonthCount, 1, 24);
         var months = Enumerable.Range(0, count).Select(i => selected.AddMonths(i - (count - 1))).ToList();
 
-        var bills = await store.ListBillsAsync(ct);
+        var bills = await store.ListBillsAsync(ct: ct);
         var payments = await store.ListPaymentsAsync(months[0], months[^1], ct);
         var byBill = payments.GroupBy(p => p.BillId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -105,7 +106,7 @@ public sealed class BillSheetService(
     public async Task<Guid> CreateBillAsync(SaveBillRequest r, CancellationToken ct = default)
     {
         Validate(r);
-        var existing = await store.ListBillsAsync(ct);
+        var existing = await store.ListBillsAsync(ct: ct);
         var section = r.Section.Trim();
         var next = existing.Where(b => b.Section == section).Select(b => b.SortOrder + 1).DefaultIfEmpty(0).Max();
         var bill = ToData(Guid.NewGuid(), next, r, null);
@@ -196,12 +197,6 @@ public sealed class BillSheetService(
 
     public async Task<SheetRefreshResult> RefreshAsync(CancellationToken ct = default)
     {
-        var bills = await store.ListBillsAsync(ct);
-        if (bills.Count == 0)
-        {
-            return new SheetRefreshResult(0, 0);
-        }
-
         var current = SheetMatcher.FirstOfMonth(Today);
         var months = Enumerable.Range(0, DefaultMonthCount).Select(i => current.AddMonths(-i)).ToList();
         var from = months[^1].AddDays(-SheetMatcher.MaxDueDayDistance);
@@ -214,8 +209,33 @@ public sealed class BillSheetService(
                 && t.Status is TransactionStatus.Pending or TransactionStatus.Posted or TransactionStatus.Matched
                     or TransactionStatus.Reconciled or TransactionStatus.NeedsReview
                 && t.EffectiveDate >= from && t.EffectiveDate <= to)
-            .Select(t => new SheetTxn(t.Id, t.EffectiveDate, t.Amount.Amount, $"{t.MerchantName} {t.Description}"))
+            .Select(t => new SheetTxn(t.Id, t.EffectiveDate, t.Amount.Amount, $"{t.MerchantName} {t.Description}", t.MerchantName ?? t.Description))
             .ToList();
+
+        // Auto-build: add a row for every monthly-repeating expense that no existing (or deleted) row covers.
+        var known = await store.ListBillsAsync(includeInactive: true, ct);
+        var added = 0;
+        foreach (var d in RecurringDetector.Detect(txns))
+        {
+            if (known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
+            {
+                continue;
+            }
+
+            var order = known.Where(b => b.Section == DetectedSection).Select(b => b.SortOrder + 1).DefaultIfEmpty(0).Max();
+            var bill = new SheetBillData(
+                Guid.NewGuid(), DetectedSection, order, d.Name, null, false, true, false, false, false,
+                d.DueDay, d.Estimated, d.Actual, "Detected from your transactions", null, d.MatchText, true);
+            await store.SaveBillAsync(bill, ct);
+            known = [.. known, bill];
+            added++;
+        }
+
+        var bills = known.Where(b => b.IsActive).ToList();
+        if (bills.Count == 0)
+        {
+            return new SheetRefreshResult(0, 0, added);
+        }
 
         var result = SheetMatcher.Match(bills, existing, txns, months);
         if (result.Upserts.Count > 0 || result.Clears.Count > 0)
@@ -223,7 +243,7 @@ public sealed class BillSheetService(
             await store.ApplyPaymentsAsync(result.Upserts, result.Clears, ct);
         }
 
-        return new SheetRefreshResult(result.Upserts.Count, result.Clears.Count);
+        return new SheetRefreshResult(result.Upserts.Count, result.Clears.Count, added);
     }
 
     // ── Import ───────────────────────────────────────────────────────────────
@@ -243,7 +263,7 @@ public sealed class BillSheetService(
 
         // Each tab is its own section, so importing the Credit Cards tab never touches the bills already loaded.
         var incoming = parsed.Bills.Select(b => b.Section).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var existing = (await store.ListBillsAsync(ct)).Where(b => incoming.Contains(b.Section)).ToList();
+        var existing = (await store.ListBillsAsync(ct: ct)).Where(b => incoming.Contains(b.Section)).ToList();
         if (existing.Count > 0)
         {
             if (!request.Replace)

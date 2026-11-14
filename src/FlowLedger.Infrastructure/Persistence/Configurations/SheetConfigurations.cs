@@ -30,6 +30,9 @@ internal sealed class SheetBillRecordConfiguration : IEntityTypeConfiguration<Sh
         builder.Property(r => r.IsActive).HasColumnName("is_active").HasDefaultValue(true);
         builder.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.HasIndex(r => r.TenantId).HasDatabaseName("ix_sheet_bills_tenant_id");
+        // Concurrent refreshes (page load, sync, prerender) must not create the same detected row twice.
+        builder.HasIndex(r => new { r.TenantId, r.Name }).IsUnique()
+            .HasFilter("section = 'Detected'").HasDatabaseName("ux_sheet_bills_detected_name");
     }
 }
 

@@ -356,4 +356,4 @@ public sealed record ImportSheetRequest(string Csv, bool Replace);
 
 public sealed record SheetImportResult(int Sections, int Bills, int PaidMarks);
 
-public sealed record SheetRefreshResult(int Marked, int Cleared);
+public sealed record SheetRefreshResult(int Marked, int Cleared, int Added = 0);

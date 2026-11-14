@@ -246,3 +246,5 @@ marked *Flux* match anywhere in the month. Account numbers are shown as the last
 Columns are matched by header name, an `x` under a month becomes a paid mark, a second header row
 (such as `Sam Expenses`) starts a new section, and `Total…` rows are skipped.
 API: `GET /api/sheet`, `POST /api/sheet/refresh`, `POST /api/sheet/import`, rows under `/api/sheet/bills`.
+
+**Auto-build.** You don't have to import anything: whenever the sheet refreshes (after a sync, an import, or when you open the page) FlowLedger scans your transactions for expenses that repeat monthly (3+ months, at most twice a month, with a steady amount or a steady day) and adds a row for each under **Detected**, with the due day, estimated amount and the months already paid. Rows already on your sheet are not duplicated, and a detected row you delete stays deleted. Frequent purchases like groceries or fuel are ignored; if something borderline slips in (a restaurant you visit monthly), just delete it.

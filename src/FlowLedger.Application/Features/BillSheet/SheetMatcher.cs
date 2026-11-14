@@ -164,6 +164,9 @@ public static class SheetMatcher
             .Select(Normalize).Where(s => s.Length >= 2).Distinct().ToList();
     }
 
+    /// <summary>True when the bill would claim a transaction with this text (used to avoid duplicating rows).</summary>
+    public static bool BillMatchesText(SheetBillData bill, string text) => Matches(Terms(bill), text);
+
     public static bool IsCardSection(string section) => section.Contains("credit card", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>"AEP (AMER ELECT PWR)" gives the whole name, the part before the parentheses and the part inside them.</summary>

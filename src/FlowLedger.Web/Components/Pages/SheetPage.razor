@@ -196,8 +196,8 @@
         try
         {
             var r = await ApiClient.RefreshSheetAsync();
-            Snackbar.Add(r is { Marked: > 0 } or { Cleared: > 0 }
-                ? $"Updated: {r.Marked} ticked, {r.Cleared} cleared."
+            Snackbar.Add(r is { Marked: > 0 } or { Cleared: > 0 } or { Added: > 0 }
+                ? $"Updated: {r.Marked} ticked, {r.Cleared} cleared, {r.Added} new row(s) detected."
                 : "Already up to date.", Severity.Info);
             await LoadAsync();
         }
