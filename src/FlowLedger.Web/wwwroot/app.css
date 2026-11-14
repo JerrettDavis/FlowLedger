@@ -281,3 +281,10 @@ html, body {
 .fl-result-table th { position: sticky; top: 0; background: var(--mud-palette-surface); font-weight: 600; }
 .fl-result-table .num { text-align: right; }
 .fl-query-editor textarea { font-family: ui-monospace, "Cascadia Code", Consolas, monospace !important; font-size: .9rem !important; }
+
+/* Masonry: CSS columns pack cards of unequal height without grid gaps. */
+.fl-masonry { column-count: 1; column-gap: 16px; }
+@media (min-width: 960px) { .fl-masonry { column-count: 2; } }
+@media (min-width: 1500px) { .fl-masonry { column-count: 3; } }
+.fl-masonry-item { break-inside: avoid; margin-bottom: 16px; display: inline-block; width: 100%; }
+.fl-masonry-span { column-span: all; display: block; }
