@@ -31,6 +31,11 @@
         {
             <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-label="Syncing" />
         }
+        @if (_backupAlert is not null && _environment == "production")
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" Href="data"
+                     aria-label="Backup warning">@_backupAlert</MudChip>
+        }
         @if (_environment is "demo" or "sandbox")
         {
             <MudChip T="string" Size="Size.Small" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
@@ -88,6 +93,7 @@
     private bool _drawerOpen = true;
     private bool _syncing = false;
     private string _environment = "unknown";
+    private string? _backupAlert;
 
     // True once the user has made an explicit choice that we've persisted;
     // while false, runtime OS-preference changes are applied.
@@ -190,6 +196,11 @@
     {
         var env = await ApiClient.GetEnvironmentAsync();
         _environment = env?.Environment ?? "unknown";
+        var data = await ApiClient.GetDataStatusAsync();
+        _backupAlert = data is null ? null
+            : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
+            : !data.Backup.OffsiteConfigured && _environment == "production" ? "No off-site backup configured"
+            : null;
     }
 
     private async Task SyncNow()
