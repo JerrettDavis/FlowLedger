@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ListTransactionsHandler>();
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<CreateTransactionHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
 
         // ── Handlers — Categories ────────────────────────────────────────────────
         services.AddScoped<ListCategoriesHandler>();

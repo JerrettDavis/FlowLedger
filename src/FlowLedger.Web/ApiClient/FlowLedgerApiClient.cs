@@ -197,6 +197,9 @@ public sealed class FlowLedgerApiClient
         return result ?? [];
     }
 
+    public Task<DashboardActivityDto?> GetDashboardActivityAsync(CancellationToken ct = default)
+        => GetJsonAsync<DashboardActivityDto>("/api/dashboard/activity", "load dashboard activity", ct: ct);
+
     public async Task<TransactionDto?> CreateTransactionAsync(CreateTransactionRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync("create transaction", async () =>

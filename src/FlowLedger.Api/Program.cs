@@ -188,6 +188,7 @@ app.MapDefaultEndpoints();
 app.MapStatusEndpoints();
 app.MapAccountEndpoints();
 app.MapTransactionEndpoints();
+app.MapDashboardEndpoints();
 app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();
