@@ -1,3 +1,4 @@
+using System.Net;
 using FlowLedger.Infrastructure.DataSafety;
 
 namespace FlowLedger.Api.Endpoints;
@@ -61,6 +62,7 @@ internal static class DataEndpoints
             return result.Ok ? Results.Ok(Public(result)) : Results.Problem(title: "Backup failed", detail: result.Error, statusCode: 500);
         })
         .WithName("BackupNow")
+        .AddEndpointFilter(LoopbackOnlyAsync)
         .WithSummary("Run a verified backup (snapshot, restore drill, off-site copy) now")
         .RequireRateLimiting("write");
 
@@ -68,10 +70,12 @@ internal static class DataEndpoints
         {
             var conn = cfg.GetConnectionString("flowledger")!;
             var zip = await SnapshotImport.ExportZipAsync(conn, Path.Combine(settings.BackupRoot, "exports"), ct);
-            var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
+            // DeleteOnClose: the unencrypted export zip is removed from the server as soon as it has been sent.
+            var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
             return Results.File(stream, "application/zip", $"flowledger-export-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
         })
         .WithName("ExportData")
+        .AddEndpointFilter(LoopbackOnlyAsync)
         .WithSummary("Download ALL data as a portable zip (CSV per table + manifest with hashes)")
         .RequireRateLimiting("write");
 
@@ -89,6 +93,7 @@ internal static class DataEndpoints
         })
         .DisableAntiforgery()
         .WithName("ImportData")
+        .AddEndpointFilter(LoopbackOnlyAsync)
         .WithSummary("Import an export zip into an EMPTY database (disaster recovery / moving machines)")
         .RequireRateLimiting("write");
 
@@ -96,6 +101,26 @@ internal static class DataEndpoints
     }
 
     private const string MxProvider = "MX";
+
+    /// <summary>
+    /// Export, import and backup-now act on the WHOLE database (every tenant). They are therefore reachable only from
+    /// the machine itself unless <c>DataAdmin:AllowRemote=true</c> is set deliberately (e.g. Docker bridge networking).
+    /// </summary>
+    private static async ValueTask<object?> LoopbackOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
+    {
+        var http = ctx.HttpContext;
+        var allowRemote = http.RequestServices.GetRequiredService<IConfiguration>().GetValue("DataAdmin:AllowRemote", false);
+        var remote = http.Connection.RemoteIpAddress;
+        if (!allowRemote && remote is not null && !IPAddress.IsLoopback(remote))
+        {
+            return Results.Problem(
+                title: "Data administration is only available from the host itself",
+                detail: "Set DataAdmin:AllowRemote=true to allow it from other addresses.",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return await next(ctx);
+    }
 
     /// <summary>Response projection: the snapshot folder name only (never the absolute server path).</summary>
     private static object Public(BackupRunResult r) => new

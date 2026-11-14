@@ -19,6 +19,7 @@ public static class SnapshotImport
         var (dir, _) = await new DatabaseSnapshotService(connectionString).CreateAsync(workDir, "export", "export", ct);
         var zip = dir + ".zip";
         ZipFile.CreateFromDirectory(dir, zip, CompressionLevel.Optimal, includeBaseDirectory: false);
+        Directory.Delete(dir, recursive: true); // only the zip remains; no loose unencrypted CSV copy is left behind
         return zip;
     }
 
