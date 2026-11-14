@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Data &amp; Backups — FlowLedger</PageTitle>
 
@@ -50,6 +51,12 @@ else
                 <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" Disabled="_running" OnClick="BackupNow">
                     @(_running ? "Backing up…" : "Back up now")
                 </MudButton>
+                <MudButton Class="mt-3 ml-2" Variant="Variant.Outlined" Disabled="_exporting" OnClick="ExportAll">
+                    @(_exporting ? "Exporting…" : "Export all data (.zip)")
+                </MudButton>
+                <MudText Typo="Typo.caption" Class="d-block mt-2 fl-muted">
+                    The export holds one CSV per table plus a hashed manifest. It can be imported into an empty database (POST /api/data/import).
+                </MudText>
             </MudPaper>
         </MudItem>
 
@@ -111,6 +118,7 @@ else
     private FlowLedger.Web.ApiClient.DataStatusDto? _status;
     private bool _loading = true;
     private bool _running;
+    private bool _exporting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -140,6 +148,29 @@ else
         {
             _running = false;
             await LoadAsync();
+        }
+    }
+
+    private async Task ExportAll()
+    {
+        _exporting = true;
+        try
+        {
+            var bytes = await ApiClient.ExportAllAsync();
+            if (bytes is not null)
+            {
+                using var ms = new MemoryStream(bytes);
+                using var reference = new DotNetStreamReference(ms);
+                await JS.InvokeVoidAsync("flowledgerDownload", $"flowledger-export-{DateTime.Now:yyyyMMdd-HHmm}.zip", reference);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _exporting = false;
         }
     }
 
