@@ -66,3 +66,18 @@ public sealed record PlannedOccurrenceGenerated(
     TenantId TenantId,
     DateOnly PlannedDate,
     Money PlannedAmount) : DomainEventBase;
+
+// ── Asset events ─────────────────────────────────────────────────────────────
+
+/// <summary>Raised when a physical asset is added to the tenant's holdings.</summary>
+public sealed record AssetAdded(
+    AssetId AssetId,
+    TenantId TenantId,
+    AssetCategory Category) : DomainEventBase;
+
+/// <summary>Raised whenever an asset's current value changes through a new valuation.</summary>
+public sealed record AssetRevalued(
+    AssetId AssetId,
+    TenantId TenantId,
+    Money PreviousValue,
+    Money NewValue) : DomainEventBase;

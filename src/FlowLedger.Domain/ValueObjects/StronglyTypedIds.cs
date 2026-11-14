@@ -50,3 +50,11 @@ public readonly record struct CategoryId(Guid Value)
     public static CategoryId From(Guid value) => new(value);
     public override string ToString() => Value.ToString();
 }
+
+/// <summary>Strongly-typed identifier for an Asset aggregate root.</summary>
+public readonly record struct AssetId(Guid Value)
+{
+    public static AssetId New() => new(Guid.NewGuid());
+    public static AssetId From(Guid value) => new(value);
+    public override string ToString() => Value.ToString();
+}
