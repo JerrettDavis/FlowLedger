@@ -246,7 +246,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
                 // Pending rows that may have been replaced by a posted record under a new provider id.
                 var settleCandidates = await _db.Transactions
-                    .Where(t => t.AccountId == account.AccountId && t.Status == TransactionStatus.Pending)
+                    .Where(t => t.AccountId == account.AccountId && t.Status == TransactionStatus.Pending
+                        && t.Source == TransactionSource.MxAggregation)
                     .ToListAsync(ct);
 
                 var toInsert = new List<Transaction>();
@@ -270,13 +271,17 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         var amount = Math.Abs(x.ProviderTx.Amount.Amount);
                         var direction = x.ProviderTx.Amount.Amount < 0m
                             ? TransactionDirection.Debit : TransactionDirection.Credit;
-                        var pending = settleCandidates
-                            .Where(t => t.Direction == direction
+                        // Only absorb on an unambiguous match; with 0 or 2+ candidates insert instead
+                        // (a duplicate is recoverable, a wrong merge is silent data loss).
+                        var matches = settleCandidates
+                            .Where(t => t.Status == TransactionStatus.Pending
+                                && t.Direction == direction
                                 && t.Amount.Amount == amount
                                 && t.EffectiveDate <= x.ProviderTx.PostedDate
                                 && t.EffectiveDate >= x.ProviderTx.PostedDate.AddDays(-7))
-                            .OrderByDescending(t => t.EffectiveDate)
-                            .FirstOrDefault();
+                            .Take(2)
+                            .ToList();
+                        var pending = matches.Count == 1 ? matches[0] : null;
                         if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint))
                         {
                             settleCandidates.Remove(pending);
