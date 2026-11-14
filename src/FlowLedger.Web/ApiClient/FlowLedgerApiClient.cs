@@ -539,4 +539,16 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<SyncResult>(JsonOptions, ct);
         });
     }
+
+    /// <summary>The verified data environment (demo / sandbox / production) of the API.</summary>
+    public async Task<EnvironmentInfo?> GetEnvironmentAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read environment", async () =>
+        {
+            var response = await _http.GetAsync("/api/environment", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<EnvironmentInfo>(JsonOptions, ct)
+                : null;
+        });
+    }
 }

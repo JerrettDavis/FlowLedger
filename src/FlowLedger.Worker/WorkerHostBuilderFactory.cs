@@ -1,3 +1,4 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Worker.Jobs;
@@ -27,6 +28,7 @@ public static class WorkerHostBuilderFactory
         // ── Application + Infrastructure (identical to API) ───────────────────
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure(builder.Configuration);
+        builder.Services.AddDataEnvironmentGuard();
 
         // ── Tenant (background jobs have no request to resolve one from) ──────
         // TryAdd: tests and future multi-tenant fan-out can register their own first/after.

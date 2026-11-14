@@ -196,6 +196,8 @@ public sealed record ConnectResult(string MemberId, string Provider);
 /// Matches the API's <c>Application.Abstractions.SyncResult</c> shape:
 /// <c>accountsUpserted</c>, <c>transactionsAdded</c>, <c>transactionsSkipped</c>, <c>recurringFlowsAdded</c>.
 /// </summary>
+public sealed record EnvironmentInfo(string Environment, bool IsProduction);
+
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
 
 // ── Assets ────────────────────────────────────────────────────────────────────

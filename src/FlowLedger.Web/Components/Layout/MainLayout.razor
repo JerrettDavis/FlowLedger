@@ -31,16 +31,37 @@
         {
             <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-label="Syncing" />
         }
-        <MudTooltip Text="Connect simulated provider and sync demo data">
-            <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
-                       Color="Color.Inherit"
-                       Variant="Variant.Text"
-                       OnClick="ConnectAndSync"
-                       Disabled="_syncing"
-                       aria-label="Connect and sync demo data">
-                Connect &amp; Sync
-            </MudButton>
-        </MudTooltip>
+        @if (_environment is "demo" or "sandbox")
+        {
+            <MudChip T="string" Size="Size.Small" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
+                     aria-label="@($"Data environment {_environment}")">@_environment.ToUpperInvariant() DATA</MudChip>
+        }
+        @if (_environment == "production")
+        {
+            <MudTooltip Text="Fetch new data from your connected institutions">
+                <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
+                           Color="Color.Inherit"
+                           Variant="Variant.Text"
+                           OnClick="SyncNow"
+                           Disabled="_syncing"
+                           aria-label="Sync now">
+                    Sync now
+                </MudButton>
+            </MudTooltip>
+        }
+        else
+        {
+            <MudTooltip Text="Connect simulated provider and sync demo data">
+                <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
+                           Color="Color.Inherit"
+                           Variant="Variant.Text"
+                           OnClick="ConnectAndSync"
+                           Disabled="_syncing"
+                           aria-label="Connect and sync demo data">
+                    Connect &amp; Sync
+                </MudButton>
+            </MudTooltip>
+        }
         <MudTooltip Text="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
             <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                            Color="Color.Inherit"
@@ -66,6 +87,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _syncing = false;
+    private string _environment = "unknown";
 
     // True once the user has made an explicit choice that we've persisted;
     // while false, runtime OS-preference changes are applied.
@@ -163,6 +185,33 @@
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
     // ── Connect & Sync ───────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        var env = await ApiClient.GetEnvironmentAsync();
+        _environment = env?.Environment ?? "unknown";
+    }
+
+    private async Task SyncNow()
+    {
+        _syncing = true;
+        try
+        {
+            var result = await ApiClient.SyncAsync();
+            Snackbar.Add(result is not null
+                ? $"Sync complete — {result.TransactionsAdded} new transactions"
+                : "Sync complete", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Sync failed");
+            Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
 
     private async Task ConnectAndSync()
     {

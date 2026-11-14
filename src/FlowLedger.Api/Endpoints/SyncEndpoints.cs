@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.DataSafety;
 using Microsoft.AspNetCore.Http;
 
 namespace FlowLedger.Api.Endpoints;
@@ -9,8 +10,16 @@ internal static class SyncEndpoints
     {
         var group = app.MapGroup("/api").WithTags("Sync");
 
-        group.MapPost("/connect", async (IFinancialSyncService syncService, CancellationToken ct) =>
+        group.MapPost("/connect", async (IFinancialSyncService syncService, DataEnvironmentState env, CancellationToken ct) =>
         {
+            if (env.Current == DataEnvironment.Production)
+            {
+                return Results.Problem(
+                    title: "Not available in production",
+                    detail: "The demo connect flow is disabled for production data. Use the provider's connect widget (/api/mx/connect-token).",
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
             var memberId = await syncService.ConnectAsync(ct);
             return Results.Ok(new { memberId, provider = "Simulated" });
         })
