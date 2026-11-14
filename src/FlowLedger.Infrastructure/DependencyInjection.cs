@@ -146,7 +146,9 @@ public static class DependencyInjection
                 TimeSpan.FromMinutes(Math.Max(0, minutes)),
                 async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                     db.SyncCursors.Where(c => c.TenantId == tenant && c.ProviderName == providerName),
-                    c => (DateTimeOffset?)c.LastSyncedAt, ct));
+                    c => (DateTimeOffset?)c.LastSyncedAt, ct),
+                crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
+                    configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
             // After every successful sync, fill in missing categories (never overwrites existing ones).
             var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(

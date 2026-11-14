@@ -3,9 +3,12 @@ using Microsoft.Extensions.Configuration;
 var builder = DistributedApplication.CreateBuilder(args);
 
 // ── Infrastructure resources ────────────────────────────────────────────────
+// The database NAME is configurable so real data can live in its own database (and the data_environment guard
+// then never sees demo rows): set FlowLedger:DatabaseName (e.g. "flowledger_prod") on the AppHost together with
+// FlowLedger:DataDir for a separate raw-payload archive. Default stays "flowledger" (the demo database).
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume(isReadOnly: false)
-    .AddDatabase("flowledger");
+    .AddDatabase("flowledger", builder.Configuration["FlowLedger:DatabaseName"] ?? "flowledger");
 
 var redis = builder.AddRedis("redis")
     .WithDataVolume(isReadOnly: false);

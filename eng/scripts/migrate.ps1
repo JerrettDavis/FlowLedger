@@ -10,7 +10,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$ConnectionString = $env:FLOWLEDGER_DB
+    [string]$ConnectionString = $env:FLOWLEDGER_DB,
+    [switch]$SkipBackup
 )
 
 Set-StrictMode -Version Latest
@@ -30,6 +31,23 @@ if (-not $ConnectionString) {
 
 Write-Step "Applying EF Core migrations..."
 Write-Host "  Target: $($ConnectionString -replace 'Password=[^;]+', 'Password=***')" -ForegroundColor DarkGray
+
+# ── Pre-migration backup (data-safety guard) ─────────────────────────────────
+# A migration can destroy data, so take a pg_dump first and ABORT if it fails. Pass -SkipBackup only
+# for a brand-new empty database (the first ever migration).
+if (-not $SkipBackup) {
+    Write-Step "Backing up the database before migrating..."
+    $backupDir = Join-Path $HOME ".flowledger/backups"
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+    $dump = Join-Path $backupDir ("premigrate-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".dump")
+    $pgUser = $env:POSTGRES_USER ?? "flowledger"
+    docker compose exec -T postgres pg_dump -U $pgUser -Fc flowledger | Set-Content -AsByteStream -Path $dump
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $dump) -or (Get-Item $dump).Length -lt 1024) {
+        Write-Error "Pre-migration backup failed or is empty ($dump). Aborting; nothing was migrated. Use -SkipBackup only for a brand-new empty database."
+        exit 1
+    }
+    Write-Host "  Backup OK -> $dump" -ForegroundColor Green
+}
 
 # ── Ensure dotnet-ef is available ────────────────────────────────────────────
 $efVersion = dotnet ef --version 2>&1
