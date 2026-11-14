@@ -27,12 +27,25 @@ internal static class SyncEndpoints
         .WithSummary("Begin a provider connection (simulated by default) for the current tenant")
         .RequireRateLimiting("write");
 
-        group.MapPost("/sync", async (IFinancialSyncService syncService, CancellationToken ct) =>
+        group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
             try
             {
                 var result = await syncService.SyncAsync(ct);
                 return Results.Ok(result);
+            }
+            catch (SyncThrottledException ex)
+            {
+                httpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(ex.RetryAfter.TotalSeconds)).ToString();
+                return Results.Problem(title: "Synced recently", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
+            }
+            catch (SyncAlreadyRunningException ex)
+            {
+                return Results.Problem(title: "Sync already running", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
+            catch (FlowLedger.Integrations.Abstractions.ProviderCallBudgetExceededException ex)
+            {
+                return Results.Problem(title: "Provider call budget reached", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
             }
             catch (FlowLedger.Integrations.Abstractions.NeedsUserActionProviderException ex)
             {

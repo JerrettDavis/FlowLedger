@@ -69,7 +69,7 @@ public static class ServiceCollectionExtensions
         });
 
         // ── Typed HTTP client + resilience ─────────────────────────────────────────
-        services.AddHttpClient<MxApiClient>((sp, http) =>
+        var mxHttp = services.AddHttpClient<MxApiClient>((sp, http) =>
         {
             var opts = sp.GetRequiredService<IOptions<FinancialProviderOptions>>().Value;
 
@@ -94,8 +94,24 @@ public static class ServiceCollectionExtensions
             return string.IsNullOrWhiteSpace(replay)
                 ? new SocketsHttpHandler()
                 : (HttpMessageHandler)new MxArchiveReplayHandler(replay);
-        })
-        .AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+        });
+        mxHttp.AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+
+        // Innermost: ledger + budget + kill switch. Skipped when replaying the archive (no network = no cost).
+        mxHttp.AddHttpMessageHandler(sp =>
+        {
+            var replay = sp.GetRequiredService<IOptions<MxProviderOptions>>().Value.ReplayArchivePath;
+            var ledger = sp.GetService<IProviderCallLedger>();
+            if (!string.IsNullOrWhiteSpace(replay) || ledger is null)
+            {
+                return new PassThroughHandler();
+            }
+
+            return new MxCallGuardHandler(
+                ledger,
+                sp.GetRequiredService<IOptionsMonitor<MxProviderOptions>>(),
+                sp.GetRequiredService<ILogger<MxCallGuardHandler>>());
+        });
 
         // ── Provider ───────────────────────────────────────────────────────────────
         // Factory registration (not ActivatorUtilities) so the provider can keep an internal
@@ -108,4 +124,8 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+}
+
+internal sealed class PassThroughHandler : DelegatingHandler
+{
 }

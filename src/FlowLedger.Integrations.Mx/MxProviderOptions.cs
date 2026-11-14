@@ -54,4 +54,13 @@ public sealed class MxProviderOptions
     /// Config key: <c>Mx:Provider:ReplayArchivePath</c>.
     /// </summary>
     public string? ReplayArchivePath { get; set; }
+
+    /// <summary>Hard cap on MX HTTP calls per UTC day, counted from the provider call ledger. 0 = unlimited.</summary>
+    public int DailyCallBudget { get; set; } = 500;
+
+    /// <summary>Hard cap on MX HTTP calls per UTC month. 0 = unlimited.</summary>
+    public int MonthlyCallBudget { get; set; } = 5000;
+
+    /// <summary>Kill switch: when true NO call is sent to MX (config reload takes effect immediately).</summary>
+    public bool CallsPaused { get; set; }
 }
