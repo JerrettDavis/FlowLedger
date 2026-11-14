@@ -136,6 +136,11 @@ public sealed class SimpleFinProviderTests
     [InlineData("Ameriprise Financial", "SPS ADVANTAGE (7133)", "INVESTMENT")]
     [InlineData("Arvest Bank", "Primay Checking (1219)", "CHECKING")]
     [InlineData("Miramar Credit Union", "Share Draft", "CHECKING")]
+    [InlineData("Discover Bank", "Online Savings", "SAVINGS")]
+    [InlineData("Discover Bank", "Cashback Debit Checking", "CHECKING")]
+    [InlineData("Some Bank", "Rewards Checking", "CHECKING")]
+    [InlineData("Discover Bank", "Discover it Card", "CREDIT_CARD")]
+    [InlineData("Arvest Bank - Personal Credit Card", "Account 1234", "CREDIT_CARD")]
     public void Infers_account_type_from_names(string org, string name, string expected)
     {
         var acct = new SfAccount { Id = "x", Name = name, Org = new SfOrg { Name = org } };

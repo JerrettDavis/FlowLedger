@@ -126,15 +126,29 @@ public sealed class Account : AggregateRoot
     /// asset accounts are treated differently by forecasts and net worth, so a wrong type causes false
     /// overdraft alerts. No-op when unchanged.
     /// </summary>
-    public void ChangeType(AccountType newType)
+    public bool ChangeType(AccountType newType)
     {
         if (newType == AccountType)
         {
-            return;
+            return false;
+        }
+
+        // Same invariant as UpdateBalance: an asset account cannot hold a negative balance without a credit limit.
+        if (IsAssetType(newType) && CurrentBalance.IsNegative && CreditLimit is null)
+        {
+            return false;
         }
 
         AccountType = newType;
+        return true;
     }
+
+    public static bool IsLiabilityType(AccountType type) =>
+        type is AccountType.CreditCard or AccountType.Loan or AccountType.Mortgage or AccountType.ManualLiability;
+
+    private static bool IsAssetType(AccountType type) =>
+        type is AccountType.Checking or AccountType.Savings or AccountType.Cash
+            or AccountType.Investment or AccountType.ManualAsset;
 
     public void Rename(string newName)
     {
@@ -153,12 +167,7 @@ public sealed class Account : AggregateRoot
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private bool IsAssetAccount => AccountType is
-        AccountType.Checking or
-        AccountType.Savings or
-        AccountType.Cash or
-        AccountType.Investment or
-        AccountType.ManualAsset;
+    private bool IsAssetAccount => IsAssetType(AccountType);
 }
 
 public enum AccountType
