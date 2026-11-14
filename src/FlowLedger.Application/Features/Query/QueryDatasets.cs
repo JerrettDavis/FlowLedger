@@ -43,6 +43,14 @@ public static class QueryCatalog
                 new("currency", "string", "ISO currency code"),
                 new("active", "bool", "Whether the account is active"),
             ]),
+        new("balance_history",
+            "Account balances over time: one row per account per day that a sync captured (the last snapshot of the day).",
+            [
+                new("date", "date", "Day the balance was captured"),
+                new("account", "string", "Account name"),
+                new("account_type", "string", "Checking, Savings, CreditCard, ..."),
+                new("balance", "number", "Balance at that time (negative for debts)"),
+            ]),
         new("assets",
             "Physical and other assets with estimated value.",
             [
@@ -74,7 +82,8 @@ public sealed class QueryDatasetProvider(
     ITransactionRepository transactions,
     IAccountRepository accounts,
     ICategoryRepository categories,
-    IAssetRepository assets)
+    IAssetRepository assets,
+    IBalanceHistoryReader balanceHistory)
 {
     private const int MaxTransactions = 50_000;
 
@@ -111,8 +120,16 @@ public sealed class QueryDatasetProvider(
                 a.LinkedAccountName, a.PurchaseDate, a.ValuationMethod,
             }).ToList();
 
+        var historyRows = (await balanceHistory.DailyAccountBalancesAsync(ct))
+            .Where(p => accountById.ContainsKey(p.AccountId))
+            .Select(p => new object?[]
+            {
+                p.Date, accountById[p.AccountId].Name, accountById[p.AccountId].AccountType, p.Balance,
+            }).ToList();
+
         return new Dictionary<string, QueryTable>(StringComparer.OrdinalIgnoreCase)
         {
+            ["balance_history"] = Table("balance_history", historyRows),
             ["transactions"] = Table("transactions", txRows, inputTruncated),
             ["accounts"] = Table("accounts", accountDtos.Select(a =>
                 new object?[] { a.Name, a.AccountType, a.Institution, a.BalanceAmount, a.BalanceCurrency, a.IsActive }).ToList()),
