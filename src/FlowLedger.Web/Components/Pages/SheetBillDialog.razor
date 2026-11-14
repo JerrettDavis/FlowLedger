@@ -1,0 +1,93 @@
+<MudDialog aria-labelledby="sheet-bill-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="sheet-bill-title">@(Row is null ? "Add row" : "Edit row")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" aria-label="Sheet row form">
+            <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required" Class="mb-2" />
+            <MudGrid Spacing="2">
+                <MudItem xs="6"><MudSelect T="string" @bind-Value="_section" Label="Section" Required="true">
+                    @foreach (var s in Sections) { <MudSelectItem Value="@s">@s</MudSelectItem> }
+                </MudSelect></MudItem>
+                <MudItem xs="6"><MudTextField @bind-Value="_payer" Label="Payer" /></MudItem>
+                <MudItem xs="4"><MudNumericField @bind-Value="_due" Label="Due day (blank = floating)" Min="1" Max="31" Clearable="true" /></MudItem>
+                <MudItem xs="4"><MudNumericField @bind-Value="_estimated" Label="Estimated" Min="0m" Format="F2" /></MudItem>
+                <MudItem xs="4"><MudNumericField @bind-Value="_actual" Label="Actual" Min="0m" Format="F2" Clearable="true" /></MudItem>
+            </MudGrid>
+            <div class="d-flex flex-wrap" style="gap:4px 16px">
+                <MudCheckBox @bind-Value="_debt" Label="Debt" />
+                <MudCheckBox @bind-Value="_perpetual" Label="Perpetual" />
+                <MudCheckBox @bind-Value="_optional" Label="Optional" />
+                <MudCheckBox @bind-Value="_business" Label="Business" />
+                <MudCheckBox @bind-Value="_auto" Label="Auto-pay" />
+            </div>
+            <MudTextField @bind-Value="_service" Label="Service / notes" Class="mb-2" />
+            <MudTextField @bind-Value="_account" Label="Account number" HelperText="Only the last 4 digits are ever shown on the sheet." Class="mb-2" />
+            <MudTextField @bind-Value="_match" Label="Match text"
+                          HelperText="Words that appear in the bank description, separated by | (e.g. att|at&t). Used to mark this row paid automatically; defaults to the name." />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        @if (Row is not null)
+        {
+            <MudButton Color="Color.Error" OnClick="Delete" StartIcon="@Icons.Material.Filled.Delete">Delete</MudButton>
+            <MudSpacer />
+        }
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    public const string DeleteResult = "delete";
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public FlowLedger.Web.ApiClient.SheetRowDto? Row { get; set; }
+    [Parameter] public string? RowSection { get; set; }
+    [Parameter] public List<string> Sections { get; set; } = [];
+
+    private MudForm _form = default!;
+    private string _name = "";
+    private string _section = "Bills";
+    private string? _payer;
+    private int? _due;
+    private decimal _estimated;
+    private decimal? _actual;
+    private bool _debt, _perpetual, _optional, _business, _auto;
+    private string? _service;
+    private string? _account;
+    private string? _match;
+
+    protected override void OnParametersSet()
+    {
+        if (Sections.Count == 0) Sections = ["Bills"];
+        _section = RowSection ?? Sections[0];
+        if (Row is null) return;
+        _name = Row.Name;
+        _payer = Row.Payer;
+        _due = Row.DueDay;
+        _estimated = Row.Estimated;
+        _actual = Row.Actual;
+        _debt = Row.IsDebt;
+        _perpetual = Row.IsPerpetual;
+        _optional = Row.IsOptional;
+        _business = Row.IsBusiness;
+        _auto = Row.AutoPay;
+        _service = Row.Service;
+        _account = Row.AccountRefMasked; // masked value is sent back unchanged => server keeps the real one
+        _match = Row.MatchText;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Delete() => MudDialog.Close(DialogResult.Ok(DeleteResult));
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+        MudDialog.Close(DialogResult.Ok(new FlowLedger.Web.ApiClient.SaveBillRequest(
+            _section, _name, _payer, _debt, _perpetual, _optional, _business, _auto,
+            _due, _estimated, _actual, _service, _account, _match)));
+    }
+}

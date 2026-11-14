@@ -224,3 +224,25 @@ appear anywhere in the demo data or in these screenshots.
 
 To use FlowLedger with real data, enable the MX integration
 (see [Getting Started](getting-started.md#mx-integration)).
+
+## Sheet (spreadsheet mode)
+
+`/sheet` is your budget workbook inside FlowLedger: one row per bill, subscription or debt, with
+payer, flags (D debt, P perpetual, O optional, B business), auto/manual, due day, estimated and
+actual cost, and a column per month. Totals (total, optional, required, personal, business) are
+per section, plus a grand total, like the spreadsheet.
+
+**Cells tick themselves.** After every sync or import (and when you open the page, or press
+*Update from payments*), a cell becomes `✓ auto` when a matching expense shows up near the bill's
+due day. Click any cell to override: a manual ✓ or manual "not paid" is never changed by automation.
+
+**Matching.** A row matches transactions whose merchant/description contains the row's *match text*
+(default: the row name; case, spaces and punctuation are ignored). Use `|` for alternatives, e.g.
+`aep|public service of ok`. Edit a row (click its name) to set this. Amounts are not compared, so
+variable bills (gas, electric) still match. Rows with a due day match within 7 days of it; rows
+marked *Flux* match anywhere in the month. Account numbers are shown as the last 4 digits only.
+
+**Import your workbook.** In Google Sheets/Excel download the bills tab as CSV and use *Import*.
+Columns are matched by header name, an `x` under a month becomes a paid mark, a second header row
+(such as `Sam Expenses`) starts a new section, and `Total…` rows are skipped.
+API: `GET /api/sheet`, `POST /api/sheet/refresh`, `POST /api/sheet/import`, rows under `/api/sheet/bills`.

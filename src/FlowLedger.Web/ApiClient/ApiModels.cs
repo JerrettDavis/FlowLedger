@@ -325,3 +325,35 @@ public sealed record QuerySchemaDto(List<DatasetInfoDto> Datasets, List<string> 
 
 /// <summary>Outcome of running a query: a result, or a user-readable error with its character offset.</summary>
 public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int Position);
+
+// Bill sheet (spreadsheet mode) ------------------------------------------------
+
+public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, string Source);
+
+public sealed record SheetRowDto(
+    Guid Id, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
+    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRefMasked, string? MatchText,
+    Dictionary<string, SheetCellDto> Cells);
+
+public sealed record SheetTotalsLine(decimal Total, decimal Optional, decimal Required, decimal Personal, decimal Business);
+
+public sealed record SheetTotalsDto(SheetTotalsLine Estimated, SheetTotalsLine Actual);
+
+public sealed record SheetSectionDto(string Name, List<SheetRowDto> Rows, SheetTotalsDto Totals);
+
+public sealed record SheetMonthSummaryDto(string Month, int PaidCount, int TotalCount, decimal PaidAmount, decimal RemainingEstimated);
+
+public sealed record SheetViewDto(
+    List<string> Months, string SelectedMonth, List<SheetSectionDto> Sections, SheetTotalsDto GrandTotals, SheetMonthSummaryDto Summary);
+
+public sealed record SaveBillRequest(
+    string Section, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
+    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRef, string? MatchText);
+
+public sealed record SetPaymentRequest(bool Paid, decimal? Amount);
+
+public sealed record ImportSheetRequest(string Csv, bool Replace);
+
+public sealed record SheetImportResult(int Sections, int Bills, int PaidMarks);
+
+public sealed record SheetRefreshResult(int Marked, int Cleared);

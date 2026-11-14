@@ -343,3 +343,25 @@ html, body {
 .fl-tip-body { color: var(--mud-palette-text-secondary); white-space: pre-line; }
 .fl-tip.k-error { border-color: var(--mud-palette-error); }
 .fl-tip.k-error .fl-tip-title { color: var(--mud-palette-error); }
+
+/* ── Spreadsheet mode (/sheet) ───────────────────────────────────────────── */
+.fl-sheet-wrap { overflow-x: auto; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-surface); }
+.fl-sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .85rem; white-space: nowrap; }
+.fl-sheet th, .fl-sheet td { padding: 4px 10px; border-bottom: 1px solid var(--mud-palette-lines-default); text-align: left; font-weight: 400; }
+.fl-sheet thead th { position: sticky; top: 0; background: var(--mud-palette-surface); font-weight: 600; z-index: 2; }
+.fl-sheet .num { text-align: right; }
+.fl-sheet .fl-sheet-name { position: sticky; left: 0; background: var(--mud-palette-surface); z-index: 1; min-width: 190px; font-weight: 500; }
+.fl-sheet thead .fl-sheet-name { z-index: 3; }
+.fl-sheet-sub { display: block; font-size: .72rem; color: var(--mud-palette-text-secondary); font-weight: 400; }
+.fl-sheet-link { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 500; cursor: pointer; text-align: left; }
+.fl-sheet-link:hover, .fl-sheet-link:focus-visible { text-decoration: underline; }
+.fl-sheet-section th { background: var(--mud-palette-background-gray); font-weight: 700; letter-spacing: .02em; }
+.fl-sheet-flags { font-family: ui-monospace, monospace; letter-spacing: .1em; color: var(--mud-palette-text-secondary); }
+.fl-sheet-total th, .fl-sheet-total td { font-weight: 500; background: var(--mud-palette-background-gray); }
+.fl-sheet-grand th, .fl-sheet-grand td { font-weight: 700; border-top: 2px solid var(--mud-palette-lines-default); }
+.fl-sheet-cur { background: color-mix(in srgb, var(--mud-palette-primary) 8%, transparent); }
+.fl-sheet-cellwrap { text-align: center !important; padding: 2px 4px !important; }
+.fl-sheet-cell { min-width: 56px; min-height: 28px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--mud-palette-text-secondary); cursor: pointer; font: inherit; }
+.fl-sheet-cell:hover, .fl-sheet-cell:focus-visible { border-color: var(--mud-palette-primary); }
+.fl-sheet-cell.paid { background: color-mix(in srgb, var(--mud-palette-success) 18%, transparent); color: var(--mud-palette-success); font-weight: 600; }
+.fl-sheet-cell.late { background: color-mix(in srgb, var(--mud-palette-warning) 22%, transparent); color: var(--mud-palette-warning); font-weight: 700; }

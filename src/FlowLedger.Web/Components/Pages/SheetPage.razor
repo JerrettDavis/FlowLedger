@@ -1,0 +1,306 @@
+@page "/sheet"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@inject FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ILogger<SheetPage> Logger
+
+<PageTitle>Sheet — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4 fl-enter" style="flex-wrap:wrap;gap:8px">
+    <div>
+        <MudText Typo="Typo.h4">Sheet</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Your bill sheet. Cells tick themselves when a matching payment syncs; click a cell to override.
+        </MudText>
+    </div>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="() => ShiftAsync(-1)" aria-label="Previous month" />
+        <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite">@MonthTitle(_selected)</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="() => ShiftAsync(1)" aria-label="Next month" />
+        <MudButton StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined" Color="Color.Primary"
+                   OnClick="RefreshAsync" Disabled="_busy" aria-label="Check transactions and tick paid rows">Update from payments</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="() => EditAsync(null, null)" aria-label="Add a row">Add row</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.UploadFile" Variant="Variant.Text"
+                   OnClick="ImportAsync" aria-label="Import from CSV">Import</MudButton>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <CardSkeleton Height="40px" Count="8" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (!_loading && _error is null && (_view is null || _view.Sections.Count == 0))
+{
+    <EmptyState Icon="@Icons.Material.Outlined.TableChart"
+                Title="Your sheet is empty"
+                Description="Add a row, or import the CSV export of your budget workbook to start from what you already track." />
+}
+
+@if (_view is { Sections.Count: > 0 })
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Paid in @MonthTitle(_selected)</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num">@_view.Summary.PaidCount of @_view.Summary.TotalCount</MudText>
+                <MudProgressLinear Value="@PaidPercent" Color="Color.Success" Class="mt-2" aria-label="Share of rows paid" />
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Paid so far</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num">@Format.Money(_view.Summary.PaidAmount)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Class="fl-card-hover"><MudCardContent>
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Still to pay (estimated)</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num">@Format.Money(_view.Summary.RemainingEstimated)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <div class="fl-sheet-wrap">
+        <table class="fl-sheet" aria-label="Bill sheet">
+            <thead>
+                <tr>
+                    <th scope="col" class="fl-sheet-name">Bill</th>
+                    <th scope="col">Payer</th>
+                    <th scope="col" title="Debt · Perpetual · Optional · Business">Flags</th>
+                    <th scope="col">Pay</th>
+                    <th scope="col" class="num">Due</th>
+                    <th scope="col" class="num">Estimated</th>
+                    <th scope="col" class="num">Actual</th>
+                    @foreach (var m in _view.Months)
+                    {
+                        <th scope="col" class="@(m == _view.SelectedMonth ? "fl-sheet-cur" : null)">@ShortMonth(m)</th>
+                    }
+                </tr>
+            </thead>
+            @foreach (var section in _view.Sections)
+            {
+                <tbody>
+                    <tr class="fl-sheet-section"><th colspan="@(7 + _view.Months.Count)" scope="colgroup">@section.Name</th></tr>
+                    @foreach (var row in section.Rows)
+                    {
+                        <tr>
+                            <th scope="row" class="fl-sheet-name">
+                                <button class="fl-sheet-link" @onclick="() => EditAsync(row, section.Name)" aria-label="@($"Edit {row.Name}")">@row.Name</button>
+                                @if (!string.IsNullOrWhiteSpace(row.Service))
+                                {
+                                    <span class="fl-sheet-sub">@row.Service</span>
+                                }
+                            </th>
+                            <td>@row.Payer</td>
+                            <td class="fl-sheet-flags">@Flags(row)</td>
+                            <td>@(row.AutoPay ? "Auto" : "Manual")</td>
+                            <td class="num">@(row.DueDay?.ToString() ?? "Flux")</td>
+                            <td class="num fl-num">@Format.Money(row.Estimated)</td>
+                            <td class="num fl-num">@Format.Money(ActualFor(row))</td>
+                            @foreach (var m in _view.Months)
+                            {
+                                var cell = row.Cells.GetValueOrDefault(m);
+                                var late = IsLate(row, m, cell);
+                                <td class="fl-sheet-cellwrap @(m == _view.SelectedMonth ? "fl-sheet-cur" : null)">
+                                    <button class="fl-sheet-cell @(cell?.Paid == true ? "paid" : late ? "late" : null)"
+                                            aria-pressed="@(cell?.Paid == true ? "true" : "false")"
+                                            aria-label="@CellLabel(row, m, cell, late)"
+                                            title="@CellTitle(cell)"
+                                            @onclick="() => ToggleAsync(row, m, cell)">
+                                        @(cell?.Paid == true ? (cell.Source == "Auto" ? "✓ auto" : "✓") : late ? "!" : "·")
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                    @foreach (var (label, est, act) in TotalLines(section.Totals))
+                    {
+                        <tr class="fl-sheet-total">
+                            <th scope="row" colspan="5" class="fl-sheet-name">@label</th>
+                            <td class="num fl-num">@Format.Money(est)</td>
+                            <td class="num fl-num">@Format.Money(act)</td>
+                            <td colspan="@_view.Months.Count"></td>
+                        </tr>
+                    }
+                </tbody>
+            }
+            <tfoot>
+                <tr class="fl-sheet-grand">
+                    <th scope="row" colspan="5" class="fl-sheet-name">Grand total</th>
+                    <td class="num fl-num">@Format.Money(_view.GrandTotals.Estimated.Total)</td>
+                    <td class="num fl-num">@Format.Money(_view.GrandTotals.Actual.Total)</td>
+                    <td colspan="@_view.Months.Count"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+}
+
+@code {
+    private SheetViewDto? _view;
+    private DateOnly _selected = FirstOfMonth(DateOnly.FromDateTime(DateTime.Today));
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+
+    private double PaidPercent => _view is { Summary.TotalCount: > 0 } ? 100.0 * _view.Summary.PaidCount / _view.Summary.TotalCount : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Backstop for the sync/import hooks: tick anything that has been paid since the last visit.
+        try { await ApiClient.RefreshSheetAsync(); }
+        catch (ApiClientException ex) { Logger.LogWarning(ex, "Sheet refresh on load failed"); }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _view = await ApiClient.GetSheetAsync(_selected.ToString("yyyy-MM"));
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+            Logger.LogError(ex, "Failed to load sheet");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ShiftAsync(int months)
+    {
+        _selected = _selected.AddMonths(months);
+        await LoadAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        try
+        {
+            var r = await ApiClient.RefreshSheetAsync();
+            Snackbar.Add(r is { Marked: > 0 } or { Cleared: > 0 }
+                ? $"Updated: {r.Marked} ticked, {r.Cleared} cleared."
+                : "Already up to date.", Severity.Info);
+            await LoadAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleAsync(SheetRowDto row, string month, SheetCellDto? cell)
+    {
+        try
+        {
+            await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: cell?.Paid != true);
+            await LoadAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task EditAsync(SheetRowDto? row, string? section)
+    {
+        var sections = _view?.Sections.Select(s => s.Name).ToList() ?? [];
+        if (!sections.Contains("Bills")) sections.Insert(0, "Bills");
+        var dialog = await DialogService.ShowAsync<SheetBillDialog>(row is null ? "Add row" : "Edit row",
+            new DialogParameters<SheetBillDialog>
+            {
+                { x => x.Row, row }, { x => x.RowSection, section }, { x => x.Sections, sections },
+            }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is not { Canceled: false }) return;
+        try
+        {
+            switch (result.Data)
+            {
+                case SaveBillRequest req:
+                    await ApiClient.SaveSheetBillAsync(row?.Id, req);
+                    break;
+                case string s when s == SheetBillDialog.DeleteResult && row is not null:
+                    await ApiClient.DeleteSheetBillAsync(row.Id);
+                    break;
+            }
+            await LoadAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        var dialog = await DialogService.ShowAsync<SheetImportDialog>("Import",
+            new DialogParameters<SheetImportDialog> { { x => x.HasExisting, _view is { Sections.Count: > 0 } } },
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: SheetImportResult r })
+        {
+            Snackbar.Add($"Imported {r.Bills} rows in {r.Sections} section(s), {r.PaidMarks} paid marks.", Severity.Success);
+            await RefreshAsync();
+        }
+    }
+
+    // ── Display helpers ──────────────────────────────────────────────────────
+
+    private static DateOnly FirstOfMonth(DateOnly d) => new(d.Year, d.Month, 1);
+
+    private static string MonthTitle(DateOnly d) => d.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string ShortMonth(string key) =>
+        DateOnly.ParseExact(key + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+            .ToString("MMM yy", System.Globalization.CultureInfo.InvariantCulture);
+
+    private decimal ActualFor(SheetRowDto row) =>
+        _view is not null && row.Cells.GetValueOrDefault(_view.SelectedMonth) is { Paid: true, Amount: { } a } ? a : row.Actual ?? row.Estimated;
+
+    private static string Flags(SheetRowDto r) =>
+        string.Concat(r.IsDebt ? "D" : "", r.IsPerpetual ? "P" : "", r.IsOptional ? "O" : "", r.IsBusiness ? "B" : "");
+
+    /// <summary>A row is late when its due day has passed this calendar month and nothing marks it paid.</summary>
+    private static bool IsLate(SheetRowDto row, string month, SheetCellDto? cell)
+    {
+        if (cell is not null || row.DueDay is not { } due) return false;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        return month == today.ToString("yyyy-MM") && due < today.Day;
+    }
+
+    private static string CellLabel(SheetRowDto row, string month, SheetCellDto? cell, bool late) =>
+        $"{row.Name}, {ShortMonth(month)}: {(cell?.Paid == true ? "paid" : late ? "overdue, not marked paid" : "not paid")}. Activate to {(cell?.Paid == true ? "mark unpaid" : "mark paid")}.";
+
+    private static string? CellTitle(SheetCellDto? cell) =>
+        cell?.Paid == true
+            ? $"{(cell.Source == "Auto" ? "Matched payment" : "Marked by you")}{(cell.Amount is { } a ? $" · {Format.Money(a)}" : "")}{(cell.PaidOn is { } d ? $" · {Format.DayMonth(d)}" : "")}"
+            : null;
+
+    private static IEnumerable<(string Label, decimal Est, decimal Act)> TotalLines(SheetTotalsDto t)
+    {
+        yield return ("Total", t.Estimated.Total, t.Actual.Total);
+        yield return ("Total optional", t.Estimated.Optional, t.Actual.Optional);
+        yield return ("Total required", t.Estimated.Required, t.Actual.Required);
+        yield return ("Total personal", t.Estimated.Personal, t.Actual.Personal);
+        yield return ("Total business", t.Estimated.Business, t.Actual.Business);
+    }
+}
