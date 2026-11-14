@@ -348,7 +348,7 @@ public static class QueryChartSvg
             for (var i = 0; i < n; i++)
             {
                 var top = 8 + i * rowH;
-                var label = m.Categories[i].Length > 20 ? m.Categories[i][..19] + "…" : m.Categories[i];
+                var label = m.Categories[i].Length > 17 ? m.Categories[i][..16] + "…" : m.Categories[i];
                 sb.Append($"<text x='{labelW - 8}' y='{top + rowH / 2 + 4:F1}' text-anchor='end' font-size='12' fill='var(--fl-text)'>{Esc(label)}</text>");
                 double pos = 0, neg = 0;
                 var barH = Math.Max(4, (rowH - 4) / (stacked ? 1 : sc) - 2);

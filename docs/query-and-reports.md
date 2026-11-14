@@ -28,7 +28,7 @@ transactions
 
 Aggregates: `count()`, `sum`, `avg`, `min`, `max`, `dcount`, `countif(cond)`, `sumif(x, cond)`.
 Scalar functions: `ago(30d)`, `today()`, `month(d)` (`2026-03`), `quarter`, `year`, `week`, `startofmonth`,
-`dayofweek`, `datediff`, `abs`, `round`, `floor`, `ceil`, `lower`, `upper`, `len`, `strcat`, `coalesce`, `iif`.
+`dayofweek` (`1 Mon`…`7 Sun`), `datediff`, `abs`, `round`, `floor`, `ceil`, `lower`, `upper`, `len`, `strcat`, `coalesce`, `iif`.
 Durations: `30d`, `2w`, `6mo`, `1y`. Dates compare with `"2026-01-01"` strings. `//` starts a comment.
 
 Datasets: `transactions` (posted + pending; planned forecast rows excluded), `accounts`, `assets`.

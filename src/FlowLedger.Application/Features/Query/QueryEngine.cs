@@ -586,7 +586,10 @@ internal sealed class EvalContext(DateOnly today)
                 return D(0) is { } w ? w.AddDays(-(((int)w.DayOfWeek + 6) % 7)) : null; // Monday
             case "startofmonth": Arity(1, 1); return D(0) is { } sm ? new DateOnly(sm.Year, sm.Month, 1) : null;
             case "startofyear": Arity(1, 1); return D(0) is { } sy ? new DateOnly(sy.Year, 1, 1) : null;
-            case "dayofweek": Arity(1, 1); return D(0) is { } dw ? dw.DayOfWeek.ToString() : null;
+            case "dayofweek":
+                Arity(1, 1);
+                // "1 Mon" … "7 Sun": ISO order, so grouped output sorts Monday first.
+                return D(0) is { } dw ? $"{((int)dw.DayOfWeek + 6) % 7 + 1} {dw.DayOfWeek.ToString()[..3]}" : null;
             case "dayofmonth": Arity(1, 1); return D(0) is { } dm ? (decimal)dm.Day : null;
             case "abs": Arity(1, 1); return N(0) is { } a ? Math.Abs(a) : null;
             case "floor": Arity(1, 1); return N(0) is { } f ? Math.Floor(f) : null;

@@ -140,9 +140,9 @@ else
 
     </MudGrid>
 
-    <MudGrid>
+    <div class="fl-masonry">
         <!-- Balance Projection Chart -->
-        <MudItem xs="12" md="8">
+        <div class="fl-masonry-item">
             <MudCard>
                 <MudCardHeader>
                     <CardHeaderContent>
@@ -169,11 +169,11 @@ else
                     }
                 </MudCardContent>
             </MudCard>
-        </MudItem>
+        </div>
 
         <!-- Upcoming Flows -->
-        <MudItem xs="12" md="4">
-            <MudCard Style="height:100%">
+        <div class="fl-masonry-item">
+            <MudCard>
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Upcoming Flows</MudText>
@@ -208,12 +208,12 @@ else
                     }
                 </MudCardContent>
             </MudCard>
-        </MudItem>
+        </div>
 
         @if (_assetSummary is { AssetCount: > 0 })
         {
-            <MudItem xs="12" md="6">
-                <MudCard Class="fl-card-hover" Style="height:100%">
+            <div class="fl-masonry-item">
+                <MudCard Class="fl-card-hover">
                     <MudCardHeader>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Assets</MudText>
@@ -256,28 +256,28 @@ else
                         }
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
+            </div>
         }
 
         @if (_activity is not null)
         {
-            <MudItem xs="12" sm="6" md="3">
+            <div class="fl-masonry-item">
                 <MudCard Class="fl-card-hover">
                     <MudCardContent>
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Money In · 30d</MudText>
                         <MudText Typo="Typo.h5" Class="fl-num" Color="Color.Success">@Format.Money(_activity.MoneyInLast30Days)</MudText>
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
+            </div>
+            <div class="fl-masonry-item">
                 <MudCard Class="fl-card-hover">
                     <MudCardContent>
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Money Out · 30d</MudText>
                         <MudText Typo="Typo.h5" Class="fl-num">@Format.Money(_activity.MoneyOutLast30Days)</MudText>
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
+            </div>
+            <div class="fl-masonry-item">
                 <MudCard Class="fl-card-hover">
                     <MudCardContent>
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Pending</MudText>
@@ -285,8 +285,8 @@ else
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@_activity.Pending.Count transaction(s) not yet posted</MudText>
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
+            </div>
+            <div class="fl-masonry-item">
                 <MudCard Class="fl-card-hover">
                     <MudCardContent>
                         <MudText Typo="Typo.overline" Color="@(_activity.Suspicious.Count > 0 ? Color.Warning : Color.Success)">Needs a Look</MudText>
@@ -296,11 +296,11 @@ else
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Duplicates, outliers, new merchants</MudText>
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
+            </div>
 
             @if (_activity.Suspicious.Count > 0)
             {
-                <MudItem xs="12">
+                <div class="fl-masonry-item">
                     <MudCard>
                         <MudCardHeader>
                             <CardHeaderContent>
@@ -327,24 +327,24 @@ else
                             }
                         </MudCardContent>
                     </MudCard>
-                </MudItem>
+                </div>
             }
 
-            <MudItem xs="12" md="6">
+            <div class="fl-masonry-item">
                 @ActivityList("Recent Activity", "Latest posted transactions across all accounts", _activity.RecentPosted, "No posted transactions yet.")
-            </MudItem>
-            <MudItem xs="12" md="6">
+            </div>
+            <div class="fl-masonry-item">
                 @ActivityList("Pending", "Authorised but not yet posted", _activity.Pending, "Nothing pending.")
-            </MudItem>
-            <MudItem xs="12">
+            </div>
+            <div class="fl-masonry-item">
                 @ActivityList("Large Transactions", $"Last 30 days, at or above {Format.Money(_activity.LargeThreshold)}", _activity.Large, "No unusually large transactions.")
-            </MudItem>
+            </div>
         }
 
         <!-- Overdraft Warnings detail -->
         @if (_overdraftWarnings.Count > 0)
         {
-            <MudItem xs="12">
+            <div class="fl-masonry-item fl-masonry-span">
                 <MudAlert Severity="Severity.Error" aria-live="assertive">
                     <MudText Typo="Typo.subtitle2">Overdraft Risk Detected</MudText>
                     @foreach (var w in _overdraftWarnings)
@@ -356,9 +356,9 @@ else
                         </MudText>
                     }
                 </MudAlert>
-            </MudItem>
+            </div>
         }
-    </MudGrid>
+    </div>
 }
 
 @code {
