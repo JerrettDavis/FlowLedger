@@ -29,11 +29,10 @@ after a mapping bug — is unacceptable.
 
 ## Follow-ups
 - DONE: `MxArchiveReplayHandler` serves archived responses (by method+path+query, newest wins) through the real client/mapper; wiring it as the HttpClient handler gives a zero-cost re-ingest. Selected via `Mx:Provider:ReplayArchivePath`. Verified live: 910 sandbox transactions replayed into a fresh tenant with MX unreachable.
-- Pending→posted duplicate handling for MX (creates duplicates, does not lose data).
+- DONE: Pending→posted handling. Same provider id: the pending row is settled in place. New id: a posted record absorbs a matching pending row (same account/amount/direction, pending date within 7 days before posting) and adopts its fingerprint. Covered by `PendingSettlementTests`.
 
 ## Verification (MX sandbox, 2026-11-13)
 - Sync 1 added 910 transactions / 6 accounts; sync 2 added 0 (310 re-read in the 30-day overlap, all deduped).
 - Cursor persisted as a date watermark (page 1, from today-30d). 31 raw payloads + sidecars archived; sandbox tenant isolated from the simulated demo tenant.
 - Widget member matched the single MX member; the saved connection resolves PENDING to it on each sync.
-- Known gap: the PENDING placeholder is re-resolved via ListMembers every sync instead of being persisted once.
-- Known gap: pending->posted duplicate handling.
+- Resolved: `IMemberIdResolver` lets the sync persist the real member id once, so later syncs skip ListMembers.

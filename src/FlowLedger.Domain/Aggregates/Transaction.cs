@@ -160,6 +160,27 @@ public sealed class Transaction : AggregateRoot
         RaiseEvent(new TransactionMatchedToPlan(TransactionId, TenantId, occurrenceId, confidence));
     }
 
+    /// <summary>
+    /// Settles a pending transaction once the provider reports it as posted. Optionally adopts the
+    /// posted record's fingerprint so later syncs dedupe against it. No-op unless currently Pending.
+    /// </summary>
+    public bool Settle(DateOnly postedDate, TransactionFingerprint? fingerprint = null)
+    {
+        if (Status != TransactionStatus.Pending)
+        {
+            return false;
+        }
+
+        PostedDate = postedDate;
+        Status = TransactionStatus.Posted;
+        if (fingerprint is not null)
+        {
+            Fingerprint = fingerprint;
+        }
+
+        return true;
+    }
+
     /// <summary>Marks the transaction as reconciled (user has confirmed it).</summary>
     public void Reconcile()
     {

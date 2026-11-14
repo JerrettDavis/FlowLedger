@@ -104,3 +104,13 @@ public interface IFinancialDataProvider
         ReadOnlyMemory<byte> rawBody,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Optional capability: providers whose stored member id can be a placeholder (e.g. MX before the
+/// Connect widget completes) resolve it once so the sync can persist the real id.
+/// </summary>
+public interface IMemberIdResolver
+{
+    /// <summary>Returns the resolved member id, or null if it is still unresolved / already final.</summary>
+    Task<string?> TryResolveMemberProviderIdAsync(string memberProviderId, CancellationToken cancellationToken = default);
+}

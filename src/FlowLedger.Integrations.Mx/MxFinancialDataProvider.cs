@@ -18,7 +18,7 @@ namespace FlowLedger.Integrations.Mx;
 /// single opaque id. The member ref's <c>ProviderId</c> is <c>{userGuid}|{memberGuid}</c> and each
 /// account's <c>ProviderId</c> is <c>{userGuid}|{accountGuid}</c> (see <see cref="MxCompositeId"/>).
 /// </summary>
-public sealed class MxFinancialDataProvider : IFinancialDataProvider
+public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdResolver
 {
     private readonly MxApiClient _client;
     private readonly MxWebhookVerifier _webhookVerifier;
@@ -58,6 +58,18 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider
 
         var members = await _client.ListMembersAsync(userGuid, ct).ConfigureAwait(false);
         return members.FirstOrDefault(m => m.Guid is not null)?.Guid;
+    }
+
+    public async Task<string?> TryResolveMemberProviderIdAsync(string memberProviderId, CancellationToken cancellationToken = default)
+    {
+        var (userGuid, guid) = MxCompositeId.Unpack(memberProviderId);
+        if (!string.Equals(guid, PendingMember, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var resolved = await ResolveMemberGuidAsync(userGuid, guid, cancellationToken).ConfigureAwait(false);
+        return resolved is null ? null : MxCompositeId.Pack(userGuid, resolved);
     }
 
     public ProviderCapabilities Capabilities =>
