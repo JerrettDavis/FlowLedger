@@ -35,6 +35,8 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<ProviderConnectionRecord> ProviderConnections => Set<ProviderConnectionRecord>();
     internal DbSet<AccountBalanceSnapshotRecord> BalanceSnapshots => Set<AccountBalanceSnapshotRecord>();
     internal DbSet<SavedReportRecord> SavedReports => Set<SavedReportRecord>();
+    internal DbSet<SheetBillRecord> SheetBills => Set<SheetBillRecord>();
+    internal DbSet<SheetPaymentRecord> SheetPayments => Set<SheetPaymentRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -67,6 +69,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ProviderConnectionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AccountBalanceSnapshotRecordConfiguration());
         modelBuilder.ApplyConfiguration(new SavedReportRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SheetBillRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SheetPaymentRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // If _tenantContext is null (design-time or test override), filters are
@@ -103,6 +107,12 @@ public sealed class FlowLedgerDbContext : DbContext
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
 
             modelBuilder.Entity<SavedReportRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
+
+            modelBuilder.Entity<SheetBillRecord>()
+                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
+
+            modelBuilder.Entity<SheetPaymentRecord>()
                 .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
         }
     }

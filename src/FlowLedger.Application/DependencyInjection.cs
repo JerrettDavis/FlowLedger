@@ -65,6 +65,11 @@ public static class DependencyInjection
         services.AddScoped<UpdateRecurringFlowHandler>();
         services.AddScoped<DeactivateRecurringFlowHandler>();
 
+        // ── Bill sheet (spreadsheet mode) ────────────────────────────────────────
+        services.AddScoped<FlowLedger.Application.Features.BillSheet.BillSheetService>();
+        services.AddScoped<FlowLedger.Application.Abstractions.ISheetAutoMarker>(
+            sp => sp.GetRequiredService<FlowLedger.Application.Features.BillSheet.BillSheetService>());
+
         // ── Handlers — Imports and Matching ──────────────────────────────────────
         services.AddScoped<MatchingEngine>();
         services.AddScoped<ImportTransactionsHandler>();
