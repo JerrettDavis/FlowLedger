@@ -102,7 +102,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
         var memberRef = await GetOrProvisionConnectionAsync(
-            tenantId, ct, allowProvision: _provider.ProviderName == "Simulated");
+            tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call
 
         // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
         if (_provider is IMemberIdResolver resolver)

@@ -6,6 +6,7 @@ using FlowLedger.Infrastructure.Storage;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
+using FlowLedger.Integrations.SimpleFin;
 using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -108,7 +109,19 @@ public static class DependencyInjection
         var mxOptions = configuration.GetSection(FinancialProviderOptions.SectionName).Get<FinancialProviderOptions>()
                         ?? new FinancialProviderOptions();
 
-        if (mxOptions.Enabled)
+        var simpleFinEnabled = bool.TryParse(configuration["SimpleFin:Enabled"], out var sf) && sf;
+
+        if (simpleFinEnabled)
+        {
+            // SimpleFIN Bridge (personal real-bank aggregation). Mutually exclusive with MX.
+            if (mxOptions.Enabled)
+            {
+                throw new InvalidOperationException("Mx:Enabled and SimpleFin:Enabled cannot both be true.");
+            }
+
+            services.AddSimpleFinProvider(configuration);
+        }
+        else if (mxOptions.Enabled)
         {
             services.AddMxProvider(configuration);
         }

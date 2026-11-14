@@ -45,6 +45,17 @@ static IResourceBuilder<T> WithMxConfig<T>(
             resource = resource.WithEnvironment($"Mx__{key}", value);
         }
     }
+
+    // SimpleFIN Bridge: same safe-by-default rule. Real bank data only when the AppHost config says so.
+    resource = resource.WithEnvironment("SimpleFin__Enabled", configuration["SimpleFin:Enabled"] ?? "false");
+    foreach (var key in new[] { "AccessUrl", "HistoryDays", "OverlapDays" })
+    {
+        var value = configuration[$"SimpleFin:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"SimpleFin__{key}", value);
+        }
+    }
     return resource;
 }
 
