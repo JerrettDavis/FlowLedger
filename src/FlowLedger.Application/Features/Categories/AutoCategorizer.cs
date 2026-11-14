@@ -20,24 +20,33 @@ public static class AutoCategorizer
     // long distinctive stems (e.g. "fuel") deliberately match inside compound names such as "QuickFuel".
     private static readonly Rule[] Rules =
     [
+        // Money moving between the user's own accounts / paying off cards comes first, so words like "online"
+        // in "ONLINE PAYMENT, THANK YOU" can never be mistaken for a purchase.
+        R(TransferCategory, @"transfer|payment,? thank you|autopay|credit card payment|credit crd|card online payment|\bepay\b|online payment|monthly payment|additional principal"),
+        // Brokerage activity is not income or spending: reinvestments and trades just move money within the portfolio.
+        R("Investments/Trades", @"dividend reinvest|reinvest|^\s*(buy|sell)\b|\bsell\s*-|\bbuy\s*-"),
         R("Income/Interest", @"interest|dividend", "Credit"),
         R("Income/Paycheck", @"payroll|salary|direct dep|paycheck|employer", "Credit"),
+        R("Income/Deposits", @"chk deposit|mobile deposit|deposit", "Credit"),
+        R("Fees/Bank Fees", @"atm usage fee|atm fee|service charge|overdraft|maintenance fee|\bfee\b"),
         R("Housing/Mortgage", @"mortgage|home loan"),
         R("Housing/Rent", @"\brent\b|landlord|property mgmt|\bhoa\b"),
-        R("Bills/Insurance", @"insurance|geico|state farm|allstate"),
-        R("Health/Medical", @"medical|clinic|dental|dentist|hospital|pharmacy|\bcvs|walgreens|health(?!y)|physician"),
-        R("Bills/Utilities", @"electric|utilit|\bwater\b|\bpower\b|energy|sewer|trash"),
-        R("Bills/Internet & Phone", @"internet|wireless|mobile|comcast|verizon|at&t|t-mobile|spectrum|broadband|fiber"),
-        R("Subscriptions", @"stream|music|storage|netflix|spotify|hulu|disney\+|cloud|subscription|fittrack|prime video|patreon"),
-        R("Transport/Fuel", @"fuel|gas station|\bshell\b|chevron|exxon|\bbp\b|sunoco|quicktrip|petrol"),
+        R("Housing/Home Maintenance", @"mowing|\blawn\b|landscap|home depot|lowe'?s|plumb|\bhvac\b|pest|goodleap"),
+        R("Bills/Insurance", @"insurance|geico|state farm|allstate|prudential"),
+        R("Health/Medical", @"medical|clinic|dental|dentist|hospital|pharmacy|\bcvs|walgreens|health(?!y)|physician|my ?chart|moodcenter|\badhd\b|therap"),
+        R("Bills/Utilities", @"electric|utilit|\bwater\b|\bpower\b|\bpwr\b|natural gas|energy|sewer|trash|city of"),
+        R("Bills/Internet & Phone", @"internet|wireless|mobile|comcast|verizon|\batt\b|at&t|t-mobile|spectrum|broadband|fiber"),
+        R("Subscriptions", @"stream|music|storage|netflix|spotify|hulu|disney\+|cloud|subscription|fittrack|prime video|patreon|anthropic|openai|chatgpt|ghost\.org|invoiceninja|nanonoble|simplefin"),
+        R("Transport/Auto Loan", @"\bhmf\b|hmfusa|auto fin|toyota fin|honda fin|ford credit|stellantis|ally auto"),
+        R("Transport/Fuel", @"fuel|gas station|\bshell\b|chevron|exxon|\bbp\b|sunoco|quicktrip|quiktrip|\bqt\b|petrol"),
         R("Transport/Public & Rideshare", @"transit|rideshare|\buber|\blyft|shuttle|\bmetro|\btaxi|\btrain\b|amtrak|\bbus\b"),
         R("Transport/Parking", @"parking|garage|\btoll\b|\bpark\b"),
-        R("Food/Groceries", @"grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|aldi|costco|publix|wegmans|instacart|bluejay"),
-        R("Food/Dining", @"cafe|coffee|bistro|grill|pizza|taco|noodle|restaurant|kitchen|diner|\bbar\b|eatery|starbucks|mcdonald|chipotle|doordash|grubhub|burger|sushi|bakery|tavern"),
-        R("Entertainment", @"cinema|movie|theater|theatre|concert|ticket|\bgames?\b|\bsteam\b|bowling"),
+        R("Family/Kids & School", @"lineleader|scholastic|swim school|\bschool\b|playtime|daycare|tutor"),
+        R("Food/Groceries", @"grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|aldi|costco|publix|wegmans|instacart|bluejay|sams club"),
+        R("Food/Dining", @"cafe|coffee|bistro|grill|pizza|taco|noodle|restaurant|kitchen|diner|\bbar\b|eatery|starbucks|mcdonald|chipotle|doordash|grubhub|burger|sushi|bakery|tavern|quiznos|chicken|waffle|moxie|creame|\bchef\b|senor|\bida red\b|dipper|brau"),
+        R("Entertainment", @"cinema|movie|theater|theatre|concert|ticket|\bgames?\b|\bsteam\b|bowling|museum|cigar"),
         R("Travel", @"airline|airways|hotel|airbnb|resort|expedia|\bdelta\b|\bunited\b"),
-        R("Shopping", @"online|electronics|shop|amazon|\btarget\b|walmart|best buy|ebay|etsy|store|mart\b|market"),
-        R(TransferCategory, @"transfer|payment thank you|autopay|credit card payment"),
+        R("Shopping", @"electronics|shop|amazon|amzn|mktpl|\btarget\b|walmart|wm supercenter|best buy|ebay|etsy|store|mart\b|market"),
     ];
 
     /// <summary>Suggested category path, or null when nothing matches.</summary>

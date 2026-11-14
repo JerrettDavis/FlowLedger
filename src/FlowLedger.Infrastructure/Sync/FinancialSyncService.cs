@@ -244,7 +244,17 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             if (page.Items.Count > 0)
             {
                 // Build fingerprints for all items in this page
+                // Banks occasionally report $0.00 informational rows (holds, fee reversals). The domain forbids
+                // zero-amount transactions, and one such row must never abort the whole sync, so skip them.
+                var zeroAmount = page.Items.Count(pt => pt.Amount.Amount == 0m);
+                if (zeroAmount > 0)
+                {
+                    _logger.LogInformation("Skipping {Count} zero-amount transaction(s) on one account.", zeroAmount);
+                    skipped += zeroAmount;
+                }
+
                 var fingerprintMap = page.Items
+                    .Where(pt => pt.Amount.Amount != 0m)
                     .Select(pt => (
                         ProviderTx: pt,
                         Fingerprint: BuildFingerprint(account.AccountId, pt)))
@@ -318,7 +328,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 {
                     _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
                 }
-                skipped += page.Items.Count - toInsert.Count - settled;
+                skipped += fingerprintMap.Count - toInsert.Count - settled;
             }
 
             cursor = page.NextCursor;

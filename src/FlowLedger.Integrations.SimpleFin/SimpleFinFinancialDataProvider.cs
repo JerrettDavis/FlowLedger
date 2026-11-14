@@ -101,7 +101,8 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
     private async Task<SfResponse> FetchCoreAsync(CancellationToken ct)
     {
-        var days = Math.Clamp(_options.HistoryDays, 1, 90);
+        // SimpleFIN rejects ranges "exceeding" 90 days; stay one day inside so clock skew can't trip the cap.
+        var days = Math.Clamp(_options.HistoryDays, 1, 89);
         var start = DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeSeconds();
         using var resp = await _http.GetAsync($"accounts?start-date={start}&pending=1", ct).ConfigureAwait(false);
 
@@ -129,6 +130,8 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
                    ?? throw new FatalProviderException("SimpleFIN returned an empty body.");
         body.Accounts ??= [];
 
+        // Informational notices (e.g. the range being capped) are not failures.
+        body.Errors = body.Errors?.Where(e => !e.Contains("capped", StringComparison.OrdinalIgnoreCase)).ToList();
         if (body.Errors is { Count: > 0 })
         {
             // Messages name institutions (e.g. "needs attention"); log them but never the access URL.
