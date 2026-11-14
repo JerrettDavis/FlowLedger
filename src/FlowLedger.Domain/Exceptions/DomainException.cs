@@ -64,3 +64,9 @@ public sealed class SplitAmountMismatchException : DomainException
     public SplitAmountMismatchException(decimal partsTotal, decimal transactionTotal, string currency)
         : base($"Split parts total {partsTotal} {currency} does not equal transaction total {transactionTotal} {currency}.") { }
 }
+
+/// <summary>Thrown when an asset invariant is violated (negative value, bad rate, too many fields…).</summary>
+public sealed class InvalidAssetException : DomainException
+{
+    public InvalidAssetException(string message) : base(message) { }
+}
