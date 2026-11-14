@@ -1,0 +1,139 @@
+@page "/reports"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@using FlowLedger.Web.Components.Shared
+@inject FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Reports — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4 fl-enter">
+    <div>
+        <MudText Typo="Typo.h4">Reports</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Saved views and multi-panel reports, plus ready-made presets.</MudText>
+    </div>
+    <MudButton Href="query" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.QueryStats">New query</MudButton>
+</div>
+
+@if (_loading)
+{
+    <CardSkeleton Height="80px" Count="4" />
+}
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+@if (!_loading && _error is null)
+{
+    @Section("My reports and views", _reports.Where(r => !r.IsPreset).ToList(), "Nothing saved yet. Run a query and use “Save view” or “Add to report”.")
+    @Section("Preset reports", _reports.Where(r => r.IsPreset && r.Kind == "Report").ToList(), null)
+    @Section("Preset views", _reports.Where(r => r.IsPreset && r.Kind == "View").ToList(), null)
+}
+
+@code {
+    private List<SavedReportDto> _reports = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _reports = await ApiClient.GetReportsAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RenderFragment Section(string title, List<SavedReportDto> items, string? emptyText) => __builder =>
+    {
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">@title</MudText>
+        @if (items.Count == 0 && emptyText is not null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@emptyText</MudText>
+        }
+        <MudGrid>
+            @foreach (var r in items)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Class="fl-card-hover" Style="height:100%">
+                        <MudCardContent>
+                            <div class="d-flex align-center justify-space-between">
+                                <MudText Typo="Typo.subtitle1">@r.Name</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@(r.Kind == "Report" ? Color.Primary : Color.Default)">
+                                    @r.Kind@(r.Kind == "Report" ? $" · {r.Panels.Count}" : "")
+                                </MudChip>
+                            </div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">@(r.Description ?? string.Join(", ", r.Panels.Select(p => p.Title)))</MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Href="@($"reports/{Uri.EscapeDataString(r.Id)}")" Color="Color.Primary" Size="Size.Small">Open</MudButton>
+                            @if (r.Kind == "View")
+                            {
+                                <MudButton Href="@($"query?view={Uri.EscapeDataString(r.Id)}")" Size="Size.Small">Edit query</MudButton>
+                            }
+                            @if (r.IsPreset)
+                            {
+                                <MudButton OnClick="() => CopyAsync(r)" Size="Size.Small">Save a copy</MudButton>
+                            }
+                            else
+                            {
+                                <MudSpacer />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="@($"Delete {r.Name}")"
+                                               OnClick="() => DeleteAsync(r)" />
+                            }
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    };
+
+    private async Task CopyAsync(SavedReportDto preset)
+    {
+        try
+        {
+            var copy = await ApiClient.SaveReportAsync(new SaveReportRequest($"{preset.Name} (copy)", preset.Description, preset.Kind, preset.Panels));
+            _reports = await ApiClient.GetReportsAsync();
+            Snackbar.Add($"Saved “{copy?.Name}”", Severity.Success);
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeleteAsync(SavedReportDto r)
+    {
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete",
+            new DialogParameters<ConfirmDialog>
+            {
+                { x => x.Title, "Delete " + r.Kind.ToLowerInvariant() },
+                { x => x.ContentText, $"Delete “{r.Name}”? This can't be undone." },
+                { x => x.ConfirmText, "Delete" },
+            });
+        if ((await dialog.Result) is not { Canceled: false })
+        {
+            return;
+        }
+
+        try
+        {
+            await ApiClient.DeleteReportAsync(Guid.Parse(r.Id));
+            _reports.Remove(r);
+            Snackbar.Add("Deleted", Severity.Success);
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,52 @@
+@using System.Text.Json
+@using FlowLedger.Web.ApiClient
+@using FlowLedger.Web.Shared
+
+<div class="fl-result-table-wrap">
+    <table class="fl-result-table">
+        <thead>
+            <tr>
+                @foreach (var c in Result.Columns)
+                {
+                    <th scope="col" class="@(c.Type == "number" ? "num" : "")">@c.Name</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Result.Rows.Take(MaxRows))
+            {
+                <tr>
+                    @for (var i = 0; i < Result.Columns.Count; i++)
+                    {
+                        var cell = row[i];
+                        <td class="@(Result.Columns[i].Type == "number" ? "num fl-num" : "")">@Display(cell, Result.Columns[i].Type)</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Result.Rows.Count > MaxRows)
+    {
+        <MudText Typo="Typo.caption" Color="Color.Secondary">Showing @MaxRows of @Result.Rows.Count rows.</MudText>
+    }
+    @if (Result.Rows.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-2">No rows.</MudText>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public QueryResultDto Result { get; set; } = default!;
+    [Parameter] public int MaxRows { get; set; } = 500;
+
+    private static string Display(JsonElement e, string type)
+    {
+        if (e.ValueKind == JsonValueKind.Number)
+        {
+            var d = e.GetDecimal();
+            return d == Math.Floor(d) ? d.ToString("N0") : d.ToString("N2");
+        }
+
+        return ChartModel.CellText(e);
+    }
+}

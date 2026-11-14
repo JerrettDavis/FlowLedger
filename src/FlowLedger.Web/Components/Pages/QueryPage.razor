@@ -1,0 +1,451 @@
+@page "/query"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@using FlowLedger.Web.Components.Shared
+@inject FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Query — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4 fl-enter">
+    <div>
+        <MudText Typo="Typo.h4">Query</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Pipe-style queries over your own data. Build a result, pick a chart, save it as a view or add it to a report.
+        </MudText>
+    </div>
+    <MudButton Href="reports" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Assessment">Reports</MudButton>
+</div>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="0" Class="pa-3 mb-4" Style="border: 1px solid var(--mud-palette-divider);">
+            @if (_loadedTitle is not null)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Editing: @_loadedTitle</MudText>
+            }
+            <div class="fl-query-editor" @onkeydown="OnKeyDown">
+                <MudTextField T="string" @bind-Value="_query" Lines="9" Variant="Variant.Outlined" Immediate="true"
+                              Placeholder="transactions | where date >= ago(30d) | summarize total = sum(amount) by category | sort by total desc"
+                              aria-label="Query editor" />
+            </div>
+            @if (_queryError is not null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-1" aria-live="assertive">@_queryError</MudText>
+            }
+            <div class="d-flex flex-wrap gap-2 mt-3 align-center">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RunAsync" Disabled="_running"
+                           StartIcon="@Icons.Material.Filled.PlayArrow">Run (Ctrl+Enter)</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="SaveViewAsync" Disabled="@(_result is null)"
+                           StartIcon="@Icons.Material.Filled.Save">@(EditingView ? "Update view" : "Save view")</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="AddToReportAsync" Disabled="@(_result is null)"
+                           StartIcon="@Icons.Material.Filled.PlaylistAdd">Add to report</MudButton>
+                <MudSpacer />
+                @if (_running)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                }
+                else if (_result is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_result.Rows.Count row(s) · @_result.ElapsedMs ms</MudText>
+                }
+            </div>
+        </MudPaper>
+
+        @if (_result is not null)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mb-4" Style="border: 1px solid var(--mud-palette-divider);">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6" sm="3">
+                        <MudSelect T="string" @bind-Value="_kind" Label="Display" Dense="true" aria-label="Visualization">
+                            @foreach (var k in Kinds)
+                            {
+                                <MudSelectItem Value="@k.Key">@k.Value</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    @if (_kind != "table")
+                    {
+                        <MudItem xs="6" sm="3">
+                            <MudSelect T="string" @bind-Value="_x" Label="X / category" Dense="true" Clearable="true" aria-label="X column">
+                                @foreach (var c in _result.Columns)
+                                {
+                                    <MudSelectItem Value="@c.Name">@c.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_y" Label="Values" Dense="true" aria-label="Value columns">
+                                @foreach (var c in _result.Columns.Where(c => c.Type == "number"))
+                                {
+                                    <MudSelectItem T="string" Value="@c.Name">@c.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudSelect T="string" @bind-Value="_seriesBy" Label="Split into series by" Dense="true" Clearable="true" aria-label="Series column">
+                                @foreach (var c in _result.Columns)
+                                {
+                                    <MudSelectItem Value="@c.Name">@c.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        @if (_kind is "column" or "bar" or "area")
+                        {
+                            <MudItem xs="12"><MudSwitch T="bool" @bind-Value="_stacked" Label="Stacked" Color="Color.Primary" /></MudItem>
+                        }
+                    }
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-3" Style="border: 1px solid var(--mud-palette-divider);">
+                <QueryChart Result="_result" Viz="CurrentViz()" />
+            </MudPaper>
+        }
+        else if (!_running && _error is null && _queryError is null)
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.QueryStats" Title="Write a query and run it"
+                        Description="Start from a preset on the right, or click a dataset column to build one." />
+        }
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudExpansionPanels MultiExpansion="true">
+            <MudExpansionPanel Text="Presets and saved views" Expanded="true">
+                @if (_reports.Count == 0)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Loading…</MudText>
+                }
+                @foreach (var group in _reports.Where(r => r.Kind == "View").GroupBy(r => r.IsPreset).OrderBy(g => g.Key))
+                {
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">@(group.Key ? "Preset views" : "My views")</MudText>
+                    <MudList T="string" Dense="true" Class="pa-0">
+                        @foreach (var r in group)
+                        {
+                            <MudListItem T="string" OnClick="() => LoadViewAsync(r)" Text="@r.Name" Icon="@Icons.Material.Filled.ShowChart" />
+                        }
+                    </MudList>
+                }
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Datasets and columns" Expanded="true">
+                @if (_schema is not null)
+                {
+                    @foreach (var d in _schema.Datasets)
+                    {
+                        <MudText Typo="Typo.subtitle2">
+                            <MudLink OnClick="() => Insert(d.Name)">@d.Name</MudLink>
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">@d.Description</MudText>
+                        <div class="d-flex flex-wrap gap-1 mb-3">
+                            @foreach (var c in d.Columns)
+                            {
+                                <MudTooltip Text="@($"{c.Type}: {c.Description}")">
+                                    <MudChip T="string" Size="Size.Small" OnClick="() => Insert(c.Name)">@c.Name</MudChip>
+                                </MudTooltip>
+                            }
+                        </div>
+                    }
+                }
+            </MudExpansionPanel>
+            <MudExpansionPanel Text="Language cheat sheet">
+                <pre class="fl-cheat">@CheatSheet</pre>
+                @if (_schema is not null)
+                {
+                    <MudText Typo="Typo.overline" Class="mt-2">Aggregates</MudText>
+                    <MudText Typo="Typo.caption">@string.Join(", ", _schema.Aggregates)</MudText>
+                    <MudText Typo="Typo.overline" Class="mt-2">Functions</MudText>
+                    <MudText Typo="Typo.caption">@string.Join(", ", _schema.Functions)</MudText>
+                }
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery(Name = "view")] public string? ViewId { get; set; }
+    [SupplyParameterFromQuery(Name = "report")] public string? ReportId { get; set; }
+    [SupplyParameterFromQuery(Name = "panel")] public int? PanelIndex { get; set; }
+
+    private static readonly Dictionary<string, string> Kinds = new()
+    {
+        ["table"] = "Table", ["column"] = "Column", ["bar"] = "Bar", ["line"] = "Line (multi-trend)", ["area"] = "Area", ["pie"] = "Donut",
+    };
+
+    private const string CheatSheet = """
+        dataset
+        | where cond and cond
+        | extend name = expr
+        | project a, b, c = expr
+        | summarize total = sum(x), n = count()
+            by month = month(date), category
+        | sort by total desc
+        | top 10 by total
+        | take 100
+        | distinct category
+        | count
+
+        Durations: 30d 2w 6mo 1y
+        Compare:   == != < <= > >= contains
+                   startswith, in (..), between(a, b)
+        """;
+
+    private string _query = "transactions\n| where direction == \"Debit\" and date >= ago(90d)\n| summarize total = sum(amount), n = count() by category\n| sort by total desc\n| take 12";
+    private QueryResultDto? _result;
+    private QuerySchemaDto? _schema;
+    private List<SavedReportDto> _reports = [];
+    private string? _error;
+    private string? _queryError;
+    private bool _running;
+    private string _kind = "table";
+    private string? _x;
+    private IReadOnlyCollection<string> _y = [];
+    private string? _seriesBy;
+    private bool _stacked;
+    private string? _loadedTitle;
+    private SavedReportDto? _loadedView;
+    private string? _handledKey;
+
+    private bool EditingView => _loadedView is { IsPreset: false, Kind: "View" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _schema = await ApiClient.GetQuerySchemaAsync();
+            _reports = await ApiClient.GetReportsAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{ViewId}|{ReportId}|{PanelIndex}";
+        if (key == "||" || key == _handledKey)
+        {
+            return;
+        }
+
+        _handledKey = key;
+        if (ViewId is not null)
+        {
+            var view = await SafeGetAsync(ViewId);
+            if (view is { Panels.Count: > 0 })
+            {
+                _loadedView = view;
+                await LoadPanelAsync(view.Panels[0], view.Name);
+            }
+        }
+        else if (ReportId is not null && PanelIndex is { } i)
+        {
+            var report = await SafeGetAsync(ReportId);
+            if (report is not null && i >= 0 && i < report.Panels.Count)
+            {
+                _loadedView = null;
+                await LoadPanelAsync(report.Panels[i], $"{report.Name} / {report.Panels[i].Title}");
+            }
+        }
+    }
+
+    private async Task<SavedReportDto?> SafeGetAsync(string id)
+    {
+        try
+        {
+            return await ApiClient.GetReportAsync(id);
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+            return null;
+        }
+    }
+
+    private async Task LoadViewAsync(SavedReportDto r)
+    {
+        _loadedView = r;
+        await LoadPanelAsync(r.Panels[0], r.Name);
+    }
+
+    private async Task LoadPanelAsync(ReportPanelDto panel, string title)
+    {
+        _query = panel.Query;
+        _loadedTitle = title;
+        _kind = panel.Viz.Kind;
+        _x = panel.Viz.X;
+        _y = panel.Viz.Y ?? [];
+        _seriesBy = panel.Viz.SeriesBy;
+        _stacked = panel.Viz.Stacked;
+        await RunCoreAsync(keepViz: true);
+    }
+
+    private VizSpecDto CurrentViz() => new(_kind, _x, _y.ToList(), _seriesBy, _stacked);
+
+    private static readonly string[] DatasetNames = ["transactions", "accounts", "assets"];
+
+    private void Insert(string text)
+    {
+        if (DatasetNames.Contains(text))
+        {
+            _query = text;
+            return;
+        }
+
+        _query = string.IsNullOrWhiteSpace(_query) ? text : _query.TrimEnd() + " " + text;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && e.Key == "Enter")
+        {
+            await RunAsync();
+        }
+    }
+
+    private Task RunAsync() => RunCoreAsync(keepViz: false);
+
+    private async Task RunCoreAsync(bool keepViz)
+    {
+        _running = true;
+        _error = null;
+        _queryError = null;
+        try
+        {
+            var outcome = await ApiClient.RunQueryAsync(_query);
+            if (outcome.Error is not null)
+            {
+                _result = null;
+                _queryError = outcome.Position > 0 && outcome.Position < _query.Length
+                    ? $"{outcome.Error} (near “{Snippet(_query, outcome.Position)}”)"
+                    : outcome.Error;
+                return;
+            }
+
+            _result = outcome.Result;
+            if (!keepViz)
+            {
+                AutoViz(_result!);
+            }
+            else if (!_y.Any())
+            {
+                _y = DefaultY(_result!);
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private static string Snippet(string q, int pos)
+        => q.Substring(pos, Math.Min(20, q.Length - pos)).Replace('\n', ' ');
+
+    private IReadOnlyCollection<string> DefaultY(QueryResultDto r)
+        => r.Columns.Where(c => c.Type == "number" && c.Name != _x).Take(1).Select(c => c.Name).ToList();
+
+    /// <summary>Picks a sensible default display for a fresh result: time on X becomes a line, small categorical a column.</summary>
+    private void AutoViz(QueryResultDto r)
+    {
+        _seriesBy = null;
+        _stacked = false;
+        var xIndex = r.Columns.FindIndex(c => c.Type != "number");
+        if (xIndex < 0)
+        {
+            xIndex = 0;
+        }
+
+        _x = r.Columns.Count > 0 ? r.Columns[xIndex].Name : null;
+        _y = DefaultY(r);
+        var timeLike = r.Columns.Count > 0 && (r.Columns[xIndex].Type == "date" || (r.Rows.Count > 0
+            && System.Text.RegularExpressions.Regex.IsMatch(FlowLedger.Web.Shared.ChartModel.CellText(r.Rows[0][xIndex]), @"^\d{4}-(\d{2}|Q\d)")));
+        _kind = !_y.Any() || r.Rows.Count < 2
+            ? "table"
+            : timeLike ? "line" : r.Rows.Count <= 20 ? "column" : "table";
+    }
+
+    private ReportPanelDto CurrentPanel(string title) => new(title, _query, CurrentViz());
+
+    private async Task SaveViewAsync()
+    {
+        if (EditingView && _loadedView is not null)
+        {
+            await PersistAsync(
+                new SaveReportRequest(_loadedView.Name, _loadedView.Description, "View", [CurrentPanel(_loadedView.Panels[0].Title)]),
+                Guid.Parse(_loadedView.Id), "View updated");
+            return;
+        }
+
+        var outcome = await ShowSaveDialogAsync(asPanel: false);
+        if (outcome is null)
+        {
+            return;
+        }
+
+        await PersistAsync(new SaveReportRequest(outcome.Name, outcome.Description, "View", [CurrentPanel(outcome.PanelTitle)]), null, "View saved");
+    }
+
+    private async Task AddToReportAsync()
+    {
+        var outcome = await ShowSaveDialogAsync(asPanel: true);
+        if (outcome is null)
+        {
+            return;
+        }
+
+        if (outcome.ExistingReportId is { } id)
+        {
+            var existing = _reports.First(r => r.Id == id);
+            var panels = existing.Panels.Append(CurrentPanel(outcome.PanelTitle)).ToList();
+            await PersistAsync(new SaveReportRequest(existing.Name, existing.Description, "Report", panels), Guid.Parse(id), "Panel added to report");
+        }
+        else
+        {
+            await PersistAsync(new SaveReportRequest(outcome.Name, outcome.Description, "Report", [CurrentPanel(outcome.PanelTitle)]), null, "Report created");
+        }
+    }
+
+    private async Task<SaveReportDialog.Outcome?> ShowSaveDialogAsync(bool asPanel)
+    {
+        var parameters = new DialogParameters<SaveReportDialog>
+        {
+            { x => x.AsPanel, asPanel },
+            { x => x.Reports, _reports },
+            { x => x.SuggestedName, _loadedTitle ?? "" },
+        };
+        var dialog = await DialogService.ShowAsync<SaveReportDialog>(asPanel ? "Add to report" : "Save view", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        return result is { Canceled: false, Data: SaveReportDialog.Outcome o } ? o : null;
+    }
+
+    private async Task PersistAsync(SaveReportRequest request, Guid? id, string success)
+    {
+        try
+        {
+            var saved = await ApiClient.SaveReportAsync(request, id);
+            _reports = await ApiClient.GetReportsAsync();
+            if (saved is { Kind: "View" })
+            {
+                _loadedView = saved;
+                _loadedTitle = saved.Name;
+            }
+
+            Snackbar.Add(success, Severity.Success);
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}
