@@ -190,6 +190,7 @@ app.MapAccountEndpoints();
 app.MapAssetEndpoints();
 app.MapTransactionEndpoints();
 app.MapDashboardEndpoints();
+app.MapQueryEndpoints();
 app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();

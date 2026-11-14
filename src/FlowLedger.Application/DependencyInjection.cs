@@ -42,6 +42,15 @@ public static class DependencyInjection
         services.AddScoped<RefreshAssetValuationHandler>();
         services.AddSingleton<FlowLedger.Application.Abstractions.IAssetValuationFeed, ModelEstimateFeed>();
 
+        // Query and reports
+        services.AddScoped<FlowLedger.Application.Features.Query.QueryDatasetProvider>();
+        services.AddScoped<FlowLedger.Application.Features.Query.RunQueryHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.GetQuerySchemaHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.ListReportsHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.GetReportHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.SaveReportHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.RunReportHandler>();
+
         // ── Handlers — Categories ────────────────────────────────────────────────
         services.AddScoped<ListCategoriesHandler>();
         services.AddScoped<GetCategoryHandler>();

@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
+        services.AddScoped<FlowLedger.Application.Features.Query.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();
 
         // ── Configuration ───────────────────────────────────────────────────
         // Register IConfiguration so that .BindConfiguration() (used by AddOptions) can resolve
