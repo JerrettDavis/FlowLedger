@@ -51,6 +51,13 @@ public sealed class AutoCategorizerTests
     [InlineData("AMAZON MKTPL*AB12", "Debit", "Shopping")]
     [InlineData("SAMS CLUB 6389", "Debit", "Food/Groceries")]
     [InlineData("CHK DEPOSIT MOBILE", "Credit", "Income/Deposits")]
+    [InlineData("Nyx*8336322778 ELECTRI HUNT VALLEY MD", "Debit", "Transport/Fuel")]
+    [InlineData("Nyx*877-494-3833 EVGO HUNT VALLEY MD", "Debit", "Transport/Fuel")]
+    [InlineData("LOVE'S #123 TULSA OK", "Debit", "Transport/Fuel")]
+    [InlineData("PAYPAL *GITHUB INC SAN FRANCIS CA", "Debit", "Subscriptions")]
+    [InlineData("PAYPAL *JETBRAINSAM FOSTER CITY CA", "Debit", "Subscriptions")]
+    [InlineData("CASH APP*SAM DAVIS*ADD DDA VISA MONEY", "Debit", "Other/Peer Payments")]
+    [InlineData("TST* POTBELLY - TULSA", "Debit", "Food/Dining")]
     public void Common_merchants_get_a_sensible_category(string merchant, string direction, string expected)
     {
         AutoCategorizer.Categorize(merchant, merchant, direction).Should().Be(expected);

@@ -100,6 +100,14 @@ public sealed class RecurringFlowDetectorTests
     }
 
     [Fact]
+    public void Weekly_variable_spending_is_a_habit_not_a_bill()
+    {
+        var amounts = new[] { 14m, 19m, 16m, 21m, 13m, 18m };
+        var tx = amounts.Select((a, i) => new FlowTxn(Acct, D(2026, 10, 3).AddDays(7 * i), a, false, "TORCHYS")).ToList();
+        RecurringFlowDetector.Detect(tx, Today).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Irregular_shopping_is_not_recurring()
     {
         var tx = Series("TARGET", false, 52m, D(2026, 9, 3), D(2026, 9, 20), D(2026, 10, 14), D(2026, 11, 9)).ToList();

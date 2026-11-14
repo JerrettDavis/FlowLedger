@@ -64,8 +64,10 @@ public sealed class RecurringSuggestionService(
         var transferIds = TransferDetector.Detect(dtos, accountTypes);
 
         // Money moving inside the portfolio / between own accounts is not a bill or a paycheck.
+        // Discretionary spending (restaurants, groceries, fuel, shopping) is habit, not a bill: a weekly taco run is
+        // not a recurring flow worth forecasting or alerting on.
         var skipCategories = (await categories.ListAsync(ct))
-            .Where(c => c.Path.Value == "Transfer" || c.Path.Value.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase))
+            .Where(c => IsIneligibleCategory(c.Path.Value))
             .Select(c => c.Id).ToHashSet();
 
         var inputs = new List<FlowTxn>();
@@ -129,6 +131,13 @@ public sealed class RecurringSuggestionService(
             s.AccountId, s.Name, s.Amount, s.Currency, s.Direction, s.AmountModel, s.Frequency,
             s.DayOfMonth, s.SecondDayOfMonth, s.IntervalWeeks, s.AnchorDayOfWeek,
             StartDate: s.NextExpected, EndDate: null, CategoryId: null, Counterparty: s.Name), ct);
+
+    private static bool IsIneligibleCategory(string path) =>
+        path == "Transfer"
+        || path == "Shopping"
+        || path == "Transport/Fuel"
+        || path.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("Food/", StringComparison.OrdinalIgnoreCase);
 
     private static bool WouldAutoAdd(DetectedFlow d) => d.Confidence >= AutoAddConfidence && d.AmountModel == "Fixed";
 
