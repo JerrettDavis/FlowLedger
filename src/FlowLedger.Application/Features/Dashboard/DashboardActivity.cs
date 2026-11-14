@@ -15,7 +15,8 @@ public sealed record DashboardActivityDto(
     decimal LargeThreshold,
     IReadOnlyList<FlaggedTransactionDto> Suspicious,
     decimal MoneyInLast30Days,
-    decimal MoneyOutLast30Days);
+    decimal MoneyOutLast30Days,
+    int TransfersExcluded = 0);
 
 /// <summary>
 /// Pure heuristics that turn raw transactions into dashboard insights. No I/O so it is trivially testable.
@@ -31,7 +32,8 @@ public static class DashboardActivityAnalyzer
     private const decimal OutlierMinExcess = 50m;
     private const int DuplicateWindowDays = 3;
 
-    public static DashboardActivityDto Analyze(IReadOnlyList<TransactionDto> all, DateOnly today, int listSize = 8)
+    public static DashboardActivityDto Analyze(
+        IReadOnlyList<TransactionDto> all, DateOnly today, int listSize = 8, IReadOnlySet<Guid>? transferIds = null)
     {
         // Planned rows are forecast placeholders, never real activity.
         var real = all.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
@@ -45,19 +47,24 @@ public static class DashboardActivityAnalyzer
         var recent = real.Where(t => !IsPending(t)).OrderByDescending(Date).ThenByDescending(t => t.CreatedAt)
             .Take(listSize).ToList();
 
-        var inWindow = real.Where(t => Date(t) >= windowStart && Date(t) <= today).ToList();
+        // Transfers between the user's own accounts are not income or spending; keep them in the feed but out of totals.
+        var transfers = transferIds ?? new HashSet<Guid>();
+        var counted = real.Where(t => !transfers.Contains(t.Id)).ToList();
+        var allInWindow = real.Where(t => Date(t) >= windowStart && Date(t) <= today).ToList();
+        var inWindow = allInWindow.Where(t => !transfers.Contains(t.Id)).ToList();
         var moneyIn = inWindow.Where(t => t.Direction == "Credit").Sum(t => t.Amount);
         var moneyOut = inWindow.Where(t => t.Direction == "Debit").Sum(t => t.Amount);
 
-        var threshold = LargeThreshold(real.Where(t => Date(t) >= today.AddDays(-HistoryDays)).Select(t => t.Amount).ToList());
+        var threshold = LargeThreshold(counted.Where(t => Date(t) >= today.AddDays(-HistoryDays)).Select(t => t.Amount).ToList());
         var large = inWindow.Where(t => t.Amount >= threshold)
             .OrderByDescending(t => t.Amount).Take(listSize).ToList();
 
-        var suspicious = FindSuspicious(real, inWindow, threshold, today, listSize);
+        var suspicious = FindSuspicious(counted, inWindow, threshold, today, listSize);
 
         return new DashboardActivityDto(
             recent, pending.Take(listSize * 2).ToList(), pending.Sum(Signed),
-            large, threshold, suspicious, moneyIn, moneyOut);
+            large, threshold, suspicious, moneyIn, moneyOut,
+            allInWindow.Count(t => transfers.Contains(t.Id)) / 2);
     }
 
     /// <summary>95th percentile of recent amounts, floored so tiny datasets don't flag everything.</summary>
@@ -122,13 +129,15 @@ public static class DashboardActivityAnalyzer
 }
 
 /// <summary>Loads recent history and runs the analyzer.</summary>
-public sealed class GetDashboardActivityHandler(ITransactionRepository repo)
+public sealed class GetDashboardActivityHandler(ITransactionRepository repo, IAccountRepository accounts)
 {
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = today.AddDays(-DashboardActivityAnalyzer.HistoryDays);
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, 5000, ct);
-        return DashboardActivityAnalyzer.Analyze(txs.Select(TransactionMapper.ToDto).ToList(), today);
+        var dtos = txs.Select(TransactionMapper.ToDto).ToList();
+        var types = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
+        return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types));
     }
 }

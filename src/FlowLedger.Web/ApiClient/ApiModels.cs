@@ -53,7 +53,8 @@ public sealed record DashboardActivityDto(
     decimal LargeThreshold,
     List<FlaggedTransactionDto> Suspicious,
     decimal MoneyInLast30Days,
-    decimal MoneyOutLast30Days);
+    decimal MoneyOutLast30Days,
+    int TransfersExcluded = 0);
 
 public sealed record CreateTransactionRequest(
     Guid AccountId,

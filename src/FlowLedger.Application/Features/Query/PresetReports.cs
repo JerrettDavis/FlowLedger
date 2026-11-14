@@ -17,7 +17,7 @@ public static class PresetReports
     private static readonly ReportPanel SpendingByCategory = Panel("Spending by category (90 days)",
         """
         transactions
-        | where direction == "Debit" and date >= ago(90d)
+        | where direction == "Debit" and is_transfer == false and date >= ago(90d)
         | summarize total = sum(amount), transactions = count() by category
         | sort by total desc
         | take 12
@@ -26,7 +26,7 @@ public static class PresetReports
     private static readonly ReportPanel CashFlowTrend = Panel("Income vs spending (12 months)",
         """
         transactions
-        | where date >= ago(12mo)
+        | where date >= ago(12mo) and is_transfer == false
         | summarize income = sumif(amount, direction == "Credit"), spending = sumif(amount, direction == "Debit") by month = month(date)
         | extend net = income - spending
         """, "line", "month", ["income", "spending", "net"]);
@@ -34,14 +34,14 @@ public static class PresetReports
     private static readonly ReportPanel CategoryTrend = Panel("Category trend (6 months)",
         """
         transactions
-        | where direction == "Debit" and date >= ago(6mo)
+        | where direction == "Debit" and is_transfer == false and date >= ago(6mo)
         | summarize total = sum(amount) by month = month(date), category
         """, "line", "month", ["total"], "category");
 
     private static readonly ReportPanel TopMerchants = Panel("Top merchants (90 days)",
         """
         transactions
-        | where direction == "Debit" and date >= ago(90d)
+        | where direction == "Debit" and is_transfer == false and date >= ago(90d)
         | summarize total = sum(amount), visits = count() by merchant
         | top 10 by total
         """, "bar", "merchant", ["total"]);
@@ -49,7 +49,7 @@ public static class PresetReports
     private static readonly ReportPanel MonthComparison = Panel("This month vs last month by category",
         """
         transactions
-        | where direction == "Debit" and date >= startofmonth(ago(1mo))
+        | where direction == "Debit" and is_transfer == false and date >= startofmonth(ago(1mo))
         | summarize last_month = sumif(amount, date < startofmonth(today())), this_month = sumif(amount, date >= startofmonth(today())) by category
         | extend change = this_month - last_month
         | sort by this_month desc
@@ -91,7 +91,7 @@ public static class PresetReports
     private static readonly ReportPanel WeekdaySpending = Panel("Spending by day of week (90 days)",
         """
         transactions
-        | where direction == "Debit" and date >= ago(90d)
+        | where direction == "Debit" and is_transfer == false and date >= ago(90d)
         | summarize total = sum(amount), average = avg(amount) by weekday = dayofweek(date)
         """, "column", "weekday", ["total"]);
 

@@ -10,7 +10,7 @@ public sealed class QueryEngineTests
     private static IReadOnlyDictionary<string, QueryTable> Data()
     {
         object?[] Tx(string date, decimal amount, string dir, string cat, string merchant, string status = "Posted")
-            => [DateOnly.Parse(date), amount, dir == "Debit" ? -amount : amount, dir, merchant, merchant, cat, "Checking", "Checking", status, "Manual", "USD", null];
+            => [DateOnly.Parse(date), amount, dir == "Debit" ? -amount : amount, dir, merchant, merchant, cat, "Checking", "Checking", status, "Manual", "USD", null, false];
 
         var cols = QueryCatalog.Datasets.First(d => d.Name == "transactions").Columns.Select(c => c.Name).ToList();
         var rows = new List<object?[]>

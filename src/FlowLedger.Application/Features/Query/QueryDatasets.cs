@@ -31,6 +31,7 @@ public static class QueryCatalog
                 new("source", "string", "Manual, Import, ProviderSync, …"),
                 new("currency", "string", "ISO currency code"),
                 new("notes", "string", "Free-text notes"),
+                new("is_transfer", "bool", "True when this is one leg of a move between your own accounts (excluded from income/spending)"),
             ]),
         new("accounts",
             "Your accounts with current balances.",
@@ -88,14 +89,16 @@ public sealed class QueryDatasetProvider(
         var loaded = await transactions.ListAllAsync(MaxTransactions + 1, ct);
         var inputTruncated = loaded.Count > MaxTransactions;
         var txRows = new List<object?[]>();
-        foreach (var t in loaded.Take(MaxTransactions).Select(TransactionMapper.ToDto))
+        var loadedDtos = loaded.Take(MaxTransactions).Select(TransactionMapper.ToDto).ToList();
+        var transferIds = TransferDetector.Detect(loadedDtos, accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()));
+        foreach (var t in loadedDtos)
         {
             if (t.Status is "Planned" or "Skipped")
             {
                 continue;
             }
 
-            txRows.Add(TransactionRow(t, accountById, categoryById));
+            txRows.Add(TransactionRow(t, accountById, categoryById, transferIds.Contains(t.Id)));
         }
 
         var accountMap = accountEntities.ToDictionary(a => a.Id);
@@ -123,7 +126,8 @@ public sealed class QueryDatasetProvider(
     private static object?[] TransactionRow(
         TransactionDto t,
         IReadOnlyDictionary<Guid, AccountDto> accountById,
-        IReadOnlyDictionary<Guid, string> categoryById)
+        IReadOnlyDictionary<Guid, string> categoryById,
+        bool isTransfer)
     {
         accountById.TryGetValue(t.AccountId, out var account);
         var signed = t.Direction == "Debit" ? -t.Amount : t.Amount;
@@ -143,6 +147,7 @@ public sealed class QueryDatasetProvider(
             t.Source,
             t.Currency,
             t.Notes,
+            isTransfer,
         ];
     }
 }

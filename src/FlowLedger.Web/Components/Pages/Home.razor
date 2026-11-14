@@ -276,6 +276,10 @@ else
                     <MudCardContent>
                         <MudText Typo="Typo.overline" Color="Color.Secondary">Money Out · 30d</MudText>
                         <MudText Typo="Typo.h5" Class="fl-num">@Format.Money(_activity.MoneyOutLast30Days)</MudText>
+                        @if (_activity.TransfersExcluded > 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Excludes @_activity.TransfersExcluded transfer(s) between your accounts</MudText>
+                        }
                     </MudCardContent>
                 </MudCard>
             </div>
