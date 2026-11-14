@@ -1,0 +1,163 @@
+@page "/data"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Data &amp; Backups — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Data &amp; Backups</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">Where your data lives, how safe it is, and what the bank connection costs.</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_status is null)
+{
+    <MudAlert Severity="Severity.Error">Could not load data status.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Backups</MudText>
+                @if (_status.Backup.Healthy)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                        Healthy — last successful backup @Ago(_status.Backup.LastSuccessUtc)
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+                        @(_status.Backup.LastRun is null
+                            ? "No backup has run yet."
+                            : _status.Backup.LastRun.Ok
+                                ? "Last backup is more than 36 hours old."
+                                : "Last backup FAILED: " + _status.Backup.LastRun.Error)
+                    </MudAlert>
+                }
+                <MudSimpleTable Dense="true" Hover="true">
+                    <tbody>
+                        <tr><td>Off-site copy</td><td>@(_status.Backup.OffsiteConfigured ? "Configured (restic)" : "NOT configured")</td></tr>
+                        <tr><td>Last run</td><td>@(_status.Backup.LastRun is null ? "—" : Ago(_status.Backup.LastRun.FinishedUtc))</td></tr>
+                        <tr><td>Rows backed up</td><td>@(_status.Backup.LastRun?.Rows.ToString("N0") ?? "—")</td></tr>
+                        <tr><td>Restore drill</td><td>@(_status.Backup.LastRun?.DrillOk is { } d ? (d ? "Passed" : "FAILED") : "—")</td></tr>
+                        <tr><td>Off-site result</td><td>@(_status.Backup.LastRun?.OffsiteDetail ?? "—")</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+                <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" Disabled="_running" OnClick="BackupNow">
+                    @(_running ? "Backing up…" : "Back up now")
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Bank connection usage (@_status.ProviderUsage.Provider)</MudText>
+                @if (_status.ProviderUsage.Paused)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Provider calls are PAUSED (kill switch on).</MudAlert>
+                }
+                <MudText Typo="Typo.body2">Today: @_status.ProviderUsage.CallsToday of @Budget(_status.ProviderUsage.DailyBudget)</MudText>
+                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsToday, _status.ProviderUsage.DailyBudget)" Class="mb-3" />
+                <MudText Typo="Typo.body2">This month: @_status.ProviderUsage.CallsThisMonth of @Budget(_status.ProviderUsage.MonthlyBudget)</MudText>
+                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsThisMonth, _status.ProviderUsage.MonthlyBudget)" Class="mb-3" />
+                @if (_status.ProviderUsage.ByEndpoint.Count > 0)
+                {
+                    <MudSimpleTable Dense="true">
+                        <thead><tr><th>Endpoint (this month)</th><th>Calls</th></tr></thead>
+                        <tbody>
+                            @foreach (var e in _status.ProviderUsage.ByEndpoint)
+                            {
+                                <tr><td>@e.Method @e.Path</td><td>@e.Calls</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="fl-muted">No provider calls recorded this month.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Recent backup runs</MudText>
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead><tr><th>When</th><th>Result</th><th>Rows</th><th>Drill</th><th>Off-site</th><th>Detail</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in _status.Backup.Runs)
+                        {
+                            <tr>
+                                <td>@r.FinishedUtc.ToLocalTime().ToString("g")</td>
+                                <td>@(r.Ok ? "OK" : "FAILED")</td>
+                                <td>@r.Rows.ToString("N0")</td>
+                                <td>@(r.DrillOk is { } d ? (d ? "pass" : "FAIL") : "—")</td>
+                                <td>@(r.OffsiteOk is { } o ? (o ? "ok" : "FAIL") : "n/a")</td>
+                                <td>@(r.Error ?? r.OffsiteDetail)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.DataStatusDto? _status;
+    private bool _loading = true;
+    private bool _running;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _status = await ApiClient.GetDataStatusAsync();
+        _loading = false;
+    }
+
+    private async Task BackupNow()
+    {
+        _running = true;
+        try
+        {
+            await ApiClient.BackupNowAsync();
+            Snackbar.Add("Backup complete and verified.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _running = false;
+            await LoadAsync();
+        }
+    }
+
+    private static string Ago(DateTimeOffset? t)
+    {
+        if (t is null)
+        {
+            return "never";
+        }
+
+        var d = DateTimeOffset.UtcNow - t.Value;
+        return d.TotalMinutes < 1 ? "just now"
+            : d.TotalHours < 1 ? $"{(int)d.TotalMinutes} min ago"
+            : d.TotalDays < 1 ? $"{(int)d.TotalHours} h ago"
+            : $"{(int)d.TotalDays} d ago";
+    }
+
+    private static string Budget(int b) => b <= 0 ? "unlimited" : b.ToString("N0");
+
+    private static double Pct(long used, int budget) => budget <= 0 ? 0 : Math.Min(100, used * 100.0 / budget);
+}

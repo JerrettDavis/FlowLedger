@@ -196,6 +196,22 @@ public sealed record ConnectResult(string MemberId, string Provider);
 /// Matches the API's <c>Application.Abstractions.SyncResult</c> shape:
 /// <c>accountsUpserted</c>, <c>transactionsAdded</c>, <c>transactionsSkipped</c>, <c>recurringFlowsAdded</c>.
 /// </summary>
+public sealed record BackupRunDto(
+    bool Ok, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, string? SnapshotDir, long Rows,
+    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error);
+
+public sealed record BackupStatusDto(
+    bool Healthy, bool Stale, bool OffsiteConfigured, DateTimeOffset? LastSuccessUtc,
+    BackupRunDto? LastRun, List<BackupRunDto> Runs);
+
+public sealed record EndpointUsageDto(string Method, string Path, long Calls);
+
+public sealed record ProviderUsageDto(
+    string Provider, long CallsToday, long CallsThisMonth, int DailyBudget, int MonthlyBudget, bool Paused,
+    List<EndpointUsageDto> ByEndpoint);
+
+public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, ProviderUsageDto ProviderUsage);
+
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
