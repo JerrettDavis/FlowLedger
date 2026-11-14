@@ -80,9 +80,11 @@ else
         <MudItem xs="12" md="6">
             <MudCard Class="fl-hero fl-card-hover fl-enter fl-enter-1">
                 <MudCardContent>
-                    <MudText Typo="Typo.overline" Color="Color.Primary">Total Balance</MudText>
-                    <MudText Typo="Typo.h3" Class="fl-num" aria-label="Total balance">@Format.Money(_totalBalance)</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Across @_accounts.Count account(s)</MudText>
+                    <MudText Typo="Typo.overline" Color="Color.Primary">Cash</MudText>
+                    <MudText Typo="Typo.h3" Class="fl-num" aria-label="Cash balance">@Format.Money(_cash)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Checking &amp; savings &nbsp;·&nbsp; Credit @Format.Money(_credit) &nbsp;·&nbsp; Loans @Format.Money(_loans) &nbsp;·&nbsp; Investments @Format.Money(_investments)
+                    </MudText>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -421,7 +423,10 @@ else
     private string? _error;
 
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
-    private decimal _totalBalance;
+    private decimal _cash;
+    private decimal _credit;
+    private decimal _loans;
+    private decimal _investments;
     private decimal _netWorth;
     private FlowLedger.Web.ApiClient.AssetSummaryDto? _assetSummary;
     private decimal _lowWaterMark;
@@ -446,7 +451,10 @@ else
             _accounts = await ApiClient.GetAccountsAsync();
 
             // Net worth: assets (positive balance accounts) minus liabilities
-            _totalBalance = _accounts.Sum(a => a.BalanceAmount);
+            _cash = _accounts.Where(a => a.AccountType is "Checking" or "Savings" or "Cash").Sum(a => a.BalanceAmount);
+            _credit = _accounts.Where(a => a.AccountType is "CreditCard").Sum(a => a.BalanceAmount);
+            _loans = _accounts.Where(a => a.AccountType is "Loan" or "Mortgage" or "ManualLiability").Sum(a => a.BalanceAmount);
+            _investments = _accounts.Where(a => a.AccountType is "Investment" or "ManualAsset").Sum(a => a.BalanceAmount);
             var assetTypes = new[] { "Checking", "Savings", "Investment", "Cash", "ManualAsset" };
             var liabilityTypes = new[] { "CreditCard", "Loan", "Mortgage", "ManualLiability" };
             var assets = _accounts.Where(a => assetTypes.Contains(a.AccountType)).Sum(a => a.BalanceAmount);
