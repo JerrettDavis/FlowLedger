@@ -18,7 +18,7 @@ public sealed class ScheduledBackupJob : IJob
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
-        var result = await _runner.RunAsync(cancellationToken);
+        var result = await _runner.RunAsync(cancellationToken, allowPrune: true);
         if (result.Ok)
         {
             _logger.LogInformation("Backup OK: {Dir} ({Rows} rows), off-site: {Offsite}", result.SnapshotDir, result.Rows, result.OffsiteDetail);
