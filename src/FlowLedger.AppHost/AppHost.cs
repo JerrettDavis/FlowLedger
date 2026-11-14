@@ -6,8 +6,11 @@ var builder = DistributedApplication.CreateBuilder(args);
 // The database NAME is configurable so real data can live in its own database (and the data_environment guard
 // then never sees demo rows): set FlowLedger:DatabaseName (e.g. "flowledger_prod") on the AppHost together with
 // FlowLedger:DataDir for a separate raw-payload archive. Default stays "flowledger" (the demo database).
+// FlowLedger:PostgresVolume names the data volume explicitly. Use a NEW name for real data so it never inherits
+// the password/contents of an older demo volume (a persistent volume keeps the password it was first created with).
+var pgVolume = builder.Configuration["FlowLedger:PostgresVolume"];
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume(isReadOnly: false)
+    .WithDataVolume(string.IsNullOrWhiteSpace(pgVolume) ? null : pgVolume, isReadOnly: false)
     .AddDatabase("flowledger", builder.Configuration["FlowLedger:DatabaseName"] ?? "flowledger");
 
 var redis = builder.AddRedis("redis")
@@ -54,6 +57,16 @@ static IResourceBuilder<T> WithMxConfig<T>(
         if (!string.IsNullOrEmpty(value))
         {
             resource = resource.WithEnvironment($"SimpleFin__{key}", value);
+        }
+    }
+
+    // Home/real-estate valuation feed (generic HTTP JSON appraisal feed). Key lives in user-secrets, never in source.
+    foreach (var key in new[] { "Enabled", "Name", "UrlTemplate", "ApiKeyHeader", "ApiKey", "ValuePath" })
+    {
+        var value = configuration[$"AssetFeeds:Http:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"AssetFeeds__Http__{key}", value);
         }
     }
     return resource;

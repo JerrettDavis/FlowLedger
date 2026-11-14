@@ -130,6 +130,12 @@ public sealed class SimpleFinProviderTests
     [InlineData("Arvest", "Premium Savings", "SAVINGS")]
     [InlineData("Fidelity", "Rollover IRA", "INVESTMENT")]
     [InlineData("Arvest", "Everyday Checking", "CHECKING")]
+    [InlineData("Chase Bank JDHPro - Chase", "Chase Freedom (7156)", "CREDIT_CARD")]
+    [InlineData("Citibank", "Citi Custom Cash Card-7029", "CREDIT_CARD")]
+    [InlineData("Ameriprise Financial", "SIGNATURE WEALTH (7133)", "INVESTMENT")]
+    [InlineData("Ameriprise Financial", "SPS ADVANTAGE (7133)", "INVESTMENT")]
+    [InlineData("Arvest Bank", "Primay Checking (1219)", "CHECKING")]
+    [InlineData("Miramar Credit Union", "Share Draft", "CHECKING")]
     public void Infers_account_type_from_names(string org, string name, string expected)
     {
         var acct = new SfAccount { Id = "x", Name = name, Org = new SfOrg { Name = org } };

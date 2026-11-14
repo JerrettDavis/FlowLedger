@@ -73,6 +73,19 @@ public static class WorkerHostBuilderFactory
                     .WithIdentity($"{nameof(ScheduledBackupJob)}-trigger", "FlowLedger")
                     .WithCronSchedule(backupCron));
             }
+
+            // Monthly home/real-estate revaluation from the configured appraisal feed (no-op when no feed is enabled).
+            var valEnabled = builder.Configuration.GetValue("AssetValuation:AutoRefresh:Enabled", defaultValue: true);
+            var valCron = builder.Configuration.GetValue("AssetValuation:AutoRefresh:CronExpression", defaultValue: "0 0 4 1 * ?")!;
+            var valKey = new JobKey(nameof(ScheduledAssetValuationJob), "FlowLedger");
+            q.AddJob<ScheduledAssetValuationJob>(opts => opts.WithIdentity(valKey).StoreDurably());
+            if (valEnabled)
+            {
+                q.AddTrigger(opts => opts
+                    .ForJob(valKey)
+                    .WithIdentity($"{nameof(ScheduledAssetValuationJob)}-trigger", "FlowLedger")
+                    .WithCronSchedule(valCron));
+            }
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
