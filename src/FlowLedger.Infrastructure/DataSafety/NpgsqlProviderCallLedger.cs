@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// </summary>
 public sealed class NpgsqlProviderCallLedger : IProviderCallLedger
 {
-    private const string CreateSql = """
+    public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS provider_api_calls (
             id bigserial PRIMARY KEY,
             provider text NOT NULL,
@@ -92,7 +92,7 @@ public sealed class NpgsqlProviderCallLedger : IProviderCallLedger
             {
                 if (!_initialised)
                 {
-                    await using var cmd = new NpgsqlCommand(CreateSql, conn);
+                    await using var cmd = new NpgsqlCommand(CreateSqlText, conn);
                     await cmd.ExecuteNonQueryAsync(ct);
                     _initialised = true;
                 }
