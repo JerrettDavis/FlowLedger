@@ -1,0 +1,39 @@
+using System.Net.Http.Headers;
+using System.Text;
+using FlowLedger.Integrations.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
+
+namespace FlowLedger.Integrations.SimpleFin;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddSimpleFinProvider(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.Configure<SimpleFinOptions>(configuration.GetSection(SimpleFinOptions.SectionName));
+
+        services.AddHttpClient<SimpleFinFinancialDataProvider>((sp, http) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<SimpleFinOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(opts.AccessUrl))
+            {
+                return; // surfaced as NeedsUserAction on first use, so the app still starts and the UI can explain.
+            }
+
+            var uri = new Uri(opts.AccessUrl, UriKind.Absolute);
+            var userInfo = Uri.UnescapeDataString(uri.UserInfo);
+            var clean = new UriBuilder(uri) { UserName = string.Empty, Password = string.Empty }.Uri;
+            http.BaseAddress = new Uri(clean.ToString().TrimEnd('/') + "/");
+            http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(userInfo)));
+        }).AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+
+        services.AddScoped<IFinancialDataProvider>(sp => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
+        return services;
+    }
+}

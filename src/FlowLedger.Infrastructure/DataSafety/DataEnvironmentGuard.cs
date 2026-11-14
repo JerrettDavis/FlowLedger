@@ -39,8 +39,14 @@ public static class DataEnvironmentGuard
 {
     public const string SettingKey = "data_environment";
 
-    public static DataEnvironment Expected(bool mxEnabled, string? mxEnvironment)
+    public static DataEnvironment Expected(bool mxEnabled, string? mxEnvironment, bool simpleFinEnabled = false)
     {
+        // SimpleFIN only ever returns real bank data, so it is always PRODUCTION.
+        if (simpleFinEnabled)
+        {
+            return DataEnvironment.Production;
+        }
+
         if (!mxEnabled)
         {
             return DataEnvironment.Demo;
@@ -146,7 +152,8 @@ public sealed class DataEnvironmentGuardService : IHostedService
             ?? throw new InvalidOperationException("No connection string available for the data-environment guard.");
 
         var mxEnabled = bool.TryParse(_config["Mx:Enabled"], out var e) && e;
-        var expected = DataEnvironmentGuard.Expected(mxEnabled, _config["Mx:Environment"]);
+        var simpleFin = bool.TryParse(_config["SimpleFin:Enabled"], out var s) && s;
+        var expected = DataEnvironmentGuard.Expected(mxEnabled, _config["Mx:Environment"], simpleFin);
         var adopt = bool.TryParse(_config["DataEnvironment:AdoptExistingAsProduction"], out var a) && a;
 
         _state.Current = await DataEnvironmentGuard.EnsureAsync(conn, expected, adopt, cancellationToken);
