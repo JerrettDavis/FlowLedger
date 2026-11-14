@@ -20,8 +20,19 @@ internal static class SyncEndpoints
 
         group.MapPost("/sync", async (IFinancialSyncService syncService, CancellationToken ct) =>
         {
-            var result = await syncService.SyncAsync(ct);
-            return Results.Ok(result);
+            try
+            {
+                var result = await syncService.SyncAsync(ct);
+                return Results.Ok(result);
+            }
+            catch (FlowLedger.Integrations.Abstractions.NeedsUserActionProviderException ex)
+            {
+                // Not a server fault: the user must (re)connect an institution first.
+                return Results.Problem(
+                    title: "Provider connection requires user action",
+                    detail: ex.UserHint ?? ex.Message,
+                    statusCode: StatusCodes.Status409Conflict);
+            }
         })
         .WithName("Sync")
         .WithSummary("Run a full/incremental financial sync for the current tenant")
