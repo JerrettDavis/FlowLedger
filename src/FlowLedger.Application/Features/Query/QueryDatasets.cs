@@ -75,7 +75,6 @@ public sealed class QueryDatasetProvider(
     ICategoryRepository categories,
     IAssetRepository assets)
 {
-    private const int PageSize = 2000;
     private const int MaxTransactions = 50_000;
 
     public async Task<IReadOnlyDictionary<string, QueryTable>> BuildAsync(CancellationToken ct = default)
@@ -85,23 +84,18 @@ public sealed class QueryDatasetProvider(
         var accountById = accountDtos.ToDictionary(a => a.Id);
         var categoryById = (await categories.ListAsync(ct)).Select(CategoryMapper.ToDto).ToDictionary(c => c.Id, c => c.Path);
 
+        // MaxTransactions + 1 so hitting the cap is detectable and reported, never silent.
+        var loaded = await transactions.ListAllAsync(MaxTransactions + 1, ct);
+        var inputTruncated = loaded.Count > MaxTransactions;
         var txRows = new List<object?[]>();
-        for (var skip = 0; skip < MaxTransactions; skip += PageSize)
+        foreach (var t in loaded.Take(MaxTransactions).Select(TransactionMapper.ToDto))
         {
-            var page = await transactions.ListAsync(null, null, null, skip, PageSize, ct);
-            foreach (var t in page.Select(TransactionMapper.ToDto))
+            if (t.Status is "Planned" or "Skipped")
             {
-                if (t.Status is "Planned" or "Skipped")
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                txRows.Add(TransactionRow(t, accountById, categoryById));
-            }
-            if (page.Count < PageSize)
-            {
-                break;
-            }
+            txRows.Add(TransactionRow(t, accountById, categoryById));
         }
 
         var accountMap = accountEntities.ToDictionary(a => a.Id);
@@ -116,15 +110,15 @@ public sealed class QueryDatasetProvider(
 
         return new Dictionary<string, QueryTable>(StringComparer.OrdinalIgnoreCase)
         {
-            ["transactions"] = Table("transactions", txRows),
+            ["transactions"] = Table("transactions", txRows, inputTruncated),
             ["accounts"] = Table("accounts", accountDtos.Select(a =>
                 new object?[] { a.Name, a.AccountType, a.Institution, a.BalanceAmount, a.BalanceCurrency, a.IsActive }).ToList()),
             ["assets"] = Table("assets", assetRows),
         };
     }
 
-    private static QueryTable Table(string name, List<object?[]> rows)
-        => new(QueryCatalog.Datasets.First(d => d.Name == name).Columns.Select(c => c.Name).ToList(), rows);
+    private static QueryTable Table(string name, List<object?[]> rows, bool truncated = false)
+        => new(QueryCatalog.Datasets.First(d => d.Name == name).Columns.Select(c => c.Name).ToList(), rows) { InputTruncated = truncated };
 
     private static object?[] TransactionRow(
         TransactionDto t,
