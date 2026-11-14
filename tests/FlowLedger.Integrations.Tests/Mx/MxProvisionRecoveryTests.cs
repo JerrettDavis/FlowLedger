@@ -41,6 +41,20 @@ public sealed class MxProvisionRecoveryTests : IDisposable
             "adopting existing MX resources must not create duplicates");
     }
 
+    [Fact]
+    public async Task Pending_member_id_resolves_to_real_member_and_final_ids_return_null()
+    {
+        Stub("/users/USR-1/members", """{"members":[{"guid":"MBR-1","name":"Bank","connection_status":"CONNECTED"}],"pagination":{"current_page":1,"total_pages":1}}""");
+        var http = new HttpClient { BaseAddress = new Uri(_server.Url!) };
+        var client = new MxApiClient(http, NullLogger<MxApiClient>.Instance, new InMemoryRawPayloadArchive());
+        var provider = new MxFinancialDataProvider(
+            client, new MxWebhookVerifier("s"), Options.Create(new MxProviderOptions()),
+            NullLogger<MxFinancialDataProvider>.Instance);
+
+        (await provider.TryResolveMemberProviderIdAsync("USR-1|PENDING")).Should().Be("USR-1|MBR-1");
+        (await provider.TryResolveMemberProviderIdAsync("USR-1|MBR-1")).Should().BeNull();
+    }
+
     private void Stub(string path, string body) =>
         _server.Given(Request.Create().WithPath(path).UsingGet())
             .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", Vnd).WithBody(body));
