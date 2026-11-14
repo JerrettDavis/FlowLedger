@@ -143,11 +143,42 @@ public static class SheetMatcher
         return FirstOfMonth(txnDate) == month ? 0 : null;
     }
 
-    private static IReadOnlyList<string> Terms(SheetBillData bill)
+    internal static IReadOnlyList<string> Terms(SheetBillData bill)
     {
-        var raw = string.IsNullOrWhiteSpace(bill.MatchText) ? bill.Name : bill.MatchText;
+        string raw;
+        if (!string.IsNullOrWhiteSpace(bill.MatchText))
+        {
+            raw = bill.MatchText;
+        }
+        else if (IsCardSection(bill.Section))
+        {
+            // Store names on card rows (Amazon, Best Buy...) match purchases, not payments: require explicit text.
+            return [];
+        }
+        else
+        {
+            raw = DefaultAlternatives(bill.Name);
+        }
+
         return raw.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(Normalize).Where(s => s.Length >= 2).Distinct().ToList();
+    }
+
+    public static bool IsCardSection(string section) => section.Contains("credit card", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>"AEP (AMER ELECT PWR)" gives the whole name, the part before the parentheses and the part inside them.</summary>
+    private static string DefaultAlternatives(string name)
+    {
+        var alts = new List<string> { name };
+        var open = name.IndexOf('(', StringComparison.Ordinal);
+        var close = open >= 0 ? name.IndexOf(')', open + 1) : -1;
+        if (open > 0 && close > open)
+        {
+            alts.Add(name[..open]);
+            alts.Add(name[(open + 1)..close]);
+        }
+
+        return string.Join('|', alts);
     }
 
     private static bool Matches(IReadOnlyList<string> terms, string text)

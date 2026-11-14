@@ -98,6 +98,10 @@
                                 {
                                     <span class="fl-sheet-sub">@row.Service</span>
                                 }
+                                @if (row.NeedsMatchText)
+                                {
+                                    <span class="fl-sheet-sub fl-sheet-hint" title="No payment has matched this row yet. Open it and set match text (words from the bank description).">not matching yet · set match text</span>
+                                }
                             </th>
                             <td>@row.Payer</td>
                             <td class="fl-sheet-flags">@Flags(row)</td>
@@ -211,7 +215,13 @@
     {
         try
         {
-            await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: cell?.Paid != true);
+            // auto tick -> manual "not paid" -> manual tick -> back to automatic
+            if (cell is { Paid: true, Source: "Manual" })
+                await ApiClient.ClearSheetPaymentAsync(row.Id, month);
+            else if (cell is { Paid: true, Source: "Auto" })
+                await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: false);
+            else
+                await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: true);
             await LoadAsync();
         }
         catch (ApiClientException ex)

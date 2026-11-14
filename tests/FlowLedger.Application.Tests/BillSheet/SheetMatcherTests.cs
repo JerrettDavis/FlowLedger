@@ -158,6 +158,26 @@ public sealed class SheetMatcherTests
     }
 
     [Fact]
+    public void Parenthesised_names_match_on_either_part()
+    {
+        var aep = Bill("AEP (AMER ELECT PWR)", 4);
+        var r = Run([aep], [Txn("AMER ELECT PWR PAYMENT", new DateOnly(2026, 11, 4))]);
+        r.Upserts.Should().ContainSingle();
+        Run([aep], [Txn("AEP OKLAHOMA", new DateOnly(2026, 11, 4))]).Upserts.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Credit_card_rows_require_explicit_match_text()
+    {
+        var card = Bill("Amazon", 5) with { Section = "Credit Cards" };
+        var purchase = Txn("AMAZON MARKETPLACE", new DateOnly(2026, 11, 5));
+
+        Run([card], [purchase]).Upserts.Should().BeEmpty();
+        Run([card with { MatchText = "amazon payment|chase amazon" }], [Txn("CHASE AMAZON CARD PMT", new DateOnly(2026, 11, 5))])
+            .Upserts.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Due_day_is_clamped_to_short_months()
     {
         SheetMatcher.ExpectedDate(31, new DateOnly(2026, 2, 1)).Should().Be(new DateOnly(2026, 2, 28));

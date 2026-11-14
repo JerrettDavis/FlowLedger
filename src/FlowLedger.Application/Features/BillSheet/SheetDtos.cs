@@ -20,6 +20,7 @@ public sealed record SheetRowDto(
     string? Service,
     string? AccountRefMasked,
     string? MatchText,
+    bool NeedsMatchText,
     IReadOnlyDictionary<string, SheetCellDto> Cells);
 
 /// <summary>Sums as in the workbook: Total, Optional, Required, Personal, Business.</summary>

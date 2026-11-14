@@ -119,10 +119,12 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task ClearAllAsync(CancellationToken ct = default)
+    public async Task ClearSectionsAsync(IReadOnlyCollection<string> sections, CancellationToken ct = default)
     {
-        db.SheetPayments.RemoveRange(await db.SheetPayments.ToListAsync(ct));
-        db.SheetBills.RemoveRange(await db.SheetBills.ToListAsync(ct));
+        var bills = await db.SheetBills.Where(b => sections.Contains(b.Section)).ToListAsync(ct);
+        var ids = bills.Select(b => b.Id).ToList();
+        db.SheetPayments.RemoveRange(await db.SheetPayments.Where(p => ids.Contains(p.BillId)).ToListAsync(ct));
+        db.SheetBills.RemoveRange(bills);
         await db.SaveChangesAsync(ct);
     }
 
