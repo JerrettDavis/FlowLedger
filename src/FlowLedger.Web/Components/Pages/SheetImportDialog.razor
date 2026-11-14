@@ -1,0 +1,73 @@
+<MudDialog aria-labelledby="sheet-import-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="sheet-import-title">Import from your budget workbook</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            In Google Sheets or Excel, open the bills tab and choose <b>File → Download → CSV</b>, then paste
+            the contents here (or pick the file). Columns are matched by header name; <b>x</b> under a month becomes a paid
+            mark. A second header row (for example "Sam Expenses") starts a new section.
+        </MudText>
+        <InputFile OnChange="OnFile" accept=".csv,text/csv" class="mb-2" aria-label="Pick a CSV file" />
+        <MudTextField @bind-Value="_csv" Label="CSV text" Lines="10" Variant="Variant.Outlined" Immediate="true" />
+        @if (HasExisting)
+        {
+            <MudCheckBox @bind-Value="_replace" Label="Replace the rows already on the sheet" Color="Color.Warning" />
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_busy || string.IsNullOrWhiteSpace(_csv))">Import</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] private FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient { get; set; } = default!;
+    [Parameter] public bool HasExisting { get; set; }
+
+    private string _csv = "";
+    private bool _replace;
+    private bool _busy;
+    private string? _error;
+
+    private async Task OnFile(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            await using var stream = e.File.OpenReadStream(2 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _csv = await reader.ReadToEndAsync();
+            _error = null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            _error = "Couldn't read that file (limit 2 MB).";
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await ApiClient.ImportSheetAsync(_csv, _replace);
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

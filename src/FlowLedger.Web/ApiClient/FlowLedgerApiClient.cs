@@ -197,6 +197,49 @@ public sealed class FlowLedgerApiClient
         return result ?? [];
     }
 
+    // Bill sheet ---------------------------------------------------------------
+
+    public Task<SheetViewDto?> GetSheetAsync(string? month = null, int months = 6, CancellationToken ct = default)
+        => GetJsonAsync<SheetViewDto>(
+            "/api/sheet?months=" + months + (string.IsNullOrWhiteSpace(month) ? "" : "&month=" + Uri.EscapeDataString(month)),
+            "load the sheet", ct: ct);
+
+    public Task<SheetRefreshResult?> RefreshSheetAsync(CancellationToken ct = default)
+        => ExecuteAsync("refresh the sheet", async () =>
+        {
+            var response = await _http.PostAsync("/api/sheet/refresh", null, ct);
+            await ThrowIfFailedAsync(response, "refresh the sheet", ct);
+            return await response.Content.ReadFromJsonAsync<SheetRefreshResult>(JsonOptions, ct);
+        });
+
+    public Task SaveSheetBillAsync(Guid? id, SaveBillRequest request, CancellationToken ct = default)
+        => SendNoContentAsync("save the row", () => id is null
+            ? _http.PostAsJsonAsync("/api/sheet/bills", request, JsonOptions, ct)
+            : _http.PutAsJsonAsync($"/api/sheet/bills/{id}", request, JsonOptions, ct), ct);
+
+    public Task DeleteSheetBillAsync(Guid id, CancellationToken ct = default)
+        => SendNoContentAsync("delete the row", () => _http.DeleteAsync($"/api/sheet/bills/{id}", ct), ct);
+
+    public Task SetSheetPaymentAsync(Guid billId, string month, bool paid, decimal? amount = null, CancellationToken ct = default)
+        => SendNoContentAsync("update the cell", () => _http.PutAsJsonAsync(
+            $"/api/sheet/bills/{billId}/payments/{month}", new SetPaymentRequest(paid, amount), JsonOptions, ct), ct);
+
+    public Task<SheetImportResult?> ImportSheetAsync(string csv, bool replace, CancellationToken ct = default)
+        => ExecuteAsync("import the sheet", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/sheet/import", new ImportSheetRequest(csv, replace), JsonOptions, ct);
+            await ThrowIfFailedAsync(response, "import the sheet", ct);
+            return await response.Content.ReadFromJsonAsync<SheetImportResult>(JsonOptions, ct);
+        });
+
+    private Task<bool> SendNoContentAsync(string description, Func<Task<HttpResponseMessage>> send, CancellationToken ct)
+        => ExecuteAsync(description, async () =>
+        {
+            var response = await send();
+            await ThrowIfFailedAsync(response, description, ct);
+            return true;
+        });
+
     // Assets -------------------------------------------------------------------
 
     public async Task<List<AssetDto>> GetAssetsAsync(CancellationToken ct = default)
