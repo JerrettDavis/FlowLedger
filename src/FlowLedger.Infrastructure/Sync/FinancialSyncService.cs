@@ -483,7 +483,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         {
             "CHECKING" => AccountType.Checking,
             "SAVINGS" => AccountType.Savings,
-            "CREDIT_CARD" or "CREDITCARD" or "CREDIT CARD" => AccountType.CreditCard,
+            "CREDIT_CARD" or "CREDITCARD" or "CREDIT CARD" or "CREDIT" => AccountType.CreditCard,
             "MORTGAGE" => AccountType.Mortgage,
             "LOAN" => AccountType.Loan,
             "INVESTMENT" or "BROKERAGE" => AccountType.Investment,

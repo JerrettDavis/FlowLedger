@@ -7,6 +7,36 @@
 
 <MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
 
+<style>
+    .fl-account-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+    .fl-account-chip { display: flex; flex-direction: column; align-items: center; min-width: 96px; max-width: 120px;
+        padding: 8px; border-radius: 12px; text-decoration: none; color: inherit; border: 1px solid var(--mud-palette-divider); }
+    .fl-account-chip:hover, .fl-account-chip:focus-visible { background: var(--mud-palette-action-default-hover); }
+    .fl-account-chip__name { font-size: 12px; font-weight: 500; margin-top: 6px; text-align: center; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .fl-account-chip__bal { font-size: 11px; opacity: .75; }
+</style>
+
+@if (!_loading && _accounts.Count > 0)
+{
+    <nav class="fl-account-strip mb-4" aria-label="Accounts">
+        @foreach (var a in _accounts.Where(x => x.IsActive))
+        {
+            var linked = !string.IsNullOrWhiteSpace(a.ExternalAccountRef) || !string.IsNullOrWhiteSpace(a.Institution);
+            <a class="fl-account-chip" href="@($"transactions?account={a.Id}")"
+               title="@a.Name — @Format.Money(a.BalanceAmount)" aria-label="@($"{a.Name}, balance {Format.Money(a.BalanceAmount)}. View transactions")">
+                <MudBadge Content="@("")" Dot="true" Color="Color.Success" Visible="@linked" Overlap="true">
+                    <MudAvatar Color="@AccountColor(a.AccountType)" Variant="Variant.Filled">
+                        <MudIcon Icon="@AccountIcon(a.AccountType)" />
+                    </MudAvatar>
+                </MudBadge>
+                <span class="fl-account-chip__name">@a.Name</span>
+                <span class="fl-account-chip__bal fl-num">@Format.Money(a.BalanceAmount)</span>
+            </a>
+        }
+    </nav>
+}
+
 @if (_error is not null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
@@ -283,6 +313,27 @@ else
 }
 
 @code {
+    private static string AccountIcon(string type) => type switch
+    {
+        "Checking" => Icons.Material.Filled.AccountBalance,
+        "Savings" => Icons.Material.Filled.Savings,
+        "CreditCard" => Icons.Material.Filled.CreditCard,
+        "Loan" or "Mortgage" => Icons.Material.Filled.Home,
+        "Investment" => Icons.Material.Filled.ShowChart,
+        "Cash" => Icons.Material.Filled.Payments,
+        _ => Icons.Material.Filled.AccountBalanceWallet
+    };
+
+    private static Color AccountColor(string type) => type switch
+    {
+        "Checking" => Color.Primary,
+        "Savings" => Color.Success,
+        "CreditCard" => Color.Warning,
+        "Loan" or "Mortgage" => Color.Error,
+        "Investment" => Color.Info,
+        _ => Color.Default
+    };
+
     private string AccountName(Guid id) => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Unknown account";
 
     private static decimal SignedValue(FlowLedger.Web.ApiClient.TransactionDto t) => t.Direction == "Debit" ? -t.Amount : t.Amount;

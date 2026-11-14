@@ -140,6 +140,9 @@
     private DateTime? _toDate;
     private Guid? _filterAccountId;
 
+    /// <summary>Deep link from the dashboard account strip: /transactions?account={id}.</summary>
+    [SupplyParameterFromQuery(Name = "account")] public Guid? AccountQuery { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -152,6 +155,7 @@
             Logger.LogError(ex, "Failed to load accounts or categories for transaction filters");
             Snackbar.Add("Couldn't load account and category filters — some dropdowns may be empty.", Severity.Warning);
         }
+        _filterAccountId ??= AccountQuery;
         await LoadAsync();
     }
 
