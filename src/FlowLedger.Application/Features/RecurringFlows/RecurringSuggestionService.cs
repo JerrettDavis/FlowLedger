@@ -139,7 +139,10 @@ public sealed class RecurringSuggestionService(
         || path.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("Food/", StringComparison.OrdinalIgnoreCase);
 
-    private static bool WouldAutoAdd(DetectedFlow d) => d.Confidence >= AutoAddConfidence && d.AmountModel == "Fixed";
+    // Fixed bills are safe to add unasked. Income is added too even when the amount varies: forecasting bills without the
+    // paychecks that cover them produces false overdraft alarms, so a regular, high-confidence paycheck must be modelled.
+    private static bool WouldAutoAdd(DetectedFlow d) =>
+        d.Confidence >= AutoAddConfidence && (d.AmountModel == "Fixed" || d.Direction == "Credit");
 
     /// <summary>Loan/mortgage/investment accounts hold balances, not bills; card accounts only produce charges, not "income".</summary>
     private static bool Eligible(AccountType type, TransactionDirection direction) => type switch
