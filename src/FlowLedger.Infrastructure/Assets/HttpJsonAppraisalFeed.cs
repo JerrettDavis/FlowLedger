@@ -68,17 +68,26 @@ public sealed class HttpJsonAppraisalFeed(
             request.Headers.TryAddWithoutValidation(_o.ApiKeyHeader, _o.ApiKey);
         }
 
-        using var response = await httpFactory.CreateClient(HttpClientName).SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            logger.LogWarning("Asset feed {Feed} returned HTTP {Status}", Name, (int)response.StatusCode);
+            using var response = await httpFactory.CreateClient(HttpClientName).SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Asset feed {Feed} returned HTTP {Status}", Name, (int)response.StatusCode);
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var amount = ReadDecimal(doc.RootElement, _o.ValuePath);
+            return amount is >= 0m ? new AssetFeedQuote(amount.Value, asOf, $"Fetched from {Name}") : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            // A flaky or non-JSON endpoint means "no value", not a server error.
+            logger.LogWarning(ex, "Asset feed {Feed} failed", Name);
             return null;
         }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        var amount = ReadDecimal(doc.RootElement, _o.ValuePath);
-        return amount is >= 0m ? new AssetFeedQuote(amount.Value, asOf, $"Fetched from {Name}") : null;
     }
 
     internal static string BuildUrl(string template, Asset asset)

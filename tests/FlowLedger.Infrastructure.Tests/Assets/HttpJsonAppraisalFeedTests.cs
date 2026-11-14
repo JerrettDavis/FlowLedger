@@ -82,6 +82,26 @@ public sealed class HttpJsonAppraisalFeedTests
             o => o.UrlTemplate = "http://prices.example.test/x").GetQuoteAsync(asset, today)).Should().BeNull();
     }
 
+    private sealed class ThrowingHandler(Exception ex) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+            => throw ex;
+    }
+
+    [Fact]
+    public async Task Network_failure_and_non_json_bodies_mean_no_value_not_an_exception()
+    {
+        var today = new DateOnly(2026, 11, 13);
+        var o = Options.Create(new HttpJsonAppraisalFeedOptions { Enabled = true, UrlTemplate = "https://prices.example.test/x", ValuePath = "v" });
+
+        var down = new HttpJsonAppraisalFeed(new Factory(new ThrowingHandler(new HttpRequestException("boom"))), o, NullLogger<HttpJsonAppraisalFeed>.Instance);
+        var timeout = new HttpJsonAppraisalFeed(new Factory(new ThrowingHandler(new TaskCanceledException("timeout"))), o, NullLogger<HttpJsonAppraisalFeed>.Instance);
+
+        (await down.GetQuoteAsync(Vehicle(), today)).Should().BeNull();
+        (await timeout.GetQuoteAsync(Vehicle(), today)).Should().BeNull();
+        (await Feed(new StubHandler(HttpStatusCode.OK, "<html>not json</html>")).GetQuoteAsync(Vehicle(), today)).Should().BeNull();
+    }
+
     [Fact]
     public async Task Accepts_numeric_strings_and_rejects_negative_values()
     {

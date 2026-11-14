@@ -70,12 +70,39 @@ internal static class AssetMapper
             : throw new AssetOperationException("The linked account was not found.");
     }
 
-    /// <summary>A linked ManualAsset account carries the asset's value into net worth, so keep it in step.</summary>
-    public static void PushValueToLinkedAccount(Asset asset, Account? linked)
+    /// <summary>
+    /// A ManualAsset account linked to assets carries their combined value into net worth. After ANY change
+    /// to an asset or its link, recompute each affected account as the sum of its active linked assets
+    /// (0 when none remain) so an unlink, relink, delete or shared link can never leave a stale balance
+    /// that would double count or under count.
+    /// </summary>
+    /// <param name="inFlight">The asset being changed. Its in-memory state wins over the database list,
+    /// which can omit a not-yet-saved asset or still include one just deactivated.</param>
+    public static async Task SyncManualAccountsAsync(
+        IAssetRepository assets, IAccountRepository accounts, IEnumerable<Guid?> accountIds, Asset inFlight, CancellationToken ct)
     {
-        if (linked is { AccountType: AccountType.ManualAsset })
+        var ids = accountIds.Where(i => i.HasValue).Select(i => i!.Value).Distinct().ToList();
+        if (ids.Count == 0)
         {
-            linked.UpdateBalance(new Money(asset.CurrentValue.Amount, linked.CurrentBalance.Currency));
+            return;
+        }
+
+        var all = (await assets.ListAsync(ct)).Where(a => a.Id != inFlight.Id).Append(inFlight).Where(a => a.IsActive).ToList();
+        foreach (var id in ids)
+        {
+            var account = await accounts.GetByIdAsync(AccountId.From(id), ct);
+            if (account is not { AccountType: AccountType.ManualAsset, IsActive: true })
+            {
+                continue;
+            }
+
+            var total = all
+                .Where(a => a.LinkedAccountId == id && a.CurrentValue.Currency == account.CurrentBalance.Currency)
+                .Sum(a => a.CurrentValue.Amount);
+            if (total != account.CurrentBalance.Amount)
+            {
+                account.UpdateBalance(new Money(total, account.CurrentBalance.Currency));
+            }
         }
     }
 }
@@ -115,9 +142,9 @@ public sealed class CreateAssetHandler(IAssetRepository assets, IAccountReposito
             r.PurchasePrice is { } p ? new Money(p, currency) : null, r.Attributes);
         asset.SetValuationModel(AssetMapper.ParseMethod(r.ValuationMethod), r.AnnualRate ?? 0m, r.SalvageValue, r.UsefulLifeYears);
         asset.LinkAccount(linked);
-        AssetMapper.PushValueToLinkedAccount(asset, linked);
 
         await assets.AddAsync(asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
         await assets.SaveChangesAsync(ct);
 
         var map = await AssetMapper.AccountsByIdAsync(accounts, ct);
@@ -136,13 +163,14 @@ public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountReposito
         }
 
         var linked = await AssetMapper.ResolveLinkAsync(accounts, r.LinkedAccountId, ct);
+        var previousLink = asset.LinkedAccountId;
         var currency = asset.CurrentValue.Currency;
 
         asset.UpdateDetails(r.Name, Enum.Parse<AssetCategory>(r.Category, ignoreCase: true), r.Manufacturer, r.Model,
             r.SerialNumber, r.Notes, r.PurchaseDate, r.PurchasePrice is { } p ? new Money(p, currency) : null, r.Attributes);
         asset.SetValuationModel(AssetMapper.ParseMethod(r.ValuationMethod), r.AnnualRate ?? 0m, r.SalvageValue, r.UsefulLifeYears);
         asset.LinkAccount(linked);
-        AssetMapper.PushValueToLinkedAccount(asset, linked);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [previousLink, asset.LinkedAccountId], asset, ct);
 
         await assets.SaveChangesAsync(ct);
         return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
@@ -163,22 +191,14 @@ public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccoun
         asset.RecordValuation(
             new Money(r.Amount, asset.CurrentValue.Currency), r.AsOf ?? AssetClock.Today,
             string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note);
-        await ApplyLinkedAccountAsync(asset, accounts, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
 
         await assets.SaveChangesAsync(ct);
         return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
     }
-
-    internal static async Task ApplyLinkedAccountAsync(Asset asset, IAccountRepository accounts, CancellationToken ct)
-    {
-        if (asset.LinkedAccountId is { } linkId)
-        {
-            AssetMapper.PushValueToLinkedAccount(asset, await accounts.GetByIdAsync(AccountId.From(linkId), ct));
-        }
-    }
 }
 
-public sealed class DeactivateAssetHandler(IAssetRepository assets)
+public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepository accounts)
 {
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
@@ -189,6 +209,7 @@ public sealed class DeactivateAssetHandler(IAssetRepository assets)
         }
 
         asset.Deactivate();
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
         await assets.SaveChangesAsync(ct);
         return true;
     }
@@ -209,7 +230,9 @@ public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepo
         var byCategory = list.GroupBy(a => a.Category)
             .Select(g => new AssetCategoryBreakdownDto(g.Key, g.Count(), g.Sum(a => a.EstimatedValue)))
             .OrderByDescending(c => c.Value).ToList();
-        var liabilities = list.Sum(a => a.LinkedLiability ?? 0m);
+        // Several assets may share one mortgage; count each linked liability account once.
+        var liabilities = list.Where(a => a.LinkedLiability.HasValue && a.LinkedAccountId.HasValue)
+            .GroupBy(a => a.LinkedAccountId!.Value).Sum(g => g.First().LinkedLiability!.Value);
         var totalValue = list.Sum(a => a.EstimatedValue);
 
         var net = NetWorthCalculator.Compute(accountList, domainAssets, today);
@@ -252,7 +275,7 @@ public sealed class RefreshAssetValuationHandler(
         }
 
         asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note);
-        await RecordAssetValuationHandler.ApplyLinkedAccountAsync(asset, accounts, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
         await assets.SaveChangesAsync(ct);
         map = await AssetMapper.AccountsByIdAsync(accounts, ct);
         return new AssetRefreshResultDto(true, $"Updated from '{feed.Name}'.",

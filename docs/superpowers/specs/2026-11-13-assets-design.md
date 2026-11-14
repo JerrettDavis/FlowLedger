@@ -13,3 +13,5 @@
 - Net worth is computed server-side by one pure `NetWorthCalculator` (`GET /api/assets/summary`); Home consumes it and falls back to the old client formula.
 - Feeds: `IAssetValuationFeed`. Built-in `ModelEstimateFeed` (no network) and `HttpJsonAppraisalFeed` (generic URL template + JSON path, API key from config, **disabled by default**, never sends serial numbers). Refresh via `POST /api/assets/{id}/refresh?feed=`.
 - Privacy: serial numbers are never logged and never sent to external feeds.
+- Manual Asset account invariant: a ManualAsset account linked to assets always holds the sum of its active linked assets' recorded values. It is recomputed on create, update (old and new link), valuation, refresh and delete, so unlink/relink/delete/shared links cannot leave a stale balance that double counts or under counts net worth.
+- Single-currency assumption (as the existing dashboard); assets in another currency than their linked account are ignored for that account's sum.
