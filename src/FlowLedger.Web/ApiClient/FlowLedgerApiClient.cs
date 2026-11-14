@@ -197,6 +197,96 @@ public sealed class FlowLedgerApiClient
         return result ?? [];
     }
 
+    // Assets -------------------------------------------------------------------
+
+    public async Task<List<AssetDto>> GetAssetsAsync(CancellationToken ct = default)
+        => await GetJsonAsync<List<AssetDto>>("/api/assets", "load assets", ct: ct) ?? [];
+
+    public Task<AssetDto?> GetAssetAsync(Guid id, CancellationToken ct = default)
+        => GetJsonAsync<AssetDto>($"/api/assets/{id}", "load asset", nullOn404: true, ct: ct);
+
+    public Task<AssetSummaryDto?> GetAssetSummaryAsync(CancellationToken ct = default)
+        => GetJsonAsync<AssetSummaryDto>("/api/assets/summary", "load asset summary", ct: ct);
+
+    public async Task<List<AssetCategoryTemplateDto>> GetAssetCategoriesAsync(CancellationToken ct = default)
+        => await GetJsonAsync<List<AssetCategoryTemplateDto>>("/api/assets/categories", "load asset categories", ct: ct) ?? [];
+
+    public Task<AssetDto?> CreateAssetAsync(CreateAssetRequest request, CancellationToken ct = default)
+        => SendAssetAsync("add asset", () => _http.PostAsJsonAsync("/api/assets", request, JsonOptions, ct), ct);
+
+    public Task<AssetDto?> UpdateAssetAsync(Guid id, UpdateAssetRequest request, CancellationToken ct = default)
+        => SendAssetAsync("update asset", () => _http.PutAsJsonAsync($"/api/assets/{id}", request, JsonOptions, ct), ct);
+
+    public Task<AssetDto?> RecordAssetValuationAsync(Guid id, RecordValuationRequest request, CancellationToken ct = default)
+        => SendAssetAsync("record valuation", () => _http.PostAsJsonAsync($"/api/assets/{id}/valuations", request, JsonOptions, ct), ct);
+
+    public async Task<AssetRefreshResultDto?> RefreshAssetAsync(Guid id, string? feed = null, CancellationToken ct = default)
+    {
+        var url = $"/api/assets/{id}/refresh" + (string.IsNullOrWhiteSpace(feed) ? "" : $"?feed={Uri.EscapeDataString(feed)}");
+        return await ExecuteAsync("refresh asset valuation", async () =>
+        {
+            var response = await _http.PostAsync(url, null, ct);
+            await ThrowIfFailedAsync(response, "refresh asset valuation", ct);
+            return await response.Content.ReadFromJsonAsync<AssetRefreshResultDto>(JsonOptions, ct);
+        });
+    }
+
+    public async Task DeleteAssetAsync(Guid id, CancellationToken ct = default)
+        => await ExecuteAsync("remove asset", async () =>
+        {
+            var response = await _http.DeleteAsync($"/api/assets/{id}", ct);
+            await ThrowIfFailedAsync(response, "remove asset", ct);
+            return true;
+        });
+
+    private Task<AssetDto?> SendAssetAsync(string description, Func<Task<HttpResponseMessage>> send, CancellationToken ct)
+        => ExecuteAsync(description, async () =>
+        {
+            var response = await send();
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            await ThrowIfFailedAsync(response, description, ct);
+            return await response.Content.ReadFromJsonAsync<AssetDto>(JsonOptions, ct);
+        });
+
+    /// <summary>Throws an <see cref="ApiClientException"/> carrying the API's 400 problem detail when present.</summary>
+    private async Task ThrowIfFailedAsync(HttpResponseMessage response, string description, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        _logger.LogError("Non-success status {StatusCode} during {Operation}", (int)response.StatusCode, description);
+        string? detail = null;
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                if (doc.RootElement.TryGetProperty("detail", out var d))
+                {
+                    detail = d.GetString();
+                }
+                else if (doc.RootElement.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Object)
+                {
+                    detail = string.Join(" ", errs.EnumerateObject().SelectMany(p => p.Value.EnumerateArray().Select(e => e.GetString())));
+                }
+            }
+            catch (JsonException)
+            {
+                // Fall through to the generic message.
+            }
+        }
+
+        throw new ApiClientException(
+            detail is { Length: > 0 } ? detail : $"Couldn't {description} (server returned {(int)response.StatusCode}).",
+            response.StatusCode);
+    }
+
     public Task<DashboardActivityDto?> GetDashboardActivityAsync(CancellationToken ct = default)
         => GetJsonAsync<DashboardActivityDto>("/api/dashboard/activity", "load dashboard activity", ct: ct);
 

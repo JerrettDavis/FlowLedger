@@ -77,6 +77,16 @@ FlowLedger supports two data sources:
 
 ---
 
+## Assets
+
+The **Assets** page tracks physical items you own — vehicles, electronics, firearms, jewelry, property, tools and more.
+
+- **Fixed fields:** name, category, manufacturer, model, serial number, notes, purchase date and price. **Custom fields** are free-form name/value pairs; each category pre-suggests useful ones (e.g. Firearm → Caliber, Action; Vehicle → VIN, Mileage). Serial numbers are never logged or sent to valuation feeds.
+- **Value over time:** pick a model — *Manual*, *Depreciates (% per year)*, *Straight-line* (useful life + salvage) or *Appreciates (% per year)*. The table shows today's estimate; recording an appraisal re-anchors the value and is kept in the valuation history.
+- **Valuation feeds:** *Refresh from feed* asks a feed for a new value. `model` (built in, offline) projects your model forward. `appraiser` is a generic HTTP/JSON feed you configure under `AssetFeeds:Http` (URL template, JSON path, optional API-key header); it is off by default.
+- **Linked accounts:** link an asset to the **Mortgage/Loan** that finances it to see equity, or to a **Manual Asset** account so the account balance follows the asset's value.
+- **Net worth:** the dashboard net worth includes tracked assets and counts each one once, even when it is linked to a Manual Asset account. The dashboard also has an **Assets** overview card.
+
 ## Transactions
 
 The Transactions page shows the full history of imported transactions across all accounts,

@@ -93,7 +93,7 @@ else
                 <MudCardContent>
                     <MudText Typo="Typo.overline" Color="Color.Secondary">Net Worth</MudText>
                     <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_netWorth)" aria-label="Net worth">@Format.Money(_netWorth)</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Assets minus liabilities</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@(_assetSummary is { AssetCount: > 0 } ? "Incl. tracked assets" : "Assets minus liabilities")</MudText>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -209,6 +209,55 @@ else
                 </MudCardContent>
             </MudCard>
         </MudItem>
+
+        @if (_assetSummary is { AssetCount: > 0 })
+        {
+            <MudItem xs="12" md="6">
+                <MudCard Class="fl-card-hover" Style="height:100%">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Assets</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@_assetSummary.AssetCount item(s) tracked</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButton Href="assets" Size="Size.Small" Variant="Variant.Text" aria-label="View all assets">View all</MudButton>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-end mb-3">
+                            <div>
+                                <MudText Typo="Typo.h5" Class="fl-num" aria-label="Total asset value">@Format.Money(_assetSummary.TotalValue)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Estimated value today</MudText>
+                            </div>
+                            @if (_assetSummary.TotalCost > 0)
+                            {
+                                <div class="text-right">
+                                    <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(_assetSummary.UnrealizedGainLoss)">@Format.Signed(_assetSummary.UnrealizedGainLoss)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">vs. @Format.Money(_assetSummary.TotalCost) cost</MudText>
+                                </div>
+                            }
+                        </div>
+                        @foreach (var c in _assetSummary.ByCategory.Take(4))
+                        {
+                            var pct = _assetSummary.TotalValue > 0 ? (double)(c.Value / _assetSummary.TotalValue * 100m) : 0d;
+                            <div class="mb-2">
+                                <div class="d-flex justify-space-between">
+                                    <MudText Typo="Typo.caption">@c.Category (@c.Count)</MudText>
+                                    <MudText Typo="Typo.caption" Class="fl-num">@Format.Money(c.Value)</MudText>
+                                </div>
+                                <MudProgressLinear Value="@pct" Color="Color.Primary" Size="Size.Small" aria-label="@($"{c.Category} share of asset value")" />
+                            </div>
+                        }
+                        @if (_assetSummary.LinkedLiabilities > 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Equity after linked debt: <span class="fl-num">@Format.Money(_assetSummary.TotalEquity)</span>
+                            </MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
 
         @if (_activity is not null)
         {
@@ -374,6 +423,7 @@ else
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private decimal _totalBalance;
     private decimal _netWorth;
+    private FlowLedger.Web.ApiClient.AssetSummaryDto? _assetSummary;
     private decimal _lowWaterMark;
     private DateOnly? _lowWaterMarkDate;
     private int _overdraftCount;
@@ -402,6 +452,19 @@ else
             var assets = _accounts.Where(a => assetTypes.Contains(a.AccountType)).Sum(a => a.BalanceAmount);
             var liabilities = _accounts.Where(a => liabilityTypes.Contains(a.AccountType)).Sum(a => Math.Abs(a.BalanceAmount));
             _netWorth = assets - liabilities;
+
+            // Asset overview is best-effort. When available, its server-side net worth replaces the
+            // client formula: it counts each physical asset once (never double-counting an asset that
+            // is linked to a Manual Asset account) and values depreciating assets as of today.
+            try
+            {
+                _assetSummary = await ApiClient.GetAssetSummaryAsync();
+                if (_assetSummary is not null)
+                {
+                    _netWorth = _assetSummary.NetWorth.NetWorth;
+                }
+            }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset summary"); }
 
             // Activity feed is best-effort: a failure here must not blank the rest of the dashboard.
             try { _activity = await ApiClient.GetDashboardActivityAsync(); }
