@@ -7,7 +7,7 @@ internal static class DataEndpoints
 {
     internal static IEndpointRouteBuilder MapDataEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/data").WithTags("Data");
+        var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api");
 
         group.MapGet("/status", async (
             BackupRunStore store,
@@ -32,8 +32,8 @@ internal static class DataEndpoints
                     stale,
                     offsiteConfigured = settings.OffsiteConfigured,
                     lastSuccessUtc = lastOk?.FinishedUtc,
-                    lastRun = last,
-                    runs,
+                    lastRun = last is null ? null : Public(last),
+                    runs = runs.Select(Public).ToList(),
                 },
                 providerUsage = new
                 {
@@ -53,7 +53,12 @@ internal static class DataEndpoints
         group.MapPost("/backup-now", async (BackupRunner runner, CancellationToken ct) =>
         {
             var result = await runner.RunAsync(ct);
-            return result.Ok ? Results.Ok(result) : Results.Problem(title: "Backup failed", detail: result.Error, statusCode: 500);
+            if (result.Error == "A backup is already running.")
+            {
+                return Results.Problem(title: "Backup already running", statusCode: StatusCodes.Status409Conflict);
+            }
+
+            return result.Ok ? Results.Ok(Public(result)) : Results.Problem(title: "Backup failed", detail: result.Error, statusCode: 500);
         })
         .WithName("BackupNow")
         .WithSummary("Run a verified backup (snapshot, restore drill, off-site copy) now")
@@ -91,4 +96,18 @@ internal static class DataEndpoints
     }
 
     private const string MxProvider = "MX";
+
+    /// <summary>Response projection: the snapshot folder name only (never the absolute server path).</summary>
+    private static object Public(BackupRunResult r) => new
+    {
+        r.Ok,
+        r.StartedUtc,
+        r.FinishedUtc,
+        SnapshotDir = r.SnapshotDir is null ? null : Path.GetFileName(r.SnapshotDir),
+        r.Rows,
+        r.OffsiteOk,
+        r.OffsiteDetail,
+        r.DrillOk,
+        r.Error,
+    };
 }

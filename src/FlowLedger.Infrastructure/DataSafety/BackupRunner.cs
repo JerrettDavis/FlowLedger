@@ -136,9 +136,29 @@ public sealed class BackupRunner
         _logger = logger;
     }
 
-    public async Task<BackupRunResult> RunAsync(CancellationToken ct = default)
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+
+    /// <param name="allowPrune">Only the scheduled job passes true; on-demand runs never delete anything.</param>
+    public async Task<BackupRunResult> RunAsync(CancellationToken ct = default, bool allowPrune = false)
     {
         var started = DateTimeOffset.UtcNow;
+        if (!await Gate.WaitAsync(0, ct))
+        {
+            return new BackupRunResult(false, started, started, null, 0, null, null, null, "A backup is already running.");
+        }
+
+        try
+        {
+            return await RunCoreAsync(started, allowPrune, ct);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private async Task<BackupRunResult> RunCoreAsync(DateTimeOffset started, bool allowPrune, CancellationToken ct)
+    {
         string? dir = null;
         long rows = 0;
         bool? offsiteOk = null;
@@ -155,7 +175,7 @@ public sealed class BackupRunner
 
             if (_settings.DrillAfterBackup)
             {
-                var drill = await SnapshotRestoreDrill.RunAsync(_connectionString, snapDir, keep: false, ct: ct);
+                var drill = await SnapshotRestoreDrill.RunAsync(_connectionString, snapDir, "flowledger_drill_" + Guid.NewGuid().ToString("N")[..8], keep: false, ct: ct);
                 drillOk = drill.Ok;
                 if (!drill.Ok)
                 {
@@ -176,7 +196,7 @@ public sealed class BackupRunner
                 offsiteDetail = "No off-site repository configured (Backup:Restic:Repository).";
             }
 
-            if (error is null && offsiteOk == true)
+            if (allowPrune && error is null && offsiteOk == true)
             {
                 Prune();
             }
@@ -215,7 +235,7 @@ public sealed class BackupRunner
             var (initCode, initOut) = await ExecAsync(["init"], env, ct);
             if (initCode != 0)
             {
-                return (false, "restic init failed: " + Truncate(initOut));
+                return (false, "restic init failed: " + Truncate(Redact(initOut)));
             }
         }
 
@@ -228,7 +248,7 @@ public sealed class BackupRunner
         var args = new List<string> { "backup", "--tag", "flowledger", "--host", "flowledger" };
         args.AddRange(paths);
         var (code, output) = await ExecAsync(args, env, ct);
-        return code == 0 ? (true, "OK: " + LastLine(output)) : (false, Truncate(output));
+        return code == 0 ? (true, "OK: " + LastLine(Redact(output))) : (false, Truncate(Redact(output)));
     }
 
     private async Task<(int Code, string Output)> ExecAsync(IEnumerable<string> args, Dictionary<string, string> env, CancellationToken ct)
@@ -250,11 +270,12 @@ public sealed class BackupRunner
             psi.Environment[k] = v;
         }
 
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromMinutes(60));
+        Process? p = null;
         try
         {
-            using var p = Process.Start(psi)!;
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromMinutes(60));
+            p = Process.Start(psi)!;
             var stdout = p.StandardOutput.ReadToEndAsync(timeout.Token);
             var stderr = p.StandardError.ReadToEndAsync(timeout.Token);
             await p.WaitForExitAsync(timeout.Token);
@@ -263,6 +284,36 @@ public sealed class BackupRunner
         catch (System.ComponentModel.Win32Exception ex)
         {
             return (-1, $"Could not start '{_settings.ResticExecutable}': {ex.Message}. Install restic or set Backup:Restic:Executable.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Our own 60-minute timeout (not the caller cancelling): stop restic and report a normal failure.
+            TryKill(p);
+            return (-2, "restic timed out after 60 minutes and was stopped.");
+        }
+        catch (OperationCanceledException)
+        {
+            TryKill(p);
+            throw;
+        }
+        finally
+        {
+            p?.Dispose();
+        }
+    }
+
+    private static void TryKill(Process? p)
+    {
+        try
+        {
+            if (p is { HasExited: false })
+            {
+                p.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // already gone
         }
     }
 
@@ -276,7 +327,8 @@ public sealed class BackupRunner
 
         var old = Directory.GetDirectories(_settings.BackupRoot, "backup-*")
             .OrderByDescending(d => d, StringComparer.Ordinal)
-            .Skip(_settings.KeepLocalSnapshots);
+            .Skip(_settings.KeepLocalSnapshots)
+            .Where(d => DateTime.UtcNow - Directory.GetCreationTimeUtc(d) > TimeSpan.FromDays(7)); // never delete recent snapshots
         foreach (var d in old)
         {
             try
@@ -288,6 +340,17 @@ public sealed class BackupRunner
                 _logger.LogWarning(ex, "Could not prune old snapshot {Dir}", d);
             }
         }
+    }
+
+    /// <summary>Strips the repository string and any scheme://user:pass@ userinfo before text is stored, logged or returned.</summary>
+    private string Redact(string text)
+    {
+        if (!string.IsNullOrWhiteSpace(_settings.ResticRepository))
+        {
+            text = text.Replace(_settings.ResticRepository!, "<repository>", StringComparison.Ordinal);
+        }
+
+        return System.Text.RegularExpressions.Regex.Replace(text, @"([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s@]+@", "$1<redacted>@");
     }
 
     private static string LastLine(string s) => s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
