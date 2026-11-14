@@ -19,6 +19,8 @@ public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool Sc
 /// </summary>
 public static class SnapshotRestoreDrill
 {
+    private static readonly System.Text.RegularExpressions.Regex SafeIdentifier = new("^[A-Za-z_][A-Za-z0-9_]{0,62}$");
+
     internal static readonly string[] SkippedTables = ["__EFMigrationsHistory"];
 
     public static async Task<RestoreDrillResult> RunAsync(
@@ -86,6 +88,15 @@ public static class SnapshotRestoreDrill
     internal static async Task<List<DrillTableResult>> LoadTablesAsync(
         string connectionString, string snapshotDir, SnapshotManifest manifest, List<string> problems, CancellationToken ct)
     {
+        // The manifest and CSV headers come from an uploaded bundle: only plain identifiers are ever interpolated into SQL.
+        foreach (var t in manifest.Tables)
+        {
+            if (!SafeIdentifier.IsMatch(t.Table))
+            {
+                throw new InvalidOperationException($"Refusing bundle: unsafe table name '{t.Table}'.");
+            }
+        }
+
         var results = new List<DrillTableResult>();
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);
@@ -97,8 +108,14 @@ public static class SnapshotRestoreDrill
         foreach (var t in manifest.Tables.Where(t => !SkippedTables.Contains(t.Table)))
         {
             var file = Path.Combine(snapshotDir, t.Table + ".csv");
-            var header = (await File.ReadLinesAsync(file, ct).FirstAsync(ct))
-                .Split(',').Select(c => "\"" + c.Trim('"') + "\"");
+            var columns = (await File.ReadLinesAsync(file, ct).FirstAsync(ct)).Split(',').Select(c => c.Trim('"')).ToList();
+            var bad = columns.FirstOrDefault(c => !SafeIdentifier.IsMatch(c));
+            if (bad is not null)
+            {
+                throw new InvalidOperationException($"Refusing bundle: unsafe column name '{bad}' in {t.Table}.csv.");
+            }
+
+            var header = columns.Select(c => "\"" + c + "\"");
             await using (var import = await conn.BeginTextImportAsync(
                 $"COPY \"{t.Table}\" ({string.Join(",", header)}) FROM STDIN (FORMAT csv, HEADER true)", ct))
             {

@@ -107,7 +107,10 @@ public sealed class CategorizationService(
         var txs = await store.LoadTrackedAsync(Max, ct);
         var target = txs.FirstOrDefault(t => t.Id == transactionId)
             ?? throw new KeyNotFoundException("Transaction not found.");
-        var id = CategoryId.From(categoryId);
+        // The id comes from the request body: it must be one of THIS tenant's categories (the repository is tenant-scoped).
+        var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
+            ?? throw new KeyNotFoundException("Category not found.");
+        var id = category.CategoryId;
         target.Categorize(id);
         var changed = 1;
 
