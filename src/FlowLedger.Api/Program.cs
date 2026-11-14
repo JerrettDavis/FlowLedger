@@ -1,3 +1,4 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Api.Auth;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Api.Jobs;
@@ -66,6 +67,10 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddDatabaseMigrationService();
 }
+
+// Refuse to start when the database's data_environment marker and Mx config disagree across the
+// production boundary. Registered AFTER the migration service so the schema exists first.
+builder.Services.AddDataEnvironmentGuard();
 
 // ── ProblemDetails (with TenantResolutionException → 401 mapping) ─────────────
 builder.Services.AddProblemDetails(options =>
@@ -186,6 +191,7 @@ app.MapDefaultEndpoints();
 
 // ── Feature endpoint groups ──────────────────────────────────────────────────
 app.MapStatusEndpoints();
+app.MapEnvironmentEndpoints();
 app.MapAccountEndpoints();
 app.MapAssetEndpoints();
 app.MapSheetEndpoints();
