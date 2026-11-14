@@ -171,6 +171,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         if (existing is not null)
         {
+            // Providers can refine/correct the type over time (and SimpleFIN infers it from names);
+            // keep it in step so liabilities never sit in the liquid-cash/overdraft calculations.
+            existing.ChangeType(this.MapProviderAccountType(pa.AccountType));
+
             // Update balance if changed (account may carry a stale balance from last sync)
             if (existing.CurrentBalance.Amount != pa.Balance.Amount ||
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)

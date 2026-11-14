@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 
@@ -10,15 +11,25 @@ internal static class SimpleFinMapper
         $"{a.Org?.Id ?? a.Org?.Domain ?? "org"}:{a.Id ?? throw new FatalProviderException("SimpleFIN account is missing its id.")}";
 
     /// <summary>SimpleFIN has no account type; infer a canonical token from the institution + account name.</summary>
+    // Word-boundary matches so short tokens (IRA, SPS) cannot hit inside other words (e.g. "Miramar").
+    private static readonly Regex MortgageRx = new(@"\bMORTGAGE\b|\bHELOC\b|\bHOME EQUITY\b", RegexOptions.Compiled);
+    private static readonly Regex LoanRx = new(@"\bLOAN\b|\bSTUDENT\b|\bAUTO FIN|\bINSTALLMENT\b", RegexOptions.Compiled);
+    private static readonly Regex CardRx = new(
+        @"\bCREDIT\b(?! UNION)|\bCARD\b|\bVISA\b|\bMASTERCARD\b|\bAMEX\b|\bAMERICAN EXPRESS\b|\bDISCOVER\b|\bFREEDOM\b|\bSAPPHIRE\b|\bSLATE\b|\bCUSTOM CASH\b|\bDOUBLE CASH\b|\bQUICKSILVER\b|\bSAVOR\b|\bREWARDS\b|\bPLATINUM\b",
+        RegexOptions.Compiled);
+    private static readonly Regex SavingsRx = new(@"\bSAVINGS?\b|\bMONEY MARKET\b", RegexOptions.Compiled);
+    private static readonly Regex InvestmentRx = new(
+        @"\b401\(?K\)?\b|\bIRA\b|\bROTH\b|\bBROKERAGE\b|\bINVEST|\bAMERIPRISE\b|\bWEALTH\b|\bSPS\b|\bADVISOR\b|\bVANGUARD\b|\bFIDELITY\b",
+        RegexOptions.Compiled);
+
     public static string InferType(SfAccount a)
     {
         var s = $"{a.Org?.Name} {a.Name}".ToUpperInvariant();
-        if (s.Contains("MORTGAGE")) { return "MORTGAGE"; }
-        if (s.Contains("LOAN") || s.Contains("STUDENT") || s.Contains("AUTO FIN") || s.Contains("INSTALLMENT")) { return "LOAN"; }
-        if (s.Contains("CREDIT") || s.Contains("CARD") || s.Contains("VISA") || s.Contains("MASTERCARD")
-            || s.Contains("AMEX") || s.Contains("AMERICAN EXPRESS") || s.Contains("DISCOVER")) { return "CREDIT_CARD"; }
-        if (s.Contains("SAVING") || s.Contains("MONEY MARKET")) { return "SAVINGS"; }
-        if (s.Contains("401") || s.Contains("IRA") || s.Contains("BROKERAGE") || s.Contains("INVEST")) { return "INVESTMENT"; }
+        if (MortgageRx.IsMatch(s)) { return "MORTGAGE"; }
+        if (LoanRx.IsMatch(s)) { return "LOAN"; }
+        if (CardRx.IsMatch(s)) { return "CREDIT_CARD"; }
+        if (SavingsRx.IsMatch(s)) { return "SAVINGS"; }
+        if (InvestmentRx.IsMatch(s)) { return "INVESTMENT"; }
         return "CHECKING";
     }
 

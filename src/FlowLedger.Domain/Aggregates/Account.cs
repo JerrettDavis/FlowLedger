@@ -20,7 +20,7 @@ public sealed class Account : AggregateRoot
     public AccountId AccountId => AccountId.From(_id);
     public TenantId TenantId { get; }
     public string Name { get; private set; }
-    public AccountType AccountType { get; }
+    public AccountType AccountType { get; private set; }
     public Money CurrentBalance { get; private set; }
     public Money? CreditLimit { get; private set; }
     public string? Institution { get; private set; }
@@ -119,6 +119,21 @@ public sealed class Account : AggregateRoot
         LastBalanceConfirmedAt = DateTimeOffset.UtcNow;
 
         RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, newBalance));
+    }
+
+    /// <summary>
+    /// Corrects the account type (e.g. a provider that cannot report types guessed wrong). Liability and
+    /// asset accounts are treated differently by forecasts and net worth, so a wrong type causes false
+    /// overdraft alerts. No-op when unchanged.
+    /// </summary>
+    public void ChangeType(AccountType newType)
+    {
+        if (newType == AccountType)
+        {
+            return;
+        }
+
+        AccountType = newType;
     }
 
     public void Rename(string newName)
