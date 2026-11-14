@@ -192,6 +192,7 @@ app.MapDefaultEndpoints();
 // ── Feature endpoint groups ──────────────────────────────────────────────────
 app.MapStatusEndpoints();
 app.MapEnvironmentEndpoints();
+app.MapDataEndpoints();
 app.MapAccountEndpoints();
 app.MapAssetEndpoints();
 app.MapSheetEndpoints();

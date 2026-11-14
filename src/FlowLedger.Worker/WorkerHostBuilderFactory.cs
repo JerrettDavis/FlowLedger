@@ -60,6 +60,19 @@ public static class WorkerHostBuilderFactory
                     .WithIdentity($"{nameof(ScheduledSyncJob)}-trigger", "FlowLedger")
                     .WithCronSchedule(cron));
             }
+
+            // Daily verified backup (+ restore drill + off-site copy). Default 03:15 local; Backup:Enabled=false disables.
+            var backupEnabled = builder.Configuration.GetValue("Backup:Enabled", defaultValue: true);
+            var backupCron = builder.Configuration.GetValue("Backup:CronExpression", defaultValue: "0 15 3 * * ?")!;
+            var backupKey = new JobKey(nameof(ScheduledBackupJob), "FlowLedger");
+            q.AddJob<ScheduledBackupJob>(opts => opts.WithIdentity(backupKey).StoreDurably());
+            if (backupEnabled)
+            {
+                q.AddTrigger(opts => opts
+                    .ForJob(backupKey)
+                    .WithIdentity($"{nameof(ScheduledBackupJob)}-trigger", "FlowLedger")
+                    .WithCronSchedule(backupCron));
+            }
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
