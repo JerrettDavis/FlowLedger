@@ -366,3 +366,8 @@ html, body {
 .fl-sheet-cell.paid { background: color-mix(in srgb, var(--mud-palette-success) 18%, transparent); color: var(--mud-palette-success); font-weight: 600; }
 .fl-sheet-cell.late { background: color-mix(in srgb, var(--mud-palette-warning) 22%, transparent); color: var(--mud-palette-warning); font-weight: 700; }
 .fl-sheet-hint { color: var(--mud-palette-warning); }
+
+/* Readability pass: slightly larger small text, and a helper for secondary copy used by newer pages. */
+.fl-muted { color: var(--mud-palette-text-secondary); }
+.mud-typography-caption { font-size: 0.8rem; }
+.mud-typography-overline { font-size: 0.75rem; letter-spacing: 0.06em; }
