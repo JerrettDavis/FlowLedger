@@ -40,7 +40,9 @@ public sealed record SheetPaymentData(
     SheetPaymentSource Source);
 
 /// <summary>Minimal transaction projection the matcher works on.</summary>
-public sealed record SheetTxn(Guid Id, DateOnly Date, decimal Amount, string Text);
+/// <param name="Text">Merchant plus description, used for matching.</param>
+/// <param name="Label">Display name of the merchant, used when detecting recurring expenses.</param>
+public sealed record SheetTxn(Guid Id, DateOnly Date, decimal Amount, string Text, string? Label = null);
 
 /// <summary>Result of a matcher run: cells to write and cells to clear.</summary>
 public sealed record SheetMatchResult(

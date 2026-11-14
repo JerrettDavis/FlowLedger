@@ -599,6 +599,11 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_sheet_bills_tenant_id");
 
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sheet_bills_detected_name")
+                        .HasFilter("section = 'Detected'");
+
                     b.ToTable("sheet_bills", (string)null);
                 });
 

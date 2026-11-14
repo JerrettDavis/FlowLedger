@@ -5,7 +5,8 @@ namespace FlowLedger.Application.Abstractions;
 /// <summary>Tenant-scoped persistence for the bill sheet (rows and monthly paid cells).</summary>
 public interface IBillSheetStore
 {
-    Task<IReadOnlyList<SheetBillData>> ListBillsAsync(CancellationToken ct = default);
+    /// <param name="includeInactive">Also returns rows the user deleted (kept so detection does not recreate them).</param>
+    Task<IReadOnlyList<SheetBillData>> ListBillsAsync(bool includeInactive = false, CancellationToken ct = default);
     Task<SheetBillData?> GetBillAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>Inserts or updates by <see cref="SheetBillData.Id"/>.</summary>

@@ -181,6 +181,48 @@ public sealed class BillSheetServiceTests
     }
 
     [Fact]
+    public async Task Refresh_builds_rows_from_recurring_expenses_ticks_them_and_respects_deletes()
+    {
+        var (svc, store, txns) = Make();
+        for (var back = 0; back < 3; back++)
+        {
+            var month = ThisMonth.AddMonths(-back);
+            await AddTxn(txns, "Peak Fitness Club", 39.99m, new DateOnly(month.Year, month.Month, 9));
+        }
+
+        var first = await svc.RefreshAsync();
+
+        first.Added.Should().Be(1);
+        first.Marked.Should().Be(3);
+        var row = (await store.ListBillsAsync()).Single();
+        row.Should().Match<SheetBillData>(b => b.Section == "Detected" && b.Name == "Peak Fitness Club" && b.DueDay == 9 && b.Estimated == 39.99m);
+
+        // Idempotent, and a row the user deleted is not rebuilt.
+        (await svc.RefreshAsync()).Added.Should().Be(0);
+        await svc.DeleteBillAsync(row.Id);
+        (await svc.RefreshAsync()).Added.Should().Be(0);
+        (await store.ListBillsAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Detection_does_not_duplicate_a_row_the_sheet_already_has()
+    {
+        var (svc, store, txns) = Make();
+        await svc.CreateBillAsync(new SaveBillRequest("Bills", "Peak Fitness", "JD", false, true, false, false, true, 9, 40, null, null, null, null));
+        for (var back = 0; back < 3; back++)
+        {
+            var month = ThisMonth.AddMonths(-back);
+            await AddTxn(txns, "Peak Fitness Club", 39.99m, new DateOnly(month.Year, month.Month, 9));
+        }
+
+        var r = await svc.RefreshAsync();
+
+        r.Added.Should().Be(0);
+        r.Marked.Should().Be(3);
+        (await store.ListBillsAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Clear_returns_a_cell_to_automatic_and_hint_flags_unmatched_rows()
     {
         var (svc, store, _) = Make();
@@ -210,11 +252,11 @@ public sealed class BillSheetServiceTests
         private readonly List<SheetBillData> _bills = [];
         private readonly List<SheetPaymentData> _payments = [];
 
-        public Task<IReadOnlyList<SheetBillData>> ListBillsAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<SheetBillData>>(_bills.Where(b => b.IsActive).OrderBy(b => b.Section).ThenBy(b => b.SortOrder).ToList());
+        public Task<IReadOnlyList<SheetBillData>> ListBillsAsync(bool includeInactive = false, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SheetBillData>>(_bills.Where(b => includeInactive || b.IsActive).OrderBy(b => b.Section).ThenBy(b => b.SortOrder).ToList());
 
         public Task<SheetBillData?> GetBillAsync(Guid id, CancellationToken ct = default)
-            => Task.FromResult(_bills.FirstOrDefault(b => b.Id == id));
+            => Task.FromResult(_bills.FirstOrDefault(b => b.Id == id && b.IsActive));
 
         public Task SaveBillAsync(SheetBillData bill, CancellationToken ct = default)
         {
@@ -226,7 +268,13 @@ public sealed class BillSheetServiceTests
         public Task<bool> DeleteBillAsync(Guid id, CancellationToken ct = default)
         {
             _payments.RemoveAll(p => p.BillId == id);
-            return Task.FromResult(_bills.RemoveAll(b => b.Id == id) > 0);
+            var i = _bills.FindIndex(b => b.Id == id && b.IsActive);
+            if (i >= 0)
+            {
+                _bills[i] = _bills[i] with { IsActive = false }; // soft delete, like the EF store
+            }
+
+            return Task.FromResult(i >= 0);
         }
 
         public Task<IReadOnlyList<SheetPaymentData>> ListPaymentsAsync(DateOnly fromMonth, DateOnly toMonth, CancellationToken ct = default)
