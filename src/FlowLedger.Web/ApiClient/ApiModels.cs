@@ -224,6 +224,10 @@ public sealed record NetWorthPointDto(string Date, decimal Value);
 public sealed record DashboardInsightsDto(
     List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth);
 
+public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
+
+public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
+
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);

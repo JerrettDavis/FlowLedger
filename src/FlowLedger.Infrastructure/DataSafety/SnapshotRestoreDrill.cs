@@ -141,7 +141,7 @@ public static class SnapshotRestoreDrill
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(
             "CREATE TABLE IF NOT EXISTS system_settings (key text PRIMARY KEY, value text NOT NULL, updated_utc timestamptz NOT NULL DEFAULT now());" +
-            NpgsqlProviderCallLedger.CreateSqlText + BackupRunStore.CreateSqlText, conn);
+            NpgsqlProviderCallLedger.CreateSqlText + BackupRunStore.CreateSqlText + NpgsqlBudgetStore.CreateSqlText, conn);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 }

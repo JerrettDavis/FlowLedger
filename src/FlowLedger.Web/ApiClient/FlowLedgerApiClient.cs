@@ -639,4 +639,41 @@ public sealed class FlowLedgerApiClient
                 : null;
         });
     }
+
+    public async Task<BudgetsDto?> GetBudgetsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read budgets", async () =>
+        {
+            var response = await _http.GetAsync("/api/budgets", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BudgetsDto>(JsonOptions, ct) : null;
+        });
+    }
+
+    public async Task SetBudgetAsync(string category, decimal monthlyLimit, CancellationToken ct = default)
+    {
+        await ExecuteAsync("save budget", async () =>
+        {
+            var response = await _http.PutAsJsonAsync("/api/budgets", new { category, monthlyLimit }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't save budget (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task DeleteBudgetAsync(string category, CancellationToken ct = default)
+    {
+        await ExecuteAsync("remove budget", async () =>
+        {
+            var response = await _http.DeleteAsync($"/api/budgets?category={Uri.EscapeDataString(category)}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't remove budget (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
 }
