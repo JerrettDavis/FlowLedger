@@ -24,8 +24,8 @@ public interface IBillSheetStore
     /// <summary>Adds many bills and cells in one save (CSV import).</summary>
     Task AddRangeAsync(IReadOnlyList<SheetBillData> bills, IReadOnlyList<SheetPaymentData> payments, CancellationToken ct = default);
 
-    /// <summary>Removes every bill and cell for the tenant.</summary>
-    Task ClearAllAsync(CancellationToken ct = default);
+    /// <summary>Removes the bills (and their cells) of the named sections only.</summary>
+    Task ClearSectionsAsync(IReadOnlyCollection<string> sections, CancellationToken ct = default);
 }
 
 /// <summary>

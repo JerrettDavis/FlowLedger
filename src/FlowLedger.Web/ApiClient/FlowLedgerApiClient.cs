@@ -224,6 +224,9 @@ public sealed class FlowLedgerApiClient
         => SendNoContentAsync("update the cell", () => _http.PutAsJsonAsync(
             $"/api/sheet/bills/{billId}/payments/{month}", new SetPaymentRequest(paid, amount), JsonOptions, ct), ct);
 
+    public Task ClearSheetPaymentAsync(Guid billId, string month, CancellationToken ct = default)
+        => SendNoContentAsync("reset the cell", () => _http.DeleteAsync($"/api/sheet/bills/{billId}/payments/{month}", ct), ct);
+
     public Task<SheetImportResult?> ImportSheetAsync(string csv, bool replace, CancellationToken ct = default)
         => ExecuteAsync("import the sheet", async () =>
         {

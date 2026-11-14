@@ -333,7 +333,7 @@ public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, 
 public sealed record SheetRowDto(
     Guid Id, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
     int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRefMasked, string? MatchText,
-    Dictionary<string, SheetCellDto> Cells);
+    bool NeedsMatchText, Dictionary<string, SheetCellDto> Cells);
 
 public sealed record SheetTotalsLine(decimal Total, decimal Optional, decimal Required, decimal Personal, decimal Business);
 

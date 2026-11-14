@@ -145,6 +145,58 @@ public sealed class BillSheetServiceTests
         updated.MatchText.Should().Be("city of tulsa");
     }
 
+    [Fact]
+    public async Task Importing_another_tab_keeps_existing_sections_and_replace_is_per_section()
+    {
+        var (svc, store, _) = Make();
+        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        const string cards = " ,Payer,Perpetual,Optional,Business/Personal,Service,Auto/Manual,Account Number,Due Date,Estimated Cost,Actual Cost\n" +
+            "Credit Cards,JD,No,No,,,,,,,\n" +
+            "Amazon,JD,No,No,,,,,5th,0,0\n";
+        var csv = cards.Replace("Credit Cards,JD,No,No,,,,,,,\n", "");
+        csv = csv.Replace(" ,Payer", "Credit Cards,Payer");
+
+        var result = await svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+
+        result.Bills.Should().Be(1);
+        (await store.ListBillsAsync()).Should().HaveCount(5);
+
+        var again = () => svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+        await again.Should().ThrowAsync<SheetOperationException>().WithMessage("*Credit Cards*");
+        await svc.ImportCsvAsync(new ImportSheetRequest(csv, true));
+        (await store.ListBillsAsync()).Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task Import_tolerates_data_rows_wider_than_the_header()
+    {
+        var (svc, store, _) = Make();
+        const string csv = "Credit Cards,Payer,Perpetual,Optional,Business/Personal,Service,Auto/Manual,Account Number,Due Date,Estimated Cost,Actual Cost\n" +
+            "LL Flooring,JD,No,No,,,,,,520,520,x\n";
+
+        var result = await svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+
+        result.Bills.Should().Be(1);
+        (await store.ListBillsAsync()).Single().Estimated.Should().Be(520m);
+    }
+
+    [Fact]
+    public async Task Clear_returns_a_cell_to_automatic_and_hint_flags_unmatched_rows()
+    {
+        var (svc, store, _) = Make();
+        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        var power = (await store.ListBillsAsync()).Single(b => b.Name == "Power Co");
+        var cur = BillSheetService.Key(ThisMonth);
+
+        await svc.SetPaymentAsync(power.Id, cur, new SetPaymentRequest(true, 5m));
+        await svc.ClearPaymentAsync(power.Id, cur);
+
+        var view = await svc.GetViewAsync(cur, 1);
+        var row = view.Sections.SelectMany(x => x.Rows).Single(r => r.Name == "Power Co");
+        row.Cells.Should().NotContainKey(cur);
+        row.NeedsMatchText.Should().BeTrue();
+    }
+
     private static async Task AddTxn(FakeTransactionRepository repo, string desc, decimal amount, DateOnly date)
     {
         var tx = Transaction.RecordActual(
@@ -203,10 +255,11 @@ public sealed class BillSheetServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ClearAllAsync(CancellationToken ct = default)
+        public Task ClearSectionsAsync(IReadOnlyCollection<string> sections, CancellationToken ct = default)
         {
-            _bills.Clear();
-            _payments.Clear();
+            var ids = _bills.Where(b => sections.Contains(b.Section)).Select(b => b.Id).ToHashSet();
+            _bills.RemoveAll(b => ids.Contains(b.Id));
+            _payments.RemoveAll(p => ids.Contains(p.BillId));
             return Task.CompletedTask;
         }
     }

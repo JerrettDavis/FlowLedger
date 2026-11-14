@@ -6,13 +6,14 @@
         <MudText Typo="Typo.body2" Class="mb-2">
             In Google Sheets or Excel, open the bills tab and choose <b>File → Download → CSV</b>, then paste
             the contents here (or pick the file). Columns are matched by header name; <b>x</b> under a month becomes a paid
-            mark. A second header row (for example "Sam Expenses") starts a new section.
+            mark. A second header row (for example "Sam Expenses") starts a new section. Import each tab in turn
+            (bills, then Credit Cards): only the sections found in the CSV are replaced.
         </MudText>
         <InputFile OnChange="OnFile" accept=".csv,text/csv" class="mb-2" aria-label="Pick a CSV file" />
         <MudTextField @bind-Value="_csv" Label="CSV text" Lines="10" Variant="Variant.Outlined" Immediate="true" />
         @if (HasExisting)
         {
-            <MudCheckBox @bind-Value="_replace" Label="Replace the rows already on the sheet" Color="Color.Warning" />
+            <MudCheckBox @bind-Value="_replace" Label="Replace rows already on the sheet in the sections this CSV contains" Color="Color.Warning" />
         }
         @if (_error is not null)
         {

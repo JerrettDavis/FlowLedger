@@ -59,7 +59,10 @@ public sealed class BillSheetService(
 
         return new SheetRowDto(
             b.Id, b.Name, b.Payer, b.IsDebt, b.IsPerpetual, b.IsOptional, b.IsBusiness, b.AutoPay,
-            b.DueDay, b.Estimated, b.Actual, b.Service, MaskReference(b.AccountRef), b.MatchText, cells);
+            b.DueDay, b.Estimated, b.Actual, b.Service, MaskReference(b.AccountRef), b.MatchText,
+            // Nothing has ever ticked this row on its own and it has no explicit match text: tell the user.
+            string.IsNullOrWhiteSpace(b.MatchText) && !cells.Values.Any(c => c.Source == nameof(SheetPaymentSource.Auto)),
+            cells);
     }
 
     /// <summary>The "Actual Cost" column: this month's payment if paid, else the last known actual, else the estimate.</summary>
@@ -161,6 +164,19 @@ public sealed class BillSheetService(
 
     // ── Cells ────────────────────────────────────────────────────────────────
 
+    /// <summary>Removes any manual or automatic mark so the cell returns to automatic.</summary>
+    public async Task<bool> ClearPaymentAsync(Guid billId, string month, CancellationToken ct = default)
+    {
+        var m = ParseMonth(month) ?? throw new SheetOperationException("Month must look like 2026-11.");
+        if (await store.GetBillAsync(billId, ct) is null)
+        {
+            return false;
+        }
+
+        await store.ApplyPaymentsAsync([], [(billId, m)], ct);
+        return true;
+    }
+
     public async Task<bool> SetPaymentAsync(Guid billId, string month, SetPaymentRequest r, CancellationToken ct = default)
     {
         var m = ParseMonth(month) ?? throw new SheetOperationException("Month must look like 2026-11.");
@@ -225,16 +241,19 @@ public sealed class BillSheetService(
             throw new SheetOperationException("No bill rows found. The CSV needs a header row containing \"Estimated Cost\".");
         }
 
-        var existing = await store.ListBillsAsync(ct);
+        // Each tab is its own section, so importing the Credit Cards tab never touches the bills already loaded.
+        var incoming = parsed.Bills.Select(b => b.Section).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existing = (await store.ListBillsAsync(ct)).Where(b => incoming.Contains(b.Section)).ToList();
         if (existing.Count > 0)
         {
             if (!request.Replace)
             {
                 throw new SheetOperationException(
-                    $"The sheet already has {existing.Count} rows. Import again with replace enabled to overwrite them.");
+                    $"The sheet already has {existing.Count} rows in {string.Join(", ", existing.Select(b => b.Section).Distinct())}. " +
+                    "Import again with replace enabled to overwrite just those sections.");
             }
 
-            await store.ClearAllAsync(ct);
+            await store.ClearSectionsAsync(existing.Select(b => b.Section).Distinct().ToList(), ct);
         }
 
         await store.AddRangeAsync(parsed.Bills, parsed.Payments, ct);

@@ -79,7 +79,7 @@ public static class SheetCsvImporter
             bills.Add(bill);
             sections.Add(section);
 
-            for (var i = 0; i < row.Length && monthCols is not null; i++)
+            for (var i = 0; i < row.Length && i < roles.Length && monthCols is not null; i++)
             {
                 if (roles[i] == Role.Month && row[i].Trim().Equals("x", StringComparison.OrdinalIgnoreCase))
                 {
