@@ -288,3 +288,58 @@ html, body {
 @media (min-width: 1500px) { .fl-masonry { column-count: 3; } }
 .fl-masonry-item { break-inside: avoid; margin-bottom: 16px; display: inline-block; width: 100%; }
 .fl-masonry-span { column-span: all; display: block; }
+
+/* Query editor: textarea over a syntax-highlight overlay (query-editor.js). Both share identical metrics. */
+.fl-editor { position: relative; }
+.fl-editor-overlay, .fl-editor-input {
+    font: 14px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+    padding: 12px 14px; margin: 0; border: 1px solid transparent; box-sizing: border-box;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 2; letter-spacing: normal; font-variant-ligatures: none;
+}
+.fl-editor-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--mud-palette-text-primary); }
+.fl-editor-input {
+    display: block; position: relative; width: 100%; min-height: 190px; resize: none; overflow: hidden;
+    background: transparent; color: transparent; caret-color: var(--mud-palette-text-primary);
+    border-color: var(--mud-palette-lines-inputs); border-radius: 4px; outline: none;
+}
+.fl-editor-input::placeholder { color: var(--mud-palette-text-disabled); }
+.fl-editor-input::selection { background: color-mix(in srgb, var(--mud-palette-primary) 35%, transparent); color: transparent; }
+.fl-editor-input:focus { border-color: var(--mud-palette-primary); box-shadow: 0 0 0 1px var(--mud-palette-primary); }
+.fl-editor-status { min-height: 1.6em; padding: 4px 2px 0; font-size: .78rem; color: var(--mud-palette-text-secondary); }
+.fl-sig-label { font-family: ui-monospace, Consolas, monospace; color: var(--mud-palette-text-primary); }
+.fl-sig-active { font-weight: 700; color: var(--mud-palette-primary); text-decoration: underline; }
+.tk-kw { color: var(--mud-palette-primary); }
+.tk-ds { color: var(--mud-palette-tertiary); }
+.tk-fn { color: var(--mud-palette-info); }
+.tk-agg { color: var(--mud-palette-secondary); }
+.tk-str { color: var(--mud-palette-success); }
+.tk-num { color: var(--mud-palette-warning); }
+.tk-cmt { color: var(--mud-palette-text-secondary); font-style: italic; }
+.tk-sym { color: var(--mud-palette-text-secondary); }
+.tk-alias { text-decoration: underline dotted var(--mud-palette-text-secondary); }
+.tk-err { text-decoration: underline wavy var(--mud-palette-error); text-underline-offset: 3px; }
+.tk-bad { background: color-mix(in srgb, var(--mud-palette-error) 25%, transparent); border-radius: 2px; }
+.fl-ac-popup, .fl-tip {
+    position: fixed; z-index: 2000; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary);
+    border: 1px solid var(--mud-palette-divider); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,.28);
+    font-size: .82rem;
+}
+.fl-ac-popup { width: 420px; max-width: calc(100vw - 16px); }
+.fl-ac-list { max-height: 244px; overflow-y: auto; padding: 4px; }
+.fl-ac-item { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.fl-ac-item.sel, .fl-ac-item:hover { background: color-mix(in srgb, var(--mud-palette-primary) 20%, transparent); }
+.fl-ac-icon { flex: none; width: 26px; text-align: center; font-size: .66rem; font-weight: 700; border-radius: 3px; padding: 1px 0;
+    background: var(--mud-palette-action-default-hover); color: var(--mud-palette-text-secondary); }
+.fl-ac-icon.k-column { color: var(--mud-palette-primary); }
+.fl-ac-icon.k-function { color: var(--mud-palette-info); }
+.fl-ac-icon.k-aggregate { color: var(--mud-palette-secondary); }
+.fl-ac-icon.k-value { color: var(--mud-palette-success); }
+.fl-ac-icon.k-dataset { color: var(--mud-palette-tertiary); }
+.fl-ac-label { font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+.fl-ac-detail { margin-left: auto; color: var(--mud-palette-text-secondary); font-size: .74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.fl-ac-doc { padding: 6px 12px; border-top: 1px solid var(--mud-palette-divider); color: var(--mud-palette-text-secondary); min-height: 2.2em; }
+.fl-tip { max-width: 420px; padding: 8px 12px; pointer-events: none; }
+.fl-tip-title { font-family: ui-monospace, Consolas, monospace; font-weight: 700; margin-bottom: 2px; }
+.fl-tip-body { color: var(--mud-palette-text-secondary); white-space: pre-line; }
+.fl-tip.k-error { border-color: var(--mud-palette-error); }
+.fl-tip.k-error .fl-tip-title { color: var(--mud-palette-error); }

@@ -56,3 +56,20 @@ Queries never touch SQL. They run in memory over datasets already filtered to th
 
 `GET /api/query/schema`, `POST /api/query/run`, `GET|POST /api/reports`, `GET /api/reports/{id}`,
 `GET /api/reports/{id}/run`, `PUT|DELETE /api/reports/{guid}`.
+
+## Editor intelligence
+
+The query box is a lightweight in-browser editor (`wwwroot/query-editor.js`) backed by a DOM-free language
+service (`wwwroot/query-intellisense.js`):
+
+- **Completion** (type, or Ctrl+Space): datasets, operators, columns, aggregates, functions and keywords,
+  aware of the current pipe stage. Columns created by earlier `extend`/`project`/`summarize` stages are
+  offered later, and dropped ones are not. Inside quotes after `==`, `!=`, `contains`, `in (…)` it offers
+  live values from your data (e.g. category and account names). Tab or Enter accepts; Enter only inserts a
+  newline if you haven't typed a partial word or used the arrow keys.
+- **Signature bar** under the editor shows the function being typed with the active parameter, or the grammar
+  of the current operator.
+- **Hover tooltips** document every dataset, operator, function, column (with type) and unknown word.
+- **Highlighting** colours tokens and underlines unknown columns/functions; a failed run marks the error spot.
+
+The language service has unit tests: `node --test tests/js`.

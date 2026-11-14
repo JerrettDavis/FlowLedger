@@ -5,6 +5,8 @@
 @inject FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Query — FlowLedger</PageTitle>
 
@@ -30,11 +32,13 @@
             {
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Editing: @_loadedTitle</MudText>
             }
-            <div class="fl-query-editor" @onkeydown="OnKeyDown">
-                <MudTextField T="string" @bind-Value="_query" Lines="9" Variant="Variant.Outlined" Immediate="true"
-                              Placeholder="transactions | where date >= ago(30d) | summarize total = sum(amount) by category | sort by total desc"
-                              aria-label="Query editor" />
+            @* JS owns the contents of this block (highlight overlay, textarea, popups). Blazor never re-renders inside it. *@
+            <div class="fl-editor" @ref="_editorHost">
+                <pre class="fl-editor-overlay" aria-hidden="true"></pre>
+                <textarea class="fl-editor-input" rows="9" spellcheck="false" aria-label="Query editor"
+                          aria-autocomplete="list" placeholder="transactions | where date >= ago(30d) | summarize total = sum(amount) by category"></textarea>
             </div>
+            <div class="fl-editor-status" aria-live="polite"></div>
             @if (_queryError is not null)
             {
                 <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-1" aria-live="assertive">@_queryError</MudText>
@@ -210,6 +214,11 @@
     private string? _loadedTitle;
     private SavedReportDto? _loadedView;
     private string? _handledKey;
+    private ElementReference _editorHost;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _editor;
+    private bool _editorStarting;
+    private DotNetObjectReference<QueryPage>? _self;
 
     private bool EditingView => _loadedView is { IsPreset: false, Kind: "View" };
 
@@ -224,6 +233,87 @@
         {
             _error = ex.Message;
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The schema arrives asynchronously, so initialise the editor on the first render that has it.
+        if (_editor is null && !_editorStarting && _schema is not null)
+        {
+            _editorStarting = true; // renders can overlap while the module imports; never create two editors
+            _self = DotNetObjectReference.Create(this);
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./query-editor.js");
+            _editor = await _module.InvokeAsync<IJSObjectReference>("create", _editorHost, _self, _schema, _query);
+        }
+    }
+
+    [JSInvokable]
+    public void OnQueryChanged(string text) => _query = text;
+
+    [JSInvokable]
+    public Task RunRequested(string text) => InvokeAsync(async () =>
+    {
+        _query = text;
+        await RunAsync();
+        StateHasChanged(); // raised from JS, so Blazor will not re-render on its own
+    });
+
+    private static readonly System.Text.RegularExpressions.Regex Identifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
+
+    /// <summary>Distinct values of a text column, for completion inside string literals.</summary>
+    [JSInvokable]
+    public async Task<string[]> GetValues(string dataset, string column)
+    {
+        if (!Identifier.IsMatch(dataset) || !Identifier.IsMatch(column))
+        {
+            return [];
+        }
+
+        try
+        {
+            var outcome = await ApiClient.RunQueryAsync(
+                $"{dataset} | summarize n = count() by {column} | top 40 by n | project {column}");
+            return outcome.Result?.Rows
+                .Select(r => FlowLedger.Web.Shared.ChartModel.CellText(r[0]))
+                .Where(v => v.Length > 0)
+                .ToArray() ?? [];
+        }
+        catch (ApiClientException)
+        {
+            return [];
+        }
+    }
+
+    private async Task SetQueryAsync(string text)
+    {
+        _query = text;
+        if (_editor is not null)
+        {
+            await _editor.InvokeVoidAsync("setValue", text);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_editor is not null)
+            {
+                await _editor.InvokeVoidAsync("dispose");
+                await _editor.DisposeAsync();
+            }
+
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit already gone; nothing to clean up client-side.
+        }
+
+        _self?.Dispose();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -276,7 +366,7 @@
 
     private async Task LoadPanelAsync(ReportPanelDto panel, string title)
     {
-        _query = panel.Query;
+        await SetQueryAsync(panel.Query);
         _loadedTitle = title;
         _kind = panel.Viz.Kind;
         _x = panel.Viz.X;
@@ -290,22 +380,19 @@
 
     private static readonly string[] DatasetNames = ["transactions", "accounts", "assets"];
 
-    private void Insert(string text)
+    private async Task Insert(string text)
     {
         if (DatasetNames.Contains(text))
         {
-            _query = text;
-            return;
+            await SetQueryAsync(text);
         }
-
-        _query = string.IsNullOrWhiteSpace(_query) ? text : _query.TrimEnd() + " " + text;
-    }
-
-    private async Task OnKeyDown(KeyboardEventArgs e)
-    {
-        if (e.CtrlKey && e.Key == "Enter")
+        else if (_editor is not null)
         {
-            await RunAsync();
+            await _editor.InvokeVoidAsync("insertAtCaret", text);
+        }
+        else
+        {
+            _query = string.IsNullOrWhiteSpace(_query) ? text : _query.TrimEnd() + " " + text;
         }
     }
 
@@ -322,6 +409,11 @@
             if (outcome.Error is not null)
             {
                 _result = null;
+                if (_editor is not null)
+                {
+                    await _editor.InvokeVoidAsync("setError", outcome.Position);
+                }
+
                 _queryError = outcome.Position > 0 && outcome.Position < _query.Length
                     ? $"{outcome.Error} (near “{Snippet(_query, outcome.Position)}”)"
                     : outcome.Error;
@@ -329,6 +421,11 @@
             }
 
             _result = outcome.Result;
+            if (_editor is not null)
+            {
+                await _editor.InvokeVoidAsync("setError", -1);
+            }
+
             if (!keepViz)
             {
                 AutoViz(_result!);
