@@ -15,6 +15,12 @@ internal static class CategorizationEndpoints
             .WithSummary("Fill in missing categories (transfers, learned merchants, keyword rules). Never overwrites existing categories.")
             .RequireRateLimiting("write");
 
+        app.MapPost("/api/categorization/clear-auto", async (CategorizationService service, CancellationToken ct) =>
+                Results.Ok(new { cleared = await service.ClearAutoCategoriesAsync(ct) }))
+            .WithTags("Categories").WithName("ClearAutoCategories")
+            .WithSummary("Remove categories that were set automatically (manual ones are never touched)")
+            .RequireRateLimiting("write");
+
         app.MapPut("/api/transactions/{id:guid}/category", async (
                 Guid id, [FromBody] SetCategoryRequest request, CategorizationService service, CancellationToken ct) =>
             {

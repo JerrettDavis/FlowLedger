@@ -35,17 +35,27 @@ public sealed class PostgresAdvisoryLock : IAsyncDisposable
     public static async Task<PostgresAdvisoryLock?> TryAcquireAsync(string connectionString, string name, CancellationToken ct = default)
     {
         var conn = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString);
-        await conn.OpenAsync(ct);
-        var key = KeyFor(name);
-        await using var cmd = new NpgsqlCommand("SELECT pg_try_advisory_lock(@k)", conn);
-        cmd.Parameters.AddWithValue("k", key);
-        if ((bool)(await cmd.ExecuteScalarAsync(ct))!)
+        try
         {
-            return new PostgresAdvisoryLock(conn, key);
-        }
+            await conn.OpenAsync(ct);
+            var key = KeyFor(name);
+            await using var cmd = new NpgsqlCommand("SELECT pg_try_advisory_lock(@k)", conn);
+            cmd.Parameters.AddWithValue("k", key);
+            if ((bool)(await cmd.ExecuteScalarAsync(ct))!)
+            {
+                return new PostgresAdvisoryLock(conn, key);
+            }
 
-        await conn.DisposeAsync();
-        return null;
+            await conn.DisposeAsync();
+            return null;
+        }
+        catch
+        {
+            // Never leak the connection: an orphaned session would keep the lock and block every later sync.
+            // Dropping the connection makes Postgres release any lock it may already have granted.
+            await conn.DisposeAsync();
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()

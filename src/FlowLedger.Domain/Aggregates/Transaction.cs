@@ -35,6 +35,9 @@ public sealed class Transaction : AggregateRoot
     public DateOnly? PostedDate { get; private set; }
 
     public CategoryId? CategoryId { get; private set; }
+
+    /// <summary>Who set <see cref="CategoryId"/>: the user (Manual, never overwritten) or the auto-categorizer (Auto, replaceable).</summary>
+    public CategorySource CategorySource { get; private set; } = CategorySource.Manual;
     public string? MerchantName { get; private set; }
     public string? Notes { get; private set; }
 
@@ -206,15 +209,28 @@ public sealed class Transaction : AggregateRoot
     }
 
     /// <summary>Categorises the transaction. Raises <see cref="TransactionCategorized"/>.</summary>
-    public void Categorize(CategoryId categoryId, string? merchantName = null)
+    public void Categorize(CategoryId categoryId, string? merchantName = null, CategorySource source = CategorySource.Manual)
     {
         CategoryId = categoryId;
+        CategorySource = source;
         if (!string.IsNullOrWhiteSpace(merchantName))
         {
             MerchantName = merchantName.Trim();
         }
 
         RaiseEvent(new TransactionCategorized(TransactionId, TenantId, categoryId));
+    }
+
+    /// <summary>Removes a category that the auto-categorizer set. A manual category is never cleared by this.</summary>
+    public bool ClearAutoCategory()
+    {
+        if (CategoryId is null || CategorySource != CategorySource.Auto)
+        {
+            return false;
+        }
+
+        CategoryId = null;
+        return true;
     }
 
     /// <summary>
@@ -316,6 +332,15 @@ public sealed class TransactionSplit
         CategoryId = categoryId;
         Notes = notes?.Trim();
     }
+}
+
+/// <summary>Provenance of a transaction's category.</summary>
+public enum CategorySource
+{
+    /// <summary>Chosen by the user (or existing data of unknown origin): never overwritten automatically.</summary>
+    Manual,
+    /// <summary>Filled in by the auto-categorizer: may be replaced when the user corrects a merchant.</summary>
+    Auto,
 }
 
 public enum TransactionDirection

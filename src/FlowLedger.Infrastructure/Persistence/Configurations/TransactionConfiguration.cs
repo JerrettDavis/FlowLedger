@@ -80,6 +80,14 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasColumnName("category_id")
             .HasConversion(StronglyTypedIdConverters.NullableCategoryIdConverter);
 
+        // Existing rows default to Manual: their category (if any) came from a user or an import, never from the auto-categorizer.
+        builder.Property(t => t.CategorySource)
+            .HasColumnName("category_source")
+            .HasConversion<string>()
+            .HasMaxLength(10)
+            .HasDefaultValue(CategorySource.Manual)
+            .IsRequired();
+
         builder.Property(t => t.MerchantName)
             .HasColumnName("merchant_name")
             .HasMaxLength(300);
