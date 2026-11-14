@@ -165,6 +165,10 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        // -- Budgets (per-tenant, ad-hoc table; part of every snapshot/export) --
+        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore(
+            configuration.GetConnectionString("flowledger")
+            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --
         services.AddSingleton(_ => FlowLedger.Infrastructure.DataSafety.BackupSettings.From(configuration));
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.BackupRunStore(

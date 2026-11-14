@@ -1,0 +1,141 @@
+@page "/budgets"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Budgets — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Budgets</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Monthly limits per category, tracked against this month's spending. Transfers between your own accounts never count.
+    A budget on a parent category (for example Food) covers its sub-categories.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_data is null)
+{
+    <MudAlert Severity="Severity.Error">Could not load budgets.</MudAlert>
+}
+else
+{
+    @if (_data.Budgets.Count(b => b.Over) is > 0 and var over)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">@over budget(s) over the limit this month.</MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Add or change a budget</MudText>
+        <div class="d-flex align-center gap-3 flex-wrap">
+            <MudSelect T="string" @bind-Value="_category" Label="Category" Style="min-width:240px" Margin="Margin.Dense">
+                @foreach (var c in Choices)
+                {
+                    <MudSelectItem Value="@c">@c@(SpentFor(c) > 0 ? $"  ({Format.Money(SpentFor(c))} this month)" : "")</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField T="decimal" @bind-Value="_limit" Label="Monthly limit" Min="0" Style="max-width:180px" Margin="Margin.Dense" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(string.IsNullOrWhiteSpace(_category))">Save budget</MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_data.Budgets.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="fl-muted">No budgets yet. Pick a category above, or use the suggestions below.</MudText>
+    }
+    else
+    {
+        <MudPaper Class="pa-4 mb-4" Outlined="true">
+            @foreach (var b in _data.Budgets)
+            {
+                <div class="mb-4">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.subtitle2">@b.Category</MudText>
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.body2" Color="@(b.Over ? Color.Error : Color.Default)" Class="fl-num">
+                                @Format.Money(b.Spent) of @Format.Money(b.MonthlyLimit)
+                                @(b.Over ? $" — over by {Format.Money(-b.Remaining)}" : $" — {Format.Money(b.Remaining)} left")
+                            </MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(b.Category))" aria-label="@($"Remove budget for {b.Category}")" />
+                        </div>
+                    </div>
+                    <MudProgressLinear Value="@Math.Min(100, b.PercentUsed)" Color="@(b.Over ? Color.Error : b.PercentUsed >= 80 ? Color.Warning : Color.Success)" Size="Size.Medium" Class="mt-1" />
+                </div>
+            }
+        </MudPaper>
+    }
+
+    @if (Suggestions.Count > 0)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Suggestions from this month's spending</MudText>
+        <div class="d-flex gap-2 flex-wrap">
+            @foreach (var s in Suggestions)
+            {
+                <MudChip T="string" Variant="Variant.Outlined" OnClick="@(() => Suggest(s.Key, s.Value))">@s.Key — @Format.Money(s.Value) so far</MudChip>
+            }
+        </div>
+    }
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.BudgetsDto? _data;
+    private bool _loading = true;
+    private string? _category;
+    private decimal _limit;
+
+    private IEnumerable<string> Choices => _data is null
+        ? []
+        : _data.SpendByCategory.Keys.Where(k => k != "Uncategorized").Concat(_data.Budgets.Select(b => b.Category)).Distinct().OrderBy(k => k);
+
+    private decimal SpentFor(string category) =>
+        _data is not null && _data.SpendByCategory.TryGetValue(category, out var v) ? v : 0m;
+
+    private List<KeyValuePair<string, decimal>> Suggestions => _data is null
+        ? []
+        : _data.SpendByCategory
+            .Where(kv => kv.Key != "Uncategorized" && kv.Key != "Transfer" && _data.Budgets.All(b => b.Category != kv.Key))
+            .OrderByDescending(kv => kv.Value).Take(6).ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _data = await ApiClient.GetBudgetsAsync();
+        _loading = false;
+    }
+
+    private void Suggest(string category, decimal spent)
+    {
+        _category = category;
+        _limit = Math.Ceiling(spent / 50m) * 50m + 50m; // a rounded limit slightly above current spend
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            await ApiClient.SetBudgetAsync(_category!, _limit);
+            Snackbar.Add("Budget saved.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task Remove(string category)
+    {
+        try
+        {
+            await ApiClient.DeleteBudgetAsync(category);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}
