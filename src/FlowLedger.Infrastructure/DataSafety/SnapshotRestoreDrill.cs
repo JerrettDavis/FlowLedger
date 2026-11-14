@@ -121,8 +121,32 @@ public static class SnapshotRestoreDrill
             }
         }
 
+        // COPY wrote explicit ids, so every serial/identity sequence is still at 1. Without this the next insert
+        // (ledger row, backup run, ...) would hit a duplicate key after a restore/import.
+        await using (var seq = new NpgsqlCommand(ResetSequencesSql, conn))
+        {
+            await seq.ExecuteNonQueryAsync(ct);
+        }
+
         return results;
     }
+
+    private const string ResetSequencesSql = """
+        DO $$
+        DECLARE r record;
+        BEGIN
+          FOR r IN
+            SELECT c.table_name AS tbl, c.column_name AS col,
+                   pg_get_serial_sequence(quote_ident(c.table_name), c.column_name) AS seq
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'public'
+          LOOP
+            IF r.seq IS NOT NULL THEN
+              EXECUTE format('SELECT setval(%L, COALESCE((SELECT max(%I) FROM %I), 0) + 1, false)', r.seq, r.col, r.tbl);
+            END IF;
+          END LOOP;
+        END $$;
+        """;
 
     internal static async Task MigrateAsync(string connectionString, string? targetMigration, CancellationToken ct)
     {

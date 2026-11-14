@@ -17,19 +17,22 @@ public sealed class GuardedSyncService : IFinancialSyncService
     private readonly TimeSpan _minInterval;
     private readonly Func<CancellationToken, Task<DateTimeOffset?>> _lastSync;
     private readonly TimeProvider _time;
+    private readonly Func<CancellationToken, Task<IAsyncDisposable?>>? _crossProcessLock;
 
     public GuardedSyncService(
         IFinancialSyncService inner,
         Guid tenant,
         TimeSpan minInterval,
         Func<CancellationToken, Task<DateTimeOffset?>> lastSync,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        Func<CancellationToken, Task<IAsyncDisposable?>>? crossProcessLock = null)
     {
         _inner = inner;
         _tenant = tenant;
         _minInterval = minInterval;
         _lastSync = lastSync;
         _time = time ?? TimeProvider.System;
+        _crossProcessLock = crossProcessLock;
     }
 
     public Task<string> ConnectAsync(CancellationToken ct = default) => _inner.ConnectAsync(ct);
@@ -42,8 +45,16 @@ public sealed class GuardedSyncService : IFinancialSyncService
             throw new SyncAlreadyRunningException();
         }
 
+        IAsyncDisposable? lease = null;
         try
         {
+            // The in-process gate only stops two syncs in THIS process; the API, the webhook job and the Worker are
+            // separate processes, so a database advisory lock is held for the whole sync (null = someone else has it).
+            if (_crossProcessLock is not null)
+            {
+                lease = await _crossProcessLock(ct) ?? throw new SyncAlreadyRunningException();
+            }
+
             if (_minInterval > TimeSpan.Zero)
             {
                 var last = await _lastSync(ct);
@@ -61,6 +72,11 @@ public sealed class GuardedSyncService : IFinancialSyncService
         }
         finally
         {
+            if (lease is not null)
+            {
+                await lease.DisposeAsync();
+            }
+
             gate.Release();
         }
     }
