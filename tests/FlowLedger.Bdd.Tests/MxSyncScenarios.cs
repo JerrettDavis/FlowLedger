@@ -31,6 +31,9 @@ public partial class MxSyncScenarios : TinyBddXunitBase
             ["Mx:WebhookSecret"] = "wiremock-test-secret",
             ["Mx:Environment"] = "sandbox",
             ["Mx:Provider:RecordsPerPage"] = MxWireMockServer.RecordsPerPage.ToString(),
+            // This scenario proves cursor idempotency with two back-to-back syncs, so disable the
+            // real-provider 30-minute min-interval guard (covered by GuardedSyncServiceTests).
+            ["Sync:MinIntervalMinutes"] = "0",
         };
 
     // ── Scenario 5 ────────────────────────────────────────────────────────────

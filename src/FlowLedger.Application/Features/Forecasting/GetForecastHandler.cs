@@ -59,7 +59,7 @@ public sealed class GetForecastHandler
         var allAccounts = await _accounts.ListAsync(ct);
         var targetAccounts = query.AccountIds is { Count: > 0 }
             ? allAccounts.Where(a => query.AccountIds.Contains(a.AccountId.Value)).ToList()
-            : allAccounts.ToList();
+            : LiquidOrAll(allAccounts);
 
         if (targetAccounts.Count == 0)
         {
@@ -150,6 +150,20 @@ public sealed class GetForecastHandler
         };
 
         return _engine.Run(forecastRequest);
+    }
+
+    /// <summary>
+    /// With no explicit account filter the forecast covers spendable cash (checking, savings, cash). Credit cards,
+    /// loans/mortgages and investments would otherwise drag the aggregate far below zero and raise false overdraft
+    /// alarms. Falls back to every account when the tenant has no liquid account.
+    /// </summary>
+    private static List<Domain.Aggregates.Account> LiquidOrAll(IReadOnlyList<Domain.Aggregates.Account> all)
+    {
+        var liquid = all.Where(a => a.AccountType is
+            Domain.Aggregates.AccountType.Checking or
+            Domain.Aggregates.AccountType.Savings or
+            Domain.Aggregates.AccountType.Cash).ToList();
+        return liquid.Count > 0 ? liquid : all.ToList();
     }
 }
 
