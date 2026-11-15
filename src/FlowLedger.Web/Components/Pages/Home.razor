@@ -381,7 +381,7 @@ else
                             {
                                 <div class="d-flex justify-space-between align-center py-1">
                                     <div>
-                                        <MudText Typo="Typo.body2" Style="font-weight:500">@f.Transaction.Description</MudText>
+                                        <MudText Typo="Typo.body2" Style="font-weight:500">@(string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName)</MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@AccountName(f.Transaction.AccountId) · @Format.DayMonth(f.Transaction.PostedDate ?? f.Transaction.EffectiveDate)</MudText>
                                         <div>
                                             @foreach (var r in f.Reasons)
@@ -475,7 +475,7 @@ else
                 {
                     <div class="d-flex justify-space-between align-center py-1">
                         <div>
-                            <MudText Typo="Typo.body2" Style="font-weight:500">@t.Description</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight:500">@(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@AccountName(t.AccountId) · @Format.DayMonth(t.PostedDate ?? t.EffectiveDate)@(t.Status == "Pending" ? " · pending" : "")</MudText>
                         </div>
                         <MudText Typo="Typo.body2" Class="fl-num" Color="@Format.Delta(SignedValue(t))">@Signed(t)</MudText>

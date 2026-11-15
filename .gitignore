@@ -449,3 +449,5 @@ appsettings.local.json
 *.p12
 secrets.json
 **/.secrets/
+.playwright-mcp/
+.serena/

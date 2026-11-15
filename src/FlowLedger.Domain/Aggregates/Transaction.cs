@@ -221,6 +221,19 @@ public sealed class Transaction : AggregateRoot
         RaiseEvent(new TransactionCategorized(TransactionId, TenantId, categoryId));
     }
 
+    /// <summary>Sets the display name (alias) for this transaction's merchant without touching its category.</summary>
+    public bool SetMerchantName(string? merchantName)
+    {
+        var value = string.IsNullOrWhiteSpace(merchantName) ? null : merchantName.Trim();
+        if (string.Equals(MerchantName, value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        MerchantName = value;
+        return true;
+    }
+
     /// <summary>Removes a category that the auto-categorizer set. A manual category is never cleared by this.</summary>
     public bool ClearAutoCategory()
     {

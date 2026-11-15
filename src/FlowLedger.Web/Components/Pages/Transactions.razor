@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject ILogger<Transactions> Logger
 @inject IJSRuntime JS
+@inject IDialogService Dialogs
 
 <PageTitle>Transactions — FlowLedger</PageTitle>
 
@@ -105,7 +106,17 @@
             </CellTemplate>
         </TemplateColumn>
         <PropertyColumn Property="x => x.Description" Title="Description" Sortable="true" />
-        <PropertyColumn Property="x => x.MerchantName" Title="Merchant" Sortable="true" />
+        <TemplateColumn Title="Merchant" Sortable="true" SortBy="x => x.MerchantName">
+            <CellTemplate>
+                @{ var row = context.Item; }
+                <div class="d-flex align-center">
+                    <MudText Typo="Typo.body2">@row.MerchantName</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Edge="Edge.End"
+                                   OnClick="@(() => EditAlias(row))"
+                                   aria-label="@($"Rename merchant for {row.Description}")" title="Rename merchant" />
+                </div>
+            </CellTemplate>
+        </TemplateColumn>
         <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
             <CellTemplate>
                 <MudText Class="fl-num" Color="@Format.Delta(context.Item.Direction == "Credit" ? context.Item.Amount : -context.Item.Amount)">
@@ -227,6 +238,31 @@
         {
             var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, _applyToMerchant);
             Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task EditAlias(FlowLedger.Web.ApiClient.TransactionDto tx)
+    {
+        var dialog = await Dialogs.ShowAsync<AliasDialog>("Rename merchant", new DialogParameters<AliasDialog>
+        {
+            { x => x.Pattern, tx.Description },
+            { x => x.Alias, tx.MerchantName ?? "" },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ValueTuple<string, string> (var pattern, var alias))
+        {
+            return;
+        }
+
+        try
+        {
+            var changed = await ApiClient.SetMerchantAliasAsync(pattern, alias);
+            Snackbar.Add($"Renamed {changed} transaction(s) to {alias}", Severity.Success);
             await LoadAsync();
         }
         catch (Exception ex)

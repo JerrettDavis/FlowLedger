@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<CreateTransactionHandler>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
+        services.AddScoped<MerchantAliasService>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
 
         // Assets
