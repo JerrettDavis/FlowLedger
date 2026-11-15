@@ -167,6 +167,7 @@ public static class DependencyInjection
             var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
                 guarded,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
+                sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
 
             // Then detect recurring income/bills (after categories exist, so transfers/trades are excluded).
@@ -182,6 +183,12 @@ public static class DependencyInjection
                 sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
         });
+
+        services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlMerchantAliasStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
 
         services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlRecurringDismissalStore(

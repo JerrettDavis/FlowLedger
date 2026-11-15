@@ -658,6 +658,22 @@ public sealed class FlowLedgerApiClient
         });
     }
 
+    /// <summary>Labels every transaction whose bank description contains <paramref name="pattern"/> as <paramref name="alias"/> (now and after future syncs). Returns how many were renamed.</summary>
+    public async Task<int> SetMerchantAliasAsync(string pattern, string alias, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("save alias", async () =>
+        {
+            var response = await _http.PutAsJsonAsync("/api/merchant-aliases", new { pattern, alias }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't save alias (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
+            return body.TryGetProperty("changed", out var c) ? c.GetInt32() : 0;
+        });
+    }
+
     /// <summary>Spending by category, 6-month cash flow and net-worth trend for the dashboard.</summary>
     public async Task<DashboardInsightsDto?> GetDashboardInsightsAsync(CancellationToken ct = default)
     {

@@ -194,6 +194,7 @@ app.MapStatusEndpoints();
 app.MapEnvironmentEndpoints();
 app.MapDataEndpoints();
 app.MapCategorizationEndpoints();
+app.MapMerchantAliasEndpoints();
 app.MapBudgetEndpoints();
 app.MapAccountEndpoints();
 app.MapAssetEndpoints();
