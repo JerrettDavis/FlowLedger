@@ -10,9 +10,31 @@
                     @foreach (var s in Sections) { <MudSelectItem Value="@s">@s</MudSelectItem> }
                 </MudSelect></MudItem>
                 <MudItem xs="6"><MudTextField @bind-Value="_payer" Label="Payer" /></MudItem>
-                <MudItem xs="4"><MudNumericField @bind-Value="_due" Label="Due day (blank = floating)" Min="1" Max="31" Clearable="true" /></MudItem>
-                <MudItem xs="4"><MudNumericField @bind-Value="_estimated" Label="Estimated" Min="0m" Format="F2" /></MudItem>
-                <MudItem xs="4"><MudNumericField @bind-Value="_actual" Label="Actual" Min="0m" Format="F2" Clearable="true" /></MudItem>
+                <MudItem xs="12"><MudSelect T="string" @bind-Value="_frequency" Label="Repeats"
+                                            HelperText="@FrequencyHelp">
+                    <MudSelectItem Value="@("Monthly")">Once a month</MudSelectItem>
+                    <MudSelectItem Value="@("TwiceMonthly")">Twice a month</MudSelectItem>
+                    <MudSelectItem Value="@("Weekly")">Every week</MudSelectItem>
+                    <MudSelectItem Value="@("EveryNWeeks")">Every N weeks</MudSelectItem>
+                </MudSelect></MudItem>
+                @if (_frequency is "Weekly" or "EveryNWeeks")
+                {
+                    <MudItem xs="@(_frequency == "EveryNWeeks" ? 6 : 12)"><MudDatePicker @bind-Date="_anchor" Label="A date one payment falls on" Required="true" /></MudItem>
+                    @if (_frequency == "EveryNWeeks")
+                    {
+                        <MudItem xs="6"><MudNumericField @bind-Value="_interval" Label="Every how many weeks" Min="2" Max="52" /></MudItem>
+                    }
+                }
+                else
+                {
+                    <MudItem xs="@(_frequency == "TwiceMonthly" ? 6 : 12)"><MudNumericField @bind-Value="_due" Label="@(_frequency == "TwiceMonthly" ? "First due day" : "Due day (blank = floating)")" Min="1" Max="31" Clearable="true" /></MudItem>
+                    @if (_frequency == "TwiceMonthly")
+                    {
+                        <MudItem xs="6"><MudNumericField @bind-Value="_due2" Label="Second due day" Min="1" Max="31" /></MudItem>
+                    }
+                }
+                <MudItem xs="6"><MudNumericField @bind-Value="_estimated" Label="@(_frequency == "Monthly" ? "Estimated" : "Estimated each time")" Min="0m" Format="F2" /></MudItem>
+                <MudItem xs="6"><MudNumericField @bind-Value="_actual" Label="@(_frequency == "Monthly" ? "Actual" : "Actual each time")" Min="0m" Format="F2" Clearable="true" /></MudItem>
             </MudGrid>
             <div class="d-flex flex-wrap" style="gap:4px 16px">
                 <MudCheckBox @bind-Value="_debt" Label="Debt" />
@@ -50,7 +72,13 @@
     private string _name = "";
     private string _section = "Bills";
     private string? _payer;
-    private int? _due;
+    private int? _due, _due2;
+    private string _frequency = "Monthly";
+    private int _interval = 2;
+    private DateTime? _anchor;
+    private string FrequencyHelp => _frequency == "Monthly"
+        ? "The estimate is the monthly cost."
+        : "The estimate is per payment; the sheet counts every payment that falls in each month (a $55 fortnightly mow is $110 or $165).";
     private decimal _estimated;
     private decimal? _actual;
     private bool _debt, _perpetual, _optional, _business, _auto;
@@ -66,6 +94,10 @@
         _name = Row.Name;
         _payer = Row.Payer;
         _due = Row.DueDay;
+        _due2 = Row.SecondDueDay;
+        _frequency = Row.Frequency;
+        _interval = Row.IntervalWeeks ?? 2;
+        _anchor = Row.AnchorDate?.ToDateTime(TimeOnly.MinValue);
         _estimated = Row.Estimated;
         _actual = Row.Actual;
         _debt = Row.IsDebt;
@@ -86,8 +118,14 @@
     {
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
+        if (_frequency is "Weekly" or "EveryNWeeks" && _anchor is null) return;
+        if (_frequency is "Weekly" or "EveryNWeeks") _due = null;
         MudDialog.Close(DialogResult.Ok(new FlowLedger.Web.ApiClient.SaveBillRequest(
             _section, _name, _payer, _debt, _perpetual, _optional, _business, _auto,
-            _due, _estimated, _actual, _service, _account, _match)));
+            _due, _estimated, _actual, _service, _account, _match,
+            _frequency,
+            _frequency == "EveryNWeeks" ? _interval : null,
+            _frequency is "Weekly" or "EveryNWeeks" && _anchor is { } a ? DateOnly.FromDateTime(a) : null,
+            _frequency == "TwiceMonthly" ? _due2 : null)));
     }
 }

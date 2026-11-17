@@ -21,7 +21,8 @@ public sealed record RecurringFlowDto(
     Guid? CategoryId,
     string? Counterparty,
     bool IsActive,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    decimal MonthlyAmount = 0m);
 
 /// <summary>Request DTO for creating a recurring flow.</summary>
 public sealed record CreateRecurringFlowRequest(

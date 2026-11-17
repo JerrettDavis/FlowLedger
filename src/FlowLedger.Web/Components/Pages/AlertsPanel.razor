@@ -1,0 +1,19 @@
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+@if (_alerts is { Count: > 0 })
+{
+    <div class="mb-4" role="region" aria-label="Alerts">
+        @foreach (var a in _alerts)
+        {
+            <MudAlert Severity="@(a.Severity == "error" ? Severity.Error : Severity.Warning)" Dense="true" Class="mb-1">
+                <strong>@a.Title</strong> — @a.Detail
+            </MudAlert>
+        }
+    </div>
+}
+
+@code {
+    private List<FlowLedger.Web.ApiClient.AlertDto>? _alerts;
+
+    protected override async Task OnInitializedAsync() => _alerts = await ApiClient.GetAlertsAsync();
+}

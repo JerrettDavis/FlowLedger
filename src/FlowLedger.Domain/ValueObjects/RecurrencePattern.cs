@@ -87,6 +87,19 @@ public sealed record RecurrencePattern
         }
     }
 
+    /// <summary>
+    /// Average number of times the pattern fires in one calendar month. Weekly is 52/12 (about 4.33) and every-two-weeks is
+    /// 26/12 (about 2.17), so a $55 fortnightly mow is about $119 a month; some months have three.
+    /// </summary>
+    public decimal OccurrencesPerMonth => Frequency switch
+    {
+        RecurrenceFrequency.Daily => 365m / 12m,
+        RecurrenceFrequency.Weekly => 52m / 12m,
+        RecurrenceFrequency.EveryNWeeks => 52m / (IntervalWeeks ?? 2) / 12m,
+        RecurrenceFrequency.TwiceMonthly => 2m,
+        _ => 1m,
+    };
+
     public override string ToString() => Frequency switch
     {
         RecurrenceFrequency.Monthly => $"Monthly on day {DayOfMonth}",

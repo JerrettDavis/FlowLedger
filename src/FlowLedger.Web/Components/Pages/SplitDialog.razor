@@ -1,0 +1,84 @@
+<MudDialog aria-labelledby="split-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="split-dialog-title">Split transaction</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            @Description — <strong>@Format.Money(Total)</strong>. Divide it across categories; the parts must add up to the total.
+            Reports and budgets count each part in its own category.
+        </MudText>
+        @foreach (var r in _rows)
+        {
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudNumericField T="decimal" @bind-Value="r.Amount" Label="Amount" Min="0" Style="max-width:140px" Margin="Margin.Dense" Immediate="true" />
+                <MudSelect T="Guid?" @bind-Value="r.CategoryId" Label="Category" Margin="Margin.Dense" Style="min-width:200px" Clearable="true">
+                    @foreach (var c in Categories.OrderBy(c => c.Path))
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)c.Id)">@c.Path</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@(_rows.Count <= 2)"
+                               OnClick="@(() => _rows.Remove(r))" aria-label="Remove this part" />
+            </div>
+        }
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddRow">Add part</MudButton>
+        <MudText Typo="Typo.body2" Color="@(Remaining == 0 ? Color.Success : Color.Error)" Class="mt-2">
+            @(Remaining == 0 ? "Parts add up." : $"Remaining to assign: {Format.Money(Remaining)}")
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        @if (HasExisting)
+        {
+            <MudButton OnClick="Clear" Color="Color.Warning" aria-label="Remove split">Remove split</MudButton>
+        }
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(Remaining != 0 || _rows.Any(r => r.Amount <= 0))"
+                   aria-label="Save split">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public decimal Total { get; set; }
+    [Parameter] public Guid? CurrentCategoryId { get; set; }
+    [Parameter] public List<FlowLedger.Web.ApiClient.TransactionSplitDto>? Existing { get; set; }
+    [Parameter] public List<FlowLedger.Web.ApiClient.CategoryDto> Categories { get; set; } = [];
+
+    private sealed class Row
+    {
+        public decimal Amount { get; set; }
+        public Guid? CategoryId { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private readonly List<Row> _rows = [];
+
+    private bool HasExisting => Existing is { Count: > 0 };
+
+    private decimal Remaining => Total - _rows.Sum(r => r.Amount);
+
+    protected override void OnInitialized()
+    {
+        if (HasExisting)
+        {
+            _rows.AddRange(Existing!.Select(s => new Row { Amount = s.Amount, CategoryId = s.CategoryId, Notes = s.Notes }));
+        }
+        else
+        {
+            var half = Math.Round(Total / 2m, 2);
+            _rows.Add(new Row { Amount = Total - half, CategoryId = CurrentCategoryId });
+            _rows.Add(new Row { Amount = half });
+        }
+    }
+
+    private void AddRow() => _rows.Add(new Row { Amount = Math.Max(0, Remaining) });
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Clear() => MudDialog.Close(DialogResult.Ok(new List<FlowLedger.Web.ApiClient.TransactionSplitDto>()));
+
+    private void Save() => MudDialog.Close(DialogResult.Ok(
+        _rows.Select(r => new FlowLedger.Web.ApiClient.TransactionSplitDto(r.Amount, r.CategoryId, r.Notes)).ToList()));
+}

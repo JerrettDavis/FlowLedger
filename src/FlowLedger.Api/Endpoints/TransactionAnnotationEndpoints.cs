@@ -1,0 +1,59 @@
+using FlowLedger.Application.Features.Transactions;
+using Microsoft.AspNetCore.Mvc;
+
+namespace FlowLedger.Api.Endpoints;
+
+/// <summary>Notes and category splits on a transaction.</summary>
+internal static class TransactionAnnotationEndpoints
+{
+    internal sealed record SetNoteRequest(string? Note);
+
+    internal sealed record SetSplitsRequest(List<SplitInput>? Splits);
+
+    internal static IEndpointRouteBuilder MapTransactionAnnotationEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/transactions").WithTags("Transactions").RequireRateLimiting("api");
+
+        group.MapPut("/{id:guid}/note", async (Guid id, [FromBody] SetNoteRequest request, TransactionAnnotationService service, CancellationToken ct) =>
+            {
+                try
+                {
+                    await service.SetNoteAsync(id, request.Note, ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
+                }
+            })
+            .WithName("SetTransactionNote")
+            .WithSummary("Set a transaction's note (blank removes it)")
+            .RequireRateLimiting("write");
+
+        group.MapPut("/{id:guid}/splits", async (Guid id, [FromBody] SetSplitsRequest request, TransactionAnnotationService service, CancellationToken ct) =>
+            {
+                try
+                {
+                    await service.SetSplitsAsync(id, request.Splits ?? [], ct);
+                    return Results.NoContent();
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["splits"] = [ex.Message] });
+                }
+            })
+            .WithName("SetTransactionSplits")
+            .WithSummary("Replace a transaction's category splits (parts must add up to the amount; empty removes the split)")
+            .RequireRateLimiting("write");
+
+        return app;
+    }
+}

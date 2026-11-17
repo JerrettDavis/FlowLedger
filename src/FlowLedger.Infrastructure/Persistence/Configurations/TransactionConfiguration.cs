@@ -96,6 +96,16 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasColumnName("notes")
             .HasMaxLength(2000);
 
+        builder.Property(t => t.SuggestedName)
+            .HasColumnName("suggested_name")
+            .HasMaxLength(300);
+
+        // Comma-joined; the public Tags list is derived from this backing field.
+        builder.Ignore(t => t.Tags);
+        builder.Property<string?>("_tags")
+            .HasColumnName("tags")
+            .HasMaxLength(500);
+
         // TransactionFingerprint — owned type (single string column).
         builder.OwnsOne(t => t.Fingerprint, fp =>
         {

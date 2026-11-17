@@ -1,0 +1,67 @@
+@page "/investments"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<PageTitle>Investments — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Investment performance</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Growth of each investment account, with deposits and withdrawals taken out so moving money in isn't counted as a gain.
+    Needs balance history, which builds up with every sync.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_accounts is null || _accounts.Count == 0)
+{
+    <MudText Typo="Typo.body2" Class="fl-muted">No investment accounts found.</MudText>
+}
+else
+{
+    @foreach (var a in _accounts)
+    {
+        <MudPaper Class="pa-4 mb-3" Outlined="true">
+            <div class="d-flex justify-space-between align-center mb-2">
+                <MudText Typo="Typo.subtitle1">@a.Name</MudText>
+                <MudText Class="fl-num">@Format.Money(a.Balance)</MudText>
+            </div>
+            @if (a.Periods.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="fl-muted">Not enough balance history yet — check back after another sync.</MudText>
+            }
+            else
+            {
+                <MudSimpleTable Dense="true" Style="overflow-x:auto">
+                    <thead><tr><th>Period</th><th>Start balance</th><th>Net deposits</th><th>Gain / loss</th><th>Return</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in a.Periods)
+                        {
+                            <tr>
+                                <td>@p.Period@(p.Days < DaysFor(p.Period) ? $" (history: {p.Days}d)" : "")</td>
+                                <td class="fl-num">@Format.Money(p.StartBalance)</td>
+                                <td class="fl-num">@Format.Money(p.NetContributions)</td>
+                                <td class="fl-num"><MudText Color="@Format.Delta(p.Gain)" Class="fl-num">@Format.Money(p.Gain)</MudText></td>
+                                <td class="fl-num">@(p.GainPercent is { } g ? $"{g:+0.00;-0.00;0.00}%" : "–")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<FlowLedger.Web.ApiClient.AccountPerformanceDto>? _accounts;
+    private bool _loading = true;
+
+    private static int DaysFor(string period) => period switch { "30 days" => 30, "90 days" => 90, _ => 365 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _accounts = await ApiClient.GetInvestmentPerformanceAsync();
+        _loading = false;
+    }
+}

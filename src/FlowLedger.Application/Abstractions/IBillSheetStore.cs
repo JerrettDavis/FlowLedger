@@ -16,10 +16,12 @@ public interface IBillSheetStore
 
     Task<IReadOnlyList<SheetPaymentData>> ListPaymentsAsync(DateOnly fromMonth, DateOnly toMonth, CancellationToken ct = default);
 
-    /// <summary>Applies upserts (by bill + month) and clears in a single save.</summary>
+    /// <summary>
+    /// Applies upserts (by bill + month + slot) and clears in a single save. A clear with slot -1 removes every slot of that month.
+    /// </summary>
     Task ApplyPaymentsAsync(
         IReadOnlyList<SheetPaymentData> upserts,
-        IReadOnlyList<(Guid BillId, DateOnly Month)> clears,
+        IReadOnlyList<(Guid BillId, DateOnly Month, int Slot)> clears,
         CancellationToken ct = default);
 
     /// <summary>Adds many bills and cells in one save (CSV import).</summary>

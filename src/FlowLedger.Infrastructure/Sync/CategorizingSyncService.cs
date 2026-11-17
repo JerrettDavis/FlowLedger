@@ -6,12 +6,14 @@ using Microsoft.Extensions.Logging;
 namespace FlowLedger.Infrastructure.Sync;
 
 /// <summary>
-/// Runs merchant aliasing and then auto-categorization after each successful sync. A failure in either never fails the sync.
+/// Runs merchant aliasing, auto-categorization, then name-suggestion + auto-tagging after each successful sync. A failure in either never fails the sync.
 /// </summary>
 public sealed class CategorizingSyncService(
     IFinancialSyncService inner,
     CategorizationService categorizer,
     MerchantAliasService aliases,
+    CategoryRuleService rules,
+    TransactionEnrichmentService enrichment,
     ILogger<CategorizingSyncService> logger) : IFinancialSyncService
 {
     public Task<string> ConnectAsync(CancellationToken ct = default) => inner.ConnectAsync(ct);
@@ -34,6 +36,19 @@ public sealed class CategorizingSyncService(
 
         try
         {
+            var ruled = await rules.ApplyAsync(ct);
+            if (ruled > 0)
+            {
+                logger.LogInformation("Applied categorization rules to {Count} transactions.", ruled);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Applying categorization rules after sync failed; it will retry on the next sync.");
+        }
+
+        try
+        {
             var c = await categorizer.RunAsync(ct);
             if (c.Categorized > 0)
             {
@@ -44,6 +59,19 @@ public sealed class CategorizingSyncService(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Auto-categorization after sync failed; it will retry on the next sync.");
+        }
+
+        try
+        {
+            var e = await enrichment.RunAsync(ct);
+            if (e.Tagged + e.Named > 0)
+            {
+                logger.LogInformation("Enriched transactions: {Tagged} auto-tagged, {Named} given a suggested name.", e.Tagged, e.Named);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Tagging/name suggestion after sync failed; it will retry on the next sync.");
         }
 
         return result;
