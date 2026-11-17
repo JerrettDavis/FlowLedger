@@ -47,27 +47,26 @@ public sealed class ScheduledSyncJob : IJob
 
         _logger.LogInformation("ScheduledSyncJob: starting incremental sync.");
 
-        // Open a DI scope so scoped services (DbContext, tenant context, sync service)
-        // are properly disposed after each job execution.
-        await using var scope = _services.CreateAsyncScope();
-
-        var syncService = scope.ServiceProvider.GetRequiredService<IFinancialSyncService>();
-
-        try
+        // One DI scope per tenant (DbContext, tenant context, sync service); a failing tenant never blocks the others.
+        await FlowLedger.Worker.TenantFanOut.ForEachTenantAsync(_services, _logger, async (sp, tenantId) =>
         {
-            var result = await syncService.SyncAsync(cancellationToken);
-            _logger.LogInformation(
-                "ScheduledSyncJob: sync complete — {AccountsUpserted} accounts, " +
-                "{TransactionsAdded} added, {TransactionsSkipped} skipped.",
-                result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
-        }
-        catch (Exception ex)
-        {
-            // Log and return without rethrowing — Quartz considers an unhandled exception a
-            // job failure and may invoke misfire handling; a graceful log-and-continue is safer
-            // for transient provider errors.
-            _logger.LogError(ex,
-                "ScheduledSyncJob: sync faulted. The job will retry on the next scheduled interval.");
-        }
+            var syncService = sp.GetRequiredService<IFinancialSyncService>();
+
+            try
+            {
+                var result = await syncService.SyncAsync(cancellationToken);
+                _logger.LogInformation(
+                    "ScheduledSyncJob: tenant {TenantId} sync complete — {AccountsUpserted} accounts, " +
+                    "{TransactionsAdded} added, {TransactionsSkipped} skipped.",
+                    tenantId, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+            }
+            catch (Exception ex)
+            {
+                // Log and continue — Quartz treats an unhandled exception as a job failure; a graceful
+                // log-and-continue is safer for transient provider errors.
+                _logger.LogError(ex,
+                    "ScheduledSyncJob: sync faulted for tenant {TenantId}. It will retry on the next scheduled interval.", tenantId);
+            }
+        }, cancellationToken);
     }
 }

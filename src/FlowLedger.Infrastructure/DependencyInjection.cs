@@ -165,6 +165,12 @@ public static class DependencyInjection
         {
             var provider = sp.GetRequiredService<FlowLedger.Integrations.Abstractions.IFinancialDataProvider>();
             var tenant = sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId;
+            // Configured provider credentials belong to the household (legacy) tenant only — never sync them into another user's tenant.
+            if (provider.ProviderName != "Simulated"
+                && tenant != TenancySettings.Legacy(sp.GetRequiredService<IConfiguration>()).LegacyTenantId)
+            {
+                return new FlowLedger.Infrastructure.Sync.UnlinkedTenantSyncService();
+            }
             var cfg = sp.GetRequiredService<IConfiguration>();
             // Real providers default to 30 min between syncs; the free Simulated provider is unthrottled.
             var defaultMinutes = provider.ProviderName == "Simulated" ? 0 : 30;
@@ -204,6 +210,12 @@ public static class DependencyInjection
                 sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
         });
+
+        services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlUserDirectory(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                TenancySettings.Legacy(configuration)));
 
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryRuleStore(

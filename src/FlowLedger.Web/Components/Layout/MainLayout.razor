@@ -78,6 +78,18 @@
                 </MudButton>
             </MudTooltip>
         }
+        <AuthorizeView>
+            <Authorized>
+                @if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst("fl_tenant") is not null)
+                {
+                    <MudText Typo="Typo.body2" Class="mx-2" aria-label="Signed in user">@(context.User.FindFirst("name")?.Value ?? context.User.FindFirst("preferred_username")?.Value ?? context.User.FindFirst("email")?.Value)</MudText>
+                    <form method="post" action="/auth/logout" style="display:inline">
+                        <AntiforgeryToken />
+                        <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text" aria-label="Sign out">Sign out</MudButton>
+                    </form>
+                }
+            </Authorized>
+        </AuthorizeView>
         <MudTooltip Text="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
             <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                            Color="Color.Inherit"

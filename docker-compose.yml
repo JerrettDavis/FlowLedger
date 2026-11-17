@@ -85,6 +85,7 @@ services:
       # rejects it outside Development. Override here for a predictable dev key.
       Api__Key: ${API__KEY:-dev-local-key-not-for-production}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
+      Tenancy__LegacyOwnerEmail: ${TENANCY__LEGACYOWNEREMAIL:-}
     # Raw provider payload archive — MUST be a persistent volume (see ADR 0007).
     volumes:
       - objects_data:/data/objects
@@ -147,6 +148,9 @@ services:
       # Use the same env-var override pattern as the api service.
       Api__Key: ${API__KEY:-dev-local-key-not-for-production}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
+      Auth__Oidc__Authority: ${AUTH__OIDC__AUTHORITY:-}
+      Auth__Oidc__ClientId: ${AUTH__OIDC__CLIENTID:-}
+      Auth__Oidc__ClientSecret: ${AUTH__OIDC__CLIENTSECRET:-}
     depends_on:
       api-probe:
         condition: service_completed_successfully

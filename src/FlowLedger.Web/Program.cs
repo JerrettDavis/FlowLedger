@@ -1,5 +1,6 @@
 using System.Globalization;
 using FlowLedger.Web.ApiClient;
+using FlowLedger.Web.Auth;
 using FlowLedger.Web.Components;
 using FlowLedger.Web.Services;
 using MudBlazor.Services;
@@ -13,6 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ── Service defaults (OpenTelemetry, health checks, service discovery) ──────
 builder.AddServiceDefaults();
+
+// ── Authentication (provider-agnostic OIDC; disabled when Auth:Oidc:Authority is empty) ──
+var oidc = builder.AddFlowLedgerAuth();
+builder.Services.AddSingleton(oidc);
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
@@ -58,16 +63,30 @@ else
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
+if (!oidc.Enabled)
+{
+    app.Logger.LogWarning("Auth:Oidc is not configured: running in single-household mode WITHOUT sign-in. Configure Auth:Oidc before exposing this app.");
+}
+else
+{
+    app.MapFlowLedgerAuthEndpoints();
+}
 
 // ── Aspire health + liveness endpoints ──────────────────────────────────────
 app.MapDefaultEndpoints();
 
 // ── Static assets + Razor components ─────────────────────────────────────────
 app.MapStaticAssets();
-app.MapRazorComponents<App>()
+var razor = app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(FlowLedger.Web.Client._Imports).Assembly);
+if (oidc.Enabled)
+{
+    razor.RequireAuthorization();
+}
 
 app.Run();

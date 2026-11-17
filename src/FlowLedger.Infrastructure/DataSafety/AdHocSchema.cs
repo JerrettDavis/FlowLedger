@@ -24,6 +24,7 @@ public static class AdHocSchema
         NpgsqlMerchantAliasStore.CreateSqlText,
         NpgsqlRecurringDismissalStore.CreateSqlText,
         NpgsqlSuspiciousDismissalStore.CreateSqlText,
+        NpgsqlUserDirectory.CreateSqlText,
     ];
 
     public static string AllSql => string.Join("\n", Scripts);

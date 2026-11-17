@@ -10,7 +10,7 @@ namespace FlowLedger.Web.ApiClient;
 /// Registered on the FlowLedgerApiClient typed HttpClient in Program.cs.
 /// Values are read from the "Api" configuration section (bound to <see cref="ApiAuthOptions"/>).
 /// </summary>
-internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options) : DelegatingHandler
+internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options, FlowLedger.Web.Auth.OidcOptions oidc) : DelegatingHandler
 {
     private readonly ApiAuthOptions _options = options.Value;
 
@@ -25,9 +25,10 @@ internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options) : D
             request.Headers.TryAddWithoutValidation("X-Api-Key", _options.Key);
         }
 
-        if (!string.IsNullOrEmpty(_options.TenantId))
+        // Single-household mode (no OIDC): the configured tenant is authoritative. With OIDC the signed-in user's own
+        // tenant is set per client (see FlowLedgerApiClient) and a missing one must fail closed, never default.
+        if (!oidc.Enabled && !string.IsNullOrEmpty(_options.TenantId))
         {
-            // Override any existing tenant header so the handler is authoritative.
             request.Headers.Remove("X-Tenant-Id");
             request.Headers.TryAddWithoutValidation("X-Tenant-Id", _options.TenantId);
         }

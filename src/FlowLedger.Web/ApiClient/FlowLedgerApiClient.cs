@@ -24,10 +24,23 @@ public sealed class FlowLedgerApiClient
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public FlowLedgerApiClient(HttpClient http, ILogger<FlowLedgerApiClient> logger)
+    public FlowLedgerApiClient(
+        HttpClient http,
+        ILogger<FlowLedgerApiClient> logger,
+        Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider? authState = null)
     {
         _http = http;
         _logger = logger;
+
+        // Per-user segmentation: this client instance belongs to one circuit/user, so bind that user's tenant once.
+        // ServerAuthenticationStateProvider completes synchronously (state is captured when the circuit starts).
+        var task = authState?.GetAuthenticationStateAsync();
+        if (task is { IsCompletedSuccessfully: true }
+            && task.Result.User.FindFirst(FlowLedger.Web.Auth.AuthSetup.TenantClaim)?.Value is { Length: > 0 } tenant)
+        {
+            _http.DefaultRequestHeaders.Remove("X-Tenant-Id");
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Tenant-Id", tenant);
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

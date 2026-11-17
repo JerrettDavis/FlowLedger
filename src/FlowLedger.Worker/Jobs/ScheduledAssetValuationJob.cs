@@ -28,36 +28,38 @@ public sealed class ScheduledAssetValuationJob(
                        ?? configuration["AssetFeeds:Http:Name"]
                        ?? "appraiser";
 
-        await using var scope = services.CreateAsyncScope();
-        var assets = scope.ServiceProvider.GetRequiredService<IAssetRepository>();
-        var refresh = scope.ServiceProvider.GetRequiredService<RefreshAssetValuationHandler>();
-
-        IReadOnlyList<Asset> all;
-        try
+        await FlowLedger.Worker.TenantFanOut.ForEachTenantAsync(services, logger, async (sp, _) =>
         {
-            all = await assets.ListAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "ScheduledAssetValuationJob: could not list assets.");
-            return;
-        }
+            var assets = sp.GetRequiredService<IAssetRepository>();
+            var refresh = sp.GetRequiredService<RefreshAssetValuationHandler>();
 
-        var homes = all.Where(a => a.IsActive && a.Category == AssetCategory.RealEstate).ToList();
-        logger.LogInformation("ScheduledAssetValuationJob: refreshing {Count} real-estate asset(s) from '{Feed}'.", homes.Count, feedName);
-
-        foreach (var home in homes)
-        {
+            IReadOnlyList<Asset> all;
             try
             {
-                var result = await refresh.HandleAsync(home.Id, feedName, cancellationToken);
-                logger.LogInformation("ScheduledAssetValuationJob: {Message}", result?.Message ?? "asset not found");
+                all = await assets.ListAsync(cancellationToken);
             }
             catch (Exception ex)
             {
-                // e.g. feed disabled / not configured, network error, rate limit.
-                logger.LogWarning(ex, "ScheduledAssetValuationJob: refresh failed for one asset; keeping last value.");
+                logger.LogError(ex, "ScheduledAssetValuationJob: could not list assets.");
+                return;
             }
-        }
+
+            var homes = all.Where(a => a.IsActive && a.Category == AssetCategory.RealEstate).ToList();
+            logger.LogInformation("ScheduledAssetValuationJob: refreshing {Count} real-estate asset(s) from '{Feed}'.", homes.Count, feedName);
+
+            foreach (var home in homes)
+            {
+                try
+                {
+                    var result = await refresh.HandleAsync(home.Id, feedName, cancellationToken);
+                    logger.LogInformation("ScheduledAssetValuationJob: {Message}", result?.Message ?? "asset not found");
+                }
+                catch (Exception ex)
+                {
+                    // e.g. feed disabled / not configured, network error, rate limit.
+                    logger.LogWarning(ex, "ScheduledAssetValuationJob: refresh failed for one asset; keeping last value.");
+                }
+            }
+        }, cancellationToken);
     }
 }

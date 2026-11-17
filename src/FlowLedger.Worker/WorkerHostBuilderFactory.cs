@@ -35,7 +35,8 @@ public static class WorkerHostBuilderFactory
         var workerTenant = Guid.TryParse(builder.Configuration["Worker:TenantId"], out var configuredTenant)
             ? configuredTenant
             : ConfiguredTenantContext.DemoTenantId;
-        builder.Services.TryAddScoped<FlowLedger.SharedKernel.ITenantContext>(_ => new ConfiguredTenantContext(workerTenant));
+        builder.Services.AddScoped(_ => new ConfiguredTenantContext(workerTenant));
+        builder.Services.TryAddScoped<FlowLedger.SharedKernel.ITenantContext>(sp => sp.GetRequiredService<ConfiguredTenantContext>());
 
         // ── Job schedule options ──────────────────────────────────────────────
         builder.Services.Configure<JobScheduleOptions>(
