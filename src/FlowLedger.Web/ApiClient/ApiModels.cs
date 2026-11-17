@@ -449,3 +449,16 @@ public sealed record RecurringSuggestionDto(
 public sealed record AutoAddResultDto(int Added, List<string> Names);
 
 public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? ManageUrl);
+
+// ── Spending insights (Mint-style breakdown) ─────────────────────────────────
+
+public sealed record BreakdownGroupDto(string Key, string Label, decimal Amount, int Count, decimal Percent, bool HasChildren);
+public sealed record TrendPointDto(string Bucket, decimal Amount);
+public sealed record BreakdownTransactionDto(
+    Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, List<string> Tags);
+
+public sealed record BreakdownResultDto(
+    DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,
+    decimal Total, decimal PreviousTotal, int TransactionCount,
+    List<BreakdownGroupDto> Groups, List<TrendPointDto> Trend, List<BreakdownTransactionDto> Transactions,
+    int TransfersExcluded, decimal NonSpendingExcluded = 0);

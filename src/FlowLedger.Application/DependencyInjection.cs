@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<TransactionAnnotationService>();
         services.AddScoped<FlowLedger.Application.Features.Investments.InvestmentPerformanceService>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Insights.GetSpendingBreakdownHandler>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.DismissSuspiciousHandler>();
 
         // Assets
