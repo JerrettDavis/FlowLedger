@@ -15,7 +15,7 @@ internal static class AssetClock
 
 internal static class AssetMapper
 {
-    public static AssetDto ToDto(Asset a, DateOnly today, IReadOnlyDictionary<Guid, Account> accounts, bool withHistory)
+    public static AssetDto ToDto(Asset a, DateOnly today, IReadOnlyDictionary<Guid, Account> accounts, bool withHistory, int spreadWindowDays = 0)
     {
         var estimate = AssetValuationEstimator.Estimate(a, today).Amount;
         Account? linked = null;
@@ -44,6 +44,9 @@ internal static class AssetMapper
             withHistory
                 ? a.Valuations.OrderByDescending(v => v.AsOf).ThenByDescending(v => v.RecordedAt)
                     .Select(v => new AssetValuationDto(v.Id, v.Amount, v.AsOf, v.Source, v.Note, v.RecordedAt)).ToList()
+                : null,
+            a.GetSpread(spreadWindowDays) is { } sp
+                ? new ValuationSpreadDto(sp.Low, sp.High, sp.Median, sp.Average, sp.SourceCount, sp.WindowDays)
                 : null);
     }
 
@@ -117,14 +120,14 @@ public sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepositor
     }
 }
 
-public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, CancellationToken ct = default)
     {
         var asset = await assets.GetByIdAsync(AssetId.From(id), ct);
         return asset is null
             ? null
-            : AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
+            : AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
     }
 }
 
@@ -178,7 +181,7 @@ public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountReposito
 }
 
 /// <summary>Records a new valuation (e.g. an appraisal) and keeps a linked ManualAsset account in step.</summary>
-public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, RecordValuationRequest r, CancellationToken ct = default)
     {
@@ -190,11 +193,11 @@ public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccoun
 
         asset.RecordValuation(
             new Money(r.Amount, asset.CurrentValue.Currency), r.AsOf ?? AssetClock.Today,
-            string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note);
+            string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note, settings.BlendWindowDays);
         await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
 
         await assets.SaveChangesAsync(ct);
-        return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
+        return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
     }
 }
 
@@ -254,7 +257,8 @@ public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepo
 public sealed class RefreshAssetValuationHandler(
     IAssetRepository assets,
     IAccountRepository accounts,
-    IEnumerable<IAssetValuationFeed> feeds)
+    IEnumerable<IAssetValuationFeed> feeds,
+    AssetValuationSettings settings)
 {
     public async Task<AssetRefreshResultDto?> HandleAsync(Guid id, string? feedName, CancellationToken ct = default)
     {
@@ -271,15 +275,15 @@ public sealed class RefreshAssetValuationHandler(
         if (quote is null)
         {
             return new AssetRefreshResultDto(false, $"Feed '{feed.Name}' has no value for this asset.",
-                AssetMapper.ToDto(asset, today, map, withHistory: true));
+                AssetMapper.ToDto(asset, today, map, withHistory: true, spreadWindowDays: settings.BlendWindowDays));
         }
 
-        asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note);
+        asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note, settings.BlendWindowDays);
         await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
         await assets.SaveChangesAsync(ct);
         map = await AssetMapper.AccountsByIdAsync(accounts, ct);
         return new AssetRefreshResultDto(true, $"Updated from '{feed.Name}'.",
-            AssetMapper.ToDto(asset, today, map, withHistory: true));
+            AssetMapper.ToDto(asset, today, map, withHistory: true, spreadWindowDays: settings.BlendWindowDays));
     }
 
     private IAssetValuationFeed ResolveFeed(string? name)
@@ -289,4 +293,14 @@ public sealed class RefreshAssetValuationHandler(
                    ?? throw new AssetOperationException($"Unknown valuation feed '{wanted}'.");
         return feed.IsEnabled ? feed : throw new AssetOperationException($"Valuation feed '{feed.Name}' is not enabled.");
     }
+}
+
+/// <summary>
+/// Valuation behaviour settings. <see cref="BlendWindowDays"/>: valuations from different sources dated within
+/// +/- this many days are averaged into the current value (0 disables blending). Bound from
+/// <c>AssetValuation:BlendWindowDays</c>.
+/// </summary>
+public sealed class AssetValuationSettings
+{
+    public int BlendWindowDays { get; init; } = 7;
 }

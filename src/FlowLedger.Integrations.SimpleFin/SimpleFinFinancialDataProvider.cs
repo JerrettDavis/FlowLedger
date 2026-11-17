@@ -62,7 +62,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             return TransactionPage.Empty(cursor);
         }
 
-        var floor = cursor.IsInitial || !DateOnly.TryParse(cursor.Value, out var c)
+        var floor = cursor.IsInitial || _options.BackfillDays > _options.HistoryDays || !DateOnly.TryParse(cursor.Value, out var c)
             ? DateOnly.MinValue
             : c.AddDays(-Math.Max(0, _options.OverlapDays));
 
@@ -102,8 +102,10 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     private async Task<SfResponse> FetchCoreAsync(CancellationToken ct)
     {
         // SimpleFIN rejects ranges "exceeding" 90 days; stay one day inside so clock skew can't trip the cap.
-        var days = Math.Clamp(_options.HistoryDays, 1, 89);
-        var start = DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeSeconds();
+        const int window = 89;
+        var days = Math.Clamp(_options.HistoryDays, 1, window);
+        var now = DateTimeOffset.UtcNow;
+        var start = now.AddDays(-days).ToUnixTimeSeconds();
         using var resp = await _http.GetAsync($"accounts?start-date={start}&pending=1", ct).ConfigureAwait(false);
 
         switch (resp.StatusCode)
@@ -145,6 +147,54 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             }
         }
 
+        if (_options.BackfillDays > days)
+        {
+            await BackfillAsync(body, now, days, window, ct).ConfigureAwait(false);
+        }
+
         return body;
+    }
+
+    /// <summary>Walks backwards from the end of the first window, merging older transactions into <paramref name="body"/>.</summary>
+    private async Task BackfillAsync(SfResponse body, DateTimeOffset now, int coveredDays, int window, CancellationToken ct)
+    {
+        var total = Math.Min(_options.BackfillDays, 1100);
+        var byId = body.Accounts!.ToDictionary(SimpleFinMapper.AccountId);
+        var covered = coveredDays;
+        var requests = 0;
+        while (covered < total && requests < 14)
+        {
+            var span = Math.Min(window, total - covered);
+            var end = now.AddDays(-covered).ToUnixTimeSeconds();
+            var start = now.AddDays(-(covered + span)).ToUnixTimeSeconds();
+            using var resp = await _http.GetAsync($"accounts?start-date={start}&end-date={end}&pending=1", ct).ConfigureAwait(false);
+            requests++;
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("SimpleFIN backfill stopped at {Covered} days: HTTP {Status}.", covered, (int)resp.StatusCode);
+                return;
+            }
+
+            var page = await resp.Content.ReadFromJsonAsync<SfResponse>(ct).ConfigureAwait(false);
+            var added = 0;
+            foreach (var acct in page?.Accounts ?? [])
+            {
+                if (acct.Transactions is not { Count: > 0 } || !byId.TryGetValue(SimpleFinMapper.AccountId(acct), out var target))
+                {
+                    continue;
+                }
+
+                (target.Transactions ??= []).AddRange(acct.Transactions);
+                added += acct.Transactions.Count;
+            }
+
+            _logger.LogInformation("SimpleFIN backfill window {Covered}-{Next} days: {Count} transaction(s).", covered, covered + span, added);
+            if (added == 0)
+            {
+                return; // nothing older is available
+            }
+
+            covered += span;
+        }
     }
 }

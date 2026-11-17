@@ -69,6 +69,28 @@ static IResourceBuilder<T> WithMxConfig<T>(
             resource = resource.WithEnvironment($"AssetFeeds__Http__{key}", value);
         }
     }
+
+    // RealtyAPI.io (Redfin Estimate). Key in AppHost user-secrets: RealtyApi:ApiKey. When enabled it becomes
+    // the monthly home-valuation feed.
+    var realtyEnabled = string.Equals(configuration["RealtyApi:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
+    resource = resource.WithEnvironment("RealtyApi__Enabled", realtyEnabled ? "true" : "false");
+    if (!string.IsNullOrEmpty(configuration["RealtyApi:ApiKey"]))
+    {
+        resource = resource.WithEnvironment("RealtyApi__ApiKey", configuration["RealtyApi:ApiKey"]!);
+    }
+    if (realtyEnabled)
+    {
+        resource = resource.WithEnvironment("AssetValuation__AutoRefresh__FeedName", "realtyapi");
+    }
+
+    // Tulsa County Assessor (public site, no key). Enabling registers the feed; it becomes the auto-refresh
+    // feed only when RealtyAPI is not already selected.
+    var tulsaEnabled = string.Equals(configuration["TulsaAssessor:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
+    resource = resource.WithEnvironment("TulsaAssessor__Enabled", tulsaEnabled ? "true" : "false");
+    if (tulsaEnabled && !realtyEnabled)
+    {
+        resource = resource.WithEnvironment("AssetValuation__AutoRefresh__FeedName", "tulsa-assessor");
+    }
     return resource;
 }
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +30,15 @@ public static class Extensions
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
             // Turn on resilience by default
-            http.AddStandardResilienceHandler();
+            // A sync (POST) can legitimately run for minutes and must never be replayed: retrying a write risks a duplicate
+            // run, so unsafe methods are not retried and the timeouts allow for long provider calls.
+            http.AddStandardResilienceHandler(options =>
+            {
+                options.Retry.DisableFor(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch, HttpMethod.Delete);
+                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(6);
+                options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+            });
 
             // Turn on service discovery by default
             http.AddServiceDiscovery();

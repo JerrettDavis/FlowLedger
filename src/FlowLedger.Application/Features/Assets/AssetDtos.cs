@@ -30,7 +30,10 @@ public sealed record AssetDto(
     IReadOnlyDictionary<string, string> Attributes,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<AssetValuationDto>? Valuations);
+    IReadOnlyList<AssetValuationDto>? Valuations,
+    ValuationSpreadDto? Spread = null);
+
+public sealed record ValuationSpreadDto(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
 
 public sealed record CreateAssetRequest(
     string Name,

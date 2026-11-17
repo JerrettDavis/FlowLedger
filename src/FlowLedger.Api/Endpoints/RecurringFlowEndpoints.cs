@@ -1,3 +1,4 @@
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Application.Features.RecurringFlows;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -90,8 +91,17 @@ internal static class RecurringFlowEndpoints
         .WithSummary("Never suggest this pattern again")
         .RequireRateLimiting("write");
 
-        group.MapPost("/detect", async (RecurringSuggestionService svc, CancellationToken ct) =>
-            Results.Ok(await svc.AutoAddAsync(ct)))
+        group.MapPost("/{id:guid}/flag-remove", async (Guid id, RecurringSuggestionService svc, CancellationToken ct) =>
+                await svc.RemoveAndSuppressAsync(id, ct) ? Results.NoContent() : Results.NotFound())
+            .WithName("FlagRecurringFlowNotRecurring")
+            .WithSummary("Deactivate a flow and never auto-detect that merchant again")
+            .RequireRateLimiting("write");
+
+        group.MapPost("/detect", async (RecurringSuggestionService svc, MerchantAliasService aliases, CancellationToken ct) =>
+            {
+                await aliases.SeedSheetDefaultsAsync(ct);
+                return Results.Ok(await svc.AutoAddAsync(ct));
+            })
             .WithName("AutoAddRecurringFlows")
             .WithSummary("Add every high-confidence, fixed-amount pattern as a recurring flow now")
             .RequireRateLimiting("write");

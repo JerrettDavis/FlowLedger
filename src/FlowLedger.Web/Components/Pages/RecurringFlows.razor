@@ -9,6 +9,15 @@
 
 <div class="d-flex align-center justify-space-between mb-4">
     <MudText Typo="Typo.h4">Recurring Flows</MudText>
+    <div class="d-flex gap-2">
+    <MudButton StartIcon="@Icons.Material.Filled.AutoFixHigh"
+               Color="Color.Default"
+               Variant="Variant.Outlined"
+               Disabled="_busy"
+               OnClick="DetectNow"
+               aria-label="Re-run recurring detection">
+        Detect now
+    </MudButton>
     <MudButton StartIcon="@Icons.Material.Filled.Add"
                Color="Color.Primary"
                Variant="Variant.Filled"
@@ -16,6 +25,7 @@
                aria-label="Add recurring flow">
         Add Flow
     </MudButton>
+    </div>
 </div>
 
 @if (_suggestions.Count > 0)
@@ -164,6 +174,13 @@
                                Color="Color.Primary"
                                OnClick="() => OpenEditDialog(context.Item)"
                                aria-label="@($"Edit flow {context.Item.Name}")" />
+                <MudTooltip Text="Not recurring: remove and never detect again">
+                    <MudIconButton Icon="@Icons.Material.Filled.Block"
+                                   Size="Size.Small"
+                                   Color="Color.Warning"
+                                   OnClick="() => FlagNotRecurring(context.Item)"
+                                   aria-label="@($"Flag {context.Item.Name} as not recurring")" />
+                </MudTooltip>
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Size="Size.Small"
                                Color="Color.Error"
@@ -237,6 +254,54 @@
             {
                 _suggestions.Remove(s);
             }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task FlagNotRecurring(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Remove '{flow.Name}' and never detect it as a recurring flow again?" },
+            { x => x.ConfirmText, "Remove & ignore" }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Not recurring", parameters, new DialogOptions { CloseButton = true });
+        if ((await dialog.Result) is not { Canceled: false })
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            if (await ApiClient.FlagRecurringFlowNotRecurringAsync(flow.Id))
+            {
+                Snackbar.Add($"Removed “{flow.Name}”; it won't be detected again.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Couldn't flag that flow.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DetectNow()
+    {
+        _busy = true;
+        try
+        {
+            var result = await ApiClient.AutoAddRecurringFlowsAsync();
+            Snackbar.Add(result is null ? "Detection failed." : $"Detection finished: added {result.Added} flow(s).",
+                result is null ? Severity.Error : Severity.Success);
+            await LoadAsync();
         }
         finally
         {

@@ -33,6 +33,12 @@ internal static class MerchantAliasEndpoints
             .WithSummary("Create or replace an alias rule and apply it to existing and future transactions")
             .RequireRateLimiting("write");
 
+        group.MapPost("/seed-sheet-defaults", async (MerchantAliasService service, CancellationToken ct) =>
+                Results.Ok(new { added = await service.SeedSheetDefaultsAsync(ct) }))
+            .WithName("SeedSheetMerchantAliases")
+            .WithSummary("Add alias rules for the services in the household bill sheet (existing rules are kept)")
+            .RequireRateLimiting("write");
+
         group.MapDelete("/", async ([FromQuery] string pattern, MerchantAliasService service, CancellationToken ct) =>
                 await service.RemoveAsync(pattern, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("DeleteMerchantAlias")

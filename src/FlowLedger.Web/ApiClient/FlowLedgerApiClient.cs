@@ -450,6 +450,13 @@ public sealed class FlowLedgerApiClient
             return response.IsSuccessStatusCode;
         });
 
+    public async Task<bool> FlagRecurringFlowNotRecurringAsync(Guid id, CancellationToken ct = default) =>
+        await ExecuteAsync("flag recurring flow as not recurring", async () =>
+        {
+            var response = await _http.PostAsync($"/api/recurring-flows/{id}/flag-remove", null, ct);
+            return response.IsSuccessStatusCode;
+        });
+
     public async Task<AutoAddResultDto?> AutoAddRecurringFlowsAsync(CancellationToken ct = default) =>
         await ExecuteAsync("detect recurring flows", async () =>
         {
@@ -521,9 +528,15 @@ public sealed class FlowLedgerApiClient
         DateOnly? from = null,
         DateOnly? to = null,
         int? months = null,
+        IReadOnlyCollection<Guid>? accountIds = null,
         CancellationToken ct = default)
     {
         var qs = new List<string>();
+        if (accountIds is { Count: > 0 })
+        {
+            qs.Add("accounts=" + string.Join(",", accountIds));
+        }
+
         if (from.HasValue)
         {
             qs.Add($"from={from:yyyy-MM-dd}");
@@ -870,6 +883,16 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Begins (or resumes) the real bank connection and returns the provider widget URL. Billable on first use.</summary>
+    /// <summary>Provider-specific connect info: SimpleFIN has no widget, so this returns the Bridge page to link institutions at.</summary>
+    public async Task<ProviderInfoDto?> GetProviderInfoAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read provider info", async () =>
+        {
+            var response = await _http.GetAsync("/api/integrations/provider", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<ProviderInfoDto>(JsonOptions, ct)
+                : null;
+        });
+
     public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync("connect bank", async () =>

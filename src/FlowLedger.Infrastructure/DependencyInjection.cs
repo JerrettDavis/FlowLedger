@@ -137,6 +137,25 @@ public static class DependencyInjection
             c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<IAssetValuationFeed, FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeed>();
 
+        // RealtyAPI.io (Redfin Estimate) home values; disabled unless RealtyApi:Enabled + ApiKey.
+        services.Configure<FlowLedger.Infrastructure.Assets.RealtyApiOptions>(
+            configuration.GetSection(FlowLedger.Infrastructure.Assets.RealtyApiOptions.SectionName));
+        services.AddHttpClient(FlowLedger.Infrastructure.Assets.RealtyApiValuationFeed.HttpClientName,
+            c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddSingleton<IAssetValuationFeed, FlowLedger.Infrastructure.Assets.RealtyApiValuationFeed>();
+
+        // Tulsa County Assessor (OK) market value; public site, disabled unless TulsaAssessor:Enabled.
+        services.Configure<FlowLedger.Infrastructure.Assets.TulsaAssessorOptions>(
+            configuration.GetSection(FlowLedger.Infrastructure.Assets.TulsaAssessorOptions.SectionName));
+        services.AddHttpClient(FlowLedger.Infrastructure.Assets.TulsaCountyAssessorValuationFeed.HttpClientName,
+            c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddSingleton<IAssetValuationFeed, FlowLedger.Infrastructure.Assets.TulsaCountyAssessorValuationFeed>();
+
+        services.AddSingleton(new FlowLedger.Application.Features.Assets.AssetValuationSettings
+        {
+            BlendWindowDays = Math.Max(0, configuration.GetValue("AssetValuation:BlendWindowDays", 7)),
+        });
+
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<FinancialSyncService>();
         services.AddScoped<FlowLedger.Application.Abstractions.IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();

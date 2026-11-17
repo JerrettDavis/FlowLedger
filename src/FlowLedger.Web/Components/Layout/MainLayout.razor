@@ -216,6 +216,15 @@
 
     private async Task ConnectBank()
     {
+        var info = await ApiClient.GetProviderInfoAsync();
+        if (info is { UsesWidget: false, ManageUrl: { Length: > 0 } manage })
+        {
+            // SimpleFIN Bridge: institutions are linked on the Bridge site; the access URL is already configured here.
+            await JS.InvokeVoidAsync("open", manage, "_blank");
+            Snackbar.Add($"{info.Provider}: link or re-authenticate institutions on the Bridge page, then press Sync now.", Severity.Info);
+            return;
+        }
+
         var ok = await DialogService.ShowMessageBoxAsync(
             "Connect a bank",
             "This opens your provider's secure connection widget. Creating the connection is a billable provider call, and it is only made once. Continue?",

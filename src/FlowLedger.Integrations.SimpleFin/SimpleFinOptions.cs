@@ -17,6 +17,13 @@ public sealed class SimpleFinOptions
     /// <summary>History window requested per sync. SimpleFIN caps a request at 90 days.</summary>
     public int HistoryDays { get; set; } = 90;
 
+    /// <summary>
+    /// One-off deep backfill: when greater than <see cref="HistoryDays"/>, a sync pages backwards in &lt;=89-day windows
+    /// (one request each) until this many days are covered or a window comes back empty, and ignores the cursor floor.
+    /// Fingerprint dedupe makes re-importing safe. Leave 0 for normal operation.
+    /// </summary>
+    public int BackfillDays { get; set; }
+
     /// <summary>Days re-read before the cursor to catch late-posting items (fingerprint dedupe makes this safe).</summary>
     public int OverlapDays { get; set; } = 7;
 }

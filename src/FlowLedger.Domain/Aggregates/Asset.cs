@@ -157,7 +157,11 @@ public sealed class Asset : AggregateRoot
     /// Appends a valuation to the history. If it is dated on/after the current anchor it also becomes
     /// the current value; an older back-dated valuation only enriches history.
     /// </summary>
-    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, string? note = null)
+    /// <param name="blendWindowDays">
+    /// When greater than zero, competing valuations (different sources) dated within this many days of the
+    /// newest valuation are averaged into <see cref="CurrentValue"/> instead of the latest one winning.
+    /// </param>
+    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, string? note = null, int blendWindowDays = 0)
     {
         if (value.Currency != CurrentValue.Currency)
         {
@@ -172,12 +176,57 @@ public sealed class Asset : AggregateRoot
         if (asOf >= ValuedOn)
         {
             var previous = CurrentValue;
-            CurrentValue = value;
+            var blended = blendWindowDays > 0 ? BlendedValue(asOf, blendWindowDays, value.Currency) : value;
+            CurrentValue = blended;
             ValuedOn = asOf;
-            RaiseEvent(new AssetRevalued(AssetId, TenantId, previous, value));
+            RaiseEvent(new AssetRevalued(AssetId, TenantId, previous, blended));
         }
 
         return valuation;
+    }
+
+    /// <summary>
+    /// Average of the latest valuation from each distinct source dated within the window ending at
+    /// <paramref name="anchor"/>. One value per source so a frequently-polled feed doesn't outweigh the others.
+    /// </summary>
+    private Money BlendedValue(DateOnly anchor, int windowDays, Currency currency)
+    {
+        var perSource = LatestPerSource(anchor, windowDays);
+        return new Money(Math.Round(perSource.Average(v => v.Amount), 2, MidpointRounding.AwayFromZero), currency);
+    }
+
+    private List<AssetValuation> LatestPerSource(DateOnly anchor, int windowDays)
+    {
+        var from = anchor.AddDays(-windowDays);
+        return _valuations
+            .Where(v => v.AsOf >= from && v.AsOf <= anchor)
+            .GroupBy(v => v.Source, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(v => v.AsOf).ThenByDescending(v => v.RecordedAt).First())
+            .ToList();
+    }
+
+    /// <summary>
+    /// Low / high / median / average across the latest valuation per source within the window ending at
+    /// <see cref="ValuedOn"/> (the same set <see cref="CurrentValue"/> is blended from). Null when the window is off.
+    /// </summary>
+    public ValuationSpread? GetSpread(int windowDays)
+    {
+        if (windowDays <= 0)
+        {
+            return null;
+        }
+
+        var amounts = LatestPerSource(ValuedOn, windowDays).Select(v => v.Amount).Order().ToList();
+        if (amounts.Count == 0)
+        {
+            return null;
+        }
+
+        var mid = amounts.Count / 2;
+        var median = amounts.Count % 2 == 1 ? amounts[mid] : (amounts[mid - 1] + amounts[mid]) / 2m;
+        return new ValuationSpread(
+            amounts[0], amounts[^1], Math.Round(median, 2, MidpointRounding.AwayFromZero),
+            Math.Round(amounts.Average(), 2, MidpointRounding.AwayFromZero), amounts.Count, windowDays);
     }
 
     /// <summary>Links (or, with null, unlinks) an account. The account must belong to the same tenant.</summary>
@@ -231,6 +280,9 @@ public sealed class Asset : AggregateRoot
 }
 
 /// <summary>One point in an asset's append-only valuation history. Owned by <see cref="Asset"/>.</summary>
+/// <summary>Spread of competing valuations inside the blend window.</summary>
+public sealed record ValuationSpread(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
+
 public sealed class AssetValuation
 {
     public Guid Id { get; private set; }

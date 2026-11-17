@@ -2,6 +2,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.BillSheet;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
+using FlowLedger.Domain.ValueObjects;
 using FlowLedger.SharedKernel;
 
 namespace FlowLedger.Application.Features.RecurringFlows;
@@ -92,7 +93,7 @@ public sealed class RecurringSuggestionService(
         var existing = (await flows.ListAsync(ct)).Where(f => f.IsActive).ToList();
 
         return detected
-            .Where(d => !dismissed.Contains(d.Key) && !Covered(d, existing))
+            .Where(d => !IsDismissed(d, dismissed) && !Covered(d, existing))
             .Select(d =>
             {
                 var account = byId[d.AccountId];
@@ -111,6 +112,75 @@ public sealed class RecurringSuggestionService(
     }
 
     public Task DismissAsync(string key, CancellationToken ct = default) => dismissals.AddAsync(key, ct);
+
+    /// <summary>
+    /// "This is not really recurring": deactivates the flow and remembers the merchant so detection never adds it back
+    /// (a gas station or restaurant that happened to look regular). Returns false when the flow does not exist.
+    /// </summary>
+    public async Task<bool> RemoveAndSuppressAsync(Guid flowId, CancellationToken ct = default)
+    {
+        var flow = await flows.GetByIdAsync(RecurringFlowId.From(flowId), ct);
+        if (flow is null)
+        {
+            return false;
+        }
+
+        var isExtra = flow.Name.EndsWith(RecurringFlowDetector.ExtraSuffix, StringComparison.Ordinal);
+        var basis = (isExtra ? flow.Name.Replace(RecurringFlowDetector.ExtraSuffix, string.Empty, StringComparison.Ordinal) : null)
+            ?? flow.Counterparty ?? flow.Name;
+        var merchant = MerchantNormalizer.Key(string.IsNullOrWhiteSpace(basis) ? flow.Name : basis);
+        if (merchant.Length >= 3)
+        {
+            var direction = flow.Direction == TransactionDirection.Credit ? "C" : "D";
+            await dismissals.AddAsync($"{flow.AccountId.Value:N}|{direction}|{merchant}{(isExtra ? "|extra" : string.Empty)}", ct);
+        }
+
+        flow.Deactivate();
+        await flows.SaveChangesAsync(ct);
+        return true;
+    }
+
+    /// <summary>
+    /// A dismissal matches the exact key, or the same account+direction with an overlapping merchant: keys saved before
+    /// merchant normalization carried phone numbers and cities, so equality alone would let a dismissed pattern return.
+    /// </summary>
+    public static bool IsDismissed(DetectedFlow d, IReadOnlySet<string> dismissed)
+    {
+        if (dismissed.Contains(d.Key))
+        {
+            return true;
+        }
+
+        var parts = d.Key.Split('|');
+        if (parts.Length < 3)
+        {
+            return false;
+        }
+
+        var merchant = parts[2];
+        foreach (var raw in dismissed)
+        {
+            var p = raw.Split('|');
+            if (p.Length < 3 || p[0] != parts[0] || p[1] != parts[1])
+            {
+                continue;
+            }
+
+            var dismissedExtra = p.Length > 3 && p[3] == "extra";
+            if (dismissedExtra && !d.IsPeriodicExtra)
+            {
+                continue;
+            }
+
+            var other = p[2];
+            if (other.Length >= 5 && merchant.Length >= 5 && (other.Contains(merchant) || merchant.Contains(other)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Adds every suggestion that is safe to add without asking. Idempotent: added flows stop being suggested.</summary>
     public async Task<AutoAddResult> AutoAddAsync(CancellationToken ct = default)
@@ -153,8 +223,25 @@ public sealed class RecurringSuggestionService(
     /// <summary>An existing active flow on the same account whose name/counterparty overlaps the merchant covers the pattern.</summary>
     private static bool Covered(DetectedFlow d, IReadOnlyList<RecurringFlow> existing)
     {
-        var merchant = RecurringDetector.Key(d.Name);
+        // A periodic extra (monthly bonus) is covered only by another extra flow, and never makes its base flow look covered.
+        var merchant = RecurringDetector.Key(d.Name.Replace(RecurringFlowDetector.ExtraSuffix, string.Empty, StringComparison.Ordinal));
+        var direction = d.Direction == "Credit" ? TransactionDirection.Credit : TransactionDirection.Debit;
+        // Same account, direction, cadence and (near) amount is the same bill even when it was named differently
+        // (the old flow carries the raw bank text, the new detection carries the alias).
+        if (!d.IsPeriodicExtra && existing.Any(f => f.AccountId.Value == d.AccountId
+                && f.Direction == direction
+                && f.Pattern.Frequency.ToString() == d.Frequency
+                && !f.Name.EndsWith(RecurringFlowDetector.ExtraSuffix, StringComparison.Ordinal)
+                && Math.Abs(f.Amount.Amount - d.Amount) <= Math.Max(0.5m, d.Amount * 0.03m)
+                && (d.Frequency == "Monthly"
+                    ? f.Pattern.DayOfMonth is { } day && d.DayOfMonth is { } dd && Math.Abs(day - dd) <= 1
+                    : f.Pattern.AnchorDayOfWeek?.ToString() == d.AnchorDayOfWeek)))
+        {
+            return true;
+        }
+
         return existing.Any(f => f.AccountId.Value == d.AccountId
+            && f.Name.EndsWith(RecurringFlowDetector.ExtraSuffix, StringComparison.Ordinal) == d.IsPeriodicExtra
             && new[] { f.Name, f.Counterparty }.Where(x => !string.IsNullOrWhiteSpace(x)).Any(x =>
             {
                 var k = RecurringDetector.Key(x!);
