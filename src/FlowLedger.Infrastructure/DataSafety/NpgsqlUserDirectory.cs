@@ -60,9 +60,15 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
             legacyTaken = await chk.ExecuteScalarAsync(ct) is not null;
         }
 
-        var emailMatches = string.IsNullOrWhiteSpace(legacy.OwnerEmail)
-            || (identity.Email is not null && string.Equals(identity.Email.Trim(), legacy.OwnerEmail.Trim(), StringComparison.OrdinalIgnoreCase));
-        var tenantId = !legacyTaken && emailMatches ? legacy.LegacyTenantId : Guid.NewGuid();
+        // Fail closed: adoption needs an explicitly configured owner. An unverified email proves nothing.
+        var subjectMatches = !string.IsNullOrWhiteSpace(legacy.OwnerSubject)
+            && string.Equals(identity.Subject, legacy.OwnerSubject.Trim(), StringComparison.Ordinal)
+            && (string.IsNullOrWhiteSpace(legacy.OwnerIssuer) || string.Equals(identity.Issuer, legacy.OwnerIssuer.Trim(), StringComparison.Ordinal));
+        var emailMatches = !string.IsNullOrWhiteSpace(legacy.OwnerEmail)
+            && identity.EmailVerified
+            && identity.Email is not null
+            && string.Equals(identity.Email.Trim(), legacy.OwnerEmail.Trim(), StringComparison.OrdinalIgnoreCase);
+        var tenantId = !legacyTaken && (subjectMatches || emailMatches) ? legacy.LegacyTenantId : Guid.NewGuid();
 
         var userId = Guid.NewGuid();
         await using (var ins = new NpgsqlCommand(

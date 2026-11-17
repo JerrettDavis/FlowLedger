@@ -8,7 +8,7 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class UserEndpoints
 {
-    internal sealed record ResolveUserRequest(string Issuer, string Subject, string? Email, string? DisplayName);
+    internal sealed record ResolveUserRequest(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false);
 
     internal static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
@@ -21,7 +21,7 @@ internal static class UserEndpoints
                 return Results.Problem(title: "issuer and subject are required", statusCode: StatusCodes.Status400BadRequest);
             }
 
-            var user = await users.ResolveAsync(new ExternalIdentity(req.Issuer.Trim(), req.Subject.Trim(), req.Email, req.DisplayName), ct);
+            var user = await users.ResolveAsync(new ExternalIdentity(req.Issuer.Trim(), req.Subject.Trim(), req.Email, req.DisplayName, req.EmailVerified), ct);
             return Results.Ok(new { userId = user.UserId, tenantId = user.TenantId, email = user.Email, displayName = user.DisplayName, created = user.Created });
         })
         .WithName("ResolveUser")

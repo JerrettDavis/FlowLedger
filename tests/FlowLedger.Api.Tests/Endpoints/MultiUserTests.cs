@@ -48,6 +48,18 @@ public sealed class MultiUserTests(FlowLedgerApiFactory factory) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task Nobody_adopts_the_household_tenant_unless_an_owner_is_configured()
+    {
+        // No Tenancy:LegacyOwner* configured in the test host: even the very first user, claiming a verified email, must not get it.
+        var client = factory.CreateAuthenticatedClient();
+        var resp = await client.PostAsJsonAsync("/api/users/resolve",
+            new { issuer = "https://idp.test/" + Guid.NewGuid(), subject = "first", email = "owner@example.com", emailVerified = true });
+        var user = (await resp.Content.ReadFromJsonAsync<Resolved>())!;
+
+        user.TenantId.Should().NotBe(FlowLedgerApiFactory.DemoTenantId);
+    }
+
+    [Fact]
     public async Task Resolve_requires_the_api_key()
     {
         var anonymous = factory.CreateClient();
