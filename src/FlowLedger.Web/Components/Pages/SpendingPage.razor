@@ -1,0 +1,429 @@
+@page "/spending"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@inject FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+@inject ILogger<SpendingPage> Logger
+
+<PageTitle>Spending — FlowLedger</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
+    <MudText Typo="Typo.h4">Spending &amp; Trends</MudText>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+        <MudSelect T="string" Value="_period" ValueChanged="OnPeriodChanged" Label="Period" Style="width:170px" Dense="true">
+            @foreach (var p in Periods)
+            {
+                <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_period == "Custom")
+        {
+            <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)" Style="width:150px" />
+            <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)" Style="width:150px" />
+        }
+        <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_accountIds" SelectedValuesChanged="OnAccountsChanged"
+                   Label="Accounts" Style="width:210px" Clearable="true"
+                   MultiSelectionTextFunc="@(v => _accountIds.Count == 0 ? "All accounts" : $"{_accountIds.Count} account(s)")">
+            @foreach (var a in _accounts)
+            {
+                <MudSelectItem T="Guid" Value="@a.Id">@a.Name</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+</div>
+
+<div class="d-flex align-center mb-4" style="gap:16px;flex-wrap:wrap">
+    <MudToggleGroup T="bool" Value="_income" ValueChanged="OnIncomeChanged" Color="Color.Primary">
+        <MudToggleItem Value="false" Text="Spending" />
+        <MudToggleItem Value="true" Text="Income" />
+    </MudToggleGroup>
+    <MudToggleGroup T="string" Value="_groupBy" ValueChanged="OnGroupByChanged" Color="Color.Primary">
+        <MudToggleItem Value="@("Category")" Text="Category" />
+        <MudToggleItem Value="@("Tag")" Text="Tag" />
+        <MudToggleItem Value="@("Merchant")" Text="Merchant" />
+        <MudToggleItem Value="@("Account")" Text="Account" />
+    </MudToggleGroup>
+    <MudSwitch T="bool" Value="_includeTransfers" ValueChanged="OnIncludeTransfersChanged" Color="Color.Primary"
+               Label="Include transfers &amp; investments" />
+</div>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+@if (_loading && _result is null)
+{
+    <CardSkeleton Height="320px" />
+}
+else if (_result is not null)
+{
+    var r = _result;
+    var delta = r.Total - r.PreviousTotal;
+    // For spending, up is bad; for income, up is good.
+    var good = _income ? delta >= 0 : delta <= 0;
+
+    <MudGrid Class="mb-2">
+        <MudItem xs="12" sm="4">
+            <MudCard Class="fl-hero"><MudCardContent>
+                <MudText Typo="Typo.overline">@(_income ? "Total income" : "Total spending")</MudText>
+                <MudText Typo="Typo.h4" Class="fl-num">@Format.Money(r.Total)</MudText>
+                <MudText Typo="Typo.caption">@Format.FullDate(r.From) – @Format.FullDate(r.To)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard><MudCardContent>
+                <MudText Typo="Typo.overline">vs previous period</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num" Color="@(good ? Color.Success : Color.Error)">
+                    @(delta >= 0 ? "+" : "−")@Format.Money(Math.Abs(delta))
+                    @if (r.PreviousTotal > 0)
+                    {
+                        <span style="font-size:.7em"> (@((delta / r.PreviousTotal).ToString("P0")))</span>
+                    }
+                </MudText>
+                <MudText Typo="Typo.caption">Previous: @Format.Money(r.PreviousTotal)</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard><MudCardContent>
+                <MudText Typo="Typo.overline">Transactions</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num">@r.TransactionCount</MudText>
+                <MudText Typo="Typo.caption">@(r.TransfersExcluded > 0 ? $"{r.TransfersExcluded} own-account transfer(s) excluded" : "Own-account transfers excluded")@(r.NonSpendingExcluded > 0 ? $" · {Format.Money(r.NonSpendingExcluded)} of transfers/investments hidden" : "")</MudText>
+            </MudCardContent></MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex align-center" style="gap:4px;flex-wrap:wrap">
+                    @if (_groupBy == "Category")
+                    {
+                        <MudLink OnClick="() => DrillTo(null)" Typo="Typo.h6">All categories</MudLink>
+                        @foreach (var crumb in Crumbs())
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                            <MudLink OnClick="() => DrillTo(crumb.Path)" Typo="Typo.h6">@crumb.Label</MudLink>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h6">By @_groupBy.ToLowerInvariant()</MudText>
+                    }
+                    @if (_select is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" OnClose="() => SelectSlice(null)">
+                            Filtered: @SelectedLabel()
+                        </MudChip>
+                    }
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (r.Groups.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Nothing in this period for the selected accounts.</MudText>
+            }
+            else
+            {
+                <div class="d-flex" style="gap:24px;flex-wrap:wrap;align-items:flex-start">
+                    <div style="flex:0 0 300px;max-width:100%;margin:0 auto">
+                        <svg viewBox="-110 -110 220 220" role="img" aria-label="Breakdown donut chart" style="width:300px;max-width:100%">
+                            @foreach (var s in Slices())
+                            {
+                                <path d="@s.Path" fill="@s.Color" stroke="var(--mud-palette-surface)" stroke-width="1.5"
+                                      style="cursor:@(s.Group is null ? "default" : "pointer");opacity:@(_select is null || s.Group?.Key == _select ? "1" : ".35")"
+                                      @onclick="() => OnSliceClick(s.Group)">
+                                    <title>@s.Label — @Format.Money(s.Amount) (@s.Percent.ToString("0.#")%)</title>
+                                </path>
+                            }
+                            @SvgText(0, -4, "middle", 9, "var(--mud-palette-text-secondary)", _select is null ? (_income ? "Income" : "Spending") : SelectedLabel())
+                            @SvgText(0, 12, "middle", 15, "var(--mud-palette-text-primary)", Format.Money(CenterAmount()), "600")
+                        </svg>
+                    </div>
+                    <div style="flex:1 1 320px;min-width:280px">
+                        <MudSimpleTable Dense="true" Hover="true" Style="max-height:360px;overflow:auto">
+                            <thead><tr><th></th><th>@_groupBy</th><th style="text-align:right">Amount</th><th style="text-align:right">%</th><th style="text-align:right">#</th><th></th></tr></thead>
+                            <tbody>
+                            @for (var i = 0; i < r.Groups.Count; i++)
+                            {
+                                var g = r.Groups[i];
+                                var color = ColorFor(i);
+                                <tr style="@(g.Key == _select ? "background:var(--mud-palette-action-default-hover)" : "")">
+                                    <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@color"></span></td>
+                                    <td>
+                                        <MudLink OnClick="() => OnSliceClick(g)">@g.Label</MudLink>
+                                        @if (g.HasChildren) { <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" title="Drill down" /> }
+                                    </td>
+                                    <td style="text-align:right" class="fl-num">@Format.Money(g.Amount)</td>
+                                    <td style="text-align:right" class="fl-num">@g.Percent.ToString("0.#")%</td>
+                                    <td style="text-align:right">@g.Count</td>
+                                    <td>
+                                        <MudIconButton Icon="@(g.Key == _select ? Icons.Material.Filled.FilterAltOff : Icons.Material.Filled.FilterAlt)"
+                                                       Size="Size.Small" title="Filter trend and transactions to this" aria-label="Filter to this"
+                                                       OnClick="() => SelectSlice(g.Key == _select ? null : g.Key)" />
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </MudSimpleTable>
+                    </div>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Trend (@(_bucket == "month" ? "monthly" : _bucket == "week" ? "weekly" : "daily"))</MudText>
+                @if (_select is not null) { <MudText Typo="Typo.caption">@SelectedLabel()</MudText> }
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @{ var max = r.Trend.Count == 0 ? 1m : Math.Max(1m, r.Trend.Max(t => t.Amount)); var n = Math.Max(1, r.Trend.Count); }
+            @if (r.Trend.Count == 0 || r.Trend.All(t => t.Amount == 0))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No activity to chart.</MudText>
+            }
+            else
+            {
+                <div style="max-width:1000px;margin:0 auto">
+                    <svg viewBox="0 0 800 240" role="img" aria-label="Trend bar chart" style="width:100%">
+                        @for (var gi = 0; gi <= 3; gi++)
+                        {
+                            var gy = 20 + (180 * (3 - gi) / 3.0);
+                            <line x1="60" y1="@gy.ToString("F1")" x2="790" y2="@gy.ToString("F1")" stroke="var(--mud-palette-lines-default)" stroke-width="1" />
+                            @SvgText(55, gy + 3, "end", 9, "var(--mud-palette-text-secondary)", Compact(max * gi / 3m))
+                        }
+                        @for (var i = 0; i < r.Trend.Count; i++)
+                        {
+                            var t = r.Trend[i];
+                            var slot = 730.0 / n;
+                            var bw = Math.Min(60.0, slot * 0.7);
+                            var x = 60 + slot * i + (slot - bw) / 2;
+                            var h = (double)(t.Amount / max) * 180;
+                            <rect x="@x.ToString("F1")" y="@((200 - h).ToString("F1"))" width="@bw.ToString("F1")" height="@h.ToString("F1")"
+                                  rx="2" fill="@(_income ? "var(--mud-palette-success)" : "var(--mud-palette-primary)")">
+                                <title>@TrendLabel(t.Bucket): @Format.Money(t.Amount)</title>
+                            </rect>
+                            @if (n <= 14 || i % Math.Ceiling(n / 10.0) == 0)
+                            {
+                                @SvgText(x + bw / 2, 218, "middle", 9, "var(--mud-palette-text-secondary)", TrendLabel(t.Bucket))
+                            }
+                        }
+                    </svg>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Transactions</MudText>
+                <MudText Typo="Typo.caption">Largest first@(r.Transactions.Count >= 200 ? " (top 200)" : "")@(_select is not null ? " · " + SelectedLabel() : "")</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (r.Transactions.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No transactions.</MudText>
+            }
+            else
+            {
+                <MudSimpleTable Dense="true" Hover="true" Style="max-height:480px;overflow:auto">
+                    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Account</th><th>Tags</th><th style="text-align:right">Amount</th></tr></thead>
+                    <tbody>
+                    @foreach (var t in r.Transactions)
+                    {
+                        <tr>
+                            <td>@Format.FullDate(t.Date)</td>
+                            <td>@(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)</td>
+                            <td>@t.Category</td>
+                            <td>@t.Account</td>
+                            <td>@string.Join(", ", t.Tags)</td>
+                            <td style="text-align:right" class="fl-num">@Format.Money(t.Amount)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private static readonly string[] Periods =
+        ["This month", "Last month", "Last 30 days", "Last 90 days", "Year to date", "Last 12 months", "All time", "Custom"];
+    private static readonly string[] Palette =
+        ["#4C9AFF", "#36B37E", "#FFAB00", "#FF5630", "#6554C0", "#00B8D9", "#F06292", "#8BC34A", "#FF8A65", "#9575CD"];
+
+    private bool _loading = true;
+    private string? _error;
+    private string _period = "Last 90 days";
+    private DateOnly _from;
+    private DateOnly _to;
+    private bool _income;
+    private string _groupBy = "Category";
+    private string? _parent;
+    private string? _select;
+    private bool _includeTransfers;
+    private string _bucket = "month";
+    private IReadOnlyCollection<Guid> _accountIds = new HashSet<Guid>();
+    private List<AccountDto> _accounts = [];
+    private BreakdownResultDto? _result;
+    private int _requestSeq;
+
+    private sealed record Slice(string Path, string Color, string Label, decimal Amount, decimal Percent, BreakdownGroupDto? Group);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ApplyPeriod();
+        try { _accounts = await ApiClient.GetAccountsAsync(); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not load accounts for spending page"); }
+        await LoadAsync();
+    }
+
+    // ── filters ──────────────────────────────────────────────────────────────
+
+    private void ApplyPeriod()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        (_from, _to) = _period switch
+        {
+            "This month" => (new DateOnly(today.Year, today.Month, 1), today),
+            "Last month" => (new DateOnly(today.Year, today.Month, 1).AddMonths(-1), new DateOnly(today.Year, today.Month, 1).AddDays(-1)),
+            "Last 30 days" => (today.AddDays(-29), today),
+            "Last 90 days" => (today.AddDays(-89), today),
+            "Year to date" => (new DateOnly(today.Year, 1, 1), today),
+            "Last 12 months" => (new DateOnly(today.Year, today.Month, 1).AddMonths(-11), today),
+            "All time" => (today.AddYears(-5), today),
+            _ => (_from == default ? today.AddDays(-89) : _from, _to == default ? today : _to),
+        };
+        var days = _to.DayNumber - _from.DayNumber + 1;
+        _bucket = days <= 45 ? "day" : days <= 120 ? "week" : "month";
+    }
+
+    private async Task OnPeriodChanged(string p) { _period = p; ApplyPeriod(); await ResetAndLoad(); }
+
+    private async Task OnCustomDate(DateTime? d, bool from)
+    {
+        if (d is null) return;
+        var v = DateOnly.FromDateTime(d.Value);
+        if (from) _from = v; else _to = v;
+        if (_to < _from) (_from, _to) = (_to, _from);
+        var days = _to.DayNumber - _from.DayNumber + 1;
+        _bucket = days <= 45 ? "day" : days <= 120 ? "week" : "month";
+        await ResetAndLoad();
+    }
+
+    private async Task OnAccountsChanged(IEnumerable<Guid> ids) { _accountIds = ids?.ToHashSet() ?? new HashSet<Guid>(); await ResetAndLoad(); }
+    private async Task OnIncomeChanged(bool v) { _income = v; await ResetAndLoad(); }
+    private async Task OnIncludeTransfersChanged(bool v) { _includeTransfers = v; await ResetAndLoad(); }
+    private async Task OnGroupByChanged(string g) { _groupBy = g ?? "Category"; await ResetAndLoad(); }
+
+    private async Task ResetAndLoad() { _parent = null; _select = null; await LoadAsync(); }
+
+    // ── drill-down / selection ───────────────────────────────────────────────
+
+    private async Task OnSliceClick(BreakdownGroupDto? g)
+    {
+        if (g is null) return;
+        if (_groupBy == "Category" && g.HasChildren)
+        {
+            await DrillTo(g.Key);
+        }
+        else
+        {
+            await SelectSlice(g.Key == _select ? null : g.Key);
+        }
+    }
+
+    private async Task DrillTo(string? path) { _parent = path; _select = null; await LoadAsync(); }
+    private async Task SelectSlice(string? key) { _select = key; await LoadAsync(); }
+
+    private IEnumerable<(string Label, string Path)> Crumbs()
+    {
+        if (string.IsNullOrWhiteSpace(_parent)) yield break;
+        var segs = _parent.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < segs.Length; i++)
+        {
+            yield return (segs[i], string.Join('/', segs.Take(i + 1)));
+        }
+    }
+
+    private string SelectedLabel() =>
+        _result?.Groups.FirstOrDefault(g => g.Key == _select)?.Label ?? _select?.Split('/').LastOrDefault() ?? "";
+
+    private decimal CenterAmount() =>
+        _select is null ? _result?.Total ?? 0 : _result?.Groups.FirstOrDefault(g => g.Key == _select)?.Amount ?? _result?.Total ?? 0;
+
+    // ── load ─────────────────────────────────────────────────────────────────
+
+    private async Task LoadAsync()
+    {
+        var seq = ++_requestSeq;
+        _loading = true;
+        _error = null;
+        try
+        {
+            var res = await ApiClient.GetBreakdownAsync(_from, _to, _income, _groupBy, _parent, _select, _bucket, _accountIds, _includeTransfers);
+            if (seq == _requestSeq) _result = res;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load spending breakdown");
+            _error = ex is ApiClientException ace ? ace.Message : "Failed to load spending data. Please try again.";
+        }
+        finally
+        {
+            if (seq == _requestSeq) _loading = false;
+        }
+    }
+
+    // ── chart helpers ────────────────────────────────────────────────────────
+
+    private static string ColorFor(int i) => Palette[i % Palette.Length];
+
+    private IEnumerable<Slice> Slices()
+    {
+        if (_result is null || _result.Total <= 0) yield break;
+        const int Max = 9;
+        var groups = _result.Groups.Where(g => g.Amount > 0).ToList();
+        var shown = groups.Take(Max).ToList();
+        var restAmount = groups.Skip(Max).Sum(g => g.Amount);
+        double start = -Math.PI / 2;
+        const double ro = 100, ri = 62;
+        var total = (double)_result.Total;
+
+        IEnumerable<(BreakdownGroupDto? G, string Label, decimal Amount, string Color)> items =
+            shown.Select((g, i) => ((BreakdownGroupDto?)g, g.Label, g.Amount, ColorFor(i)))
+                 .Concat(restAmount > 0 ? [((BreakdownGroupDto?)null, "Other", restAmount, "#7f8794")] : []);
+
+        foreach (var it in items)
+        {
+            var frac = (double)it.Amount / total;
+            var sweep = Math.Min(frac, 0.99999) * 2 * Math.PI;
+            var end = start + sweep;
+            var large = sweep > Math.PI ? 1 : 0;
+            string P(double r, double a) => $"{(r * Math.Cos(a)).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{(r * Math.Sin(a)).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}";
+            var path = $"M {P(ro, start)} A {ro} {ro} 0 {large} 1 {P(ro, end)} L {P(ri, end)} A {ri} {ri} 0 {large} 0 {P(ri, start)} Z";
+            yield return new Slice(path, it.Color, it.Label, it.Amount, (decimal)(frac * 100), it.G);
+            start = end;
+        }
+    }
+
+    private string TrendLabel(string bucket) => bucket.Length switch
+    {
+        7 => DateOnly.ParseExact(bucket + "-01", "yyyy-MM-dd").ToString("MMM yy"),
+        _ => DateOnly.ParseExact(bucket, "yyyy-MM-dd").ToString("MMM d"),
+    };
+
+    private static MarkupString SvgText(double x, double y, string anchor, int size, string fill, string content, string? weight = null) =>
+        new($"<text x='{x.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}' y='{y.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}' " +
+            $"text-anchor='{anchor}' font-size='{size}'{(weight is null ? "" : $" font-weight='{weight}'")} fill='{fill}'>{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    private static string Compact(decimal v) =>
+        v >= 1_000_000 ? $"${v / 1_000_000:0.#}M" : v >= 1000 ? $"${v / 1000:0.#}k" : $"${v:0}";
+}
