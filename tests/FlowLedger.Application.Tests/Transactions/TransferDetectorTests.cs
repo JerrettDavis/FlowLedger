@@ -1,5 +1,5 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.Transactions;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
 

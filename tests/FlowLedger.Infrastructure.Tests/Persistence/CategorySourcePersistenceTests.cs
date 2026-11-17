@@ -1,7 +1,7 @@
-using FluentAssertions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;

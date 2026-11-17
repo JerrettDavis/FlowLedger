@@ -1,9 +1,9 @@
+using System.Text.Json;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using System.Text.Json;
 
 namespace FlowLedger.Infrastructure.DataSafety;
 

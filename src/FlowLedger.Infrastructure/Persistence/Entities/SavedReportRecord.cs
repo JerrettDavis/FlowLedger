@@ -17,8 +17,14 @@ internal sealed class SavedReportRecord
     public static SavedReportRecord Create(Guid tenantId, string name, string? description, string kind, string panelsJson, DateTimeOffset now)
         => new()
         {
-            Id = Guid.NewGuid(), TenantId = tenantId, Name = name, Description = description,
-            Kind = kind, PanelsJson = panelsJson, CreatedAt = now, UpdatedAt = now,
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = name,
+            Description = description,
+            Kind = kind,
+            PanelsJson = panelsJson,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
     public void Update(string name, string? description, string kind, string panelsJson, DateTimeOffset now)

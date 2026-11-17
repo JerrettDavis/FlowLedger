@@ -20,14 +20,14 @@ internal sealed class AccountBalanceSnapshotRecord
     public static AccountBalanceSnapshotRecord Create(
         Guid tenantId, Guid accountId, string providerName, string providerAccountId,
         decimal balance, string currency, DateTimeOffset capturedAt) => new()
-    {
-        Id = Guid.NewGuid(),
-        TenantId = tenantId,
-        AccountId = accountId,
-        ProviderName = providerName,
-        ProviderAccountId = providerAccountId,
-        Balance = balance,
-        Currency = currency,
-        CapturedAt = capturedAt,
-    };
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            AccountId = accountId,
+            ProviderName = providerName,
+            ProviderAccountId = providerAccountId,
+            Balance = balance,
+            Currency = currency,
+            CapturedAt = capturedAt,
+        };
 }

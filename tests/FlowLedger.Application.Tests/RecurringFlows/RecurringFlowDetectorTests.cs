@@ -1,5 +1,5 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.RecurringFlows;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.RecurringFlows;
 
