@@ -1,8 +1,8 @@
-using FluentAssertions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;

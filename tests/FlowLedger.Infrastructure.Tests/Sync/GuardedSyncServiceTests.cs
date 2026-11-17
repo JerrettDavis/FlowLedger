@@ -1,6 +1,6 @@
-using FluentAssertions;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Sync;
+using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
 
