@@ -106,6 +106,19 @@
     private string _environment = "unknown";
     private string? _backupAlert;
 
+    // ── Auto-sync ─────────────────────────────────────────────────────────────
+    // While the app is on screen: sync on load if the last sync is > 1h old, then re-check every few
+    // minutes and sync hourly. Hidden tabs never sync (the Worker covers that daily). The server still
+    // enforces single-flight, its minimum interval and the provider call budget; any failure or
+    // throttle backs the browser off so it never hammers a limited API.
+    private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan AutoSyncTick = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan AutoSyncBackoff = TimeSpan.FromHours(2);
+    private readonly CancellationTokenSource _autoCts = new();
+    private DateTimeOffset? _lastSyncedAt;
+    private DateTimeOffset _autoBackoffUntil = DateTimeOffset.MinValue;
+    private TimeSpan _serverMinInterval = TimeSpan.FromMinutes(30);
+
     // True once the user has made an explicit choice that we've persisted;
     // while false, runtime OS-preference changes are applied.
     private bool _hasUserOverride = false;
@@ -154,11 +167,15 @@
 
         _hasUserOverride = persisted.HasValue;
         ThemeService.Initialize(persisted, systemPrefersDark);
+
+        _ = RunAutoSyncLoopAsync(_autoCts.Token);
         // StateHasChanged is called by the ThemeChanged event that Initialize fires.
     }
 
     public void Dispose()
     {
+        _autoCts.Cancel();
+        _autoCts.Dispose();
         ThemeService.ThemeChanged -= OnThemeChanged;
     }
 
@@ -253,12 +270,82 @@
         }
     }
 
-    private async Task SyncNow()
+    private async Task RunAutoSyncLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            await AutoSyncIfDueAsync();
+            using var timer = new PeriodicTimer(AutoSyncTick);
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await AutoSyncIfDueAsync();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Auto-sync loop stopped");
+        }
+    }
+
+    private async Task AutoSyncIfDueAsync()
+    {
+        if (_syncing || DateTimeOffset.UtcNow < _autoBackoffUntil)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!await JS.InvokeAsync<bool>("FlowLedgerPage.isVisible"))
+            {
+                return; // not on display: leave it to the daily Worker sync
+            }
+
+            // Source of truth is the server (survives reloads and covers syncs from other processes).
+            var status = await ApiClient.GetSyncStatusAsync();
+            if (status is null)
+            {
+                return;
+            }
+
+            _lastSyncedAt = status.LastSyncedAt;
+            _serverMinInterval = TimeSpan.FromMinutes(Math.Max(0, status.MinIntervalMinutes));
+            var wait = (status.LastSyncedAt is { } last ? last + AutoSyncInterval : DateTimeOffset.MinValue)
+                       - DateTimeOffset.UtcNow;
+            if (wait > TimeSpan.Zero || status.Provider == "Simulated")
+            {
+                return;
+            }
+
+            await InvokeAsync(() => RunSyncAsync(auto: true));
+        }
+        catch (Exception ex)
+        {
+            _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
+            Logger.LogWarning(ex, "Auto-sync check failed; backing off for {Backoff}", AutoSyncBackoff);
+        }
+    }
+
+    private Task SyncNow() => RunSyncAsync(auto: false);
+
+    private async Task RunSyncAsync(bool auto)
     {
         _syncing = true;
+        if (auto) StateHasChanged();
         try
         {
             var result = await ApiClient.SyncAsync();
+            if (auto)
+            {
+                if (result is { TransactionsAdded: > 0 })
+                {
+                    Snackbar.Add($"Auto-sync: {result.TransactionsAdded} new transactions", Severity.Info);
+                }
+                return;
+            }
+
             Snackbar.Add(result is not null
                 ? $"Sync complete — {result.TransactionsAdded} new transactions"
                 : "Sync complete", Severity.Success);
@@ -266,11 +353,20 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Sync failed");
-            Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+            if (auto)
+            {
+                // Throttled / budget / needs-reauth / provider outage: stay quiet and back off.
+                _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
+            }
+            else
+            {
+                Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+            }
         }
         finally
         {
             _syncing = false;
+            if (auto) StateHasChanged();
         }
     }
 

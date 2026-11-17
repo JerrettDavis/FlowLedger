@@ -18,8 +18,10 @@ public sealed class JobScheduleOptions
 
     /// <summary>
     /// Cron expression controlling how often the sync runs.
-    /// Default: every 4 hours — conservative to avoid hammering providers.
+    /// Default: once a day (12:00 UTC). While the web app is open it syncs hourly itself, so this
+    /// background job is only the "nobody is looking" safety net — and the sync guard's minimum
+    /// interval makes it a no-op if the app has synced recently.
     /// Override in appsettings.{Environment}.json or environment variables.
     /// </summary>
-    public string CronExpression { get; set; } = "0 0 */4 * * ?";
+    public string CronExpression { get; set; } = "0 0 12 * * ?";
 }

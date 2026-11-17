@@ -57,3 +57,8 @@ window.FlowLedgerTheme = {
         }
     }
 };
+
+// Used by MainLayout's auto-sync: only sync while the tab is actually on screen.
+window.FlowLedgerPage = {
+    isVisible: () => document.visibilityState === 'visible'
+};

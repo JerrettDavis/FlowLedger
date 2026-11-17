@@ -48,7 +48,7 @@ public static class WorkerHostBuilderFactory
             // At compose time the options may not yet be validated, so we read the raw config.
             var schedSection = builder.Configuration.GetSection(JobScheduleOptions.SectionName);
             var enabled = schedSection.GetValue("Enabled", defaultValue: true);
-            var cron = schedSection.GetValue("CronExpression", defaultValue: "0 0 */4 * * ?")!;
+            var cron = schedSection.GetValue("CronExpression", defaultValue: "0 0 12 * * ?")!;
 
             var jobKey = new JobKey(nameof(ScheduledSyncJob), "FlowLedger");
             q.AddJob<ScheduledSyncJob>(opts => opts.WithIdentity(jobKey).StoreDurably());

@@ -34,7 +34,7 @@ public sealed class WorkerHostTests
         var options = new JobScheduleOptions();
 
         options.Enabled.Should().BeTrue("jobs should be enabled by default");
-        options.CronExpression.Should().Be("0 0 */4 * * ?",
+        options.CronExpression.Should().Be("0 0 12 * * ?",
             "default cron should fire every 4 hours — conservative, not aggressive polling");
     }
 

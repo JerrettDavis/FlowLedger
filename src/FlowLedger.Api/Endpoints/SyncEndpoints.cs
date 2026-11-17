@@ -42,6 +42,23 @@ internal static class SyncEndpoints
             .WithName("GetProviderInfo")
             .WithSummary("Active data provider and where institutions are linked");
 
+        // Lets the browser decide whether an auto-sync is due without calling the provider.
+        group.MapGet("/sync/status", async (
+                FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext db,
+                FlowLedger.SharedKernel.ITenantContext tenantContext,
+                FlowLedger.Integrations.Abstractions.IFinancialDataProvider provider,
+                IConfiguration cfg,
+                CancellationToken ct) =>
+            {
+                var providerName = provider.ProviderName;
+                var last = await FlowLedger.Infrastructure.Sync.SyncStatusReader.LastSyncedAtAsync(db, tenantContext, providerName, ct);
+                var defaultMinutes = providerName == "Simulated" ? 0 : 30;
+                var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
+                return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = providerName });
+            })
+            .WithName("GetSyncStatus")
+            .WithSummary("When the last successful sync finished and the enforced minimum interval");
+
         group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
             try
