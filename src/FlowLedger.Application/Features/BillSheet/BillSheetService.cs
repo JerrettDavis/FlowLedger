@@ -309,7 +309,8 @@ public sealed class BillSheetService(
                 // An earlier refresh saw this as a monthly bill; now there is enough history to know it repeats more often.
                 var fixedUp = RepeatingBill(covering.Id, covering.Section, covering.SortOrder, f, covering.Service) with
                 {
-                    Name = covering.Name, MatchText = covering.MatchText,
+                    Name = covering.Name,
+                    MatchText = covering.MatchText,
                 };
                 await store.SaveBillAsync(fixedUp, ct);
                 known = known.Select(b => b.Id == covering.Id ? fixedUp : b).ToList();
