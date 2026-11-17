@@ -125,6 +125,16 @@ public static class AuthSetup
                     [OpenIdConnectDefaults.AuthenticationScheme]))
             .AllowAnonymous();
 
+        // After linking a login the tenant claim in the cookie is stale: clear only the local cookie, then re-challenge
+        // (the IdP session is still alive, so the user is not prompted again) to re-resolve identity -> tenant.
+        app.MapGet("/auth/relogin", async (HttpContext ctx) =>
+            {
+                await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return Results.Challenge(new AuthenticationProperties { RedirectUri = "/account/logins" },
+                    [OpenIdConnectDefaults.AuthenticationScheme]);
+            })
+            .RequireAuthorization();
+
         app.MapGet("/auth/failed", () => Results.Text(
                 "Sign-in failed. Try again at /auth/login. If it keeps failing, check the identity provider configuration.",
                 statusCode: StatusCodes.Status401Unauthorized))

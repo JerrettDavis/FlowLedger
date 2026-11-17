@@ -25,3 +25,13 @@ Status: accepted (supersedes the "deferred" part of ADR 0001 for sign-in)
 * Per-user SimpleFIN/MX linking (needs encrypted per-tenant credential storage).
 * Shared households (several users, one tenant) and an admin role.
 * Direct JWT bearer on the API for non-browser clients.
+
+## Addendum — several logins, one person (multi-login linking)
+`app_users` rows are *logins*; several logins may point at the same `tenant_id`. A new login joins an existing tenant by, in order:
+1. **Configured owner** (`Tenancy:LegacyOwnerSubject` / `LegacyOwnerEmail`, each a comma/semicolon list): joins the legacy household tenant, even after an earlier owner login already adopted it.
+2. **Verified email** equal to an existing, verified login's email (`Tenancy:AutoLinkVerifiedEmail`, default on). Unverified emails never auto-link unless `Tenancy:TrustUnverifiedEmail=true` — leave that off if users can edit their own email in the IdP, because it would let them join someone else's data.
+3. Otherwise it gets a fresh empty tenant (a spouse's login lands here), and can be linked later.
+
+**Link code** (self-service, any IdP): *Linked logins* page → "Generate code" on the main login; sign in with the other login and enter it. Codes are single-use, 15 minutes, stored hashed. Redeeming re-points only that login; the login's previous tenant and its rows are left untouched (nothing is merged or deleted). A login can be unlinked (gets a new empty tenant); a tenant's last login cannot be unlinked.
+
+Migration is additive (`email_verified` column, indexes, `app_user_link_codes` table; `CREATE/ALTER ... IF NOT EXISTS`); existing rows keep their tenant. AppHost forwards `Tenancy__*` to Api and Worker and pins `Tenancy__LegacyTenantId` so a `Worker:TenantId` override cannot change which tenant owners adopt.

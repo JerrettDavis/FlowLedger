@@ -21,9 +21,10 @@ public partial class MxSyncScenarios : TinyBddXunitBase
     public MxSyncScenarios(BddTestFixture fixture, ITestOutputHelper output) : base(output)
         => _fixture = fixture;
 
-    private static IReadOnlyDictionary<string, string?> MxConfig(string baseUrl) =>
+    private static IReadOnlyDictionary<string, string?> MxConfig(string baseUrl, Guid householdTenant) =>
         new Dictionary<string, string?>
         {
+            ["Tenancy:LegacyTenantId"] = householdTenant.ToString(), // configured provider credentials belong to the household tenant only
             ["Mx:Enabled"] = "true",
             ["Mx:BaseUrl"] = baseUrl,
             ["Mx:ClientId"] = "test-client",
@@ -55,7 +56,7 @@ public partial class MxSyncScenarios : TinyBddXunitBase
 
         async Task<SyncResult> FirstSync(TestTenantContext t)
         {
-            using var scope = _fixture.CreateScope(t, MxConfig(mx.BaseUrl));
+            using var scope = _fixture.CreateScope(t, MxConfig(mx.BaseUrl, t.TenantId));
             var sync = scope.Resolve<IFinancialSyncService>();
             // Real providers are never provisioned implicitly by a sync: connect explicitly first.
             await sync.ConnectAsync();
@@ -75,7 +76,7 @@ public partial class MxSyncScenarios : TinyBddXunitBase
         // to run a second sync — the cursor persisted by the first sync prevents re-import.
         async Task<bool> SecondSyncIdempotent(SyncResult _)
         {
-            using var scope = _fixture.CreateScope(tenant, MxConfig(mx.BaseUrl));
+            using var scope = _fixture.CreateScope(tenant, MxConfig(mx.BaseUrl, tenant.TenantId));
             var sync = scope.Resolve<IFinancialSyncService>();
             var second = await sync.SyncAsync();
             second.TransactionsAdded.Should().Be(0,
