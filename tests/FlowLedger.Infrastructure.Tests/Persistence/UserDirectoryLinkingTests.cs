@@ -55,7 +55,8 @@ public sealed class UserDirectoryLinkingTests : IAsyncLifetime
     [Fact]
     public async Task VerifiedEmailMatch_LinksSecondLoginToSameTenant_ButSpouseStaysSeparate()
     {
-        var dir = Dir();
+        var dir = Dir(new LegacyTenantClaim(Legacy, null, AutoLinkVerifiedEmail: true));
+        (await Dir().ResolveAsync(Id("d1", "d@x.com"))).TenantId.Should().NotBe((await Dir().ResolveAsync(Id("d2", "d@x.com"))).TenantId, "auto-link is off by default");
         var first = await dir.ResolveAsync(Id("one", "Me@Home.com"));
         var second = await dir.ResolveAsync(new ExternalIdentity("https://google", "g-1", "me@home.com", "me", true));
         var wife = await dir.ResolveAsync(Id("wife", "wife@home.com"));
@@ -66,12 +67,12 @@ public sealed class UserDirectoryLinkingTests : IAsyncLifetime
     [Fact]
     public async Task UnverifiedEmail_DoesNotAutoLink_UnlessTrusted()
     {
-        var dir = Dir();
+        var dir = Dir(new LegacyTenantClaim(Legacy, null, AutoLinkVerifiedEmail: true));
         var first = await dir.ResolveAsync(Id("one", "me@home.com", verified: false));
         var second = await dir.ResolveAsync(Id("two", "me@home.com", verified: false));
         second.TenantId.Should().NotBe(first.TenantId);
 
-        var trusting = Dir(new LegacyTenantClaim(Legacy, null, TrustUnverifiedEmail: true));
+        var trusting = Dir(new LegacyTenantClaim(Legacy, null, AutoLinkVerifiedEmail: true, TrustUnverifiedEmail: true));
         var t1 = await trusting.ResolveAsync(Id("t1", "t@home.com", verified: false));
         var t2 = await trusting.ResolveAsync(Id("t2", "t@home.com", verified: false));
         t2.TenantId.Should().Be(t1.TenantId);

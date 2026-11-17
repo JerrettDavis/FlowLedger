@@ -90,7 +90,8 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
         //    owner's several IdP accounts all see the same data. Fail closed: with nothing configured nobody matches.
         var subjectMatches = Split(legacy.OwnerSubject).Contains(identity.Subject, StringComparer.Ordinal)
             && (string.IsNullOrWhiteSpace(legacy.OwnerIssuer) || string.Equals(identity.Issuer, legacy.OwnerIssuer.Trim(), StringComparison.Ordinal));
-        var emailMatches = emailTrusted
+        var emailMatches = identity.EmailVerified && !string.IsNullOrWhiteSpace(identity.Email)
+            && (string.IsNullOrWhiteSpace(legacy.OwnerIssuer) || string.Equals(identity.Issuer, legacy.OwnerIssuer.Trim(), StringComparison.Ordinal))
             && Split(legacy.OwnerEmail).Contains(identity.Email!.Trim(), StringComparer.OrdinalIgnoreCase);
 
         Guid? tenantId = subjectMatches || emailMatches ? legacy.LegacyTenantId : null;
