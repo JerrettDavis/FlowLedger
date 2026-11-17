@@ -66,21 +66,27 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
 
     public async Task ApplyPaymentsAsync(
         IReadOnlyList<SheetPaymentData> upserts,
-        IReadOnlyList<(Guid BillId, DateOnly Month)> clears,
+        IReadOnlyList<(Guid BillId, DateOnly Month, int Slot)> clears,
         CancellationToken ct = default)
     {
-        var touched = upserts.Select(u => (u.BillId, u.Month)).Concat(clears).ToHashSet();
+        var touched = upserts.Select(u => (u.BillId, u.Month)).Concat(clears.Select(c => (c.BillId, c.Month))).ToHashSet();
         var billIds = touched.Select(t => t.Item1).Distinct().ToList();
         var months = touched.Select(t => t.Item2).Distinct().ToList();
         var current = (await db.SheetPayments.Where(p => billIds.Contains(p.BillId) && months.Contains(p.Month)).ToListAsync(ct))
-            .ToDictionary(p => (p.BillId, p.Month));
+            .ToDictionary(p => (p.BillId, p.Month, p.Slot));
 
         // Clear first and save so a freed transaction can be re-assigned without tripping the unique index.
-        foreach (var key in clears)
+        foreach (var (billId, month, slot) in clears)
         {
-            if (current.Remove(key, out var gone))
+            var doomed = slot < 0
+                ? current.Keys.Where(k => k.BillId == billId && k.Month == month).ToList()
+                : [(billId, month, slot)];
+            foreach (var key in doomed)
             {
-                db.SheetPayments.Remove(gone);
+                if (current.Remove(key, out var gone))
+                {
+                    db.SheetPayments.Remove(gone);
+                }
             }
         }
 
@@ -91,7 +97,7 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
 
         foreach (var u in upserts)
         {
-            if (current.TryGetValue((u.BillId, u.Month), out var row))
+            if (current.TryGetValue((u.BillId, u.Month, u.Slot), out var row))
             {
                 Apply(row, u);
             }
@@ -144,7 +150,8 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
 
     private static SheetBillData ToData(SheetBillRecord r)
         => new(r.Id, r.Section, r.SortOrder, r.Name, r.Payer, r.IsDebt, r.IsPerpetual, r.IsOptional, r.IsBusiness,
-            r.AutoPay, r.DueDay, r.Estimated, r.Actual, r.Service, r.AccountRef, r.MatchText, r.IsActive);
+            r.AutoPay, r.DueDay, r.Estimated, r.Actual, r.Service, r.AccountRef, r.MatchText, r.IsActive,
+            r.Frequency, r.IntervalWeeks, r.AnchorDate, r.SecondDueDay);
 
     private static void Apply(SheetBillRecord r, SheetBillData d)
     {
@@ -164,11 +171,15 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
         r.AccountRef = d.AccountRef;
         r.MatchText = d.MatchText;
         r.IsActive = d.IsActive;
+        r.Frequency = d.Frequency;
+        r.IntervalWeeks = d.IntervalWeeks;
+        r.AnchorDate = d.AnchorDate;
+        r.SecondDueDay = d.SecondDueDay;
     }
 
     private static SheetPaymentData ToData(SheetPaymentRecord r)
         => new(r.BillId, r.Month, r.IsPaid, r.Amount, r.PaidOn, r.TransactionId,
-            Enum.TryParse<SheetPaymentSource>(r.Source, out var s) ? s : SheetPaymentSource.Manual);
+            Enum.TryParse<SheetPaymentSource>(r.Source, out var s) ? s : SheetPaymentSource.Manual, r.Slot);
 
     private static void Apply(SheetPaymentRecord r, SheetPaymentData d)
     {
@@ -178,6 +189,7 @@ internal sealed class EfBillSheetStore(FlowLedgerDbContext db, ITenantContext te
         r.Amount = d.Amount;
         r.PaidOn = d.PaidOn;
         r.TransactionId = d.TransactionId;
+        r.Slot = d.Slot;
         r.Source = d.Source.ToString();
     }
 }

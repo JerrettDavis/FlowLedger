@@ -18,7 +18,22 @@ public sealed record SheetBillData(
     string? Service,
     string? AccountRef,
     string? MatchText,
-    bool IsActive);
+    bool IsActive,
+    string Frequency = BillFrequency.Monthly,
+    int? IntervalWeeks = null,
+    DateOnly? AnchorDate = null,
+    int? SecondDueDay = null);
+
+/// <summary>How often a sheet row is paid. <see cref="Estimated"/> amounts are per payment, not per month.</summary>
+public static class BillFrequency
+{
+    public const string Monthly = "Monthly";
+    public const string TwiceMonthly = "TwiceMonthly";
+    public const string Weekly = "Weekly";
+    public const string EveryNWeeks = "EveryNWeeks";
+
+    public static bool IsKnown(string? f) => f is Monthly or TwiceMonthly or Weekly or EveryNWeeks;
+}
 
 public enum SheetPaymentSource
 {
@@ -37,7 +52,8 @@ public sealed record SheetPaymentData(
     decimal? Amount,
     DateOnly? PaidOn,
     Guid? TransactionId,
-    SheetPaymentSource Source);
+    SheetPaymentSource Source,
+    int Slot = 0);
 
 /// <summary>Minimal transaction projection the matcher works on.</summary>
 /// <param name="Text">Merchant plus description, used for matching.</param>
@@ -47,4 +63,4 @@ public sealed record SheetTxn(Guid Id, DateOnly Date, decimal Amount, string Tex
 /// <summary>Result of a matcher run: cells to write and cells to clear.</summary>
 public sealed record SheetMatchResult(
     IReadOnlyList<SheetPaymentData> Upserts,
-    IReadOnlyList<(Guid BillId, DateOnly Month)> Clears);
+    IReadOnlyList<(Guid BillId, DateOnly Month, int Slot)> Clears);

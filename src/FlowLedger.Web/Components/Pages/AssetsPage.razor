@@ -68,7 +68,8 @@
     </EmptyState>
 }
 
-<MudDataGrid T="FlowLedger.Web.ApiClient.AssetDto" Items="_assets" Filterable="true"
+<MudDataGrid T="FlowLedger.Web.ApiClient.AssetDto"
+             DragDropColumnReordering="true" Items="_assets" Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow" SortMode="SortMode.Multiple"
              Hover="true" Dense="true" aria-label="Assets table">
     <Columns>

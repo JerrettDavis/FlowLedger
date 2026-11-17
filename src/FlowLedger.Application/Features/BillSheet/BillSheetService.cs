@@ -1,5 +1,6 @@
 using System.Globalization;
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.BillSheet;
@@ -41,11 +42,14 @@ public sealed class BillSheetService(
             .ToList();
 
         var allRows = sections.SelectMany(s => s.Rows).Select(r => (r, ActualFor(r, selected))).ToList();
-        var paid = allRows.Where(x => x.r.Cells.GetValueOrDefault(Key(selected))?.Paid == true).ToList();
+
+        // Progress counts every payment due this month: a fortnightly bill counts two or three times.
+        var slots = allRows.SelectMany(x => SlotsFor(x.r, selected).Select(s => (Row: x.r, Slot: s))).ToList();
+        var paidSlots = slots.Where(x => x.Slot.Paid).ToList();
         var summary = new SheetMonthSummaryDto(
-            Key(selected), paid.Count, allRows.Count,
-            paid.Sum(x => x.Item2),
-            allRows.Except(paid).Sum(x => x.r.Estimated));
+            Key(selected), paidSlots.Count, slots.Count,
+            paidSlots.Sum(x => x.Slot.Amount ?? x.Row.Actual ?? x.Row.Estimated),
+            slots.Where(x => !x.Slot.Paid).Sum(x => x.Row.Estimated));
 
         return new SheetViewDto(months.Select(Key).ToList(), Key(selected), sections, Totals(allRows), summary);
     }
@@ -53,28 +57,65 @@ public sealed class BillSheetService(
     private static SheetRowDto ToRow(SheetBillData b, List<SheetPaymentData>? payments, IReadOnlyList<DateOnly> months, DateOnly selected)
     {
         var cells = new Dictionary<string, SheetCellDto>();
-        foreach (var p in payments ?? [])
+        var slots = new Dictionary<string, IReadOnlyList<SheetSlotDto>>();
+        foreach (var month in months)
         {
-            cells[Key(p.Month)] = new SheetCellDto(p.IsPaid, p.Amount, p.PaidOn, p.Source.ToString());
+            var due = BillSchedule.Slots(b, month);
+            var monthPayments = (payments ?? []).Where(p => p.Month == month).ToList();
+            var list = due.Select((d, i) =>
+            {
+                var p = monthPayments.FirstOrDefault(x => x.Slot == i);
+                return new SheetSlotDto(i, d, p?.IsPaid == true, p?.Amount, p?.PaidOn, p?.Source.ToString());
+            }).ToList();
+            slots[Key(month)] = list;
+
+            if (monthPayments.Count == 0)
+            {
+                continue;
+            }
+
+            // Collapse the month's slots into one cell: paid only when every expected payment is.
+            var paidSlots = monthPayments.Where(p => p.IsPaid && p.Slot < due.Count).ToList();
+            var allPaid = paidSlots.Count >= due.Count;
+            var lastPaid = paidSlots.Select(p => p.PaidOn).Where(d => d is not null).DefaultIfEmpty(null).Max();
+            var source = monthPayments.All(p => p.Source == SheetPaymentSource.Auto) ? nameof(SheetPaymentSource.Auto) : nameof(SheetPaymentSource.Manual);
+            cells[Key(month)] = due.Count <= 1
+                ? new SheetCellDto(monthPayments[0].IsPaid, monthPayments[0].Amount, monthPayments[0].PaidOn, monthPayments[0].Source.ToString())
+                : new SheetCellDto(allPaid, paidSlots.Count == 0 ? null : paidSlots.Sum(p => p.Amount ?? 0m), lastPaid, source, paidSlots.Count, due.Count);
         }
 
+        var selectedSlots = BillSchedule.Slots(b, selected).Count;
         return new SheetRowDto(
             b.Id, b.Name, b.Payer, b.IsDebt, b.IsPerpetual, b.IsOptional, b.IsBusiness, b.AutoPay,
             b.DueDay, b.Estimated, b.Actual, b.Service, MaskReference(b.AccountRef), b.MatchText,
             // Nothing has ever ticked this row on its own and it has no explicit match text: tell the user.
             string.IsNullOrWhiteSpace(b.MatchText) && !cells.Values.Any(c => c.Source == nameof(SheetPaymentSource.Auto)),
-            cells);
+            cells, b.Frequency, b.IntervalWeeks, b.AnchorDate, b.SecondDueDay, slots,
+            b.Estimated * Math.Max(1, selectedSlots));
     }
 
     /// <summary>The "Actual Cost" column: this month's payment if paid, else the last known actual, else the estimate.</summary>
     private static decimal ActualFor(SheetRowDto r, DateOnly month)
-        => r.Cells.GetValueOrDefault(Key(month)) is { Paid: true, Amount: { } a } ? a : r.Actual ?? r.Estimated;
+    {
+        var slots = SlotsFor(r, month);
+        if (slots.Count <= 1)
+        {
+            return r.Cells.GetValueOrDefault(Key(month)) is { Paid: true, Amount: { } a } ? a : r.Actual ?? r.Estimated;
+        }
+
+        // Several payments in the month: what was actually paid, plus the expected amount for each one still due.
+        return slots.Sum(s => s.Paid && s.Amount is { } a ? a : r.Actual ?? r.Estimated);
+    }
+
+    private static IReadOnlyList<SheetSlotDto> SlotsFor(SheetRowDto r, DateOnly month)
+        => r.Slots?.GetValueOrDefault(Key(month)) ?? [new SheetSlotDto(0, null, r.Cells.GetValueOrDefault(Key(month))?.Paid == true,
+            r.Cells.GetValueOrDefault(Key(month))?.Amount, null, null)];
 
     private static SheetTotalsDto Totals(IEnumerable<(SheetRowDto Row, decimal Actual)> rows)
     {
         var list = rows.ToList();
         return new SheetTotalsDto(
-            Line(list.Select(x => (x.Row, x.Row.Estimated))),
+            Line(list.Select(x => (x.Row, x.Row.MonthlyEstimated))),
             Line(list.Select(x => (x.Row, x.Actual))));
     }
 
@@ -138,7 +179,9 @@ public sealed class BillSheetService(
             id, r.Section.Trim(), order, r.Name.Trim(), r.Payer?.Trim(), r.IsDebt, r.IsPerpetual, r.IsOptional,
             r.IsBusiness, r.AutoPay, r.DueDay, r.Estimated, r.Actual, r.Service?.Trim(),
             accountRef ?? (string.IsNullOrWhiteSpace(r.AccountRef) ? null : r.AccountRef.Trim()),
-            string.IsNullOrWhiteSpace(r.MatchText) ? null : r.MatchText.Trim(), true);
+            string.IsNullOrWhiteSpace(r.MatchText) ? null : r.MatchText.Trim(), true,
+            string.IsNullOrWhiteSpace(r.Frequency) ? BillFrequency.Monthly : r.Frequency,
+            r.IntervalWeeks, r.AnchorDate, r.SecondDueDay);
 
     private static void Validate(SaveBillRequest r)
     {
@@ -161,12 +204,34 @@ public sealed class BillSheetService(
         {
             throw new SheetOperationException("Amounts cannot be negative.");
         }
+
+        var frequency = string.IsNullOrWhiteSpace(r.Frequency) ? BillFrequency.Monthly : r.Frequency;
+        if (!BillFrequency.IsKnown(frequency))
+        {
+            throw new SheetOperationException("Frequency must be Monthly, TwiceMonthly, Weekly or EveryNWeeks.");
+        }
+
+        if (frequency is BillFrequency.Weekly or BillFrequency.EveryNWeeks && r.AnchorDate is null)
+        {
+            throw new SheetOperationException("Weekly and every-N-weeks rows need a date one payment falls on (the anchor date).");
+        }
+
+        if (frequency == BillFrequency.EveryNWeeks && r.IntervalWeeks is null or < 2 or > 52)
+        {
+            throw new SheetOperationException("Interval must be between 2 and 52 weeks.");
+        }
+
+        if (frequency == BillFrequency.TwiceMonthly
+            && (r.DueDay is not { } first || r.SecondDueDay is not { } second || second is < 1 or > 31 || first >= second))
+        {
+            throw new SheetOperationException("Twice-monthly rows need two due days, the first earlier than the second.");
+        }
     }
 
     // ── Cells ────────────────────────────────────────────────────────────────
 
     /// <summary>Removes any manual or automatic mark so the cell returns to automatic.</summary>
-    public async Task<bool> ClearPaymentAsync(Guid billId, string month, CancellationToken ct = default)
+    public async Task<bool> ClearPaymentAsync(Guid billId, string month, int? slot = null, CancellationToken ct = default)
     {
         var m = ParseMonth(month) ?? throw new SheetOperationException("Month must look like 2026-11.");
         if (await store.GetBillAsync(billId, ct) is null)
@@ -174,7 +239,7 @@ public sealed class BillSheetService(
             return false;
         }
 
-        await store.ApplyPaymentsAsync([], [(billId, m)], ct);
+        await store.ApplyPaymentsAsync([], [(billId, m, slot ?? -1)], ct);
         return true;
     }
 
@@ -188,7 +253,12 @@ public sealed class BillSheetService(
         }
 
         decimal? amount = r.Paid ? r.Amount ?? bill.Actual ?? bill.Estimated : null;
-        var payment = new SheetPaymentData(billId, m, r.Paid, amount, r.Paid ? Today : null, null, SheetPaymentSource.Manual);
+        if (r.Slot < 0 || r.Slot >= Math.Max(1, BillSchedule.Slots(bill, m).Count))
+        {
+            throw new SheetOperationException("That payment does not exist in this month.");
+        }
+
+        var payment = new SheetPaymentData(billId, m, r.Paid, amount, r.Paid ? Today : null, null, SheetPaymentSource.Manual, r.Slot);
         await store.ApplyPaymentsAsync([payment], [], ct);
         return true;
     }
@@ -215,9 +285,41 @@ public sealed class BillSheetService(
         // Auto-build: add a row for every monthly-repeating expense that no existing (or deleted) row covers.
         var known = await store.ListBillsAsync(includeInactive: true, ct);
         var added = 0;
+
+        // Merchants that charge weekly, every other week or twice a month (a $55 mow every second Tuesday) are not
+        // monthly bills: detect them first so they get a row that repeats, instead of a single monthly $55.
+        var repeating = RecurringFlowDetector
+            .Detect(txns.Select(t => new FlowTxn(Guid.Empty, t.Date, t.Amount, false, t.Label ?? t.Text)).ToList(), Today)
+            .Where(f => f.Frequency is BillFrequency.Weekly or BillFrequency.EveryNWeeks or BillFrequency.TwiceMonthly
+                && f.AmountModel == "Fixed" && f.Confidence >= 0.8)
+            .ToList();
+        foreach (var f in repeating)
+        {
+            var covering = known.FirstOrDefault(b => SheetMatcher.BillMatchesText(b, f.Name));
+            if (covering is null)
+            {
+                var order = known.Where(b => b.Section == DetectedSection).Select(b => b.SortOrder + 1).DefaultIfEmpty(0).Max();
+                var bill = RepeatingBill(Guid.NewGuid(), DetectedSection, order, f, "Detected from your transactions");
+                await store.SaveBillAsync(bill, ct);
+                known = [.. known, bill];
+                added++;
+            }
+            else if (covering is { Section: DetectedSection, Frequency: BillFrequency.Monthly, IsActive: true })
+            {
+                // An earlier refresh saw this as a monthly bill; now there is enough history to know it repeats more often.
+                var fixedUp = RepeatingBill(covering.Id, covering.Section, covering.SortOrder, f, covering.Service) with
+                {
+                    Name = covering.Name, MatchText = covering.MatchText,
+                };
+                await store.SaveBillAsync(fixedUp, ct);
+                known = known.Select(b => b.Id == covering.Id ? fixedUp : b).ToList();
+            }
+        }
+
+        var repeatingKeys = repeating.Select(f => RecurringDetector.Key(f.Name)).ToHashSet();
         foreach (var d in RecurringDetector.Detect(txns))
         {
-            if (known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
+            if (repeatingKeys.Contains(RecurringDetector.Key(d.Name)) || known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
             {
                 continue;
             }
@@ -245,6 +347,15 @@ public sealed class BillSheetService(
 
         return new SheetRefreshResult(result.Upserts.Count, result.Clears.Count, added);
     }
+
+    private static SheetBillData RepeatingBill(Guid id, string section, int order, DetectedFlow f, string? service)
+        => new(
+            id, section, order, f.Name, null, false, true, false, false, false,
+            f.Frequency == BillFrequency.TwiceMonthly ? f.DayOfMonth : null, f.Amount, f.Amount, service, null,
+            RecurringDetector.MatchTextFor(f.Name), true,
+            f.Frequency, f.IntervalWeeks,
+            f.Frequency == BillFrequency.TwiceMonthly ? null : f.LastSeen,
+            f.Frequency == BillFrequency.TwiceMonthly ? f.SecondDayOfMonth : null);
 
     // ── Import ───────────────────────────────────────────────────────────────
 

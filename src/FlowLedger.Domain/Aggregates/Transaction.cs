@@ -41,6 +41,14 @@ public sealed class Transaction : AggregateRoot
     public string? MerchantName { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>Cleaned-up merchant name derived from the bank descriptor by the ingestion pipeline. Never replaces <see cref="MerchantName"/> (the user's alias).</summary>
+    public string? SuggestedName { get; private set; }
+
+    private string? _tags;
+
+    /// <summary>Free-form labels: a mix of user-added tags and ones from the auto-tagger (see <see cref="ApplyAutoTags"/>).</summary>
+    public IReadOnlyList<string> Tags => string.IsNullOrEmpty(_tags) ? [] : _tags.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
     /// <summary>Fingerprint used for deduplication during import.</summary>
     public TransactionFingerprint? Fingerprint { get; private set; }
 
@@ -234,6 +242,38 @@ public sealed class Transaction : AggregateRoot
         return true;
     }
 
+    /// <summary>Stores the suggested display name. Returns true when it changed.</summary>
+    public bool SetSuggestedName(string? name)
+    {
+        var value = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        if (string.Equals(SuggestedName, value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        SuggestedName = value;
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces the auto-managed tags: every tag in <paramref name="vocabulary"/> is dropped and <paramref name="auto"/> is added,
+    /// so user-added tags outside the vocabulary are never touched. Returns true when the tag set changed.
+    /// </summary>
+    public bool ApplyAutoTags(IEnumerable<string> auto, IReadOnlySet<string> vocabulary)
+    {
+        var kept = Tags.Where(t => !vocabulary.Contains(t));
+        var next = kept.Concat(auto).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.Ordinal).ToList();
+        var joined = next.Count == 0 ? null : string.Join(',', next);
+        var current = Tags.OrderBy(t => t, StringComparer.Ordinal);
+        if (current.SequenceEqual(next))
+        {
+            return false;
+        }
+
+        _tags = joined;
+        return true;
+    }
+
     /// <summary>Removes a category that the auto-categorizer set. A manual category is never cleared by this.</summary>
     public bool ClearAutoCategory()
     {
@@ -266,6 +306,12 @@ public sealed class Transaction : AggregateRoot
         _splits.Clear();
         _splits.AddRange(list);
     }
+
+    /// <summary>Removes all splits, returning the transaction to a single category.</summary>
+    public void ClearSplits() => _splits.Clear();
+
+    /// <summary>Sets or clears (blank) the note.</summary>
+    public void SetNote(string? note) => Notes = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
 
     public void AddNote(string note)
     {

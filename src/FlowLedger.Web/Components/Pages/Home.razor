@@ -2,10 +2,14 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ILogger<Home> Logger
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
+
+<AlertsPanel />
 
 <style>
     .fl-account-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
@@ -390,7 +394,11 @@ else
                                             }
                                         </div>
                                     </div>
-                                    <MudText Typo="Typo.body2" Class="fl-num">@Signed(f.Transaction)</MudText>
+                                    <div class="d-flex align-center">
+                                        <MudText Typo="Typo.body2" Class="fl-num">@Signed(f.Transaction)</MudText>
+                                        <MudButton Size="Size.Small" Color="Color.Default" OnClick="() => DismissFlag(f)"
+                                                   aria-label="@($"Dismiss alert for {FlagName(f)}")">Dismiss</MudButton>
+                                    </div>
                                 </div>
                             }
                         </MudCardContent>
@@ -430,6 +438,41 @@ else
 }
 
 @code {
+    private static string FlagName(FlowLedger.Web.ApiClient.FlaggedTransactionDto f) =>
+        string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName;
+
+    private async Task DismissFlag(FlowLedger.Web.ApiClient.FlaggedTransactionDto f)
+    {
+        var dialog = await Dialogs.ShowAsync<DismissFlagDialog>("Dismiss alert", new DialogParameters<DismissFlagDialog>
+        {
+            { x => x.Merchant, FlagName(f) },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+
+        var note = result.Data as string;
+        try
+        {
+            if (await ApiClient.DismissSuspiciousAsync(f.Transaction.Id, string.IsNullOrWhiteSpace(note) ? null : note))
+            {
+                _activity = _activity! with { Suspicious = _activity.Suspicious.Where(x => x != f).ToList() };
+                Snackbar.Add("Alert dismissed", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Couldn't dismiss the alert", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to dismiss flagged transaction");
+            Snackbar.Add("Couldn't dismiss the alert", Severity.Error);
+        }
+    }
+
     private static string AccountIcon(string type) => type switch
     {
         "Checking" => Icons.Material.Filled.AccountBalance,

@@ -239,6 +239,55 @@ public sealed class BillSheetServiceTests
         row.NeedsMatchText.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Refresh_detects_a_fortnightly_bill_and_the_month_counts_every_mow()
+    {
+        var (svc, store, txns) = Make();
+        for (var i = 0; i < 8; i++)
+        {
+            await AddTxn(txns, "MUSTANG MOWING", 55m, Today.AddDays(-3 - 14 * i));
+        }
+
+        var result = await svc.RefreshAsync();
+
+        result.Added.Should().Be(1);
+        var bill = (await store.ListBillsAsync()).Single();
+        bill.Should().Match<SheetBillData>(b => b.Frequency == BillFrequency.EveryNWeeks && b.IntervalWeeks == 2 && b.Estimated == 55m);
+
+        // Every month in view lists the mows that fall in it, each payment ticked from its own transaction.
+        var view = await svc.GetViewAsync(BillSheetService.Key(ThisMonth), 3);
+        var row = view.Sections.SelectMany(x => x.Rows).Single();
+        foreach (var month in view.Months)
+        {
+            var slots = row.Slots![month];
+            slots.Count.Should().BeInRange(2, 3);
+            slots.Where(sl => sl.Due <= Today.AddDays(-3)).Should().OnlyContain(sl => sl.Paid);
+        }
+
+        var selectedSlots = row.Slots![view.SelectedMonth].Count;
+        row.MonthlyEstimated.Should().Be(55m * selectedSlots);
+        view.GrandTotals.Estimated.Total.Should().Be(55m * selectedSlots);
+        view.Summary.TotalCount.Should().Be(selectedSlots);
+    }
+
+    [Fact]
+    public async Task Refresh_upgrades_a_monthly_detected_row_that_actually_repeats()
+    {
+        var (svc, store, txns) = Make();
+        var monthly = new SheetBillData(Guid.NewGuid(), BillSheetService.DetectedSection, 0, "MUSTANG MOWING", null, false, true, false,
+            false, false, 12, 55m, 55m, "Detected from your transactions", null, "MUSTANG MOWING", true);
+        await store.SaveBillAsync(monthly);
+        for (var i = 0; i < 8; i++)
+        {
+            await AddTxn(txns, "MUSTANG MOWING", 55m, Today.AddDays(-3 - 14 * i));
+        }
+
+        await svc.RefreshAsync();
+
+        (await store.ListBillsAsync()).Single().Should().Match<SheetBillData>(b =>
+            b.Id == monthly.Id && b.Frequency == BillFrequency.EveryNWeeks && b.DueDay == null && b.AnchorDate != null);
+    }
+
     private static async Task AddTxn(FakeTransactionRepository repo, string desc, decimal amount, DateOnly date)
     {
         var tx = Transaction.RecordActual(
@@ -280,16 +329,16 @@ public sealed class BillSheetServiceTests
         public Task<IReadOnlyList<SheetPaymentData>> ListPaymentsAsync(DateOnly fromMonth, DateOnly toMonth, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<SheetPaymentData>>(_payments.Where(p => p.Month >= fromMonth && p.Month <= toMonth).ToList());
 
-        public Task ApplyPaymentsAsync(IReadOnlyList<SheetPaymentData> upserts, IReadOnlyList<(Guid BillId, DateOnly Month)> clears, CancellationToken ct = default)
+        public Task ApplyPaymentsAsync(IReadOnlyList<SheetPaymentData> upserts, IReadOnlyList<(Guid BillId, DateOnly Month, int Slot)> clears, CancellationToken ct = default)
         {
-            foreach (var (b, m) in clears)
+            foreach (var (b, m, slot) in clears)
             {
-                _payments.RemoveAll(p => p.BillId == b && p.Month == m);
+                _payments.RemoveAll(p => p.BillId == b && p.Month == m && (slot < 0 || p.Slot == slot));
             }
 
             foreach (var u in upserts)
             {
-                _payments.RemoveAll(p => p.BillId == u.BillId && p.Month == u.Month);
+                _payments.RemoveAll(p => p.BillId == u.BillId && p.Month == u.Month && p.Slot == u.Slot);
                 _payments.Add(u);
             }
 

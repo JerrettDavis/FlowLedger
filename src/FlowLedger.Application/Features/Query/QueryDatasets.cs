@@ -107,6 +107,17 @@ public sealed class QueryDatasetProvider(
                 continue;
             }
 
+            if (t.Splits is { Count: > 0 } splits)
+            {
+                // A split transaction contributes one row per part, so spending reports and budgets see each category's share.
+                foreach (var s in splits)
+                {
+                    txRows.Add(TransactionRow(t, accountById, categoryById, transferIds.Contains(t.Id), s.Amount, s.CategoryId, s.Notes ?? t.Notes));
+                }
+
+                continue;
+            }
+
             txRows.Add(TransactionRow(t, accountById, categoryById, transferIds.Contains(t.Id)));
         }
 
@@ -144,15 +155,20 @@ public sealed class QueryDatasetProvider(
         TransactionDto t,
         IReadOnlyDictionary<Guid, AccountDto> accountById,
         IReadOnlyDictionary<Guid, string> categoryById,
-        bool isTransfer)
+        bool isTransfer,
+        decimal? amountOverride = null,
+        Guid? categoryOverride = null,
+        string? notesOverride = null)
     {
         accountById.TryGetValue(t.AccountId, out var account);
-        var signed = t.Direction == "Debit" ? -t.Amount : t.Amount;
-        var category = t.CategoryId is { } cid && categoryById.TryGetValue(cid, out var path) ? path : "Uncategorized";
+        var amount = amountOverride ?? t.Amount;
+        var signed = t.Direction == "Debit" ? -amount : amount;
+        var categoryKey = amountOverride is null ? t.CategoryId : categoryOverride;
+        var category = categoryKey is { } cid && categoryById.TryGetValue(cid, out var path) ? path : "Uncategorized";
         return
         [
             t.PostedDate ?? t.EffectiveDate,
-            t.Amount,
+            amount,
             signed,
             t.Direction,
             t.Description,
@@ -163,7 +179,7 @@ public sealed class QueryDatasetProvider(
             t.Status,
             t.Source,
             t.Currency,
-            t.Notes,
+            amountOverride is null ? t.Notes : notesOverride,
             isTransfer,
         ];
     }
