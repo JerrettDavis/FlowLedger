@@ -1,7 +1,7 @@
 using System.Net;
-using FluentAssertions;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
+using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

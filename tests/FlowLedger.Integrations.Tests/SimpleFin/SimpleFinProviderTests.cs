@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text;
-using FluentAssertions;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.SimpleFin;
+using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

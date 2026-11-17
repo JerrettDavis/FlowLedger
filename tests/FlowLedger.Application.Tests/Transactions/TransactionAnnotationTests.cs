@@ -1,4 +1,3 @@
-using FluentAssertions;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Query;
@@ -6,6 +5,7 @@ using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
 

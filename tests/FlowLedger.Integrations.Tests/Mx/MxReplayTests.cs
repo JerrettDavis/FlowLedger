@@ -30,7 +30,9 @@ public sealed class MxReplayTests : IClassFixture<MxWireMockFixture>
                 await File.WriteAllBytesAsync(stem + ".json", item.Payload);
                 await File.WriteAllTextAsync(stem + ".meta.json", System.Text.Json.JsonSerializer.Serialize(new
                 {
-                    method = item.Context!.Method, pathAndQuery = item.Context.PathAndQuery, statusCode = item.Context.StatusCode,
+                    method = item.Context!.Method,
+                    pathAndQuery = item.Context.PathAndQuery,
+                    statusCode = item.Context.StatusCode,
                 }));
             }
 

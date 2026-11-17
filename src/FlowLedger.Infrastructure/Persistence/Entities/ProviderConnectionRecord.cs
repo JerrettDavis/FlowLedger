@@ -21,16 +21,16 @@ internal sealed class ProviderConnectionRecord
     public static ProviderConnectionRecord Create(
         Guid tenantId, string providerName, string memberProviderId,
         string institution, string status, DateTimeOffset now) => new()
-    {
-        Id = Guid.NewGuid(),
-        TenantId = tenantId,
-        ProviderName = providerName,
-        MemberProviderId = memberProviderId,
-        Institution = institution,
-        Status = status,
-        CreatedAt = now,
-        UpdatedAt = now,
-    };
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ProviderName = providerName,
+            MemberProviderId = memberProviderId,
+            Institution = institution,
+            Status = status,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
 
     public void ResolveMember(string memberProviderId, DateTimeOffset now)
     {

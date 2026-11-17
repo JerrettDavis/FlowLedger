@@ -23,6 +23,8 @@ namespace FlowLedger.Bdd.Tests.Support;
 /// </summary>
 public sealed class BddTestFixture : IAsyncLifetime
 {
+    private readonly string _objectStoragePath = Path.Combine(Path.GetTempPath(), $"flowledger-bdd-{Guid.NewGuid():N}");
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("flowledger_bdd_test")
         .WithUsername("test")
@@ -53,6 +55,10 @@ public sealed class BddTestFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _container.DisposeAsync();
+        if (Directory.Exists(_objectStoragePath))
+        {
+            Directory.Delete(_objectStoragePath, recursive: true);
+        }
     }
 
     /// <summary>Resets all data between scenarios. Call as the first async Given step.</summary>
@@ -79,6 +85,7 @@ public sealed class BddTestFixture : IAsyncLifetime
             ["ConnectionStrings:flowledger"] = ConnectionString,
             // Default: Simulated provider (no credentials required).
             ["Mx:Enabled"] = "false",
+            ["ObjectStorage:RootPath"] = _objectStoragePath,
         };
 
         if (extraConfig is not null)

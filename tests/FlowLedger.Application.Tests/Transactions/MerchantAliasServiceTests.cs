@@ -1,8 +1,8 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
 

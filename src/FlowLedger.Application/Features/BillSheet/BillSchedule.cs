@@ -16,22 +16,22 @@ public static class BillSchedule
         switch (bill.Frequency)
         {
             case BillFrequency.Weekly or BillFrequency.EveryNWeeks when bill.AnchorDate is { } anchor:
-            {
-                var step = 7 * StepWeeks(bill);
-                // The series is anchor + k * step for any integer k (also before the anchor), so past months line up too.
-                var offset = first.DayNumber - anchor.DayNumber;
-                var k = (int)Math.Ceiling(offset / (double)step);
-                var dates = new List<DateOnly?>();
-                for (var d = anchor.AddDays(k * step); d <= last; d = d.AddDays(step))
                 {
-                    if (d >= first)
+                    var step = 7 * StepWeeks(bill);
+                    // The series is anchor + k * step for any integer k (also before the anchor), so past months line up too.
+                    var offset = first.DayNumber - anchor.DayNumber;
+                    var k = (int)Math.Ceiling(offset / (double)step);
+                    var dates = new List<DateOnly?>();
+                    for (var d = anchor.AddDays(k * step); d <= last; d = d.AddDays(step))
                     {
-                        dates.Add(d);
+                        if (d >= first)
+                        {
+                            dates.Add(d);
+                        }
                     }
-                }
 
-                return dates;
-            }
+                    return dates;
+                }
 
             case BillFrequency.TwiceMonthly when bill.DueDay is { } d1 && bill.SecondDueDay is { } d2 && d1 < d2:
                 return

@@ -1,8 +1,8 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Categories;
 

@@ -107,7 +107,7 @@ public static class DashboardActivityAnalyzer
             var others = history.Where(o => o.Id != t.Id).ToList();
 
             if (others.Any(o => o.AccountId == t.AccountId && o.Direction == t.Direction && o.Amount == t.Amount
-                && Key(o) == key && Math.Abs((( o.PostedDate ?? o.EffectiveDate).DayNumber) - date.DayNumber) <= DuplicateWindowDays))
+                && Key(o) == key && Math.Abs(((o.PostedDate ?? o.EffectiveDate).DayNumber) - date.DayNumber) <= DuplicateWindowDays))
             {
                 reasons.Add("Possible duplicate charge");
             }

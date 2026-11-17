@@ -78,11 +78,11 @@ public class DashboardTests : E2ETestBase
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
-        // MudText Typo.overline labels from Home.razor summary cards
-        (await Page!.GetByText("Total Balance").CountAsync()).Should().BeGreaterThan(0);
-        (await Page!.GetByText("Net Worth").CountAsync()).Should().BeGreaterThan(0);
-        (await Page!.GetByText("Forecast Low").CountAsync()).Should().BeGreaterThan(0);
-        (await Page!.GetByText("Overdraft Risk").CountAsync()).Should().BeGreaterThan(0);
+        // Home's hero card shows cash separately from credit, loans, and investments.
+        await Assertions.Expect(Page!.GetByLabel("Cash balance", new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(Page.GetByText("Net Worth", new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(Page.GetByText("Forecast Low", new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(Page.GetByText("Overdraft Risk", new() { Exact = true })).ToBeVisibleAsync();
         AssertNoPageErrors();
     }
 
