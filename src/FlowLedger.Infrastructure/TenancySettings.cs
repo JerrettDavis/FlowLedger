@@ -10,15 +10,18 @@ public static class TenancySettings
 
     public static LegacyTenantClaim Legacy(IConfiguration cfg)
     {
+        var tenant = DefaultLegacyTenantId;
         foreach (var key in new[] { "Tenancy:LegacyTenantId", "Api:TenantId", "Worker:TenantId" })
         {
             if (Guid.TryParse(cfg[key], out var id) && id != Guid.Empty)
             {
-                return new LegacyTenantClaim(id, NullIfBlank(cfg["Tenancy:LegacyOwnerEmail"]));
+                tenant = id;
+                break;
             }
         }
 
-        return new LegacyTenantClaim(DefaultLegacyTenantId, NullIfBlank(cfg["Tenancy:LegacyOwnerEmail"]));
+        return new LegacyTenantClaim(tenant, NullIfBlank(cfg["Tenancy:LegacyOwnerEmail"]),
+            NullIfBlank(cfg["Tenancy:LegacyOwnerSubject"]), NullIfBlank(cfg["Tenancy:LegacyOwnerIssuer"]));
     }
 
     private static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;

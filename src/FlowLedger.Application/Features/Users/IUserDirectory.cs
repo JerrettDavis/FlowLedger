@@ -1,7 +1,7 @@
 namespace FlowLedger.Application.Features.Users;
 
 /// <summary>An identity asserted by an external OpenID Connect provider (authentik, Keycloak, Entra, Google, ...).</summary>
-public sealed record ExternalIdentity(string Issuer, string Subject, string? Email, string? DisplayName);
+public sealed record ExternalIdentity(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false);
 
 /// <summary>A FlowLedger user and the tenant (data partition) it owns.</summary>
 public sealed record ResolvedUser(Guid UserId, Guid TenantId, string? Email, string? DisplayName, bool Created);
@@ -24,5 +24,8 @@ public interface IUserDirectory
 
 /// <summary>Rules for who adopts the pre-multi-user household tenant.</summary>
 /// <param name="LegacyTenantId">The tenant that already holds the household's data.</param>
-/// <param name="OwnerEmail">If set, only this email may adopt it; otherwise the first user to sign in does.</param>
-public sealed record LegacyTenantClaim(Guid LegacyTenantId, string? OwnerEmail);
+/// <param name="OwnerSubject">Preferred: the IdP subject (and optionally issuer) that owns it. Unforgeable by other users.</param>
+/// <param name="OwnerIssuer">If set, the subject must come from this issuer.</param>
+/// <param name="OwnerEmail">Alternative: this email, honoured only when the IdP reports it verified.</param>
+/// <remarks>Fail closed: with none of the owner settings configured, nobody adopts the legacy tenant.</remarks>
+public sealed record LegacyTenantClaim(Guid LegacyTenantId, string? OwnerEmail, string? OwnerSubject = null, string? OwnerIssuer = null);

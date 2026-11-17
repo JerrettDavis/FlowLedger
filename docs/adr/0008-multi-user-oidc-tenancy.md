@@ -13,8 +13,9 @@ Status: accepted (supersedes the "deferred" part of ADR 0001 for sign-in)
   signed-in user's `fl_tenant` claim, bound per Blazor circuit. With OIDC enabled a missing claim sends no tenant
   header, so the API fails closed.
 * **Existing data**: the pre-multi-user household data lives in the legacy tenant
-  (`Tenancy:LegacyTenantId`, default `Api:TenantId`, default `…0001`). The first user to sign in adopts it, or only
-  `Tenancy:LegacyOwnerEmail` if set (recommended).
+  (`Tenancy:LegacyTenantId`, default `Api:TenantId`, default `…0001`). Adoption fails closed: only the identity named by
+  `Tenancy:LegacyOwnerSubject` (+ optional issuer), or `Tenancy:LegacyOwnerEmail` with `email_verified=true`, adopts it.
+  With nothing configured, nobody does.
 * **Provider credentials stay with the household**: configured provider credentials (SimpleFIN access URL, MX) are
   synced only for the legacy tenant. Other tenants get an empty sync (`UnlinkedTenantSyncService`) so one user's bank
   data can never land in another's. Per-user institution linking is future work.

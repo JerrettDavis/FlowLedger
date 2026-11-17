@@ -89,6 +89,7 @@ public static class AuthSetup
                                 issuer,
                                 subject = sub,
                                 email = principal.FindFirstValue("email"),
+                                emailVerified = string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase),
                                 displayName = principal.FindFirstValue(oidc.NameClaim) ?? principal.FindFirstValue("name") ?? principal.FindFirstValue("preferred_username"),
                             }),
                         };

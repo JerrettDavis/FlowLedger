@@ -19,10 +19,17 @@ Auth__Oidc__RequireHttpsMetadata=true
 (User-secrets work too: `dotnet user-secrets set "Auth:Oidc:Authority" ... --project src/FlowLedger.Web`.)
 Leave `Authority` empty for single-household mode with **no sign-in** (development only; logged as a warning).
 
-## 3. Keep your existing data
-Set on the **API** and **Worker**: `Tenancy__LegacyOwnerEmail=<your email as the IdP reports it>`. The first sign-in
-from that email adopts the existing household tenant (all current accounts/transactions). Everyone else gets an
-empty tenant. Without this setting the *first* user to sign in adopts it.
+## 3. Keep your existing data (required, fails closed)
+Existing accounts/transactions live in the household tenant. Nobody adopts it automatically. Bind it to yourself on the
+**API** and **Worker**, preferably by IdP subject (find it in the authentik user's "attributes"/`sub`, or the `app_users`
+table after a first sign-in):
+```
+Tenancy__LegacyOwnerSubject=<your sub>
+Tenancy__LegacyOwnerIssuer=https://auth.example.com/application/o/flowledger/   # optional
+```
+or by email, honoured only when the IdP reports `email_verified=true`:
+`Tenancy__LegacyOwnerEmail=you@example.com`. Adoption happens at your first sign-in; if you signed in before setting
+this, point `app_users.tenant_id` for your row at the household tenant (or ask for a helper).
 
 ## Notes
 * Linked bank connections (SimpleFIN/MX) belong to the household owner only; other users start empty.
