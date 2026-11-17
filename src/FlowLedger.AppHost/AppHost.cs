@@ -126,6 +126,21 @@ var worker = builder.AddProject<Projects.FlowLedger_Worker>("worker")
 WithMxConfig(worker, builder.Configuration);
 worker.WithEnvironment("ObjectStorage__RootPath", objectsDir);
 
+// Tenancy (multi-user / multi-login): forwarded to every service that resolves identities or fans out over tenants,
+// so they all agree on which tenant is the legacy household and who owns it. Pin LegacyTenantId explicitly so a
+// Worker:TenantId override can never change which tenant the owner's logins adopt.
+foreach (var svc in new IResourceBuilder<IResourceWithEnvironment>[] { api, worker })
+{
+    svc.WithEnvironment("Tenancy__LegacyTenantId", builder.Configuration["Tenancy:LegacyTenantId"] ?? "00000000-0000-0000-0000-000000000001");
+    foreach (var key in new[] { "LegacyOwnerEmail", "LegacyOwnerSubject", "LegacyOwnerIssuer", "AutoLinkVerifiedEmail", "TrustUnverifiedEmail" })
+    {
+        if (!string.IsNullOrEmpty(builder.Configuration[$"Tenancy:{key}"]))
+        {
+            svc.WithEnvironment($"Tenancy__{key}", builder.Configuration[$"Tenancy:{key}"]!);
+        }
+    }
+}
+
 // Optional: point the worker at a dedicated tenant (e.g. an MX-sandbox tenant) so sandbox data never
 // blends with the simulated demo tenant. API callers select the same tenant via X-Tenant-Id.
 if (!string.IsNullOrEmpty(builder.Configuration["FlowLedger:WorkerTenantId"]))
