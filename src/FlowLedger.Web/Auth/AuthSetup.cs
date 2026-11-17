@@ -27,6 +27,7 @@ public static class AuthSetup
 
         if (!oidc.Enabled)
         {
+            builder.Services.AddAuthentication();
             builder.Services.AddAuthorization();
             return oidc;
         }
