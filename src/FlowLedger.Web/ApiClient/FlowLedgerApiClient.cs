@@ -593,6 +593,16 @@ public sealed class FlowLedgerApiClient
         });
     }
 
+    /// <summary>Last successful sync time and the server's enforced minimum interval (no provider call).</summary>
+    public async Task<SyncStatusDto?> GetSyncStatusAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read sync status", async () =>
+        {
+            var response = await _http.GetAsync("/api/sync/status", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<SyncStatusDto>(JsonOptions, ct)
+                : null;
+        });
+
     /// <summary>The verified data environment (demo / sandbox / production) of the API.</summary>
     public async Task<EnvironmentInfo?> GetEnvironmentAsync(CancellationToken ct = default)
     {

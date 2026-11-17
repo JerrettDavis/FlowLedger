@@ -128,6 +128,8 @@ public sealed record UpdateRecurringFlowRequest(
 
 // ── Forecast (flattened API surface) ──────────────────────────────────────────
 
+public sealed record SyncStatusDto(DateTimeOffset? LastSyncedAt, int MinIntervalMinutes, string Provider);
+
 public sealed class ForecastResultDto
 {
     public Guid ForecastRunId { get; init; }
