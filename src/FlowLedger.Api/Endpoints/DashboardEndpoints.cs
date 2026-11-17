@@ -16,6 +16,8 @@ internal static class DashboardEndpoints
         IReadOnlyList<MonthCashFlow> CashFlow,
         IReadOnlyList<NetWorthPoint> NetWorth);
 
+    internal sealed record DismissSuspiciousRequest(string? Note);
+
     internal static IEndpointRouteBuilder MapDashboardEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/dashboard").WithTags("Dashboard").RequireRateLimiting("api");
@@ -24,6 +26,23 @@ internal static class DashboardEndpoints
                 Results.Ok(await handler.HandleAsync(ct)))
             .WithName("GetDashboardActivity")
             .WithSummary("Recent, pending, large and suspicious transactions across all accounts");
+
+        group.MapPost("/suspicious/{transactionId:guid}/dismiss",
+                async (Guid transactionId, DismissSuspiciousRequest? request, DismissSuspiciousHandler handler, CancellationToken ct) =>
+                {
+                    try
+                    {
+                        await handler.HandleAsync(transactionId, request?.Note, ct);
+                        return Results.NoContent();
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
+                    }
+                })
+            .WithName("DismissSuspiciousTransaction")
+            .WithSummary("Dismiss a flagged transaction from Suspicious Activity, with an optional note")
+            .RequireRateLimiting("write");
 
         group.MapGet("/insights", async (RunQueryHandler query, CancellationToken ct) =>
             {

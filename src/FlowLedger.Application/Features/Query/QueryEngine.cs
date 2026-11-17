@@ -136,18 +136,18 @@ public static class QueryEngine
                     rows.Select(r => p.Items.Select(i => ctx.Eval(i.Expr, scope, r)).ToArray()).ToList());
 
             case ExtendOp e:
-            {
-                var newNames = names.ToList();
-                var work = rows.Select(r => r.ToList()).ToList();
-                foreach (var item in e.Items)
                 {
-                    var s = new Scope(newNames);
-                    s.Check(item.Expr);
-                    var idx = newNames.FindIndex(n => n.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
-                    foreach (var r in work)
+                    var newNames = names.ToList();
+                    var work = rows.Select(r => r.ToList()).ToList();
+                    foreach (var item in e.Items)
                     {
-                        var v = ctx.Eval(item.Expr, s, r.ToArray());
-                        if (idx >= 0)
+                        var s = new Scope(newNames);
+                        s.Check(item.Expr);
+                        var idx = newNames.FindIndex(n => n.Equals(item.Name, StringComparison.OrdinalIgnoreCase));
+                        foreach (var r in work)
+                        {
+                            var v = ctx.Eval(item.Expr, s, r.ToArray());
+                            if (idx >= 0)
                             {
                                 r[idx] = v;
                             }
@@ -156,13 +156,13 @@ public static class QueryEngine
                                 r.Add(v);
                             }
                         }
-                    if (idx < 0)
+                        if (idx < 0)
                         {
                             newNames.Add(item.Name);
                         }
                     }
-                return (newNames, work.Select(r => r.ToArray()).ToList());
-            }
+                    return (newNames, work.Select(r => r.ToArray()).ToList());
+                }
 
             case SummarizeOp s:
                 return Summarize(s, names, rows, ctx);
@@ -177,24 +177,24 @@ public static class QueryEngine
                 return (names, Sort(rows, [top.Key], scope, ctx).Take(top.Count).ToList());
 
             case DistinctOp d:
-            {
-                foreach (var i in d.Items)
+                {
+                    foreach (var i in d.Items)
                     {
                         scope.Check(i.Expr);
                     }
 
                     var seen = new HashSet<string>();
-                var outRows = new List<object?[]>();
-                foreach (var r in rows)
-                {
-                    var vals = d.Items.Select(i => ctx.Eval(i.Expr, scope, r)).ToArray();
-                    if (seen.Add(KeyOf(vals)))
+                    var outRows = new List<object?[]>();
+                    foreach (var r in rows)
+                    {
+                        var vals = d.Items.Select(i => ctx.Eval(i.Expr, scope, r)).ToArray();
+                        if (seen.Add(KeyOf(vals)))
                         {
                             outRows.Add(vals);
                         }
                     }
-                return (d.Items.Select(i => i.Name).ToList(), outRows);
-            }
+                    return (d.Items.Select(i => i.Name).ToList(), outRows);
+                }
 
             case CountOp:
                 return (["count"], [[(decimal)rows.Count]]);
@@ -420,11 +420,11 @@ internal sealed class EvalContext(DateOnly today)
             case Unary u: return EvalUnary(u, scope, row);
             case Binary b: return EvalBinary(b, scope, row);
             case InList l:
-            {
-                var v = Eval(l.Value, scope, row);
-                var found = l.Items.Any(i => Values.Compare(v, Eval(i, scope, row)) == 0 && v is not null);
-                return l.Negated ? !found : found;
-            }
+                {
+                    var v = Eval(l.Value, scope, row);
+                    var found = l.Items.Any(i => Values.Compare(v, Eval(i, scope, row)) == 0 && v is not null);
+                    return l.Negated ? !found : found;
+                }
             case Call c: return EvalCall(c, scope, row);
             default: throw new QueryException("Unsupported expression.");
         }
@@ -523,7 +523,12 @@ internal sealed class EvalContext(DateOnly today)
 
     private static string TypeName(object? v) => v switch
     {
-        decimal => "number", string => "string", DateOnly => "date", bool => "bool", DurationValue => "duration", _ => "value",
+        decimal => "number",
+        string => "string",
+        DateOnly => "date",
+        bool => "bool",
+        DurationValue => "duration",
+        _ => "value",
     };
 
     private object? EvalCall(Call c, Scope scope, object?[] row)
@@ -568,15 +573,15 @@ internal sealed class EvalContext(DateOnly today)
                 Arity(0, 0);
                 return today;
             case "ago":
-            {
-                Arity(1, 1);
-                return Arg(0) switch
                 {
-                    DurationValue dur => dur.SubtractFrom(today),
-                    decimal days => today.AddDays(-(int)days),
-                    _ => throw new QueryException("ago() takes a duration such as 30d, 2w, 6mo or 1y.", c.Pos),
-                };
-            }
+                    Arity(1, 1);
+                    return Arg(0) switch
+                    {
+                        DurationValue dur => dur.SubtractFrom(today),
+                        decimal days => today.AddDays(-(int)days),
+                        _ => throw new QueryException("ago() takes a duration such as 30d, 2w, 6mo or 1y.", c.Pos),
+                    };
+                }
             case "year": Arity(1, 1); return D(0) is { } y ? (decimal)y.Year : null;
             case "month": Arity(1, 1); return D(0) is { } m ? m.ToString("yyyy-MM", CultureInfo.InvariantCulture) : null;
             case "quarter": Arity(1, 1); return D(0) is { } q ? $"{q.Year}-Q{(q.Month - 1) / 3 + 1}" : null;
@@ -596,11 +601,11 @@ internal sealed class EvalContext(DateOnly today)
             case "ceil": Arity(1, 1); return N(0) is { } ce ? Math.Ceiling(ce) : null;
             case "sign": Arity(1, 1); return N(0) is { } sg ? (decimal)Math.Sign(sg) : null;
             case "round":
-            {
-                Arity(1, 2);
-                var digits = c.Args.Count > 1 ? (int)(N(1) ?? 0) : 0;
-                return N(0) is { } r ? Math.Round(r, Math.Clamp(digits, 0, 8), MidpointRounding.AwayFromZero) : null;
-            }
+                {
+                    Arity(1, 2);
+                    var digits = c.Args.Count > 1 ? (int)(N(1) ?? 0) : 0;
+                    return N(0) is { } r ? Math.Round(r, Math.Clamp(digits, 0, 8), MidpointRounding.AwayFromZero) : null;
+                }
             case "lower": Arity(1, 1); return Arg(0) is { } lo ? Values.Str(lo).ToLowerInvariant() : null;
             case "upper": Arity(1, 1); return Arg(0) is { } up ? Values.Str(up).ToUpperInvariant() : null;
             case "trim": Arity(1, 1); return Arg(0) is { } tr ? Values.Str(tr).Trim() : null;
@@ -625,10 +630,10 @@ internal sealed class EvalContext(DateOnly today)
                 Arity(3, 3);
                 return Truthy(Arg(0)) ? Arg(1) : Arg(2);
             case "datediff":
-            {
-                Arity(2, 2);
-                return D(0) is { } d1 && D(1) is { } d2 ? (decimal)(d1.DayNumber - d2.DayNumber) : null;
-            }
+                {
+                    Arity(2, 2);
+                    return D(0) is { } d1 && D(1) is { } d2 ? (decimal)(d1.DayNumber - d2.DayNumber) : null;
+                }
             default:
                 if (IsAggregateName(c.Name))
                 {
@@ -661,10 +666,10 @@ internal sealed class EvalContext(DateOnly today)
         {
             case "sum": return Sum(values);
             case "avg":
-            {
-                var nums = Numbers(values, a);
-                return nums.Count == 0 ? null : nums.Sum() / nums.Count;
-            }
+                {
+                    var nums = Numbers(values, a);
+                    return nums.Count == 0 ? null : nums.Sum() / nums.Count;
+                }
             case "min": return values.Count == 0 ? null : values.MinBy(v => v, Comparer<object?>.Create(Values.Compare));
             case "max": return values.Count == 0 ? null : values.MaxBy(v => v, Comparer<object?>.Create(Values.Compare));
             case "dcount": return (decimal)values.Select(v => Values.Str(v).ToLowerInvariant()).Distinct().Count();

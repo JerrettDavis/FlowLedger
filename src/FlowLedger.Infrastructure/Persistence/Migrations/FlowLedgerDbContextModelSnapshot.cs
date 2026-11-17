@@ -351,9 +351,19 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("status");
 
+                    b.Property<string>("SuggestedName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("suggested_name");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("_tags")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("tags");
 
                     b.HasKey("Id");
 
@@ -529,6 +539,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("actual");
 
+                    b.Property<DateOnly?>("AnchorDate")
+                        .HasColumnType("date")
+                        .HasColumnName("anchor_date");
+
                     b.Property<bool>("AutoPay")
                         .HasColumnType("boolean")
                         .HasColumnName("auto_pay");
@@ -544,6 +558,18 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Estimated")
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("estimated");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Monthly")
+                        .HasColumnName("frequency");
+
+                    b.Property<int?>("IntervalWeeks")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_weeks");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -582,6 +608,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("payer");
+
+                    b.Property<int?>("SecondDueDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("second_due_day");
 
                     b.Property<string>("Section")
                         .IsRequired()
@@ -641,6 +671,12 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("paid_on");
 
+                    b.Property<int>("Slot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("slot");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -660,14 +696,14 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_sheet_payments_tenant_id");
 
-                    b.HasIndex("BillId", "Month")
-                        .IsUnique()
-                        .HasDatabaseName("ux_sheet_payments_bill_month");
-
                     b.HasIndex("TenantId", "TransactionId")
                         .IsUnique()
                         .HasDatabaseName("ux_sheet_payments_transaction")
                         .HasFilter("transaction_id IS NOT NULL");
+
+                    b.HasIndex("BillId", "Month", "Slot")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sheet_payments_bill_month");
 
                     b.ToTable("sheet_payments", (string)null);
                 });

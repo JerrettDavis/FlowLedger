@@ -1,0 +1,111 @@
+@page "/debt"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Debt payoff — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Debt payoff planner</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Compare paying the highest-rate debt first (avalanche, least interest) with the smallest balance first (snowball, quickest wins).
+    Balances are pre-filled from your credit and loan accounts; enter each debt's rate and minimum payment.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        @foreach (var d in _rows)
+        {
+            <div class="d-flex align-center gap-3 flex-wrap mb-2">
+                <MudTextField T="string" Immediate="true" @bind-Value="d.Name" Label="Debt" Style="min-width:200px" Margin="Margin.Dense" />
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Rate" Label="APR %" Min="0" Max="100" Style="max-width:110px" Margin="Margin.Dense" />
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => _rows.Remove(d))" aria-label="@($"Remove {d.Name}")" />
+            </div>
+        }
+        <div class="d-flex align-center gap-3 flex-wrap mt-2">
+            <MudButton OnClick="AddRow" StartIcon="@Icons.Material.Filled.Add">Add debt</MudButton>
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_extra" Label="Extra per month" Min="0" Style="max-width:170px" Margin="Margin.Dense" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Calculate" Disabled="@(_rows.Count == 0)">Compare</MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_result is not null)
+    {
+        <div class="d-flex gap-4 flex-wrap">
+            @foreach (var (title, p) in new[] { ("Avalanche (highest APR first)", _result.Avalanche), ("Snowball (smallest balance first)", _result.Snowball) })
+            {
+                <MudPaper Class="pa-4" Outlined="true" Style="min-width:320px;flex:1">
+                    <MudText Typo="Typo.subtitle1">@title</MudText>
+                    @if (!p.Feasible)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2">Not paid off within 50 years — payments don't cover the interest.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudText Class="fl-num">Debt-free in @p.Months months (@(p.Months / 12)y @(p.Months % 12)m)</MudText>
+                    }
+                    <MudText Class="fl-num">Total interest: @Format.Money(p.TotalInterest)</MudText>
+                    @foreach (var x in p.Debts)
+                    {
+                        <MudText Typo="Typo.body2" Class="fl-muted">@x.Name — @(x.PayoffMonth > 0 ? $"paid off month {x.PayoffMonth}" : "not paid off"), interest @Format.Money(x.InterestPaid)</MudText>
+                    }
+                </MudPaper>
+            }
+        </div>
+        @if (_result.Avalanche.Feasible && _result.Snowball.Feasible && _result.Snowball.TotalInterest > _result.Avalanche.TotalInterest)
+        {
+            <MudText Class="mt-3">Avalanche saves @Format.Money(_result.Snowball.TotalInterest - _result.Avalanche.TotalInterest) in interest.</MudText>
+        }
+    }
+}
+
+@code {
+    private sealed class Row
+    {
+        public string Name { get; set; } = "";
+        public decimal Balance { get; set; }
+        public decimal Rate { get; set; }
+        public decimal Minimum { get; set; }
+    }
+
+    private static readonly HashSet<string> Liabilities = new(StringComparer.OrdinalIgnoreCase) { "CreditCard", "Loan", "Mortgage", "ManualLiability" };
+
+    private readonly List<Row> _rows = [];
+    private decimal _extra;
+    private FlowLedger.Web.ApiClient.DebtPlanDto? _result;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var accounts = await ApiClient.GetAccountsAsync();
+        // Providers report liabilities as positive owed amounts (and some as negative), so key off the account type and use the magnitude.
+        foreach (var a in accounts.Where(a => a.IsActive && Liabilities.Contains(a.AccountType) && a.BalanceAmount != 0))
+        {
+            var owed = Math.Abs(a.BalanceAmount);
+            _rows.Add(new Row { Name = a.Name, Balance = owed, Minimum = Math.Max(25m, Math.Round(owed * 0.02m, 0)) });
+        }
+
+        _loading = false;
+    }
+
+    private void AddRow() => _rows.Add(new Row { Name = "New debt" });
+
+    private async Task Calculate()
+    {
+        try
+        {
+            _result = await ApiClient.PlanDebtAsync(
+                _rows.Select(r => new FlowLedger.Web.ApiClient.DebtRowDto(r.Name, r.Balance, r.Rate, r.Minimum)).ToList(), _extra);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

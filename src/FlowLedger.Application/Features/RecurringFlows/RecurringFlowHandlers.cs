@@ -167,5 +167,6 @@ internal static class RecurringFlowMapper
         f.CategoryId?.Value,
         f.Counterparty,
         f.IsActive,
-        f.CreatedAt);
+        f.CreatedAt,
+        Math.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
 }

@@ -1,6 +1,6 @@
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Application;
 using FlowLedger.Infrastructure;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Worker.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

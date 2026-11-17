@@ -86,6 +86,7 @@
 }
 
 <MudDataGrid T="FlowLedger.Web.ApiClient.TransactionDto"
+             DragDropColumnReordering="true"
              Items="Visible"
              Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow"
@@ -110,10 +111,27 @@
             <CellTemplate>
                 @{ var row = context.Item; }
                 <div class="d-flex align-center">
-                    <MudText Typo="Typo.body2">@row.MerchantName</MudText>
+                    <div>
+                        <MudText Typo="Typo.body2">@(string.IsNullOrWhiteSpace(row.MerchantName) ? row.SuggestedName : row.MerchantName)</MudText>
+                        @if (row.Tags is { Count: > 0 })
+                        {
+                            @foreach (var tag in row.Tags)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="my-0">@tag</MudChip>
+                            }
+                        }
+                    </div>
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Edge="Edge.End"
                                    OnClick="@(() => EditAlias(row))"
                                    aria-label="@($"Rename merchant for {row.Description}")" title="Rename merchant" />
+                    <MudIconButton Icon="@(string.IsNullOrWhiteSpace(row.Notes) ? Icons.Material.Outlined.NoteAdd : Icons.Material.Filled.StickyNote2)" Size="Size.Small"
+                                   Color="@(string.IsNullOrWhiteSpace(row.Notes) ? Color.Default : Color.Primary)"
+                                   OnClick="@(() => EditNote(row))"
+                                   aria-label="@($"Note for {row.Description}")" title="@(string.IsNullOrWhiteSpace(row.Notes) ? "Add a note" : row.Notes)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.CallSplit" Size="Size.Small"
+                                   Color="@(row.Splits is { Count: > 0 } ? Color.Primary : Color.Default)"
+                                   OnClick="@(() => EditSplits(row))"
+                                   aria-label="@($"Split {row.Description} across categories")" title="@(row.Splits is { Count: > 0 } ? "Edit split" : "Split across categories")" />
                 </div>
             </CellTemplate>
         </TemplateColumn>
@@ -263,6 +281,59 @@
         {
             var changed = await ApiClient.SetMerchantAliasAsync(pattern, alias);
             Snackbar.Add($"Renamed {changed} transaction(s) to {alias}", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task EditNote(FlowLedger.Web.ApiClient.TransactionDto tx)
+    {
+        var dialog = await Dialogs.ShowAsync<NoteDialog>("Transaction note", new DialogParameters<NoteDialog>
+        {
+            { x => x.Description, tx.Description },
+            { x => x.Note, tx.Notes ?? "" },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not string note)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApiClient.SetTransactionNoteAsync(tx.Id, note);
+            Snackbar.Add(note.Length == 0 ? "Note removed" : "Note saved", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task EditSplits(FlowLedger.Web.ApiClient.TransactionDto tx)
+    {
+        var dialog = await Dialogs.ShowAsync<SplitDialog>("Split transaction", new DialogParameters<SplitDialog>
+        {
+            { x => x.Description, tx.Description },
+            { x => x.Total, tx.Amount },
+            { x => x.CurrentCategoryId, tx.CategoryId },
+            { x => x.Existing, tx.Splits },
+            { x => x.Categories, _categories },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not List<FlowLedger.Web.ApiClient.TransactionSplitDto> splits)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApiClient.SetTransactionSplitsAsync(tx.Id, splits);
+            Snackbar.Add(splits.Count == 0 ? "Split removed" : "Split saved", Severity.Success);
             await LoadAsync();
         }
         catch (Exception ex)

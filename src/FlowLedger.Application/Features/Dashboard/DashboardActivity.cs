@@ -6,6 +6,13 @@ namespace FlowLedger.Application.Features.Dashboard;
 /// <summary>A transaction surfaced for attention, with human-readable reasons.</summary>
 public sealed record FlaggedTransactionDto(TransactionDto Transaction, IReadOnlyList<string> Reasons);
 
+/// <summary>Per-tenant record of flagged transactions the user reviewed and dismissed, each with an optional note.</summary>
+public interface ISuspiciousDismissalStore
+{
+    Task<IReadOnlySet<Guid>> ListIdsAsync(CancellationToken ct = default);
+    Task DismissAsync(Guid transactionId, string? note, CancellationToken ct = default);
+}
+
 /// <summary>At-a-glance activity feed across all accounts.</summary>
 public sealed record DashboardActivityDto(
     IReadOnlyList<TransactionDto> RecentPosted,
@@ -33,7 +40,8 @@ public static class DashboardActivityAnalyzer
     private const int DuplicateWindowDays = 3;
 
     public static DashboardActivityDto Analyze(
-        IReadOnlyList<TransactionDto> all, DateOnly today, int listSize = 8, IReadOnlySet<Guid>? transferIds = null)
+        IReadOnlyList<TransactionDto> all, DateOnly today, int listSize = 8, IReadOnlySet<Guid>? transferIds = null,
+        IReadOnlySet<Guid>? dismissedIds = null)
     {
         // Planned rows are forecast placeholders, never real activity.
         var real = all.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
@@ -59,7 +67,8 @@ public static class DashboardActivityAnalyzer
         var large = inWindow.Where(t => t.Amount >= threshold)
             .OrderByDescending(t => t.Amount).Take(listSize).ToList();
 
-        var suspicious = FindSuspicious(counted, inWindow, threshold, today, listSize);
+        var reviewable = dismissedIds is { Count: > 0 } ? inWindow.Where(t => !dismissedIds.Contains(t.Id)).ToList() : inWindow;
+        var suspicious = FindSuspicious(counted, reviewable, threshold, today, listSize);
 
         return new DashboardActivityDto(
             recent, pending.Take(listSize * 2).ToList(), pending.Sum(Signed),
@@ -98,7 +107,7 @@ public static class DashboardActivityAnalyzer
             var others = history.Where(o => o.Id != t.Id).ToList();
 
             if (others.Any(o => o.AccountId == t.AccountId && o.Direction == t.Direction && o.Amount == t.Amount
-                && Key(o) == key && Math.Abs((( o.PostedDate ?? o.EffectiveDate).DayNumber) - date.DayNumber) <= DuplicateWindowDays))
+                && Key(o) == key && Math.Abs(((o.PostedDate ?? o.EffectiveDate).DayNumber) - date.DayNumber) <= DuplicateWindowDays))
             {
                 reasons.Add("Possible duplicate charge");
             }
@@ -129,7 +138,8 @@ public static class DashboardActivityAnalyzer
 }
 
 /// <summary>Loads recent history and runs the analyzer.</summary>
-public sealed class GetDashboardActivityHandler(ITransactionRepository repo, IAccountRepository accounts)
+public sealed class GetDashboardActivityHandler(
+    ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals)
 {
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
@@ -138,6 +148,24 @@ public sealed class GetDashboardActivityHandler(ITransactionRepository repo, IAc
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, 5000, ct);
         var dtos = txs.Select(TransactionMapper.ToDto).ToList();
         var types = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
-        return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types));
+        return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types),
+            dismissedIds: await dismissals.ListIdsAsync(ct));
+    }
+}
+
+/// <summary>Marks a flagged transaction as reviewed so it stops appearing under Suspicious Activity.</summary>
+public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissals)
+{
+    public const int MaxNoteLength = 500;
+
+    public Task HandleAsync(Guid transactionId, string? note, CancellationToken ct = default)
+    {
+        var trimmed = note?.Trim();
+        if (trimmed is { Length: > MaxNoteLength })
+        {
+            throw new ArgumentException($"Note must be {MaxNoteLength} characters or fewer.");
+        }
+
+        return dismissals.DismissAsync(transactionId, string.IsNullOrEmpty(trimmed) ? null : trimmed, ct);
     }
 }

@@ -28,6 +28,10 @@ internal sealed class SheetBillRecordConfiguration : IEntityTypeConfiguration<Sh
         builder.Property(r => r.AccountRef).HasColumnName("account_ref").HasMaxLength(300);
         builder.Property(r => r.MatchText).HasColumnName("match_text").HasMaxLength(300);
         builder.Property(r => r.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+        builder.Property(r => r.Frequency).HasColumnName("frequency").HasMaxLength(20).IsRequired().HasDefaultValue("Monthly");
+        builder.Property(r => r.IntervalWeeks).HasColumnName("interval_weeks");
+        builder.Property(r => r.AnchorDate).HasColumnName("anchor_date");
+        builder.Property(r => r.SecondDueDay).HasColumnName("second_due_day");
         builder.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.HasIndex(r => r.TenantId).HasDatabaseName("ix_sheet_bills_tenant_id");
         // Concurrent refreshes (page load, sync, prerender) must not create the same detected row twice.
@@ -46,6 +50,7 @@ internal sealed class SheetPaymentRecordConfiguration : IEntityTypeConfiguration
         builder.Property(r => r.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(r => r.BillId).HasColumnName("bill_id").IsRequired();
         builder.Property(r => r.Month).HasColumnName("month").IsRequired();
+        builder.Property(r => r.Slot).HasColumnName("slot").HasDefaultValue(0);
         builder.Property(r => r.IsPaid).HasColumnName("is_paid");
         builder.Property(r => r.Amount).HasColumnName("amount").HasColumnType("numeric(18,4)");
         builder.Property(r => r.PaidOn).HasColumnName("paid_on");
@@ -53,7 +58,7 @@ internal sealed class SheetPaymentRecordConfiguration : IEntityTypeConfiguration
         builder.Property(r => r.Source).HasColumnName("source").HasMaxLength(10).IsRequired();
 
         builder.HasOne<SheetBillRecord>().WithMany().HasForeignKey(r => r.BillId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasIndex(r => new { r.BillId, r.Month }).IsUnique().HasDatabaseName("ux_sheet_payments_bill_month");
+        builder.HasIndex(r => new { r.BillId, r.Month, r.Slot }).IsUnique().HasDatabaseName("ux_sheet_payments_bill_month");
         // A transaction may back at most one cell, even with concurrent refreshes.
         builder.HasIndex(r => new { r.TenantId, r.TransactionId }).IsUnique()
             .HasFilter("transaction_id IS NOT NULL").HasDatabaseName("ux_sheet_payments_transaction");

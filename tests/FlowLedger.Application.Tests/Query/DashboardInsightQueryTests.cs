@@ -1,5 +1,5 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.Query;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Query;
 

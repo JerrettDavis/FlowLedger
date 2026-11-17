@@ -281,21 +281,21 @@ internal sealed class QueryParser
             case "head":
                 return new TakeOp(ParseCount());
             case "top":
-            {
-                var n = ParseCount();
-                if (!EatWord("by"))
+                {
+                    var n = ParseCount();
+                    if (!EatWord("by"))
                     {
                         throw new QueryException("Expected 'by' after top N.", Cur.Pos);
                     }
 
                     var keys = ParseSortKeys();
-                if (keys.Count != 1)
+                    if (keys.Count != 1)
                     {
                         throw new QueryException("top accepts a single sort key.", pos);
                     }
 
                     return new TopOp(n, keys[0]);
-            }
+                }
             case "count":
                 return new CountOp();
             default:
@@ -566,17 +566,17 @@ internal sealed class QueryParser
                 _p++;
                 return new DurationLiteral((int)t.Number, t.Unit);
             case Tok.Symbol when t.Text == "(":
-            {
-                _p++;
-                var e = ParseExpr();
-                ExpectSymbol(")");
-                return e;
-            }
+                {
+                    _p++;
+                    var e = ParseExpr();
+                    ExpectSymbol(")");
+                    return e;
+                }
             case Tok.Ident:
-            {
-                _p++;
-                var lower = t.Text.ToLowerInvariant();
-                if (lower == "true")
+                {
+                    _p++;
+                    var lower = t.Text.ToLowerInvariant();
+                    if (lower == "true")
                     {
                         return new Literal(true);
                     }
@@ -592,18 +592,18 @@ internal sealed class QueryParser
                     }
 
                     if (EatSymbol("("))
-                {
-                    var args = new List<Expr>();
-                    if (!IsSymbol(")"))
                     {
-                        do { args.Add(ParseExpr()); } while (EatSymbol(","));
+                        var args = new List<Expr>();
+                        if (!IsSymbol(")"))
+                        {
+                            do { args.Add(ParseExpr()); } while (EatSymbol(","));
+                        }
+                        ExpectSymbol(")");
+                        return new Call(lower, args, t.Pos);
                     }
-                    ExpectSymbol(")");
-                    return new Call(lower, args, t.Pos);
-                }
 
-                return new ColumnRef(t.Text, t.Pos);
-            }
+                    return new ColumnRef(t.Text, t.Pos);
+                }
             default:
                 throw new QueryException($"Unexpected '{Describe(t)}'.", t.Pos);
         }

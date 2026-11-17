@@ -41,7 +41,12 @@ public sealed record TransactionDto(
     string? MerchantName,
     string? Notes,
     string? Fingerprint,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? SuggestedName = null,
+    List<string>? Tags = null,
+    List<TransactionSplitDto>? Splits = null);
+
+public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);
 
 public sealed record FlaggedTransactionDto(TransactionDto Transaction, List<string> Reasons);
 
@@ -97,7 +102,8 @@ public sealed record RecurringFlowDto(
     Guid? CategoryId,
     string? Counterparty,
     bool IsActive,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    decimal MonthlyAmount = 0m);
 
 public sealed record CreateRecurringFlowRequest(
     Guid AccountId,
@@ -227,6 +233,24 @@ public sealed record DashboardInsightsDto(
 public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
+
+public sealed record GoalDto(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete, DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete);
+
+public sealed record DebtRowDto(string Name, decimal Balance, decimal AnnualRatePercent, decimal MinimumPayment);
+
+public sealed record DebtPayoffDto(string Name, int PayoffMonth, decimal InterestPaid);
+
+public sealed record PayoffPlanDto(string Strategy, bool Feasible, int Months, decimal TotalInterest, decimal TotalPaid, List<DebtPayoffDto> Debts);
+
+public sealed record DebtPlanDto(PayoffPlanDto Avalanche, PayoffPlanDto Snowball);
+
+public sealed record AlertDto(string Severity, string Title, string Detail);
+
+public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
+
+public sealed record PeriodPerformanceDto(string Period, int Days, decimal StartBalance, decimal NetContributions, decimal Gain, double? GainPercent);
+
+public sealed record AccountPerformanceDto(Guid AccountId, string Name, decimal Balance, List<PeriodPerformanceDto> Periods);
 
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
@@ -362,12 +386,16 @@ public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int 
 
 // Bill sheet (spreadsheet mode) ------------------------------------------------
 
-public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, string Source);
+public sealed record SheetSlotDto(int Slot, DateOnly? Due, bool Paid, decimal? Amount, DateOnly? PaidOn, string? Source);
+
+public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, string Source, int PaidCount = 0, int Expected = 1);
 
 public sealed record SheetRowDto(
     Guid Id, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
     int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRefMasked, string? MatchText,
-    bool NeedsMatchText, Dictionary<string, SheetCellDto> Cells);
+    bool NeedsMatchText, Dictionary<string, SheetCellDto> Cells,
+    string Frequency = "Monthly", int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null,
+    Dictionary<string, List<SheetSlotDto>>? Slots = null, decimal MonthlyEstimated = 0m);
 
 public sealed record SheetTotalsLine(decimal Total, decimal Optional, decimal Required, decimal Personal, decimal Business);
 
@@ -382,9 +410,10 @@ public sealed record SheetViewDto(
 
 public sealed record SaveBillRequest(
     string Section, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
-    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRef, string? MatchText);
+    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRef, string? MatchText,
+    string? Frequency = null, int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null);
 
-public sealed record SetPaymentRequest(bool Paid, decimal? Amount);
+public sealed record SetPaymentRequest(bool Paid, decimal? Amount, int Slot = 0);
 
 public sealed record ImportSheetRequest(string Csv, bool Replace);
 

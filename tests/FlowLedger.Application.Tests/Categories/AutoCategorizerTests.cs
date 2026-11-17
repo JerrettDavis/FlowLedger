@@ -1,5 +1,5 @@
-using FluentAssertions;
 using FlowLedger.Application.Features.Categories;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Categories;
 

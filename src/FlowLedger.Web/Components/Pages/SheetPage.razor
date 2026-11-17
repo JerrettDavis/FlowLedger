@@ -106,14 +106,40 @@
                             <td>@row.Payer</td>
                             <td class="fl-sheet-flags">@Flags(row)</td>
                             <td>@(row.AutoPay ? "Auto" : "Manual")</td>
-                            <td class="num">@(row.DueDay?.ToString() ?? "Flux")</td>
-                            <td class="num fl-num">@Format.Money(row.Estimated)</td>
+                            <td class="num">@DueText(row)</td>
+                            <td class="num fl-num">
+                                @Format.Money(MonthlyEstimated(row))
+                                @if (SlotCount(row) > 1)
+                                {
+                                    <span class="fl-sheet-sub">@Format.Money(row.Estimated) × @SlotCount(row)</span>
+                                }
+                            </td>
                             <td class="num fl-num">@Format.Money(ActualFor(row))</td>
                             @foreach (var m in _view.Months)
                             {
                                 var cell = row.Cells.GetValueOrDefault(m);
-                                var late = IsLate(row, m, cell);
+                                var slots = row.Slots?.GetValueOrDefault(m);
                                 <td class="fl-sheet-cellwrap @(m == _view.SelectedMonth ? "fl-sheet-cur" : null)">
+                                @if (slots is { Count: > 1 })
+                                {
+                                    @* A bill that repeats inside the month shows once per date. *@
+                                    <div class="d-flex flex-column" style="gap:2px">
+                                    @foreach (var slot in slots)
+                                    {
+                                        var slotLate = IsSlotLate(slot);
+                                        <button class="fl-sheet-cell @(slot.Paid ? "paid" : slotLate ? "late" : null)"
+                                                aria-pressed="@(slot.Paid ? "true" : "false")"
+                                                aria-label="@SlotLabel(row, m, slot, slotLate)"
+                                                title="@SlotTitle(slot)"
+                                                @onclick="() => ToggleSlotAsync(row, m, slot)">
+                                            @(slot.Due is { } due ? Format.DayMonth(due) : "—") @(slot.Paid ? (slot.Source == "Auto" ? "✓ auto" : "✓") : slotLate ? "!" : "·")
+                                        </button>
+                                    }
+                                    </div>
+                                }
+                                else
+                                {
+                                    var late = IsLate(row, m, cell);
                                     <button class="fl-sheet-cell @(cell?.Paid == true ? "paid" : late ? "late" : null)"
                                             aria-pressed="@(cell?.Paid == true ? "true" : "false")"
                                             aria-label="@CellLabel(row, m, cell, late)"
@@ -121,6 +147,7 @@
                                             @onclick="() => ToggleAsync(row, m, cell)">
                                         @(cell?.Paid == true ? (cell.Source == "Auto" ? "✓ auto" : "✓") : late ? "!" : "·")
                                     </button>
+                                }
                                 </td>
                             }
                         </tr>
@@ -230,6 +257,36 @@
         }
     }
 
+    private async Task ToggleSlotAsync(SheetRowDto row, string month, SheetSlotDto slot)
+    {
+        try
+        {
+            // Same cycle as a single cell, but per payment: auto tick -> manual "not paid" -> manual tick -> automatic.
+            if (slot is { Paid: true, Source: "Manual" })
+                await ApiClient.ClearSheetPaymentAsync(row.Id, month, slot.Slot);
+            else if (slot is { Paid: true, Source: "Auto" })
+                await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: false, slot: slot.Slot);
+            else
+                await ApiClient.SetSheetPaymentAsync(row.Id, month, paid: true, slot: slot.Slot);
+            await LoadAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static bool IsSlotLate(SheetSlotDto slot) =>
+        !slot.Paid && slot.Due is { } due && due < DateOnly.FromDateTime(DateTime.Today);
+
+    private static string SlotLabel(SheetRowDto row, string month, SheetSlotDto slot, bool late) =>
+        $"{row.Name}, {(slot.Due is { } d ? Format.DayMonth(d) : ShortMonth(month))}: {(slot.Paid ? "paid" : late ? "overdue, not marked paid" : "not paid")}. Activate to {(slot.Paid ? "mark unpaid" : "mark paid")}.";
+
+    private static string? SlotTitle(SheetSlotDto slot) =>
+        slot.Paid
+            ? $"{(slot.Source == "Auto" ? "Matched payment" : "Marked by you")}{(slot.Amount is { } a ? $" · {Format.Money(a)}" : "")}{(slot.PaidOn is { } d ? $" · {Format.DayMonth(d)}" : "")}"
+            : null;
+
     private async Task EditAsync(SheetRowDto? row, string? section)
     {
         var sections = _view?.Sections.Select(s => s.Name).ToList() ?? [];
@@ -283,8 +340,27 @@
         DateOnly.ParseExact(key + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
             .ToString("MMM yy", System.Globalization.CultureInfo.InvariantCulture);
 
-    private decimal ActualFor(SheetRowDto row) =>
-        _view is not null && row.Cells.GetValueOrDefault(_view.SelectedMonth) is { Paid: true, Amount: { } a } ? a : row.Actual ?? row.Estimated;
+    private int SlotCount(SheetRowDto row) =>
+        _view is not null && row.Slots?.GetValueOrDefault(_view.SelectedMonth) is { Count: > 1 } s ? s.Count : 1;
+
+    private decimal MonthlyEstimated(SheetRowDto row) => row.Estimated * SlotCount(row);
+
+    /// <summary>The "Actual Cost" column for the selected month: paid amounts plus the expected amount for each payment still due.</summary>
+    private decimal ActualFor(SheetRowDto row)
+    {
+        if (_view is null) return row.Actual ?? row.Estimated;
+        if (row.Slots?.GetValueOrDefault(_view.SelectedMonth) is { Count: > 1 } slots)
+            return slots.Sum(s => s.Paid && s.Amount is { } a ? a : row.Actual ?? row.Estimated);
+        return row.Cells.GetValueOrDefault(_view.SelectedMonth) is { Paid: true, Amount: { } p } ? p : row.Actual ?? row.Estimated;
+    }
+
+    private static string DueText(SheetRowDto row) => row.Frequency switch
+    {
+        "Weekly" when row.AnchorDate is { } a => $"Weekly · {a.DayOfWeek.ToString()[..3]}",
+        "EveryNWeeks" when row.AnchorDate is { } a => $"Every {row.IntervalWeeks} wks · {a.DayOfWeek.ToString()[..3]}",
+        "TwiceMonthly" => $"{row.DueDay} & {row.SecondDueDay}",
+        _ => row.DueDay?.ToString() ?? "Flux",
+    };
 
     private static string Flags(SheetRowDto r) =>
         string.Concat(r.IsDebt ? "D" : "", r.IsPerpetual ? "P" : "", r.IsOptional ? "O" : "", r.IsBusiness ? "B" : "");

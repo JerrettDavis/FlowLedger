@@ -23,6 +23,8 @@ namespace FlowLedger.Api.Tests;
 /// </summary>
 public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private readonly string _objectStoragePath = Path.Combine(Path.GetTempPath(), $"flowledger-api-{Guid.NewGuid():N}");
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("flowledger_api_test")
         .WithUsername("test")
@@ -68,6 +70,10 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     {
         await _postgres.DisposeAsync();
         await base.DisposeAsync();
+        if (Directory.Exists(_objectStoragePath))
+        {
+            Directory.Delete(_objectStoragePath, recursive: true);
+        }
     }
 
     /// <summary>Resets the database to a clean state. Call at the start of each test.</summary>
@@ -101,6 +107,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 ["ConnectionStrings:flowledger"] = _postgres.GetConnectionString(),
                 ["Api:Key"] = DevApiKey,
                 ["Mx:Enabled"] = "false",
+                ["ObjectStorage:RootPath"] = _objectStoragePath,
             });
         });
     }

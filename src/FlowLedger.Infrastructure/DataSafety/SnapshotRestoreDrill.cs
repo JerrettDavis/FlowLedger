@@ -1,9 +1,9 @@
+using System.Text.Json;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using System.Text.Json;
 
 namespace FlowLedger.Infrastructure.DataSafety;
 
@@ -180,9 +180,7 @@ public static class SnapshotRestoreDrill
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand(
-            "CREATE TABLE IF NOT EXISTS system_settings (key text PRIMARY KEY, value text NOT NULL, updated_utc timestamptz NOT NULL DEFAULT now());" +
-            NpgsqlProviderCallLedger.CreateSqlText + BackupRunStore.CreateSqlText + NpgsqlBudgetStore.CreateSqlText, conn);
+        await using var cmd = new NpgsqlCommand(AdHocSchema.AllSql, conn);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 }

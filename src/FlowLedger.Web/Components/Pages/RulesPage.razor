@@ -1,0 +1,90 @@
+@page "/rules"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Rules — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Categorization rules</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    When a transaction's description contains your text, it gets the category you choose — now and on every future sync.
+    The longest matching text wins. Categories you set by hand on a transaction are never overridden.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <div class="d-flex align-center gap-3 flex-wrap">
+            <MudTextField T="string" Immediate="true" @bind-Value="_pattern" Label="If description contains" Style="min-width:260px" Margin="Margin.Dense" />
+            <MudTextField T="string" Immediate="true" @bind-Value="_category" Label="Category (e.g. Food/Coffee)" Style="min-width:260px" Margin="Margin.Dense" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save"
+                       Disabled="@(string.IsNullOrWhiteSpace(_pattern) || string.IsNullOrWhiteSpace(_category))">Save rule</MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_rules is null || _rules.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="fl-muted">No rules yet.</MudText>
+    }
+    else
+    {
+        <MudPaper Class="pa-2" Outlined="true">
+            @foreach (var r in _rules)
+            {
+                <div class="d-flex justify-space-between align-center pa-1">
+                    <MudText>Contains <strong>@r.Pattern</strong> → @r.CategoryPath</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(r.Pattern))" aria-label="@($"Remove rule {r.Pattern}")" />
+                </div>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<FlowLedger.Web.ApiClient.CategoryRuleDto>? _rules;
+    private bool _loading = true;
+    private string? _pattern;
+    private string? _category;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _rules = await ApiClient.GetCategoryRulesAsync();
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            var changed = await ApiClient.SetCategoryRuleAsync(_pattern!, _category!);
+            Snackbar.Add($"Rule saved — {changed} transaction(s) updated.", Severity.Success);
+            _pattern = null;
+            _category = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task Remove(string pattern)
+    {
+        try
+        {
+            await ApiClient.DeleteCategoryRuleAsync(pattern);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

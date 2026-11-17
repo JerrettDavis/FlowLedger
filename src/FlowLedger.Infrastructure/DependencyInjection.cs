@@ -168,6 +168,8 @@ public static class DependencyInjection
                 guarded,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
+                sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
+                sp.GetRequiredService<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>(),
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
 
             // Then detect recurring income/bills (after categories exist, so transfers/trades are excluded).
@@ -184,8 +186,19 @@ public static class DependencyInjection
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
         });
 
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryRuleStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
         services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlMerchantAliasStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+
+        services.AddScoped<FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlSuspiciousDismissalStore(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
@@ -203,6 +216,10 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Budgets (per-tenant, ad-hoc table; part of every snapshot/export) --
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore(
+            configuration.GetConnectionString("flowledger")
+            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        // -- Savings goals (per-tenant, ad-hoc table; part of every snapshot/export) --
+        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore(
             configuration.GetConnectionString("flowledger")
             ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --

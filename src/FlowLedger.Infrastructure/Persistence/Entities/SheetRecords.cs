@@ -21,6 +21,12 @@ internal sealed class SheetBillRecord
     public string? AccountRef { get; set; }
     public string? MatchText { get; set; }
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Monthly | TwiceMonthly | Weekly | EveryNWeeks. Estimated is per payment, not per month.</summary>
+    public string Frequency { get; set; } = "Monthly";
+    public int? IntervalWeeks { get; set; }
+    public DateOnly? AnchorDate { get; set; }
+    public int? SecondDueDay { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 
@@ -31,6 +37,9 @@ internal sealed class SheetPaymentRecord
     public Guid TenantId { get; set; }
     public Guid BillId { get; set; }
     public DateOnly Month { get; set; }
+
+    /// <summary>Which of the month's payments this is (0 for a monthly bill; 0..n-1 for a weekly or fortnightly one).</summary>
+    public int Slot { get; set; }
     public bool IsPaid { get; set; }
     public decimal? Amount { get; set; }
     public DateOnly? PaidOn { get; set; }

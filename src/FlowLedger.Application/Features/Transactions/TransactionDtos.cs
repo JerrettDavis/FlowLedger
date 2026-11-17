@@ -18,7 +18,13 @@ public sealed record TransactionDto(
     string? MerchantName,
     string? Notes,
     string? Fingerprint,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? SuggestedName = null,
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<TransactionSplitDto>? Splits = null);
+
+/// <summary>One portion of a split transaction.</summary>
+public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);
 
 /// <summary>Request DTO for creating a manual transaction.</summary>
 public sealed record CreateTransactionRequest(
