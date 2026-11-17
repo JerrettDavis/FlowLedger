@@ -273,7 +273,7 @@ public sealed class ForecastEngine : IForecastEngine
             {
                 Source = ForecastItemSource.PlannedOccurrence,
                 SourceId = occ.OccurrenceId.Value,
-                Label = $"Planned ({occ.FlowId})",
+                Label = occ.FlowName ?? $"Planned ({occ.FlowId})",
                 Amount = occ.PlannedAmount,
                 Direction = occ.Direction,
                 BalanceDelta = delta,

@@ -21,7 +21,8 @@ public sealed record DetectedFlow(
     DateOnly LastSeen,
     DateOnly NextExpected,
     int Occurrences,
-    double Confidence);
+    double Confidence,
+    bool IsPeriodicExtra = false);
 
 /// <summary>
 /// Pure detector for recurring income and expenses. Groups transactions by (account, direction, merchant), measures the
@@ -33,30 +34,128 @@ public static class RecurringFlowDetector
 {
     private const double MinConfidence = 0.6;
 
+    /// <summary>Suffix on the name of the monthly flow that carries a recurring bonus / true-up on top of a weekly or biweekly base.</summary>
+    public const string ExtraSuffix = " (periodic extra)";
+
+    // A deposit this far above the typical one is a candidate periodic extra (a monthly bonus week).
+    private const decimal ExtraRatio = 1.4m;
+
     public static IReadOnlyList<DetectedFlow> Detect(IReadOnlyList<FlowTxn> transactions, DateOnly today)
     {
         var result = new List<DetectedFlow>();
-        var groups = transactions
+        var buckets = transactions
             .Where(t => t.Amount > 0 && !string.IsNullOrWhiteSpace(t.Text))
-            .GroupBy(t => (t.AccountId, t.IsCredit, Key: RecurringDetector.Key(t.Text)))
-            .Where(g => g.Key.Key.Length >= 3);
+            .GroupBy(t => (t.AccountId, t.IsCredit));
 
-        foreach (var g in groups)
+        foreach (var bucket in buckets)
         {
-            var flow = Analyze(g.Key.AccountId, g.Key.IsCredit, g.Key.Key, g.ToList(), today);
-            // A pattern that missed two whole periods has stopped (cancelled subscription, ended job): not worth predicting.
-            var stopped = flow is not null && today.DayNumber - flow.LastSeen.DayNumber > PeriodDays(flow.Frequency) * 2 + 3;
-            if (flow is not null && !stopped && flow.Confidence >= MinConfidence)
+            // Group by normalized merchant (processor prefix, phone numbers and state codes removed).
+            var byNorm = bucket
+                .Select(t => (Txn: t, Norm: MerchantNormalizer.Normalize(t.Text)))
+                .Where(x => RecurringDetector.Key(x.Norm).Length >= 3)
+                .GroupBy(x => x.Norm)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Txn).ToList());
+
+            // The same merchant often appears with and without a trailing city ("MICROSOFT" / "MICROSOFT REDMOND"). Try the
+            // shortest key first with every longer key that extends it merged in; if that is not a pattern, the longer keys
+            // get their own turn. Merging can only blur a pattern, never invent one.
+            var consumed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var root in byNorm.Keys.OrderBy(k => k.Count(c => c == ' ')).ThenBy(k => k.Length).ToList())
             {
-                result.Add(flow);
+                if (consumed.Contains(root))
+                {
+                    continue;
+                }
+
+                var members = byNorm.Keys
+                    .Where(k => !consumed.Contains(k) && (k == root || k.StartsWith(root + " ", StringComparison.Ordinal)))
+                    .ToList();
+                var txns = members.SelectMany(k => byNorm[k]).ToList();
+                var isCredit = bucket.Key.IsCredit;
+
+                if (!isCredit && IsHabitMerchant(root))
+                {
+                    foreach (var m in members)
+                    {
+                        consumed.Add(m);
+                    }
+
+                    continue;
+                }
+
+                var found = false;
+                foreach (var flow in Analyze(bucket.Key.AccountId, isCredit, RecurringDetector.Key(root), txns, today, root))
+                {
+                    // A pattern that missed two whole periods has stopped (cancelled subscription, ended job): not worth predicting.
+                    var stopped = today.DayNumber - flow.LastSeen.DayNumber > PeriodDays(flow.Frequency) * 2 + 3;
+                    if (!stopped && flow.Confidence >= MinConfidence)
+                    {
+                        result.Add(flow);
+                        found = true;
+                    }
+                }
+
+                if (found)
+                {
+                    foreach (var m in members)
+                    {
+                        consumed.Add(m);
+                    }
+                }
             }
         }
 
         return result.OrderByDescending(f => f.Confidence).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private static DetectedFlow? Analyze(Guid accountId, bool isCredit, string key, List<FlowTxn> txns, DateOnly today)
+    // Merchants people visit out of habit, not on a schedule: fuel, restaurants, groceries, coffee, delivery. Never a bill.
+    private static readonly string[] HabitWords =
+    [
+        "CASEYS", "QUIKTRIP", "QT ", "SHELL", "CHEVRON", "EXXON", "MOBIL ", "MURPHY", "KUM & GO", "KUM AND GO", "LOVES", "SPEEDWAY",
+        "CONOCO", "PHILLIPS 66", "SINCLAIR", "SUNOCO", "VALERO", "BUCEE", "BUC-EE", "RACETRAC", "WAWA", "SHEETZ", "IONNA", "CIRCLE K",
+        "7-ELEVEN", "7 ELEVEN", "FUEL", "GAS STATION", "PETRO", "TRAVEL CENTER", "CEFCO", "LOVE'S",
+        "MCDONALD", "WENDY", "BURGER", "TACO", "PIZZA", "CAFE", "COFFEE", "STARBUCKS", "GRILL", "BBQ", "SUSHI", "DINER", "BAKERY",
+        "CHICK-FIL-A", "CHICKFILA", "SONIC", "WHATABURGER", "TORCHY", "CUISINE", "RESTAURANT", "CANTINA", "KITCHEN", "DOORDASH",
+        "UBER EATS", "UBEREATS", "GRUBHUB", "DUNKIN", "PANERA", "CHIPOTLE", "SUBWAY", "DAIRY QUEEN", "BREWING", "BREWERY", "PUB ",
+        "WALMART", "WAL-MART", "SAFEWAY", "REASOR", "SPROUTS", "WHOLE FOODS", "KROGER", "ALDI", "TARGET", "COSTCO", "SAMS CLUB",
+        "SAM'S CLUB", "HOMELAND", "DOLLAR GENERAL", "DOLLAR TREE", "WALGREENS", "CVS", "BASS PRO", "AMAZON MKTP", "AMZN MKTP",
+    ];
+
+    private static bool IsHabitMerchant(string normalized)
     {
+        var padded = normalized + " ";
+        return HabitWords.Any(w => padded.Contains(w, StringComparison.Ordinal));
+    }
+
+    // Words that mark a real bill, whose amount legitimately drifts month to month (utilities, insurance, loans).
+    private static readonly string[] BillWords =
+    [
+        "ELECT", "PWR", "POWER", "GAS UTIL", "NATURAL GAS", "WATER", "UTIL", "SEWER", "INSURANCE", "ASSURANCE", "MORTGAGE", "LOAN",
+        "STATE FARM", "PAYMENT", "AT&T", "ATT ", "VERIZON", "COX", "INTERNET", "MEDICAL", "MYCHART", "MY CHART",
+    ];
+
+    private static bool IsBillish(string normalized)
+    {
+        var padded = normalized + " ";
+        return BillWords.Any(w => padded.Contains(w, StringComparison.Ordinal));
+    }
+
+    private static IReadOnlyList<DetectedFlow> Analyze(
+        Guid accountId, bool isCredit, string key, List<FlowTxn> txns, DateOnly today, string normalizedName)
+    {
+        var flow = AnalyzeCore(accountId, isCredit, key, txns, today, normalizedName, out var extra);
+        if (flow is null)
+        {
+            return [];
+        }
+
+        return extra is null ? [flow] : [flow, extra];
+    }
+
+    private static DetectedFlow? AnalyzeCore(
+        Guid accountId, bool isCredit, string key, List<FlowTxn> txns, DateOnly today, string normalizedName, out DetectedFlow? extraFlow)
+    {
+        extraFlow = null;
         // One occurrence per date (a split deposit is still one paycheck); amounts on the same day are summed.
         var days = txns.GroupBy(t => t.Date).OrderBy(d => d.Key)
             .Select(d => (Date: d.Key, Amount: d.Sum(x => x.Amount))).ToList();
@@ -72,29 +171,35 @@ public static class RecurringFlowDetector
         }
 
         var amounts = days.Select(d => d.Amount).ToList();
-        var median = Median(amounts);
-        var fixedShare = amounts.Count(a => Math.Abs(a - median) <= median * 0.03m) / (double)amounts.Count;
-        var stableShare = amounts.Count(a => Math.Abs(a - median) <= median * 0.35m) / (double)amounts.Count;
-        var isFixed = fixedShare >= 0.8;
+        var (median, isFixed, stableShare) = AmountStats(amounts);
 
         var last = days[^1].Date;
-        var label = BestLabel(txns);
+        var label = BestLabel(txns, normalizedName);
+
+        // A weekly/biweekly paycheck with one bigger check each month (a bonus week) is two flows: the regular check plus a
+        // monthly extra for the difference. The base statistics then ignore the bonus checks so they don't look "variable".
+        var split = SplitPeriodicExtra(days);
+        var (baseMedian, baseFixed, baseStable) = split is null
+            ? (median, isFixed, stableShare)
+            : AmountStats(split.BaseAmounts);
 
         // Weekly (≥4 occurrences). Variable amounts only for income: weekly expense with varying amounts is shopping.
         var weekly = Share(gaps, 6, 8);
-        if (weekly >= 0.7 && days.Count >= 4 && (isFixed || stableShare >= 0.7 && isCredit))
+        if (weekly >= 0.7 && days.Count >= 4 && (baseFixed || baseStable >= 0.7 && isCredit))
         {
             var dow = ModeDayOfWeek(days.Select(d => d.Date));
-            return Build(key, accountId, isCredit, label, median, isFixed, "Weekly", null, null, null, dow,
+            extraFlow = BuildExtra(split, key, accountId, isCredit, label, baseMedian, today);
+            return Build(key, accountId, isCredit, label, baseMedian, baseFixed, "Weekly", null, null, null, dow,
                 last, NextWeekly(last, 7, today), days.Count, weekly, expectedN: 6);
         }
 
         // Every two weeks (≥3).
         var biweekly = Share(gaps, 13, 15);
-        if (biweekly >= 0.7 && (isFixed || stableShare >= 0.7))
+        if (biweekly >= 0.7 && (baseFixed || baseStable >= 0.7))
         {
             var dow = ModeDayOfWeek(days.Select(d => d.Date));
-            return Build(key, accountId, isCredit, label, median, isFixed, "EveryNWeeks", null, null, 2, dow,
+            extraFlow = BuildExtra(split, key, accountId, isCredit, label, baseMedian, today);
+            return Build(key, accountId, isCredit, label, baseMedian, baseFixed, "EveryNWeeks", null, null, 2, dow,
                 last, NextWeekly(last, 14, today), days.Count, biweekly, expectedN: 4);
         }
 
@@ -105,14 +210,24 @@ public static class RecurringFlowDetector
                 last, NextMonthly(last, today, d1, d2), days.Count, 0.95, expectedN: 4);
         }
 
-        // Monthly: gaps of roughly a month, at most one per month, with a stable day or a stable amount.
+        // Monthly: gaps of roughly a month, at most one per month, with a stable day and a stable amount.
         var monthly = Share(gaps, 26, 35);
-        if (monthly >= 0.7)
+        if (monthly >= (days.Count >= 4 ? 0.6 : 0.7))
         {
+            // Billing day drifts across the month boundary (1st, 30th, 1st): measure day distance around the 30-day circle
+            // and take the most common day as the anchor instead of a plain median.
             var monthDays = days.Select(d => d.Date.Day).ToList();
-            var medDay = (int)Math.Round(Median(monthDays.Select(x => (decimal)x).ToList()));
-            var dayStable = monthDays.Count(x => Math.Abs(x - medDay) <= 4) >= monthDays.Count * 0.7;
-            if (dayStable && stableShare >= 0.6)
+            var medDay = monthDays.OrderByDescending(r => monthDays.Count(x => DayDistance(x, r) <= 4)).ThenBy(r => r).First();
+            var dayStable = monthDays.Count(x => DayDistance(x, medDay) <= 4) >= monthDays.Count * 0.7;
+            // A bill shows up once a month; a merchant hit several times inside a month is a habit (fuel, lunch), not a bill.
+            var crowded = gaps.Count(g => g < 20) > gaps.Count * 0.25;
+            // Variable-amount expenses must be tightly clustered unless the merchant looks like a utility/insurer/lender;
+            // a gas station visited around the same day each month varies far more than a power bill.
+            var tight = amounts.Count(a => Math.Abs(a - median) <= median * 0.2m) / (double)amounts.Count;
+            var amountOk = isCredit
+                ? stableShare >= 0.6
+                : isFixed || tight >= 0.6 || (IsBillish(normalizedName) && stableShare >= 0.6);
+            if (dayStable && !crowded && amountOk)
             {
                 return Build(key, accountId, isCredit, label, median, isFixed, "Monthly", Math.Min(medDay, 28), null, null, null,
                     last, NextMonthly(last, today, Math.Min(medDay, 28), null), days.Count, monthly, expectedN: 3);
@@ -120,6 +235,84 @@ public static class RecurringFlowDetector
         }
 
         return null;
+    }
+
+    private static (decimal Median, bool IsFixed, double StableShare) AmountStats(List<decimal> amounts)
+    {
+        var median = Median(amounts);
+        var fixedShare = amounts.Count(a => Math.Abs(a - median) <= median * 0.03m) / (double)amounts.Count;
+        var stableShare = amounts.Count(a => Math.Abs(a - median) <= median * 0.35m) / (double)amounts.Count;
+        return (median, fixedShare >= 0.8, stableShare);
+    }
+
+    private sealed record ExtraSplit(List<decimal> BaseAmounts, List<(DateOnly Date, decimal Amount)> Extras);
+
+    /// <summary>
+    /// Finds deposits clearly above the typical one that recur about once a month on a stable day (a bonus week). Needs at
+    /// least two, no more than 40% of all deposits, with month-length gaps between them. Null when there is no such pattern.
+    /// </summary>
+    private static ExtraSplit? SplitPeriodicExtra(List<(DateOnly Date, decimal Amount)> days)
+    {
+        if (days.Count < 6)
+        {
+            return null;
+        }
+
+        var typical = Median(days.Select(d => d.Amount).ToList());
+        var extras = days.Where(d => d.Amount > typical * ExtraRatio && d.Amount - typical >= 50m).ToList();
+        if (extras.Count < 2 || extras.Count > days.Count * 0.4)
+        {
+            return null;
+        }
+
+        var gaps = new List<int>();
+        for (var i = 1; i < extras.Count; i++)
+        {
+            gaps.Add(extras[i].Date.DayNumber - extras[i - 1].Date.DayNumber);
+        }
+
+        // Month-length gaps (4-5 weeks, allowing a holiday shift), and the same part of the month each time.
+        var monthlyGaps = gaps.Count(g => g >= 24 && g <= 38) / (double)gaps.Count;
+        var medDay = (int)Math.Round(Median(extras.Select(e => (decimal)e.Date.Day).ToList()));
+        var dayStable = extras.Count(e => Math.Abs(e.Date.Day - medDay) <= 5) >= extras.Count * 0.7;
+        if (monthlyGaps < 0.7 || !dayStable)
+        {
+            return null;
+        }
+
+        var extraDates = extras.Select(e => e.Date).ToHashSet();
+        var baseAmounts = days.Where(d => !extraDates.Contains(d.Date)).Select(d => d.Amount).ToList();
+        return baseAmounts.Count >= 3 ? new ExtraSplit(baseAmounts, extras) : null;
+    }
+
+    /// <summary>The monthly flow for the bonus: average bonus check minus the regular check, on the usual day of the month.</summary>
+    private static DetectedFlow? BuildExtra(
+        ExtraSplit? split, string key, Guid accountId, bool isCredit, string label, decimal baseAmount, DateOnly today)
+    {
+        if (split is null)
+        {
+            return null;
+        }
+
+        var diffs = split.Extras.Select(e => e.Amount - baseAmount).ToList();
+        var mean = diffs.Average();
+        if (mean <= 0)
+        {
+            return null;
+        }
+
+        var isFixed = diffs.All(d => Math.Abs(d - mean) <= mean * 0.1m);
+        var day = Math.Min((int)Math.Round(Median(split.Extras.Select(e => (decimal)e.Date.Day).ToList())), 28);
+        var lastExtra = split.Extras[^1].Date;
+        var gaps = new List<int>();
+        for (var i = 1; i < split.Extras.Count; i++)
+        {
+            gaps.Add(split.Extras[i].Date.DayNumber - split.Extras[i - 1].Date.DayNumber);
+        }
+
+        var built = Build(key + "|extra", accountId, isCredit, label + ExtraSuffix, mean, isFixed, "Monthly", day, null, null, null,
+            lastExtra, NextMonthly(lastExtra, today, day, null), split.Extras.Count, Share(gaps, 24, 38), expectedN: 3);
+        return built is null ? null : built with { IsPeriodicExtra = true };
     }
 
     private static DetectedFlow? Build(
@@ -145,6 +338,12 @@ public static class RecurringFlowDetector
             NextExpected: next,
             Occurrences: count,
             Confidence: confidence);
+    }
+
+    private static int DayDistance(int a, int b)
+    {
+        var d = Math.Abs(a - b);
+        return Math.Min(d, 30 - d);
     }
 
     private static int PeriodDays(string frequency) =>
@@ -220,12 +419,15 @@ public static class RecurringFlowDetector
             && seconds.All(x => Math.Abs(x - second) <= 2);
     }
 
-    /// <summary>Display name: the most common text up to the first digit run (references and dates vary).</summary>
-    private static string BestLabel(List<FlowTxn> txns)
+    /// <summary>
+    /// Display name: an alias the user gave it (mixed case) as-is, otherwise the normalized merchant, which drops the
+    /// processor prefix, reference numbers and state.
+    /// </summary>
+    private static string BestLabel(List<FlowTxn> txns, string normalizedName)
     {
-        var raw = txns.GroupBy(t => RecurringDetector.MatchTextFor(t.Text.Trim()))
-            .OrderByDescending(g => g.Count()).First().Key;
-        var collapsed = string.Join(' ', raw.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        var raw = txns.GroupBy(t => t.Text.Trim()).OrderByDescending(g => g.Count()).First().Key;
+        var text = raw.Any(char.IsLower) ? raw : normalizedName;
+        var collapsed = string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         return collapsed.Length > 80 ? collapsed[..80] : collapsed;
     }
 

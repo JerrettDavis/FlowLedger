@@ -27,6 +27,21 @@ internal static class SyncEndpoints
         .WithSummary("Begin a provider connection (simulated by default) for the current tenant")
         .RequireRateLimiting("write");
 
+        // Which provider is active and, for providers with no embeddable widget, where the user links institutions.
+        group.MapGet("/integrations/provider", (FlowLedger.Integrations.Abstractions.IFinancialDataProvider provider) =>
+            {
+                var name = provider.ProviderName;
+                var simplefin = name.Contains("simplefin", StringComparison.OrdinalIgnoreCase);
+                return Results.Ok(new
+                {
+                    provider = name,
+                    usesWidget = !simplefin,
+                    manageUrl = simplefin ? "https://bridge.simplefin.org/simplefin/" : null,
+                });
+            })
+            .WithName("GetProviderInfo")
+            .WithSummary("Active data provider and where institutions are linked");
+
         group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
             try

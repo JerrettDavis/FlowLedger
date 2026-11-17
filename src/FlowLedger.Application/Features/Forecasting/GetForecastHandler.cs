@@ -104,7 +104,8 @@ public sealed class GetForecastHandler
                     PlannedAmount = o.PlannedAmount,
                     Direction = o.Direction,
                     PlannedDate = o.PlannedDate,
-                    MatchedTransactionId = o.MatchedTransactionId
+                    MatchedTransactionId = o.MatchedTransactionId,
+                    FlowName = f.Name
                 }))
             .ToList();
 

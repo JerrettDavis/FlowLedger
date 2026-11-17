@@ -20,6 +20,8 @@ internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options) : D
     {
         if (!string.IsNullOrEmpty(_options.Key))
         {
+            // Overwrite, never append: a resilience retry re-sends the same request object, and a doubled key fails auth (401).
+            request.Headers.Remove("X-Api-Key");
             request.Headers.TryAddWithoutValidation("X-Api-Key", _options.Key);
         }
 

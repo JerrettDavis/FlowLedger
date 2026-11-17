@@ -371,3 +371,6 @@ html, body {
 .fl-muted { color: var(--mud-palette-text-secondary); }
 .mud-typography-caption { font-size: 0.8rem; }
 .mud-typography-overline { font-size: 0.75rem; letter-spacing: 0.06em; }
+
+.fl-sheet-sort { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; cursor: pointer; white-space: nowrap; }
+.fl-sheet-sort:hover, .fl-sheet-sort:focus-visible { text-decoration: underline; }

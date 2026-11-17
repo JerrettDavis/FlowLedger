@@ -32,6 +32,48 @@ public sealed class AssetTests
     }
 
     [Fact]
+    public void RecordValuation_averages_distinct_sources_within_window()
+    {
+        var a = NewAsset(200m); // Manual @ Jan1
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(3), "feedA", blendWindowDays: 7);
+        a.CurrentValue.Amount.Should().Be(250m);
+        a.RecordValuation(new Money(400m, "USD"), Jan1.AddDays(7), "feedB", blendWindowDays: 7);
+        a.CurrentValue.Amount.Should().Be(300m); // (200 + 300 + 400) / 3
+        a.ValuedOn.Should().Be(Jan1.AddDays(7));
+    }
+
+    [Fact]
+    public void RecordValuation_blend_uses_latest_per_source_and_ignores_values_outside_window()
+    {
+        var a = NewAsset(200m);
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(2), "feedA", blendWindowDays: 7);
+        a.RecordValuation(new Money(500m, "USD"), Jan1.AddDays(4), "feedA", blendWindowDays: 7); // replaces 300
+        a.CurrentValue.Amount.Should().Be(350m); // (200 + 500) / 2
+        a.RecordValuation(new Money(900m, "USD"), Jan1.AddDays(20), "feedB", blendWindowDays: 7);
+        a.CurrentValue.Amount.Should().Be(900m); // earlier values are > 7 days old
+    }
+
+    [Fact]
+    public void GetSpread_reports_low_high_median_average_per_source()
+    {
+        var a = NewAsset(200m);
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA", blendWindowDays: 7);
+        a.RecordValuation(new Money(1000m, "USD"), Jan1.AddDays(2), "feedB", blendWindowDays: 7);
+        var s = a.GetSpread(7)!;
+        (s.Low, s.High, s.Median, s.SourceCount).Should().Be((200m, 1000m, 300m, 3));
+        s.Average.Should().Be(500m);
+        a.GetSpread(0).Should().BeNull();
+    }
+
+    [Fact]
+    public void RecordValuation_without_window_keeps_latest_wins()
+    {
+        var a = NewAsset(200m);
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA");
+        a.CurrentValue.Amount.Should().Be(300m);
+    }
+
+    [Fact]
     public void RecordValuation_newer_updates_current_and_older_only_history()
     {
         var a = NewAsset();

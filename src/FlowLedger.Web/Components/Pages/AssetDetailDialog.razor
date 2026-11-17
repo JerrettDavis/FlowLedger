@@ -35,6 +35,21 @@
                 </MudItem>
             </MudGrid>
 
+            @if (_asset.Spread is { SourceCount: > 1 } sp)
+            {
+                <MudPaper Outlined="true" Class="pa-2 mb-3" aria-label="Valuation spread">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">
+                        Valuation spread &middot; @sp.SourceCount sources within &plusmn;@sp.WindowDays days
+                    </MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">Low</MudText><MudText Class="fl-num">@Format.Money(sp.Low)</MudText></MudItem>
+                        <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">Median</MudText><MudText Class="fl-num">@Format.Money(sp.Median)</MudText></MudItem>
+                        <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">Average (current)</MudText><MudText Class="fl-num">@Format.Money(sp.Average)</MudText></MudItem>
+                        <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">High</MudText><MudText Class="fl-num">@Format.Money(sp.High)</MudText></MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
             @if (_asset.Attributes.Count > 0 || !string.IsNullOrWhiteSpace(_asset.SerialNumber))
             {
                 <MudSimpleTable Dense="true" Class="mb-3" aria-label="Asset details">
@@ -63,6 +78,8 @@
 
             <div class="d-flex align-center gap-2 mb-3">
                 <MudSelect T="string" @bind-Value="_feed" Label="Feed" Dense="true" Style="max-width:200px" aria-label="Valuation feed">
+                    <MudSelectItem Value="@("realtyapi")">Redfin Estimate (RealtyAPI)</MudSelectItem>
+                    <MudSelectItem Value="@("tulsa-assessor")">Tulsa County Assessor</MudSelectItem>
                     <MudSelectItem Value="@("model")">Model estimate</MudSelectItem>
                     <MudSelectItem Value="@("appraiser")">Appraiser feed</MudSelectItem>
                 </MudSelect>
@@ -103,7 +120,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { _asset = await ApiClient.GetAssetAsync(AssetId); }
+        try
+        {
+            _asset = await ApiClient.GetAssetAsync(AssetId);
+            if (string.Equals(_asset?.Category?.ToString(), "RealEstate", StringComparison.OrdinalIgnoreCase)) _feed = "realtyapi";
+        }
         catch (Exception ex) { Fail(ex, "Couldn't load asset"); }
     }
 

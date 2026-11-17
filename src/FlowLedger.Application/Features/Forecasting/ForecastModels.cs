@@ -79,6 +79,8 @@ public sealed class ForecastOccurrenceInput
     public required DateOnly PlannedDate { get; init; }
     /// <summary>If set, this occurrence has already been matched to an actual.</summary>
     public TransactionId? MatchedTransactionId { get; init; }
+    /// <summary>Display name of the owning flow, used to label the projected line item.</summary>
+    public string? FlowName { get; init; }
 }
 
 /// <summary>An actual transaction already on the account.</summary>

@@ -64,6 +64,16 @@ public static class QueryCatalog
                 new("purchase_date", "date", "Purchase date"),
                 new("valuation_method", "string", "How the value is estimated"),
             ]),
+        new("asset_valuations",
+            "Every recorded valuation of every asset over time (manual, model, and feed values such as the Redfin Estimate for your home).",
+            [
+                new("date", "date", "Date the valuation applies to"),
+                new("asset", "string", "Asset name"),
+                new("category", "string", "Asset category"),
+                new("value", "number", "Recorded value on that date"),
+                new("source", "string", "Manual, Estimate, realtyapi, appraiser, ..."),
+                new("note", "string", "Free-text note"),
+            ]),
     ];
 
     public static IReadOnlyList<string> Functions { get; } =
@@ -123,7 +133,15 @@ public sealed class QueryDatasetProvider(
 
         var accountMap = accountEntities.ToDictionary(a => a.Id);
         var today = AssetClock.Today;
-        var assetRows = (await assets.ListAsync(ct))
+        var assetEntities = await assets.ListAsync(ct);
+        var valuationRows = assetEntities
+            .SelectMany(a => a.Valuations.Select(v => new object?[]
+            {
+                v.AsOf, a.Name, a.Category.ToString(), v.Amount, v.Source, v.Note,
+            }))
+            .OrderBy(r => (DateOnly)r[0]!)
+            .ToList();
+        var assetRows = assetEntities
             .Select(a => AssetMapper.ToDto(a, today, accountMap, withHistory: false))
             .Select(a => new object?[]
             {
@@ -145,6 +163,7 @@ public sealed class QueryDatasetProvider(
             ["accounts"] = Table("accounts", accountDtos.Select(a =>
                 new object?[] { a.Name, a.AccountType, a.Institution, a.BalanceAmount, a.BalanceCurrency, a.IsActive }).ToList()),
             ["assets"] = Table("assets", assetRows),
+            ["asset_valuations"] = Table("asset_valuations", valuationRows),
         };
     }
 

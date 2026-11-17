@@ -286,6 +286,26 @@ public sealed class BillSheetService(
         var known = await store.ListBillsAsync(includeInactive: true, ct);
         var added = 0;
 
+        // A row covers a detected merchant if it matches the merchant's label OR the bank text of any of its transactions:
+        // once an alias renames "AMER ELECT PWR CPPWDRAWAL" to "AEP", the old row still matches the raw text, and the
+        // alias label alone would add a duplicate.
+        bool IsCovered(IReadOnlyList<SheetBillData> rows, string name)
+        {
+            if (rows.Any(b => SheetMatcher.BillMatchesText(b, name)))
+            {
+                return true;
+            }
+
+            var key = RecurringDetector.Key(name);
+            var normKey = MerchantNormalizer.Key(name);
+            return txns.Any(t =>
+            {
+                var label = t.Label ?? t.Text;
+                return (RecurringDetector.Key(label) == key || MerchantNormalizer.Key(label) == normKey)
+                    && rows.Any(b => SheetMatcher.BillMatchesText(b, t.Text));
+            });
+        }
+
         // Merchants that charge weekly, every other week or twice a month (a $55 mow every second Tuesday) are not
         // monthly bills: detect them first so they get a row that repeats, instead of a single monthly $55.
         var repeating = RecurringFlowDetector
@@ -295,7 +315,8 @@ public sealed class BillSheetService(
             .ToList();
         foreach (var f in repeating)
         {
-            var covering = known.FirstOrDefault(b => SheetMatcher.BillMatchesText(b, f.Name));
+            var covering = known.FirstOrDefault(b => SheetMatcher.BillMatchesText(b, f.Name))
+                ?? known.FirstOrDefault(b => IsCovered([b], f.Name));
             if (covering is null)
             {
                 var order = known.Where(b => b.Section == DetectedSection).Select(b => b.SortOrder + 1).DefaultIfEmpty(0).Max();
@@ -320,7 +341,7 @@ public sealed class BillSheetService(
         var repeatingKeys = repeating.Select(f => RecurringDetector.Key(f.Name)).ToHashSet();
         foreach (var d in RecurringDetector.Detect(txns))
         {
-            if (repeatingKeys.Contains(RecurringDetector.Key(d.Name)) || known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
+            if (repeatingKeys.Contains(RecurringDetector.Key(d.Name)) || IsCovered(known, d.Name))
             {
                 continue;
             }

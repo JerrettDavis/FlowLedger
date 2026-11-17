@@ -286,7 +286,10 @@ public sealed record AssetDto(
     Dictionary<string, string> Attributes,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    List<AssetValuationDto>? Valuations);
+    List<AssetValuationDto>? Valuations,
+    ValuationSpreadDto? Spread = null);
+
+public sealed record ValuationSpreadDto(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
 
 public sealed record CreateAssetRequest(
     string Name,
@@ -442,3 +445,5 @@ public sealed record RecurringSuggestionDto(
     bool WouldAutoAdd);
 
 public sealed record AutoAddResultDto(int Added, List<string> Names);
+
+public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? ManageUrl);

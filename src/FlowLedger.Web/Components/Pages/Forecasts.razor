@@ -9,6 +9,15 @@
 <div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
     <MudText Typo="Typo.h4">Forecasts</MudText>
     <div class="d-flex align-center" style="gap:8px">
+        <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_selectedIds" SelectedValuesChanged="OnAccountsChanged"
+                   Label="Accounts" Style="width:220px" Clearable="true"
+                   MultiSelectionTextFunc="@(v => _selectedIds.Count() == 0 ? "Liquid accounts" : $"{_selectedIds.Count()} account(s)")"
+                   aria-label="Accounts to include in forecast">
+            @foreach (var acct in _accounts)
+            {
+                <MudSelectItem T="Guid" Value="@acct.Id">@acct.Name</MudSelectItem>
+            }
+        </MudSelect>
         <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:140px"
                    aria-label="Forecast horizon in months">
             <MudSelectItem Value="1">1 month</MudSelectItem>
@@ -132,76 +141,124 @@ else if (_forecast is not null)
         </MudAlert>
     }
 
-    <!-- Aggregate projection chart -->
-    <MudCard Class="mb-4">
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h6">Aggregate (Household) Balance</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            @if (_forecast.AggregateSeries.Count > 0)
-            {
-                <div style="height:240px;overflow:hidden" role="img" aria-label="Aggregate balance projection chart">
-                    @SvgChart.BuildBalanceProjection(
-                        _forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList(),
-                        zeroLine: 0m,
-                        breaches: _forecast.OverdraftWarnings.Select(w => w.FirstBreachDate).ToList(),
-                        lowWaterMark: _forecast.AggregateLowWaterMark is not null
-                            ? (_forecast.AggregateLowWaterMark.Date, _forecast.AggregateLowWaterMark.MinBalanceAmount)
-                            : null)
-                </div>
-            }
-        </MudCardContent>
-    </MudCard>
+    <!-- View mode -->
+    <MudToggleGroup T="string" Value="_view" ValueChanged="OnViewChanged" Class="mb-4" Color="Color.Primary" aria-label="Forecast view">
+        <MudToggleItem Value="@("aggregate")" Text="Aggregate" />
+        <MudToggleItem Value="@("accounts")" Text="By account" />
+    </MudToggleGroup>
 
-    <!-- Per-account series -->
-    @foreach (var series in _forecast.AccountSeries)
+    @if (_view == "aggregate")
     {
-        var account = _accounts.FirstOrDefault(a => a.Id == series.AccountId);
-        var lwm = _forecast.LowWaterMarks.FirstOrDefault(l => l.AccountId == series.AccountId);
+        <MudCard Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Aggregate (Household) Balance</MudText>
+                    <MudText Typo="Typo.caption">@(_selectedIds.Count() == 0 ? "Liquid accounts" : $"{_selectedIds.Count()} selected account(s)")</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_forecast.AggregateSeries.Count > 0)
+                {
+                    <div style="max-width:900px;margin:0 auto" role="img" aria-label="Aggregate balance projection chart">
+                        @SvgChart.BuildBalanceProjection(
+                            _forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList(),
+                            zeroLine: 0m,
+                            breaches: _forecast.OverdraftWarnings.Select(w => w.FirstBreachDate).ToList(),
+                            lowWaterMark: _forecast.AggregateLowWaterMark is not null
+                                ? (_forecast.AggregateLowWaterMark.Date, _forecast.AggregateLowWaterMark.MinBalanceAmount)
+                                : null)
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
 
-        <MudExpansionPanel Text="@($"{account?.Name ?? series.AccountId.ToString()} — Low: {Format.Money(lwm?.MinBalanceAmount ?? series.StartingBalanceAmount)}")"
-                           Dense="true" Class="mb-2">
-            <MudDataGrid T="FlowLedger.Web.ApiClient.ForecastPointDto"
-                         DragDropColumnReordering="true"
-                         Items="series.Points"
-                         Dense="true"
-                         Hover="true"
-                         aria-label="@($"{account?.Name} forecast series")">
-                <Columns>
-                    <TemplateColumn Title="Date" SortBy="x => x.Date">
-                        <CellTemplate>@Format.DayMonth(context.Item.Date)</CellTemplate>
-                    </TemplateColumn>
-                    <TemplateColumn Title="Balance">
-                        <CellTemplate>
-                            <MudText Class="fl-num"
-                                     Color="@(context.Item.BalanceAmount < 0 ? Color.Error : Color.Default)"
-                                     Typo="Typo.body2">
-                                @Format.Money(context.Item.BalanceAmount)
-                            </MudText>
-                        </CellTemplate>
-                    </TemplateColumn>
-                    <TemplateColumn Title="Net Change">
-                        <CellTemplate>
-                            <MudText Class="fl-num"
-                                     Color="@(context.Item.NetChangeAmount >= 0 ? Color.Success : Color.Error)"
-                                     Typo="Typo.body2">
-                                @Format.Signed(context.Item.NetChangeAmount)
-                            </MudText>
-                        </CellTemplate>
-                    </TemplateColumn>
-                    <TemplateColumn Title="Items">
-                        <CellTemplate>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @string.Join(", ", context.Item.ContributingItems.Select(i => i.Label).Take(3))
-                                @(context.Item.ContributingItems.Count > 3 ? $" +{context.Item.ContributingItems.Count - 3} more" : "")
-                            </MudText>
-                        </CellTemplate>
-                    </TemplateColumn>
-                </Columns>
-            </MudDataGrid>
-        </MudExpansionPanel>
+        <MudCard Class="mb-4">
+            <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Projected line items</MudText></CardHeaderContent></MudCardHeader>
+            <MudCardContent>
+                @{ var aggRows = AggregateRows(); }
+                @if (aggRows.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No projected activity in this horizon.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto">
+                        <thead><tr><th>Date</th><th>Account</th><th>Item</th><th style="text-align:right">Amount</th><th style="text-align:right">Total balance</th></tr></thead>
+                        <tbody>
+                        @foreach (var g in aggRows)
+                        {
+                            var first = true;
+                            @foreach (var r in g.Items)
+                            {
+                                var isFirst = first;
+                                <tr>
+                                    <td>@(first ? Format.FullDate(g.Date) : "")</td>
+                                    <td>@AccountName(r.AccountId)</td>
+                                    <td>@r.Item.Label @if (r.Item.IsActual) { <MudChip T="string" Size="Size.Small" Variant="Variant.Text">posted</MudChip> }</td>
+                                    <td style="text-align:right" class="fl-num"><MudText Typo="Typo.body2" Color="@(r.Item.BalanceDeltaAmount >= 0 ? Color.Success : Color.Error)">@Format.Signed(r.Item.BalanceDeltaAmount)</MudText></td>
+                                    <td style="text-align:right" class="fl-num">@(isFirst ? Format.Money(g.Balance) : "")</td>
+                                </tr>
+                                first = false;
+                            }
+                        }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        @foreach (var series in _forecast.AccountSeries)
+        {
+            var account = _accounts.FirstOrDefault(a => a.Id == series.AccountId);
+            var lwm = _forecast.LowWaterMarks.FirstOrDefault(l => l.AccountId == series.AccountId);
+            var chartPts = new List<(DateOnly, decimal)> { (_forecast.HorizonStart, series.StartingBalanceAmount) };
+            chartPts.AddRange(series.Points.Select(p => (p.Date, p.BalanceAmount)));
+            chartPts.Add((_forecast.HorizonEnd, series.Points.Count > 0 ? series.Points[^1].BalanceAmount : series.StartingBalanceAmount));
+
+            <MudExpansionPanels Class="mb-2" MultiExpansion="true">
+              <MudExpansionPanel Expanded="true"
+                               Text="@($"{account?.Name ?? series.AccountId.ToString()} — start {Format.Money(series.StartingBalanceAmount)}, low {Format.Money(lwm?.MinBalanceAmount ?? series.StartingBalanceAmount)}")"
+                               Dense="true">
+                @if (chartPts.Count >= 2)
+                {
+                    <div style="max-width:900px;margin:0 auto" role="img" aria-label="@($"{account?.Name} balance projection")">
+                        @SvgChart.BuildBalanceProjection(chartPts, zeroLine: 0m,
+                            breaches: _forecast.OverdraftWarnings.Where(w => w.AccountId == series.AccountId).Select(w => w.FirstBreachDate).ToList(),
+                            lowWaterMark: lwm is not null ? (lwm.Date, lwm.MinBalanceAmount) : null)
+                    </div>
+                }
+                @if (series.Points.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                        Nothing is projected for this account: no recurring flows or upcoming transactions are recorded. Balance holds at @Format.Money(series.StartingBalanceAmount). Add a recurring flow to project income or bills here.
+                    </MudText>
+                }
+                    <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto">
+                        <thead><tr><th>Date</th><th>Item</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead>
+                        <tbody>
+                        <tr><td>@Format.FullDate(_forecast.AsOf)</td><td>Starting balance</td><td></td><td style="text-align:right" class="fl-num">@Format.Money(series.StartingBalanceAmount)</td></tr>
+                        @foreach (var p in series.Points)
+                        {
+                            var first = true;
+                            @foreach (var i in p.ContributingItems)
+                            {
+                                var isFirst = first;
+                                <tr>
+                                    <td>@(first ? Format.FullDate(p.Date) : "")</td>
+                                    <td>@i.Label @if (i.IsActual) { <MudChip T="string" Size="Size.Small" Variant="Variant.Text">posted</MudChip> }</td>
+                                    <td style="text-align:right" class="fl-num"><MudText Typo="Typo.body2" Color="@(i.BalanceDeltaAmount >= 0 ? Color.Success : Color.Error)">@Format.Signed(i.BalanceDeltaAmount)</MudText></td>
+                                    <td style="text-align:right" class="fl-num"><MudText Typo="Typo.body2" Color="@(p.BalanceAmount < 0 ? Color.Error : Color.Default)">@(isFirst ? Format.Money(p.BalanceAmount) : "")</MudText></td>
+                                </tr>
+                                first = false;
+                            }
+                        }
+                        </tbody>
+                    </MudSimpleTable>
+              </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
     }
 }
 else
@@ -217,6 +274,33 @@ else
     private int _horizonMonths = 3;
     private FlowLedger.Web.ApiClient.ForecastResultDto? _forecast;
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private IReadOnlyCollection<Guid> _selectedIds = new HashSet<Guid>();
+    private string _view = "aggregate";
+
+    private string AccountName(Guid id) => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? id.ToString()[..8];
+
+    private async Task OnAccountsChanged(IEnumerable<Guid> ids)
+    {
+        _selectedIds = ids?.ToHashSet() ?? new HashSet<Guid>();
+        await LoadAsync();
+    }
+
+    private void OnViewChanged(string v) => _view = v ?? "aggregate";
+
+    private sealed record AggRow(Guid AccountId, FlowLedger.Web.ApiClient.ForecastLineItemDto Item);
+    private sealed record AggGroup(DateOnly Date, decimal Balance, List<AggRow> Items);
+
+    private List<AggGroup> AggregateRows()
+    {
+        if (_forecast is null) return [];
+        var balances = _forecast.AggregateSeries.ToDictionary(p => p.Date, p => p.BalanceAmount);
+        return _forecast.AccountSeries
+            .SelectMany(s => s.Points.SelectMany(p => p.ContributingItems.Select(i => (p.Date, Row: new AggRow(s.AccountId, i)))))
+            .GroupBy(x => x.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new AggGroup(g.Key, balances.GetValueOrDefault(g.Key), g.Select(x => x.Row).ToList()))
+            .ToList();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -238,7 +322,7 @@ else
         _error = null;
         try
         {
-            _forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);
+            _forecast = await ApiClient.GetForecastAsync(months: _horizonMonths, accountIds: _selectedIds.ToList());
         }
         catch (Exception ex)
         {

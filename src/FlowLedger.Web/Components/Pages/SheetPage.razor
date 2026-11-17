@@ -72,13 +72,13 @@
         <table class="fl-sheet" aria-label="Bill sheet">
             <thead>
                 <tr>
-                    <th scope="col" class="fl-sheet-name">Bill</th>
-                    <th scope="col">Payer</th>
-                    <th scope="col" title="Debt · Perpetual · Optional · Business">Flags</th>
-                    <th scope="col">Pay</th>
-                    <th scope="col" class="num">Due</th>
-                    <th scope="col" class="num">Estimated</th>
-                    <th scope="col" class="num">Actual</th>
+                    <th scope="col" class="fl-sheet-name" aria-sort="@AriaSort("name")"><button class="fl-sheet-sort" @onclick='() => SortBy("name")'>Bill@(SortArrow("name"))</button></th>
+                    <th scope="col" aria-sort="@AriaSort("payer")"><button class="fl-sheet-sort" @onclick='() => SortBy("payer")'>Payer@(SortArrow("payer"))</button></th>
+                    <th scope="col" title="Debt · Perpetual · Optional · Business" aria-sort="@AriaSort("flags")"><button class="fl-sheet-sort" @onclick='() => SortBy("flags")'>Flags@(SortArrow("flags"))</button></th>
+                    <th scope="col" aria-sort="@AriaSort("pay")"><button class="fl-sheet-sort" @onclick='() => SortBy("pay")'>Pay@(SortArrow("pay"))</button></th>
+                    <th scope="col" class="num" title="Bills that pay more than once a month stay at the bottom" aria-sort="@AriaSort("due")"><button class="fl-sheet-sort" @onclick='() => SortBy("due")'>Due@(SortArrow("due"))</button></th>
+                    <th scope="col" class="num" aria-sort="@AriaSort("est")"><button class="fl-sheet-sort" @onclick='() => SortBy("est")'>Estimated@(SortArrow("est"))</button></th>
+                    <th scope="col" class="num" aria-sort="@AriaSort("actual")"><button class="fl-sheet-sort" @onclick='() => SortBy("actual")'>Actual@(SortArrow("actual"))</button></th>
                     @foreach (var m in _view.Months)
                     {
                         <th scope="col" class="@(m == _view.SelectedMonth ? "fl-sheet-cur" : null)">@ShortMonth(m)</th>
@@ -89,7 +89,7 @@
             {
                 <tbody>
                     <tr class="fl-sheet-section"><th colspan="@(7 + _view.Months.Count)" scope="colgroup">@section.Name</th></tr>
-                    @foreach (var row in section.Rows)
+                    @foreach (var row in Sorted(section.Rows))
                     {
                         <tr>
                             <th scope="row" class="fl-sheet-name">
@@ -181,6 +181,56 @@
     private bool _loading = true;
     private bool _busy;
     private string? _error;
+
+    // ── Column sorting (view-only; the stored order is untouched) ──────────────────────
+    private string? _sortKey;
+    private bool _sortDesc;
+
+    private void SortBy(string key)
+    {
+        // asc -> desc -> back to the sheet's own order
+        if (_sortKey != key) { _sortKey = key; _sortDesc = false; }
+        else if (!_sortDesc) { _sortDesc = true; }
+        else { _sortKey = null; _sortDesc = false; }
+    }
+
+    private string AriaSort(string key) => _sortKey != key ? "none" : _sortDesc ? "descending" : "ascending";
+
+    private MarkupString SortArrow(string key) =>
+        new(_sortKey != key ? "" : _sortDesc ? " <span aria-hidden=\"true\">▼</span>" : " <span aria-hidden=\"true\">▲</span>");
+
+    /// <summary>Weekly, every-other-week and twice-monthly bills (or any row with several dates this month) pay more than once a month.</summary>
+    private bool IsMultiPayment(SheetRowDto row) => row.Frequency != "Monthly" || SlotCount(row) > 1;
+
+    private IEnumerable<SheetRowDto> Sorted(List<SheetRowDto> rows)
+    {
+        if (_sortKey is null) return rows;
+
+        decimal Num(SheetRowDto r) => _sortKey == "est" ? MonthlyEstimated(r) : ActualFor(r);
+        var cmp = StringComparer.OrdinalIgnoreCase;
+
+        // Sorting by due day keeps multi-payment bills grouped at the bottom whichever way the sort runs; "Flux" (no fixed
+        // day) sits between them and the dated bills.
+        if (_sortKey == "due")
+        {
+            var ordered = rows
+                .OrderBy(r => IsMultiPayment(r) ? 2 : r.DueDay is null ? 1 : 0)
+                .ThenBy(r => _sortDesc ? 0 : r.DueDay ?? 0)
+                .ThenByDescending(r => _sortDesc ? r.DueDay ?? 0 : 0)
+                .ThenBy(r => r.Name, cmp);
+            return ordered;
+        }
+
+        IOrderedEnumerable<SheetRowDto> by = _sortKey switch
+        {
+            "name" => _sortDesc ? rows.OrderByDescending(r => r.Name, cmp) : rows.OrderBy(r => r.Name, cmp),
+            "payer" => _sortDesc ? rows.OrderByDescending(r => r.Payer ?? "", cmp) : rows.OrderBy(r => r.Payer ?? "", cmp),
+            "flags" => _sortDesc ? rows.OrderByDescending(r => Flags(r), cmp) : rows.OrderBy(r => Flags(r), cmp),
+            "pay" => _sortDesc ? rows.OrderByDescending(r => r.AutoPay) : rows.OrderBy(r => r.AutoPay),
+            _ => _sortDesc ? rows.OrderByDescending(Num) : rows.OrderBy(Num),
+        };
+        return by.ThenBy(r => r.Name, cmp);
+    }
 
     private double PaidPercent => _view is { Summary.TotalCount: > 0 } ? 100.0 * _view.Summary.PaidCount / _view.Summary.TotalCount : 0;
 

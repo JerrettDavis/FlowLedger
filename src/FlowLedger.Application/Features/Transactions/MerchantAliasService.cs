@@ -48,6 +48,66 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
         return await ApplyAsync(ct);
     }
 
+    /// <summary>
+    /// Bank descriptor text -> the service name used in the household bill sheet. Many bills arrive via PayPal/Google Pay,
+    /// so the descriptor names the processor ("PP*GOOGLE LLC GOOGLE W") rather than the service ("G-Suite").
+    /// </summary>
+    public static readonly IReadOnlyList<MerchantAliasDto> SheetDefaults =
+    [
+        new("GOOGLE LLC GOOGLE W", "G-Suite"),
+        new("NABU CASA", "Home Assistant Cloud"),
+        new("PAYPAL *MICROSOFT", "Microsoft 365 Family"),
+        new("DIGITALOCEA", "Digital Ocean"),
+        new("PRUDENTIAL PAYMENTS", "Prudential Life"),
+        new("GOODLEAP", "Goodleap"),
+        new("ROCKET MORTGAGE", "Rocket Mortgage"),
+        new("ATT PAYMENT", "AT&T"),
+        new("OK NATURAL GAS", "Oklahoma Natural Gas"),
+        new("AMER ELECT PWR", "AEP"),
+        new("NORTHWESTERN MY CHART", "Northwestern Medicine"),
+        new("ADOBE INC ADOBE", "Adobe CC"),
+        new("GITHUB INC", "GitHub"),
+        new("OPENAI *CHATGPT", "OpenAI"),
+        new("CITY OF TULSA", "City of Tulsa"),
+        new("NETFLIX", "Netflix"),
+        new("STATE FARM", "State Farm"),
+        new("GOOGLE ONE", "Google One"),
+        new("INVOICENINJA", "Invoice Ninja"),
+        new("JETBRAINS", "JetBrains"),
+        new("GOOGLE DISCORD", "Discord Nitro"),
+        new("ANTHROPIC", "Claude"),
+        new("STELLANTIS", "Stellantis"),
+        new("HMFUSA", "HMF Hyundai"),
+        new("GOOGLE YOUTUBE", "YouTube Premium Family"),
+        new("HUMBLEBUNDL", "Humble Bundle"),
+        new("GOOGLE HBO MAX", "HBO Max"),
+        new("MUSTANG MOWING", "Mustang Mowing"),
+        new("PY *MOXIE", "Moxie Pest Control"),
+    ];
+
+    /// <summary>Adds the sheet-derived rules the user does not already have (never overwrites), then applies them. Returns rules added.</summary>
+    public async Task<int> SeedSheetDefaultsAsync(CancellationToken ct = default)
+    {
+        var existing = (await store.ListAsync(ct)).Select(r => r.Pattern).ToHashSet(StringComparer.Ordinal);
+        var added = 0;
+        foreach (var rule in SheetDefaults)
+        {
+            var key = NormalizePattern(rule.Pattern);
+            if (existing.Add(key))
+            {
+                await store.SetAsync(key, rule.Alias, ct);
+                added++;
+            }
+        }
+
+        if (added > 0)
+        {
+            await ApplyAsync(ct);
+        }
+
+        return added;
+    }
+
     public Task<bool> RemoveAsync(string pattern, CancellationToken ct = default) => store.RemoveAsync(NormalizePattern(pattern), ct);
 
     /// <summary>Applies every rule to all transactions. Idempotent; returns the number of transactions renamed.</summary>
