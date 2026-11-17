@@ -11,6 +11,10 @@ public static class SheetMatcher
     /// <summary>Largest gap (days) between a transaction and a bill's expected date in a month.</summary>
     public const int MaxDueDayDistance = 7;
 
+    /// <summary>Largest gap (days) for rows that repeat several times a month: half the shortest interval, so slots never overlap.</summary>
+    private static int MaxDistance(SheetBillData bill) =>
+        BillSchedule.IsMulti(bill) && bill.Frequency == BillFrequency.Weekly ? 3 : MaxDueDayDistance;
+
     public static SheetMatchResult Match(
         IReadOnlyList<SheetBillData> bills,
         IReadOnlyList<SheetPaymentData> existing,
@@ -24,14 +28,14 @@ public static class SheetMatcher
         var txnById = transactions.ToDictionary(t => t.Id);
         var terms = activeBills.ToDictionary(b => b.Id, Terms);
 
-        var clears = new List<(Guid, DateOnly)>();
-        var occupied = new HashSet<(Guid, DateOnly)>();
+        var clears = new List<(Guid, DateOnly, int)>();
+        var occupied = new HashSet<(Guid, DateOnly, int)>();
         var claimed = new HashSet<Guid>();
 
         // Manual marks win: claim their transactions first so an auto mark can never steal one.
         foreach (var p in existing.Where(p => p.Source == SheetPaymentSource.Manual))
         {
-            occupied.Add((p.BillId, FirstOfMonth(p.Month)));
+            occupied.Add((p.BillId, FirstOfMonth(p.Month), p.Slot));
             if (p.TransactionId is { } manualTid)
             {
                 claimed.Add(manualTid);
@@ -44,7 +48,7 @@ public static class SheetMatcher
             var month = FirstOfMonth(p.Month);
             if (!monthSet.Contains(month))
             {
-                occupied.Add((p.BillId, month));
+                occupied.Add((p.BillId, month, p.Slot));
                 if (p.TransactionId is { } outside)
                 {
                     claimed.Add(outside);
@@ -58,15 +62,16 @@ public static class SheetMatcher
                 && txnById.TryGetValue(tid, out var t)
                 && billById.ContainsKey(p.BillId)
                 && Matches(terms[p.BillId], t.Text)
+                && p.Slot < BillSchedule.Slots(billById[p.BillId], month).Count
                 && !claimed.Contains(tid);
             if (!valid)
             {
-                clears.Add((p.BillId, month));
+                clears.Add((p.BillId, month, p.Slot));
                 continue;
             }
 
             claimed.Add(p.TransactionId!.Value);
-            occupied.Add((p.BillId, month));
+            occupied.Add((p.BillId, month, p.Slot));
         }
 
         var edges = new List<Edge>();
@@ -87,18 +92,22 @@ public static class SheetMatcher
 
                 foreach (var month in monthSet)
                 {
-                    if (occupied.Contains((bill.Id, month)))
+                    var slots = BillSchedule.Slots(bill, month);
+                    for (var slot = 0; slot < slots.Count; slot++)
                     {
-                        continue;
-                    }
+                        if (occupied.Contains((bill.Id, month, slot)))
+                        {
+                            continue;
+                        }
 
-                    var distance = Distance(bill.DueDay, month, txn.Date);
-                    if (distance is null)
-                    {
-                        continue;
-                    }
+                        var distance = Distance(slots[slot], month, txn.Date, MaxDistance(bill));
+                        if (distance is null)
+                        {
+                            continue;
+                        }
 
-                    edges.Add(new Edge(bill, month, txn, distance.Value, Math.Abs(txn.Amount - bill.Estimated)));
+                        edges.Add(new Edge(bill, month, slot, txn, distance.Value, Math.Abs(txn.Amount - bill.Estimated)));
+                    }
                 }
             }
         }
@@ -107,17 +116,17 @@ public static class SheetMatcher
         foreach (var e in edges
             .OrderBy(e => e.Distance).ThenBy(e => e.AmountGap).ThenBy(e => e.Txn.Date)
             .ThenBy(e => e.Txn.Id).ThenBy(e => e.Bill.Section, StringComparer.Ordinal)
-            .ThenBy(e => e.Bill.SortOrder).ThenBy(e => e.Bill.Id).ThenBy(e => e.Month))
+            .ThenBy(e => e.Bill.SortOrder).ThenBy(e => e.Bill.Id).ThenBy(e => e.Month).ThenBy(e => e.Slot))
         {
-            if (claimed.Contains(e.Txn.Id) || occupied.Contains((e.Bill.Id, e.Month)))
+            if (claimed.Contains(e.Txn.Id) || occupied.Contains((e.Bill.Id, e.Month, e.Slot)))
             {
                 continue;
             }
 
             claimed.Add(e.Txn.Id);
-            occupied.Add((e.Bill.Id, e.Month));
+            occupied.Add((e.Bill.Id, e.Month, e.Slot));
             upserts.Add(new SheetPaymentData(
-                e.Bill.Id, e.Month, true, e.Txn.Amount, e.Txn.Date, e.Txn.Id, SheetPaymentSource.Auto));
+                e.Bill.Id, e.Month, true, e.Txn.Amount, e.Txn.Date, e.Txn.Id, SheetPaymentSource.Auto, e.Slot));
         }
 
         return new SheetMatchResult(upserts, clears);
@@ -131,12 +140,12 @@ public static class SheetMatcher
             ? new DateOnly(month.Year, month.Month, Math.Min(d, DateTime.DaysInMonth(month.Year, month.Month)))
             : null;
 
-    private static int? Distance(int? dueDay, DateOnly month, DateOnly txnDate)
+    private static int? Distance(DateOnly? expected, DateOnly month, DateOnly txnDate, int maxDistance)
     {
-        if (ExpectedDate(dueDay, month) is { } expected)
+        if (expected is { } date)
         {
-            var days = Math.Abs(txnDate.DayNumber - expected.DayNumber);
-            return days <= MaxDueDayDistance ? days : null;
+            var days = Math.Abs(txnDate.DayNumber - date.DayNumber);
+            return days <= maxDistance ? days : null;
         }
 
         // Flux bills match only inside the month.
@@ -215,5 +224,5 @@ public static class SheetMatcher
         return sb.ToString();
     }
 
-    private sealed record Edge(SheetBillData Bill, DateOnly Month, SheetTxn Txn, int Distance, decimal AmountGap);
+    private sealed record Edge(SheetBillData Bill, DateOnly Month, int Slot, SheetTxn Txn, int Distance, decimal AmountGap);
 }

@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Categories;
+using FlowLedger.Application.Features.Transactions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;
@@ -13,6 +14,12 @@ internal static class CategorizationEndpoints
                 Results.Ok(await service.RunAsync(ct)))
             .WithTags("Categories").WithName("RunCategorization")
             .WithSummary("Fill in missing categories (transfers, learned merchants, keyword rules). Never overwrites existing categories.")
+            .RequireRateLimiting("write");
+
+        app.MapPost("/api/transactions/enrich", async (TransactionEnrichmentService service, CancellationToken ct) =>
+                Results.Ok(await service.RunAsync(ct)))
+            .WithTags("Transactions").WithName("EnrichTransactions")
+            .WithSummary("Re-run automatic tagging and merchant-name suggestions over all transactions (user tags and aliases are never touched)")
             .RequireRateLimiting("write");
 
         app.MapPost("/api/categorization/clear-auto", async (CategorizationService service, CancellationToken ct) =>

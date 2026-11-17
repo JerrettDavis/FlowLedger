@@ -37,8 +37,8 @@ internal static class SheetEndpoints
             await s.SetPaymentAsync(id, month, r, ct) ? Results.NoContent() : Results.NotFound()))
             .WithName("SetSheetPayment").WithSummary("Manually mark a cell paid or unpaid").RequireRateLimiting("write");
 
-        group.MapDelete("/bills/{id:guid}/payments/{month}", (Guid id, string month, BillSheetService s, CancellationToken ct) => Guarded(async () =>
-            await s.ClearPaymentAsync(id, month, ct) ? Results.NoContent() : Results.NotFound()))
+        group.MapDelete("/bills/{id:guid}/payments/{month}", (Guid id, string month, int? slot, BillSheetService s, CancellationToken ct) => Guarded(async () =>
+            await s.ClearPaymentAsync(id, month, slot, ct) ? Results.NoContent() : Results.NotFound()))
             .WithName("ClearSheetPayment").WithSummary("Return a cell to automatic").RequireRateLimiting("write");
 
         group.MapPost("/import", ([FromBody] ImportSheetRequest r, BillSheetService s, CancellationToken ct) => Guarded(async () =>

@@ -92,7 +92,17 @@
     </EmptyState>
 }
 
+@if (_flows.Any(f => f.IsActive))
+{
+    <MudText Typo="Typo.body2" Class="mb-2" aria-live="polite">
+        Per month, active flows: <span class="fl-num" style="color:var(--mud-palette-success)">+@Format.Money(MonthlyTotal("Credit"))</span> in ·
+        <span class="fl-num" style="color:var(--mud-palette-error)">−@Format.Money(MonthlyTotal("Debit"))</span> out.
+        Weekly and every-other-week items count every time they fall in the month (a $55 fortnightly bill is about $119/month).
+    </MudText>
+}
+
 <MudDataGrid T="FlowLedger.Web.ApiClient.RecurringFlowDto"
+             DragDropColumnReordering="true"
              Items="_flows"
              Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow"
@@ -115,6 +125,13 @@
             <CellTemplate>
                 <MudText Class="fl-num" Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
                     @Format.Signed(context.Item.Amount, context.Item.Direction == "Credit") @context.Item.Currency
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Per month" Sortable="true" SortBy="x => x.MonthlyAmount">
+            <CellTemplate>
+                <MudText Class="fl-num" Typo="Typo.body2" title="@($"{PerMonthCount(context.Item):0.##} occurrence(s) a month on average")">
+                    @Format.Money(context.Item.MonthlyAmount)
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
@@ -362,6 +379,12 @@
         }
     }
 
+    private decimal MonthlyTotal(string direction) =>
+        _flows.Where(f => f.IsActive && f.Direction == direction).Sum(f => f.MonthlyAmount);
+
+    private static decimal PerMonthCount(FlowLedger.Web.ApiClient.RecurringFlowDto f) =>
+        f.Amount > 0 ? f.MonthlyAmount / f.Amount : 0;
+
     private static string DescribeSchedule(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
     {
         return flow.RecurrenceFrequency switch
@@ -370,7 +393,8 @@
             "Monthly" => "Monthly",
             "Weekly" when flow.AnchorDayOfWeek is not null => $"Every {flow.AnchorDayOfWeek}",
             "Weekly" => "Weekly",
-            "BiWeekly" when flow.IntervalWeeks.HasValue => $"Every {flow.IntervalWeeks} weeks",
+            "EveryNWeeks" when flow.IntervalWeeks.HasValue => $"Every {flow.IntervalWeeks} weeks on {flow.AnchorDayOfWeek}",
+            "TwiceMonthly" => $"Twice a month ({flow.DayOfMonth} & {flow.SecondDayOfMonth})",
             "Daily" => "Daily",
             _ => flow.RecurrenceFrequency
         };

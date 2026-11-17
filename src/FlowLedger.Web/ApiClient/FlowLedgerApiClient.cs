@@ -220,12 +220,14 @@ public sealed class FlowLedgerApiClient
     public Task DeleteSheetBillAsync(Guid id, CancellationToken ct = default)
         => SendNoContentAsync("delete the row", () => _http.DeleteAsync($"/api/sheet/bills/{id}", ct), ct);
 
-    public Task SetSheetPaymentAsync(Guid billId, string month, bool paid, decimal? amount = null, CancellationToken ct = default)
+    public Task SetSheetPaymentAsync(Guid billId, string month, bool paid, decimal? amount = null, int slot = 0, CancellationToken ct = default)
         => SendNoContentAsync("update the cell", () => _http.PutAsJsonAsync(
-            $"/api/sheet/bills/{billId}/payments/{month}", new SetPaymentRequest(paid, amount), JsonOptions, ct), ct);
+            $"/api/sheet/bills/{billId}/payments/{month}", new SetPaymentRequest(paid, amount, slot), JsonOptions, ct), ct);
 
-    public Task ClearSheetPaymentAsync(Guid billId, string month, CancellationToken ct = default)
-        => SendNoContentAsync("reset the cell", () => _http.DeleteAsync($"/api/sheet/bills/{billId}/payments/{month}", ct), ct);
+    /// <param name="slot">One payment of a multi-payment month, or null to reset the whole month.</param>
+    public Task ClearSheetPaymentAsync(Guid billId, string month, int? slot = null, CancellationToken ct = default)
+        => SendNoContentAsync("reset the cell", () => _http.DeleteAsync(
+            $"/api/sheet/bills/{billId}/payments/{month}" + (slot is { } s ? $"?slot={s}" : ""), ct), ct);
 
     public Task<SheetImportResult?> ImportSheetAsync(string csv, bool replace, CancellationToken ct = default)
         => ExecuteAsync("import the sheet", async () =>
@@ -383,6 +385,14 @@ public sealed class FlowLedgerApiClient
 
     public Task<DashboardActivityDto?> GetDashboardActivityAsync(CancellationToken ct = default)
         => GetJsonAsync<DashboardActivityDto>("/api/dashboard/activity", "load dashboard activity", ct: ct);
+
+    /// <summary>Dismisses a flagged transaction from Suspicious Activity, optionally recording why.</summary>
+    public async Task<bool> DismissSuspiciousAsync(Guid transactionId, string? note, CancellationToken ct = default) =>
+        await ExecuteAsync("dismiss flagged transaction", async () =>
+        {
+            var response = await _http.PostAsJsonAsync($"/api/dashboard/suspicious/{transactionId}/dismiss", new { note }, JsonOptions, ct);
+            return response.IsSuccessStatusCode;
+        });
 
     public async Task<TransactionDto?> CreateTransactionAsync(CreateTransactionRequest request, CancellationToken ct = default)
     {
@@ -717,6 +727,142 @@ public sealed class FlowLedgerApiClient
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't remove budget (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task<DebtPlanDto?> PlanDebtAsync(List<DebtRowDto> debts, decimal extraMonthly, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("plan debt payoff", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/debt/plan", new { debts, extraMonthly }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't compute plan (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return await response.Content.ReadFromJsonAsync<DebtPlanDto>(JsonOptions, ct);
+        });
+    }
+
+    public async Task<List<AlertDto>?> GetAlertsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read alerts", async () =>
+        {
+            var response = await _http.GetAsync("/api/alerts", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<AlertDto>>(JsonOptions, ct) : null;
+        });
+    }
+
+    public async Task<List<CategoryRuleDto>?> GetCategoryRulesAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read category rules", async () =>
+        {
+            var response = await _http.GetAsync("/api/category-rules", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<CategoryRuleDto>>(JsonOptions, ct) : null;
+        });
+    }
+
+    public async Task<int> SetCategoryRuleAsync(string pattern, string categoryPath, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("save category rule", async () =>
+        {
+            var response = await _http.PutAsJsonAsync("/api/category-rules", new { pattern, categoryPath }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't save rule (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
+            return body.TryGetProperty("changed", out var c) ? c.GetInt32() : 0;
+        });
+    }
+
+    public async Task DeleteCategoryRuleAsync(string pattern, CancellationToken ct = default)
+    {
+        await ExecuteAsync("remove category rule", async () =>
+        {
+            var response = await _http.DeleteAsync($"/api/category-rules?pattern={Uri.EscapeDataString(pattern)}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't remove rule (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task SetTransactionNoteAsync(Guid transactionId, string note, CancellationToken ct = default)
+    {
+        await ExecuteAsync("save transaction note", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/note", new { note }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't save note (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task SetTransactionSplitsAsync(Guid transactionId, List<TransactionSplitDto> splits, CancellationToken ct = default)
+    {
+        await ExecuteAsync("save transaction splits", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/splits", new { splits }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = response.StatusCode == System.Net.HttpStatusCode.BadRequest ? await response.Content.ReadAsStringAsync(ct) : "";
+                throw new ApiClientException(detail.Contains("add up") ? "The splits must add up to the transaction amount." : $"Couldn't save splits (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task<List<AccountPerformanceDto>?> GetInvestmentPerformanceAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read investment performance", async () =>
+        {
+            var response = await _http.GetAsync("/api/investments/performance", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<AccountPerformanceDto>>(JsonOptions, ct) : null;
+        });
+    }
+
+    public async Task<List<GoalDto>?> GetGoalsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync("read goals", async () =>
+        {
+            var response = await _http.GetAsync("/api/goals", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<GoalDto>>(JsonOptions, ct) : null;
+        });
+    }
+
+    public async Task SaveGoalAsync(Guid? id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, CancellationToken ct = default)
+    {
+        await ExecuteAsync("save goal", async () =>
+        {
+            var response = await _http.PutAsJsonAsync("/api/goals", new { id, name, targetAmount, savedAmount, targetDate }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't save goal (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return true;
+        });
+    }
+
+    public async Task DeleteGoalAsync(Guid id, CancellationToken ct = default)
+    {
+        await ExecuteAsync("remove goal", async () =>
+        {
+            var response = await _http.DeleteAsync($"/api/goals/{id}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't remove goal (server returned {(int)response.StatusCode}).", response.StatusCode);
             }
 
             return true;

@@ -1,0 +1,119 @@
+@page "/goals"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Goals — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Savings goals</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Set a target (emergency fund, vacation, down payment), track what you've set aside, and see the monthly amount needed to hit your date.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editId is null ? "New goal" : "Edit goal")</MudText>
+        <div class="d-flex align-center gap-3 flex-wrap">
+            <MudTextField T="string" Immediate="true" @bind-Value="_name" Label="Name" Style="min-width:220px" Margin="Margin.Dense" />
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_target" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
+            <MudDatePicker @bind-Date="_date" Label="Target date (optional)" Margin="Margin.Dense" Style="max-width:200px" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(string.IsNullOrWhiteSpace(_name) || _target <= 0)">Save goal</MudButton>
+            @if (_editId is not null)
+            {
+                <MudButton OnClick="Reset">Cancel</MudButton>
+            }
+        </div>
+    </MudPaper>
+
+    @if (_goals is null || _goals.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="fl-muted">No goals yet. Add one above.</MudText>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Outlined="true">
+            @foreach (var g in _goals)
+            {
+                <div class="mb-4">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.subtitle2">@g.Name @(g.Complete ? "🎉" : "")</MudText>
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.body2" Class="fl-num">
+                                @Format.Money(g.SavedAmount) of @Format.Money(g.TargetAmount)
+                                @(g.TargetDate is { } d ? $" · by {d:MMM yyyy}" : "")
+                                @(g.MonthlyNeeded is { } m ? $" · {Format.Money(m)}/mo needed" : "")
+                            </MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => Edit(g))" aria-label="@($"Edit {g.Name}")" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(g))" aria-label="@($"Remove {g.Name}")" />
+                        </div>
+                    </div>
+                    <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1" />
+                </div>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<FlowLedger.Web.ApiClient.GoalDto>? _goals;
+    private bool _loading = true;
+    private Guid? _editId;
+    private string? _name;
+    private decimal _target;
+    private decimal _saved;
+    private DateTime? _date;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _goals = await ApiClient.GetGoalsAsync();
+        _loading = false;
+    }
+
+    private void Edit(FlowLedger.Web.ApiClient.GoalDto g)
+    {
+        _editId = g.Id; _name = g.Name; _target = g.TargetAmount; _saved = g.SavedAmount;
+        _date = g.TargetDate?.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void Reset()
+    {
+        _editId = null; _name = null; _target = 0; _saved = 0; _date = null;
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null);
+            Snackbar.Add("Goal saved.", Severity.Success);
+            Reset();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task Remove(FlowLedger.Web.ApiClient.GoalDto g)
+    {
+        try
+        {
+            await ApiClient.DeleteGoalAsync(g.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

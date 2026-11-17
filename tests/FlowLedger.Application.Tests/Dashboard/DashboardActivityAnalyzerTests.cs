@@ -16,6 +16,17 @@ public sealed class DashboardActivityAnalyzerTests
             null, merchant, null, null, DateTimeOffset.UtcNow);
 
     [Fact]
+    public void Dismissed_transactions_are_not_flagged()
+    {
+        var big = Tx(400, "NEWSHOP", 1);
+        Tx(8, "TINY", 1);
+
+        DashboardActivityAnalyzer.Analyze([big], Today).Suspicious.Should().ContainSingle();
+        DashboardActivityAnalyzer.Analyze([big], Today, dismissedIds: new HashSet<Guid> { big.Id })
+            .Suspicious.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Separates_pending_from_recent_posted_and_ignores_planned()
     {
         var r = DashboardActivityAnalyzer.Analyze(

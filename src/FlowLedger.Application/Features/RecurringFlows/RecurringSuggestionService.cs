@@ -59,11 +59,10 @@ public sealed class RecurringSuggestionService(
         var all = await transactions.ListAllAsync(ScanLimit, ct);
 
         var real = all.Where(t => t.Status is TransactionStatus.Posted or TransactionStatus.Matched or TransactionStatus.Reconciled).ToList();
-        var dtos = real.Select(TransactionMapper.ToDto).ToList();
-        var accountTypes = acctList.ToDictionary(a => a.Id, a => a.AccountType.ToString());
-        var transferIds = TransferDetector.Detect(dtos, accountTypes);
 
-        // Money moving inside the portfolio / between own accounts is not a bill or a paycheck.
+        // Recurring transfers (a monthly move to savings, a standing card payment) are kept on purpose: the money really
+        // leaves one account and lands in another, so each account's forecast needs its own leg. Only the investment
+        // categories below are skipped.
         // Discretionary spending (restaurants, groceries, fuel, shopping) is habit, not a bill: a weekly taco run is
         // not a recurring flow worth forecasting or alerting on.
         var skipCategories = (await categories.ListAsync(ct))
@@ -73,7 +72,7 @@ public sealed class RecurringSuggestionService(
         var inputs = new List<FlowTxn>();
         foreach (var t in real)
         {
-            if (transferIds.Contains(t.Id) || (t.CategoryId is { } c && skipCategories.Contains(c.Value)))
+            if ((t.CategoryId is { } c && skipCategories.Contains(c.Value)))
             {
                 continue;
             }
@@ -133,8 +132,7 @@ public sealed class RecurringSuggestionService(
             StartDate: s.NextExpected, EndDate: null, CategoryId: null, Counterparty: s.Name), ct);
 
     private static bool IsIneligibleCategory(string path) =>
-        path == "Transfer"
-        || path == "Shopping"
+        path == "Shopping"
         || path == "Transport/Fuel"
         || path.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("Food/", StringComparison.OrdinalIgnoreCase);

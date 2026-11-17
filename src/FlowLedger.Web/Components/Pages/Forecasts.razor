@@ -164,6 +164,7 @@ else if (_forecast is not null)
         <MudExpansionPanel Text="@($"{account?.Name ?? series.AccountId.ToString()} — Low: {Format.Money(lwm?.MinBalanceAmount ?? series.StartingBalanceAmount)}")"
                            Dense="true" Class="mb-2">
             <MudDataGrid T="FlowLedger.Web.ApiClient.ForecastPointDto"
+                         DragDropColumnReordering="true"
                          Items="series.Points"
                          Dense="true"
                          Hover="true"
