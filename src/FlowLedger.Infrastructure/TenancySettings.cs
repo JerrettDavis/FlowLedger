@@ -22,7 +22,7 @@ public static class TenancySettings
 
         return new LegacyTenantClaim(tenant, NullIfBlank(cfg["Tenancy:LegacyOwnerEmail"]),
             NullIfBlank(cfg["Tenancy:LegacyOwnerSubject"]), NullIfBlank(cfg["Tenancy:LegacyOwnerIssuer"]),
-            !bool.TryParse(cfg["Tenancy:AutoLinkVerifiedEmail"], out var auto) || auto,
+            bool.TryParse(cfg["Tenancy:AutoLinkVerifiedEmail"], out var auto) && auto,
             bool.TryParse(cfg["Tenancy:TrustUnverifiedEmail"], out var trust) && trust);
     }
 

@@ -49,8 +49,8 @@ public enum LinkOutcome { Linked, AlreadyLinked, InvalidOrExpired, UnknownUser }
 /// <param name="OwnerSubject">Preferred: the IdP subject (and optionally issuer) that owns it. Unforgeable by other users.</param>
 /// <param name="OwnerIssuer">If set, the subject must come from this issuer.</param>
 /// <param name="OwnerEmail">Alternative: this email, honoured only when the IdP reports it verified.</param>
-/// <param name="AutoLinkVerifiedEmail">A new login whose verified email equals an existing login's email joins that login's tenant.</param>
+/// <param name="AutoLinkVerifiedEmail">Opt-in (default off): a new login whose verified email equals an existing login's email joins that login's tenant.</param>
 /// <param name="TrustUnverifiedEmail">Treat the email as verified even if the IdP omits email_verified (only for a self-hosted IdP you administer).</param>
 /// <remarks>Fail closed: with none of the owner settings configured, nobody adopts the legacy tenant.</remarks>
 public sealed record LegacyTenantClaim(Guid LegacyTenantId, string? OwnerEmail, string? OwnerSubject = null, string? OwnerIssuer = null,
-    bool AutoLinkVerifiedEmail = true, bool TrustUnverifiedEmail = false);
+    bool AutoLinkVerifiedEmail = false, bool TrustUnverifiedEmail = false);
