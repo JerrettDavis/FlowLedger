@@ -11,8 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlowLedger.Web.Client\FlowLedger.Web.Client.csproj" />
-    <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
-    <ProjectReference Include="..\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
   </ItemGroup>
 
