@@ -82,7 +82,11 @@ Ensure the proxy:
 - Redirects all HTTP (port 80) traffic to HTTPS (port 443).
 - Sets `X-Forwarded-Proto: https` and `X-Forwarded-For` so that ASP.NET Core's
   `UseForwardedHeaders()` picks them up correctly.
-- Terminates TLS before forwarding to the container on port 5001 (API) and 5002 (Web).
+- Terminates TLS before forwarding to the Web container on `127.0.0.1:5002`. Expose only
+  the Web UI (and, if you use MX, `POST /api/integrations/mx/webhooks` on the API); the
+  rest of the API is a backend for the Web and should stay private.
+- Is required for remote sign-in: outside Development the auth cookie is `Secure`-only, so
+  OIDC sign-in over plain HTTP from another device will fail.
 
 ## Rotating `API__KEY` without downtime
 
@@ -130,10 +134,10 @@ permanently lost.
 
 ## PostgreSQL security
 
-- Change the default `POSTGRES_PASSWORD` before first deployment.
-- The compose service exposes Postgres on host port 5432 for developer convenience.
-  In production, remove the `ports:` mapping from the `postgres` service (or bind to
-  `127.0.0.1:5432` only) so the database is not reachable from the public network.
+- `POSTGRES_PASSWORD` has no default; compose refuses to start until you set a strong one.
+- The compose file binds Postgres (and Redis, API, Web) to `127.0.0.1` only, for the local
+  dev loop and migrate scripts. Keep it that way, or remove the `ports:` mapping entirely;
+  never publish the database on a public interface.
 - Restrict the `flowledger` user to the minimum required privileges on the `flowledger`
   database; do not use the PostgreSQL superuser in application connection strings.
 - Enable SSL for the Postgres connection by adding `sslmode=require` to the connection

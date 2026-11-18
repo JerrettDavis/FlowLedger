@@ -42,8 +42,12 @@ public static class AuthSetup
                 o.Cookie.Name = "flowledger.auth";
                 o.Cookie.HttpOnly = true;
                 o.Cookie.SameSite = SameSiteMode.Lax;
+                // Secure-only outside Development (remote access must go through a TLS proxy); plain-http localhost dev still works.
+                o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 o.ExpireTimeSpan = TimeSpan.FromDays(14);
                 o.SlidingExpiration = true;
+                // Re-check login -> tenant every few minutes so an unlinked/moved login loses the old tenant's data.
+                o.Events.OnValidatePrincipal = TenantMappingValidator.ValidateAsync;
             })
             .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, o =>
             {
@@ -103,6 +107,14 @@ public static class AuthSetup
                         var id = (ClaimsIdentity)principal.Identity!;
                         id.AddClaim(new Claim(TenantClaim, user.TenantId.ToString()));
                         id.AddClaim(new Claim(UserClaim, user.UserId.ToString()));
+                        if (user.IsHousehold)
+                        {
+                            id.AddClaim(new Claim(HouseholdAccess.Claim, "true"));
+                        }
+
+                        // Just resolved: the first periodic mapping re-check is due one interval from now.
+                        ctx.Properties!.Items[TenantMappingValidator.CheckedItem] =
+                            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
                     },
                     OnRemoteFailure = ctx =>
                     {
@@ -116,6 +128,26 @@ public static class AuthSetup
         builder.Services.AddAuthorization(o =>
             o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
         return oidc;
+    }
+
+    /// <summary>Config key that deliberately allows running WITHOUT sign-in outside Development (trusted single-user LAN only).</summary>
+    public const string AllowAnonymousKey = "Auth:AllowAnonymous";
+
+    /// <summary>
+    /// Without OIDC the Web app has no sign-in at all and acts as the household tenant for whoever reaches it.
+    /// That is fine for local development, but outside Development it must be an explicit choice.
+    /// </summary>
+    public static void EnsureSignInConfigured(OidcOptions oidc, IHostEnvironment env, IConfiguration cfg)
+    {
+        if (oidc.Enabled || env.IsDevelopment() || cfg.GetValue(AllowAnonymousKey, false))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Sign-in is not configured (Auth:Oidc:Authority / Auth:Oidc:ClientId are empty) and the environment is '{env.EnvironmentName}'. " +
+            "Without OIDC anyone who can reach the Web UI sees and changes the household's data. Configure Auth__Oidc__* " +
+            "(see docs/self-hosting/multi-user-auth.md) or, for a trusted single-user network only, set Auth__AllowAnonymous=true.");
     }
 
     public static void MapFlowLedgerAuthEndpoints(this WebApplication app)
@@ -150,5 +182,5 @@ public static class AuthSetup
     private static string SafeLocal(string? url) =>
         !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") ? url : "/";
 
-    private sealed record ResolveResponse(Guid UserId, Guid TenantId);
+    private sealed record ResolveResponse(Guid UserId, Guid TenantId, bool IsHousehold = false);
 }

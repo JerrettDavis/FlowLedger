@@ -71,10 +71,19 @@ internal static class MxEndpoints
             ISchedulerFactory schedulerFactory,
             CancellationToken ct) =>
         {
-            // Read the raw body bytes — required for exact HMAC verification.
-            using var ms = new MemoryStream();
-            await request.Body.CopyToAsync(ms, ct);
-            var rawBody = ms.ToArray();
+            // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
+            if (request.ContentLength > MaxWebhookBodyBytes)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
+            // Read the raw body bytes — required for exact HMAC verification. Bounded read: chunked bodies
+            // carry no Content-Length, so stop as soon as the cap is exceeded.
+            var rawBody = await ReadBoundedAsync(request.Body, MaxWebhookBodyBytes, ct);
+            if (rawBody is null)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
 
             var signature = request.Headers.TryGetValue("X-MX-Signature", out var sig)
                 ? sig.ToString()
@@ -140,5 +149,27 @@ internal static class MxEndpoints
         .RequireRateLimiting("webhook");
 
         return app;
+    }
+
+    /// <summary>MX webhook payloads are small JSON events; anything larger is refused before signature work.</summary>
+    internal const int MaxWebhookBodyBytes = 1024 * 1024;
+
+    /// <summary>Reads at most <paramref name="limit"/> bytes; returns null as soon as the body exceeds it.</summary>
+    private static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        var buffer = new byte[16 * 1024];
+        int read;
+        while ((read = await body.ReadAsync(buffer, ct)) > 0)
+        {
+            if (ms.Length + read > limit)
+            {
+                return null;
+            }
+
+            ms.Write(buffer, 0, read);
+        }
+
+        return ms.ToArray();
     }
 }

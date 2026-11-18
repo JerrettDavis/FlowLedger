@@ -14,7 +14,7 @@ internal static class UserEndpoints
     {
         var group = app.MapGroup("/api/users").WithTags("Users").RequireRateLimiting("api");
 
-        group.MapPost("/resolve", async (ResolveUserRequest req, IUserDirectory users, CancellationToken ct) =>
+        group.MapPost("/resolve", async (ResolveUserRequest req, IUserDirectory users, IConfiguration cfg, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(req.Issuer) || string.IsNullOrWhiteSpace(req.Subject))
             {
@@ -22,7 +22,9 @@ internal static class UserEndpoints
             }
 
             var user = await users.ResolveAsync(new ExternalIdentity(req.Issuer.Trim(), req.Subject.Trim(), req.Email, req.DisplayName, req.EmailVerified), ct);
-            return Results.Ok(new { userId = user.UserId, tenantId = user.TenantId, email = user.Email, displayName = user.DisplayName, created = user.Created });
+            // isHousehold: this login maps to the household (legacy) tenant, the only one allowed to see /api/data (backups, export).
+            var isHousehold = user.TenantId == FlowLedger.Infrastructure.TenancySettings.Legacy(cfg).LegacyTenantId;
+            return Results.Ok(new { userId = user.UserId, tenantId = user.TenantId, email = user.Email, displayName = user.DisplayName, created = user.Created, isHousehold });
         })
         .WithName("ResolveUser")
         .WithSummary("Map an authenticated external identity to its FlowLedger user and tenant (creating on first sight)");
