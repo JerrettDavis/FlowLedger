@@ -1,5 +1,7 @@
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
+using FlowLedger.Worker;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Quartz;
@@ -14,17 +16,30 @@ namespace FlowLedger.Worker.Tests;
 public sealed class WorkerHostTests
 {
     [Fact]
-    public void Worker_host_builds_without_exception()
+    public async Task Worker_host_wires_jobs_and_a_per_scope_tenant_context()
     {
-        // Arrange + Act — building the host validates the DI container graph.
-        // AddInfrastructure requires a connection string; we supply a dummy value.
-        var act = () => Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
-        {
-            EnvironmentName = "Testing",
-        });
+        // Build (not start) the real worker host; AddInfrastructure needs a connection string, a dummy one is enough.
+        using var host = WorkerHostBuilderFactory.BuildTestHost(b =>
+            b.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:flowledger"] = "Host=localhost;Database=unused;Username=u;Password=p",
+                ["Worker:TenantId"] = "11111111-1111-1111-1111-111111111111",
+            }));
 
-        // The builder itself must construct without throwing.
-        act.Should().NotThrow();
+        // Each scope gets its own tenant context, seeded from Worker:TenantId, and the ITenantContext resolves to it.
+        await using var s1 = host.Services.CreateAsyncScope();
+        await using var s2 = host.Services.CreateAsyncScope();
+        var c1 = s1.ServiceProvider.GetRequiredService<ConfiguredTenantContext>();
+        var c2 = s2.ServiceProvider.GetRequiredService<ConfiguredTenantContext>();
+        c1.Should().NotBeSameAs(c2);
+        c1.TenantId.Should().Be(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        s1.ServiceProvider.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().Should().BeSameAs(c1);
+
+        // The three scheduled jobs are registered with Quartz.
+        var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler();
+        var keys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals("FlowLedger"));
+        keys.Select(k => k.Name).Should().BeEquivalentTo(
+            nameof(ScheduledSyncJob), nameof(ScheduledBackupJob), nameof(ScheduledAssetValuationJob));
     }
 
     [Fact]

@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FlowLedger.Worker.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.AspNetCore" />
   </ItemGroup>
