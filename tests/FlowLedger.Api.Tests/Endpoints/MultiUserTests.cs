@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
+using FlowLedger.Application.Features.Assets;
+using FlowLedger.Application.Features.Categories;
+using FlowLedger.Application.Features.RecurringFlows;
+using FlowLedger.Application.Features.Transactions;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -86,5 +90,78 @@ public sealed class MultiUserTests(FlowLedgerApiFactory factory) : IAsyncLifetim
 
         var aliceList = await aliceClient.GetFromJsonAsync<List<AccountDto>>("/api/accounts");
         aliceList.Should().Contain(a => a.Id == account.Id);
+    }
+
+    [Theory]
+    [InlineData("accounts")]
+    [InlineData("transactions")]
+    [InlineData("assets")]
+    [InlineData("recurring-flows")]
+    [InlineData("categories")]
+    public async Task Another_tenant_gets_404_by_id_and_never_sees_the_row_in_lists(string resource)
+    {
+        var issuer = "https://idp.test/" + Guid.NewGuid();
+        var alice = factory.CreateAuthenticatedClient((await Resolve(issuer, "alice")).TenantId);
+        var bob = factory.CreateAuthenticatedClient((await Resolve(issuer, "bob")).TenantId);
+
+        var id = await SeedAsync(alice, resource);
+
+        (await alice.GetAsync($"/api/{resource}/{id}")).StatusCode.Should().Be(HttpStatusCode.OK, "the owner can read it");
+        (await alice.GetStringAsync($"/api/{resource}")).Should().Contain(id.ToString());
+
+        (await bob.GetAsync($"/api/{resource}/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var bobList = await bob.GetAsync($"/api/{resource}");
+        bobList.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await bobList.Content.ReadAsStringAsync()).Should().NotContain(id.ToString());
+    }
+
+    [Fact]
+    public async Task Another_tenants_forecast_does_not_include_the_owners_accounts()
+    {
+        var issuer = "https://idp.test/" + Guid.NewGuid();
+        var alice = factory.CreateAuthenticatedClient((await Resolve(issuer, "alice")).TenantId);
+        var bob = factory.CreateAuthenticatedClient((await Resolve(issuer, "bob")).TenantId);
+
+        var accountId = await SeedAsync(alice, "accounts");
+        await SeedAsync(alice, "recurring-flows", accountId);
+
+        (await alice.GetStringAsync("/api/forecast")).Should().Contain(accountId.ToString());
+
+        var bobForecast = await bob.GetAsync("/api/forecast");
+        (await bobForecast.Content.ReadAsStringAsync()).Should().NotContain(accountId.ToString());
+        // Explicitly requesting the other tenant's account id must not leak it either.
+        var targeted = await bob.GetAsync($"/api/forecast?accounts={accountId}");
+        (await targeted.Content.ReadAsStringAsync()).Should().NotContain("Alice Checking");
+    }
+
+    private static async Task<Guid> SeedAsync(HttpClient c, string resource, Guid? accountId = null)
+    {
+        async Task<Guid> Post(string url, object body)
+        {
+            var r = await c.PostAsJsonAsync(url, body);
+            r.StatusCode.Should().Be(HttpStatusCode.Created, await r.Content.ReadAsStringAsync());
+            var json = await r.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            return json.GetProperty("id").GetGuid();
+        }
+
+        if (resource == "accounts")
+        {
+            return await Post("/api/accounts", new CreateAccountRequest("Alice Checking", "Checking", 1234m, "USD", null, null));
+        }
+
+        var account = accountId ?? await SeedAsync(c, "accounts");
+        return resource switch
+        {
+            "transactions" => await Post("/api/transactions",
+                new CreateTransactionRequest(account, 50m, "USD", "Debit", "Coffee Shop", new DateOnly(2026, 1, 15), null, null, null, null)),
+            "assets" => await Post("/api/assets",
+                new CreateAssetRequest("MacBook", "Electronics", 2000m, "USD", null, new DateOnly(2024, 1, 1), 2400m, "Apple", "MBP", null, null,
+                    "Manual", null, null, null, null, null)),
+            "recurring-flows" => await Post("/api/recurring-flows",
+                new CreateRecurringFlowRequest(account, "Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null,
+                    new DateOnly(2026, 1, 1), null, null, "Landlord")),
+            "categories" => await Post("/api/categories", new CreateCategoryRequest("food", "Food", null)),
+            _ => throw new ArgumentOutOfRangeException(nameof(resource)),
+        };
     }
 }

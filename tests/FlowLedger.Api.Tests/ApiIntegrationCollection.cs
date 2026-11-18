@@ -11,4 +11,4 @@ namespace FlowLedger.Api.Tests;
 /// </summary>
 [CollectionDefinition("ApiIntegration")]
 public sealed class ApiIntegrationCollection
-    : ICollectionFixture<FlowLedgerApiFactory>, ICollectionFixture<FailClosedApiFactory>;
+    : ICollectionFixture<FlowLedgerApiFactory>, ICollectionFixture<FailClosedApiFactory>, ICollectionFixture<AutoLinkApiFactory>;
