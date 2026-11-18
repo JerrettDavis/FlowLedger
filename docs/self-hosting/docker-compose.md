@@ -16,8 +16,11 @@ cd FlowLedger
 
 # 2. Create your local env file
 cp .env.example .env
-# Edit .env — set a strong POSTGRES_PASSWORD at minimum.
-# The default API__KEY is fine for local dev.
+# Edit .env — set POSTGRES_PASSWORD and API__KEY (both REQUIRED, for every profile):
+#   openssl rand -hex 32
+# Then either configure OIDC sign-in (Auth__Oidc__*, see multi-user-auth.md) or, for a
+# trusted single-user machine only, set AUTH__ALLOWANONYMOUS=true. Without one of the two
+# the Web UI refuses to start (compose runs the apps as Production).
 
 # 3. Build and start all services
 docker compose --profile full up --build
@@ -36,6 +39,11 @@ Services come up at:
 | API        | http://localhost:5001     |
 | PostgreSQL  | localhost:5432            |
 | Redis      | localhost:6379            |
+
+Every port is published on **127.0.0.1 only**. To reach the Web UI from another device, put a
+TLS reverse proxy in front of it (see [production.md](production.md)); OIDC sign-in cookies are
+`Secure` outside Development, so sign-in over plain HTTP from a LAN IP will not work. Never
+publish the API, PostgreSQL or Redis ports beyond the host.
 
 Health endpoints:
 - `GET http://localhost:5001/alive` — API liveness
@@ -72,8 +80,11 @@ All variables can be set in `.env` (copy from `.env.example`).
 
 | Variable                        | Default                            | Description                                                          |
 |---------------------------------|------------------------------------|----------------------------------------------------------------------|
-| `POSTGRES_PASSWORD`             | `dev_only_change_in_prod`          | PostgreSQL superuser password. **Required** for `full` profile.       |
-| `API__KEY`                      | `dev-local-key-not-for-production` | API authentication key. Use `openssl rand -hex 32` for production.   |
+| `POSTGRES_PASSWORD`             | (none: **required**)               | PostgreSQL password. Compose refuses to start without it.             |
+| `API__KEY`                      | (none: **required**)               | API authentication key (`openssl rand -hex 32`). The API rejects the dev default outside Development. |
+| `ASPNETCORE_ENVIRONMENT`        | `Production`                       | Set `Development` only for local debugging (enables the dev tenant fallback). |
+| `AUTH__ALLOWANONYMOUS`          | `false`                            | `true` lets the Web UI run **without sign-in** outside Development. Trusted single-user host only. |
+| `AUTH__OIDC__AUTHORITY` / `AUTH__OIDC__CLIENTID` / `AUTH__OIDC__CLIENTSECRET` | (unset) | OIDC sign-in, see [multi-user-auth.md](multi-user-auth.md). |
 | `ConnectionStrings__flowledger` | Derived from `POSTGRES_PASSWORD`   | Full Npgsql connection string (auto-set in compose).                  |
 | `ConnectionStrings__redis`      | `redis:6379`                       | Redis connection string.                                             |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`  | (unset)                            | Optional: OTLP endpoint for traces/metrics/logs.                     |
@@ -85,7 +96,8 @@ Connection string names used internally:
 ## Applying migrations manually
 
 When running the full stack, the API applies migrations automatically at startup
-(it starts in `Development` environment in compose). To apply migrations manually
+(compose sets `Database__MigrateOnStartup=true`; a verified snapshot is taken first when
+migrations are pending against existing data). To apply migrations manually
 against a running compose database:
 
 ```bash

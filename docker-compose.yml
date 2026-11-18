@@ -9,8 +9,16 @@
 #   Full stack  (self-hosted / CI validation):
 #     docker compose --profile full up --build
 #
-# Env vars: copy .env.example → .env and fill in POSTGRES_PASSWORD.
-# The full-stack profile additionally needs API__KEY (see .env.example).
+# Env vars: copy .env.example → .env and set POSTGRES_PASSWORD and API__KEY
+# (both REQUIRED for every profile, compose refuses to start without them;
+# generate each with `openssl rand -hex 32`).
+#
+# Secure by default:
+#   - apps run as ASPNETCORE_ENVIRONMENT=Production (override in .env for dev);
+#   - every host port is bound to 127.0.0.1 only. Put a TLS reverse proxy in
+#     front of the Web UI for remote access (see docs/self-hosting/production.md);
+#   - the Web UI refuses to start outside Development without OIDC sign-in
+#     (Auth__Oidc__*) unless AUTH__ALLOWANONYMOUS=true is set deliberately.
 #
 # Notes on healthchecks:
 #   The .NET 10 chiseled-extra images ship no shell or curl. The api and web
@@ -25,13 +33,13 @@
 # ── Shared environment fragments ──────────────────────────────────────────────
 x-db-env: &db-env
   ConnectionStrings__flowledger: >-
-    Host=postgres;Port=5432;Database=flowledger;Username=flowledger;Password=${POSTGRES_PASSWORD:-dev_only_change_in_prod}
+    Host=postgres;Port=5432;Database=flowledger;Username=flowledger;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 32)}
 
 x-redis-env: &redis-env
   ConnectionStrings__redis: "redis:6379"
 
 x-app-common-env: &app-common-env
-  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
   ASPNETCORE_HTTP_PORTS: "8080"
   Mx__Enabled: "false"
 
@@ -43,10 +51,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: flowledger
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_only_change_in_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 32)}
       POSTGRES_DB: flowledger
     ports:
-      - "5432:5432"
+      # Loopback only: for the Aspire dev loop / migrate scripts on this machine. Never expose the database.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -60,7 +69,8 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Loopback only (Aspire dev loop). Redis has no auth here: never expose it.
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -78,13 +88,15 @@ services:
       dockerfile: src/FlowLedger.Api/Dockerfile
     restart: unless-stopped
     ports:
-      - "5001:8080"
+      # Loopback only: the API key is the only gate in front of every tenant's data.
+      - "127.0.0.1:5001:8080"
     environment:
       <<: [*app-common-env, *db-env, *redis-env]
-      # In Development, Api:Key may be the dev default — the startup guard only
-      # rejects it outside Development. Override here for a predictable dev key.
-      Api__Key: ${API__KEY:-dev-local-key-not-for-production}
+      # Required; the API refuses to start outside Development with a missing or dev-default key.
+      Api__Key: ${API__KEY:?Set API__KEY in .env (openssl rand -hex 32)}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
+      # Compose has no separate migration job: apply EF migrations at API startup (idempotent).
+      Database__MigrateOnStartup: "true"
       Tenancy__LegacyOwnerEmail: ${TENANCY__LEGACYOWNEREMAIL:-}
     # Raw provider payload archive — MUST be a persistent volume (see ADR 0007).
     volumes:
@@ -116,7 +128,7 @@ services:
             echo 'API healthy.';
             exit 0;
           fi;
-          echo \"Attempt $i/30 failed, retrying in 5s...\";
+          echo \"Attempt $$i/30 failed, retrying in 5s...\";
           sleep 5;
         done;
         echo 'API did not become healthy in time.';
@@ -138,7 +150,8 @@ services:
       dockerfile: src/FlowLedger.Web/Dockerfile
     restart: unless-stopped
     ports:
-      - "5002:8080"
+      # Loopback only: publish through a TLS reverse proxy for remote access.
+      - "127.0.0.1:5002:8080"
     environment:
       <<: *app-common-env
       # Aspire service-discovery env-var convention: services__<name>__<scheme>__<index>
@@ -146,11 +159,13 @@ services:
       services__api__http__0: "http://api:8080"
       # API auth — must match the api service's Api__Key so X-Api-Key passes validation.
       # Use the same env-var override pattern as the api service.
-      Api__Key: ${API__KEY:-dev-local-key-not-for-production}
+      Api__Key: ${API__KEY:?Set API__KEY in .env (openssl rand -hex 32)}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
       Auth__Oidc__Authority: ${AUTH__OIDC__AUTHORITY:-}
       Auth__Oidc__ClientId: ${AUTH__OIDC__CLIENTID:-}
       Auth__Oidc__ClientSecret: ${AUTH__OIDC__CLIENTSECRET:-}
+      # Without OIDC the Web UI has NO sign-in; outside Development it refuses to start unless this is true.
+      Auth__AllowAnonymous: ${AUTH__ALLOWANONYMOUS:-false}
     depends_on:
       api-probe:
         condition: service_completed_successfully

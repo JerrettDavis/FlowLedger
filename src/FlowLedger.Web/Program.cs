@@ -17,6 +17,7 @@ builder.AddServiceDefaults();
 
 // ── Authentication (provider-agnostic OIDC; disabled when Auth:Oidc:Authority is empty) ──
 var oidc = builder.AddFlowLedgerAuth();
+AuthSetup.EnsureSignInConfigured(oidc, builder.Environment, builder.Configuration); // refuse to run open outside Development
 builder.Services.AddSingleton(oidc);
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
