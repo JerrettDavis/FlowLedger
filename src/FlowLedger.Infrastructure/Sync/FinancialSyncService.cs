@@ -236,6 +236,17 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         var storedCursorValue = await _cursorStore.GetAsync(_provider.ProviderName, providerAccountId, ct);
         var cursor = string.IsNullOrEmpty(storedCursorValue) ? SyncCursor.Initial : new SyncCursor(storedCursorValue);
 
+        // Pending rows that may have been replaced by a posted record under a new provider id.
+        // Loaded once per account; rows this sync inserts as pending are added to the lookup below.
+        var settleCandidates = new Dictionary<(TransactionDirection, decimal), List<Transaction>>();
+        foreach (var p in await _db.Transactions
+                     .Where(t => t.AccountId == account.AccountId && t.Status == TransactionStatus.Pending
+                         && t.Source == TransactionSource.MxAggregation)
+                     .ToListAsync(ct))
+        {
+            AddSettleCandidate(settleCandidates, p);
+        }
+
         bool hasMore = true;
         while (hasMore)
         {
@@ -270,12 +281,6 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     .ToListAsync(ct);
                 var existingByFp = existingRows.ToDictionary(t => t.Fingerprint!.Value);
 
-                // Pending rows that may have been replaced by a posted record under a new provider id.
-                var settleCandidates = await _db.Transactions
-                    .Where(t => t.AccountId == account.AccountId && t.Status == TransactionStatus.Pending
-                        && t.Source == TransactionSource.MxAggregation)
-                    .ToListAsync(ct);
-
                 var toInsert = new List<Transaction>();
                 var settled = 0;
                 foreach (var x in fingerprintMap)
@@ -299,18 +304,18 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                             ? TransactionDirection.Debit : TransactionDirection.Credit;
                         // Only absorb on an unambiguous match; with 0 or 2+ candidates insert instead
                         // (a duplicate is recoverable, a wrong merge is silent data loss).
-                        var matches = settleCandidates
-                            .Where(t => t.Status == TransactionStatus.Pending
-                                && t.Direction == direction
-                                && t.Amount.Amount == amount
-                                && t.EffectiveDate <= x.ProviderTx.PostedDate
-                                && t.EffectiveDate >= x.ProviderTx.PostedDate.AddDays(-7))
-                            .Take(2)
-                            .ToList();
+                        var matches = settleCandidates.TryGetValue((direction, amount), out var bucket)
+                            ? bucket
+                                .Where(t => t.Status == TransactionStatus.Pending
+                                    && t.EffectiveDate <= x.ProviderTx.PostedDate
+                                    && t.EffectiveDate >= x.ProviderTx.PostedDate.AddDays(-7))
+                                .Take(2)
+                                .ToList()
+                            : [];
                         var pending = matches.Count == 1 ? matches[0] : null;
                         if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint))
                         {
-                            settleCandidates.Remove(pending);
+                            bucket!.Remove(pending);
                             settled++;
                             continue;
                         }
@@ -323,6 +328,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 {
                     await _db.Transactions.AddRangeAsync(toInsert, ct);
                     added += toInsert.Count;
+                    foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
+                                 && t.Status == TransactionStatus.Pending && t.Source == TransactionSource.MxAggregation))
+                    {
+                        AddSettleCandidate(settleCandidates, inserted);
+                    }
                 }
                 if (settled > 0)
                 {
@@ -340,6 +350,17 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
 
         return (added, skipped);
+    }
+
+    private static void AddSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)
+    {
+        var key = (t.Direction, t.Amount.Amount);
+        if (!lookup.TryGetValue(key, out var list))
+        {
+            lookup[key] = list = [];
+        }
+
+        list.Add(t);
     }
 
     private static TransactionFingerprint BuildFingerprint(AccountId accountId, ProviderTransaction pt)

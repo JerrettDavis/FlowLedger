@@ -564,7 +564,14 @@ else
     {
         try
         {
-            _accounts = await ApiClient.GetAccountsAsync();
+            // The calls are independent: start them together, then handle each result (and its failure) separately.
+            var accountsTask = ApiClient.GetAccountsAsync();
+            var assetSummaryTask = ApiClient.GetAssetSummaryAsync();
+            var activityTask = ApiClient.GetDashboardActivityAsync();
+            var insightsTask = ApiClient.GetDashboardInsightsAsync();
+            var forecastTask = ApiClient.GetForecastAsync(months: 3);
+
+            _accounts = await accountsTask;
 
             // Net worth: assets (positive balance accounts) minus liabilities
             _cash = _accounts.Where(a => a.AccountType is "Checking" or "Savings" or "Cash").Sum(a => a.BalanceAmount);
@@ -582,7 +589,7 @@ else
             // is linked to a Manual Asset account) and values depreciating assets as of today.
             try
             {
-                _assetSummary = await ApiClient.GetAssetSummaryAsync();
+                _assetSummary = await assetSummaryTask;
                 if (_assetSummary is not null)
                 {
                     _netWorth = _assetSummary.NetWorth.NetWorth;
@@ -591,13 +598,13 @@ else
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset summary"); }
 
             // Activity feed is best-effort: a failure here must not blank the rest of the dashboard.
-            try { _activity = await ApiClient.GetDashboardActivityAsync(); }
+            try { _activity = await activityTask; }
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard activity"); }
 
             // Insight widgets are best-effort: a failure must not blank the rest of the dashboard.
             try
             {
-                _insights = await ApiClient.GetDashboardInsightsAsync();
+                _insights = await insightsTask;
                 if (_insights is not null)
                 {
                     _spendSeries = [new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.SpendingByCategory.Select(c => (double)c.Amount).ToArray() }];
@@ -616,7 +623,7 @@ else
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
 
             // Forecast
-            var forecast = await ApiClient.GetForecastAsync(months: 3);
+            var forecast = await forecastTask;
             if (forecast is not null)
             {
                 _forecastSeries = forecast.AggregateSeries;

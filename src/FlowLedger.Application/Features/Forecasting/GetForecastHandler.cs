@@ -113,16 +113,9 @@ public sealed class GetForecastHandler
 
         // Load transactions from horizon start through horizon end; include actuals
         // that fall within the window.
-        var txList = await _transactions.ListAsync(
-            accountId: null,
-            from: horizonStart,
-            to: horizonEnd,
-            skip: 0,
-            take: int.MaxValue,
-            ct: ct);
+        var txList = await _transactions.ListForAccountsAsync(accountIds, horizonStart, horizonEnd, ct);
 
         var actualInputs = txList
-            .Where(t => accountIds.Any(id => id == t.AccountId))
             .Select(t => new ForecastTransactionInput
             {
                 TransactionId = t.TransactionId,
