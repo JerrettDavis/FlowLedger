@@ -43,7 +43,7 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="8" md="6">
-            <MudTextField @bind-Value="_search" Immediate="true" Label="Search description or merchant" Clearable="true"
+            <MudTextField @bind-Value="Search" Immediate="true" DebounceInterval="300" Label="Search description or merchant" Clearable="true"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                           aria-label="Search transactions" />
         </MudItem>
@@ -152,13 +152,13 @@
         <TemplateColumn Title="Category" Sortable="false">
             <CellTemplate>
                 @{
-                    var cat = context.Item.CategoryId.HasValue ? _categories.FirstOrDefault(c => c.Id == context.Item.CategoryId) : null;
+                    var cat = context.Item.CategoryId is { } catId && _categoryById.TryGetValue(catId, out var foundCat) ? foundCat : null;
                     var item = context.Item;
                 }
                 <MudMenu Dense="true" Label="@(cat?.DisplayName ?? "Uncategorized")" Variant="Variant.Text" Size="Size.Small"
                          Color="@(cat is null ? Color.Default : Color.Primary)" EndIcon="@Icons.Material.Filled.ArrowDropDown"
                          aria-label="@($"Change category for {item.Description}")">
-                    @foreach (var c in _categories.OrderBy(c => c.Path))
+                    @foreach (var c in _sortedCategories)
                     {
                         var target = c;
                         <MudMenuItem OnClick="@(() => SetCategory(item, target))">@target.Path</MudMenuItem>
@@ -169,7 +169,7 @@
         <TemplateColumn Title="Account" Sortable="false">
             <CellTemplate>
                 @{
-                    var acct = _accounts.FirstOrDefault(a => a.Id == context.Item.AccountId);
+                    _accountById.TryGetValue(context.Item.AccountId, out var acct);
                 }
                 <MudText Typo="Typo.body2">@(acct?.Name ?? "–")</MudText>
             </CellTemplate>
@@ -196,12 +196,47 @@
     private bool _categorizing;
     private const int TakeLimit = 5000;
 
-    private List<FlowLedger.Web.ApiClient.TransactionDto> Visible =>
-        string.IsNullOrWhiteSpace(_search)
+    private List<FlowLedger.Web.ApiClient.TransactionDto> _visible = [];
+    private Dictionary<Guid, FlowLedger.Web.ApiClient.CategoryDto> _categoryById = [];
+    private List<FlowLedger.Web.ApiClient.CategoryDto> _sortedCategories = [];
+    private Dictionary<Guid, FlowLedger.Web.ApiClient.AccountDto> _accountById = [];
+
+    private List<FlowLedger.Web.ApiClient.TransactionDto> Visible => _visible;
+
+    private string? Search
+    {
+        get => _search;
+        set
+        {
+            _search = value;
+            RecomputeVisible();
+        }
+    }
+
+    private void RecomputeVisible()
+        => _visible = string.IsNullOrWhiteSpace(_search)
             ? _transactions
             : _transactions.Where(t =>
                 t.Description.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
                 (t.MerchantName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+
+    private void RebuildLookups()
+    {
+        _categoryById = _categories.GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First());
+        _sortedCategories = _categories.OrderBy(c => c.Path).ToList();
+        _accountById = _accounts.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First());
+    }
+
+    /// <summary>Replaces one row in place and refreshes the cached view (avoids a full reload for single-row edits).</summary>
+    private void PatchRow(Guid id, Func<FlowLedger.Web.ApiClient.TransactionDto, FlowLedger.Web.ApiClient.TransactionDto> patch)
+    {
+        var i = _transactions.FindIndex(t => t.Id == id);
+        if (i >= 0)
+        {
+            _transactions[i] = patch(_transactions[i]);
+            RecomputeVisible();
+        }
+    }
 
     /// <summary>Deep link from the dashboard account strip: /transactions?account={id}.</summary>
     [SupplyParameterFromQuery(Name = "account")] public Guid? AccountQuery { get; set; }
@@ -212,6 +247,7 @@
         {
             _accounts = await ApiClient.GetAccountsAsync();
             _categories = await ApiClient.GetCategoriesAsync();
+            RebuildLookups();
         }
         catch (Exception ex)
         {
@@ -236,6 +272,7 @@
                 from: from,
                 to: to,
                 take: TakeLimit);
+            RecomputeVisible();
         }
         catch (Exception ex)
         {
@@ -256,7 +293,14 @@
         {
             var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, _applyToMerchant);
             Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
-            await LoadAsync();
+            if (changed > 1)
+            {
+                await LoadAsync();
+            }
+            else
+            {
+                PatchRow(tx.Id, t => t with { CategoryId = category.Id });
+            }
         }
         catch (Exception ex)
         {
@@ -306,7 +350,7 @@
         {
             await ApiClient.SetTransactionNoteAsync(tx.Id, note);
             Snackbar.Add(note.Length == 0 ? "Note removed" : "Note saved", Severity.Success);
-            await LoadAsync();
+            PatchRow(tx.Id, t => t with { Notes = note.Length == 0 ? null : note });
         }
         catch (Exception ex)
         {
@@ -334,7 +378,7 @@
         {
             await ApiClient.SetTransactionSplitsAsync(tx.Id, splits);
             Snackbar.Add(splits.Count == 0 ? "Split removed" : "Split saved", Severity.Success);
-            await LoadAsync();
+            PatchRow(tx.Id, t => t with { Splits = splits.Count == 0 ? null : splits });
         }
         catch (Exception ex)
         {
@@ -350,6 +394,7 @@
             var r = await ApiClient.RunCategorizationAsync();
             Snackbar.Add(r is null ? "Done" : $"Categorized {r.Categorized} ({r.Transfers} transfers); {r.StillUncategorized} left for you to review", Severity.Success);
             _categories = await ApiClient.GetCategoriesAsync();
+            RebuildLookups();
             await LoadAsync();
         }
         catch (Exception ex)
@@ -369,8 +414,8 @@
         var sb = new System.Text.StringBuilder("date,description,merchant,amount,direction,status,category,account\n");
         foreach (var t in Visible)
         {
-            var cat = t.CategoryId.HasValue ? _categories.FirstOrDefault(c => c.Id == t.CategoryId)?.Path : null;
-            var acct = _accounts.FirstOrDefault(a => a.Id == t.AccountId)?.Name;
+            var cat = t.CategoryId is { } cid && _categoryById.TryGetValue(cid, out var c) ? c.Path : null;
+            var acct = _accountById.TryGetValue(t.AccountId, out var a) ? a.Name : null;
             var signed = t.Direction == "Credit" ? t.Amount : -t.Amount;
             sb.Append(t.EffectiveDate.ToString("yyyy-MM-dd")).Append(',').Append(Csv(t.Description)).Append(',').Append(Csv(t.MerchantName))
               .Append(',').Append(signed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(',').Append(t.Direction)
