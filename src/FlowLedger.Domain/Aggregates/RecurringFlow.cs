@@ -6,7 +6,7 @@ namespace FlowLedger.Domain.Aggregates;
 
 /// <summary>
 /// RecurringFlow aggregate root. Represents a repeating money event (payroll, rent, subscription).
-/// It is the primary input to the forecasting engine; occurrence generation (Milestone 4) uses
+/// It is the primary input to the forecasting engine; occurrence generation uses
 /// the <see cref="RecurrencePattern"/> and <see cref="ActiveWindow"/> to produce
 /// <see cref="PlannedFlowOccurrence"/> entities.
 ///
