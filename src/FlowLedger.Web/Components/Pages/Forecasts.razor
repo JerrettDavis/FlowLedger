@@ -172,6 +172,25 @@ else if (_forecast is not null)
             </MudCardContent>
         </MudCard>
 
+        @if (_forecast.Bands.Count > 0)
+        {
+            var endBand = _forecast.Bands[^1];
+            <MudCard Class="mb-4">
+                <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">With everyday spending</MudText></CardHeaderContent></MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        The schedule above only counts bills and income. You also spend about
+                        <strong class="fl-num">@Format.Money(_forecast.TypicalWeeklySpend)</strong> a week on everything else
+                        (±<span class="fl-num">@Format.Money(_forecast.WeeklySpendStdDev)</span>, from the last @_forecast.SpendHistoryWeeks weeks).
+                    </MudText>
+                    <MudText Typo="Typo.body1">
+                        By @Format.FullDate(endBand.Date): expected <strong class="fl-num">@Format.Money(endBand.Expected)</strong>,
+                        80% likely between <span class="fl-num">@Format.Money(endBand.Low)</span> and <span class="fl-num">@Format.Money(endBand.High)</span>.
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+
         <MudCard Class="mb-4">
             <MudCardHeader><CardHeaderContent><MudText Typo="Typo.h6">Projected line items</MudText></CardHeaderContent></MudCardHeader>
             <MudCardContent>

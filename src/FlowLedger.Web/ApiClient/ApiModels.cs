@@ -144,6 +144,18 @@ public sealed class ForecastResultDto
     public List<AccountLowWaterMarkDto> LowWaterMarks { get; init; } = [];
     public AggregateLowWaterMarkDto? AggregateLowWaterMark { get; init; }
     public List<OverdraftWarningDto> OverdraftWarnings { get; init; } = [];
+    public List<ForecastBandPointDto> Bands { get; init; } = [];
+    public decimal TypicalWeeklySpend { get; init; }
+    public decimal WeeklySpendStdDev { get; init; }
+    public int SpendHistoryWeeks { get; init; }
+}
+
+public sealed class ForecastBandPointDto
+{
+    public DateOnly Date { get; init; }
+    public decimal Expected { get; init; }
+    public decimal Low { get; init; }
+    public decimal High { get; init; }
 }
 
 public sealed class AccountForecastSeriesDto

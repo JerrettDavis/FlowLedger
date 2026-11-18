@@ -143,7 +143,42 @@ public sealed class GetForecastHandler
             Goals = query.Goals ?? []
         };
 
-        return _engine.Run(forecastRequest);
+        var result = _engine.Run(forecastRequest);
+
+        // Everyday spending the schedule does not cover: debits from the last ~26 weeks, minus transfers and anything an
+        // active recurring flow already accounts for. Best-effort: a failure here must never break the deterministic forecast.
+        try
+        {
+            var historyFrom = query.AsOf.AddDays(-7 * ForecastBands.HistoryWeeks);
+            var history = await _transactions.ListForAccountsAsync(accountIds, historyFrom, query.AsOf, ct);
+            var dtos = history.Select(Transactions.TransactionMapper.ToDto).ToList();
+            var types = allAccounts.ToDictionary(a => a.Id, a => a.AccountType.ToString());
+            var transfers = Transactions.TransferDetector.Detect(dtos, types);
+            var flowKeys = activeFlows.Where(f => f.Direction == Domain.Aggregates.TransactionDirection.Debit)
+                .SelectMany(f => new[] { f.Name, f.Counterparty })
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => BillSheet.RecurringDetector.Key(x!))
+                .Where(k => k.Length >= 4).Distinct().ToList();
+
+            bool Scheduled(Transactions.TransactionDto t)
+            {
+                var k = BillSheet.RecurringDetector.Key(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName);
+                return k.Length >= 4 && flowKeys.Any(f => k.Contains(f) || f.Contains(k));
+            }
+
+            var unscheduled = dtos
+                .Where(t => t.Direction == "Debit" && t.Status is not ("Planned" or "Skipped") && !transfers.Contains(t.Id) && !Scheduled(t))
+                .Select(t => (t.PostedDate ?? t.EffectiveDate, t.Amount));
+            var profile = ForecastBands.BuildProfile(unscheduled, query.AsOf);
+            result.SpendingProfile = profile;
+            result.Bands = ForecastBands.Compute(result.AggregateSeries, query.AsOf, profile);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Keep the deterministic forecast; bands stay empty.
+        }
+
+        return result;
     }
 
     /// <summary>
