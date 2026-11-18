@@ -218,7 +218,8 @@
             ? _transactions
             : _transactions.Where(t =>
                 t.Description.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                (t.MerchantName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+                (t.MerchantName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.Notes?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
 
     private void RebuildLookups()
     {
