@@ -68,6 +68,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<bool>("TypeLockedByUser")
+                        .HasColumnType("boolean")
+                        .HasColumnName("type_locked_by_user");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId")

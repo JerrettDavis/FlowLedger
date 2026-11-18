@@ -26,6 +26,19 @@ public sealed class CreateAccountRequestValidator : AbstractValidator<CreateAcco
     }
 }
 
+public sealed class ChangeAccountTypeRequestValidator : AbstractValidator<ChangeAccountTypeRequest>
+{
+    private static readonly string[] ValidAccountTypes = Enum.GetNames(typeof(Domain.Aggregates.AccountType));
+
+    public ChangeAccountTypeRequestValidator()
+    {
+        RuleFor(x => x.AccountType)
+            .NotEmpty()
+            .Must(t => ValidAccountTypes.Contains(t, StringComparer.OrdinalIgnoreCase))
+            .WithMessage($"AccountType must be one of: {string.Join(", ", ValidAccountTypes)}.");
+    }
+}
+
 public sealed class UpdateAccountRequestValidator : AbstractValidator<UpdateAccountRequest>
 {
     public UpdateAccountRequestValidator()

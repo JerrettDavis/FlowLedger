@@ -194,6 +194,40 @@ public sealed class CategorizationService(
         return changed;
     }
 
+    /// <summary>
+    /// Re-derives the auto-assigned "Transfer" categories after an account's type changed (card/loan payments become
+    /// transfers, or stop being them). Only auto categories that disagree with the current transfer detection are
+    /// cleared (an auto Transfer that is no longer a transfer; a detected transfer leg carrying another auto category),
+    /// then <see cref="RunAsync"/> re-categorizes them. Manual categories are never touched. Returns rows reset.
+    /// </summary>
+    public async Task<int> RecategorizeAfterAccountTypeChangeAsync(CancellationToken ct = default)
+    {
+        var txs = await store.LoadTrackedAsync(Max, ct);
+        var real = txs.Where(t => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped).ToList();
+        var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
+        var transferIds = TransferDetector.Detect(real.Select(TransactionMapper.ToDto).ToList(), accountTypes);
+        var transferCategoryId = (await categories.ListAsync(ct))
+            .FirstOrDefault(c => string.Equals(c.Path.Value, AutoCategorizer.TransferCategory, StringComparison.OrdinalIgnoreCase))?.Id;
+
+        var reset = 0;
+        foreach (var t in real.Where(t => t.CategorySource == CategorySource.Auto && t.CategoryId is not null))
+        {
+            var isTransferCategory = transferCategoryId is not null && t.CategoryId!.Value.Value == transferCategoryId;
+            if (isTransferCategory != transferIds.Contains(t.Id) && t.ClearAutoCategory())
+            {
+                reset++;
+            }
+        }
+
+        if (reset > 0)
+        {
+            await store.SaveAsync(ct);
+            await RunAsync(ct);
+        }
+
+        return reset;
+    }
+
     /// <summary>Clears every category the auto-categorizer set (manual categories are untouched) so it can be re-run with better rules.</summary>
     public async Task<int> ClearAutoCategoriesAsync(CancellationToken ct = default)
     {

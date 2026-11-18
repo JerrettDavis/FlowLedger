@@ -39,6 +39,12 @@ internal static class SimpleFinMapper
         if (CardGenericRx.IsMatch(full) || CardBrandRx.IsMatch(name)) { return "CREDIT_CARD"; }
         if (InvestmentRx.IsMatch(full)) { return "INVESTMENT"; }
         if (SavingsRx.IsMatch(full)) { return "SAVINGS"; }
+
+        // Nothing in the names identified the product (e.g. a Chase card whose account name is the cardholder's name).
+        // SimpleFIN reports liabilities as negative balances, and a deposit account that is not explicitly named
+        // checking/savings and sits below zero is far more likely a card than an overdrawn account. Users can still
+        // correct a wrong guess (the correction is pinned and survives every sync).
+        if (ParseDecimal(a.Balance) is < 0m) { return "CREDIT_CARD"; }
         return "CHECKING";
     }
 
