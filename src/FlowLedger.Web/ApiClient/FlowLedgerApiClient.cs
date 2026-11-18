@@ -865,12 +865,12 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Recategorizes one transaction, or (applyToAll) every transaction of the same merchant plus future syncs. Returns how many changed.</summary>
-    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default)
+    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null)
     {
         return await ExecuteAsync("recategorize", async () =>
         {
             var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/recategorize",
-                new { categoryId, applyToAll }, ct);
+                new { categoryId, applyToAll, note }, ct);
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't recategorize (server returned {(int)response.StatusCode}).", response.StatusCode);

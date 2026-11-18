@@ -28,6 +28,7 @@ public sealed class CategoryRuleService(
 {
     private const int Max = 50_000;
     public const int MaxLength = 200;
+    public const int MaxNoteLength = 1000;
 
     public static string NormalizePattern(string? pattern) => MerchantAliasService.NormalizePattern(pattern);
 
@@ -66,8 +67,13 @@ public sealed class CategoryRuleService(
     /// re-labels EVERY transaction of the same merchant (including ones categorized by hand earlier) and saves a rule so
     /// future syncs of that merchant land in the same category. Returns how many transactions changed.
     /// </summary>
-    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default)
+    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null)
     {
+        if (note?.Trim() is { Length: > MaxNoteLength })
+        {
+            throw new ArgumentException($"Notes are limited to {MaxNoteLength} characters.");
+        }
+
         var target = await transactions.FindTrackedAsync(transactionId, ct)
             ?? throw new KeyNotFoundException("Transaction not found.");
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
@@ -76,6 +82,7 @@ public sealed class CategoryRuleService(
 
         var changed = target.CategoryId == id && target.CategorySource == CategorySource.Manual ? 0 : 1;
         target.Categorize(id);
+        target.AppendNote(note);
 
         string? pattern = null;
         if (applyToAll)

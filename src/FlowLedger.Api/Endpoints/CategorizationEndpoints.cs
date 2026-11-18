@@ -8,7 +8,7 @@ internal static class CategorizationEndpoints
 {
     internal sealed record SetCategoryRequest(Guid CategoryId, bool ApplyToMerchant = false);
 
-    internal sealed record RecategorizeRequest(Guid CategoryId, bool ApplyToAll = false);
+    internal sealed record RecategorizeRequest(Guid CategoryId, bool ApplyToAll = false, string? Note = null);
 
     internal static IEndpointRouteBuilder MapCategorizationEndpoints(this IEndpointRouteBuilder app)
     {
@@ -17,11 +17,15 @@ internal static class CategorizationEndpoints
             {
                 try
                 {
-                    return Results.Ok(new { changed = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct) });
+                    return Results.Ok(new { changed = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct, request.Note) });
                 }
                 catch (KeyNotFoundException)
                 {
                     return Results.NotFound();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
                 }
             })
             .WithTags("Transactions").WithName("RecategorizeTransaction")

@@ -462,7 +462,7 @@ else if (_result is not null)
             { x => x.Categories, _categories },
         }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
         var result = await dialog.Result;
-        if (result is null || result.Canceled || result.Data is not ValueTuple<Guid, string, bool> (var categoryId, var path, var all))
+        if (result is null || result.Canceled || result.Data is not ValueTuple<Guid, string, bool, string?> (var categoryId, var path, var all, var note))
         {
             return;
         }
@@ -477,7 +477,7 @@ else if (_result is not null)
                 path = created.Path;
             }
 
-            var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all);
+            var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all, note: note);
             // Show the new category immediately, then reload totals/charts/groups from the server.
             if (_result is not null)
             {
