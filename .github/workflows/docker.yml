@@ -136,6 +136,8 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci_test_password
           API__KEY: ci-test-api-key-not-for-production
+          # Compose runs as Production; the ephemeral CI stack has no IdP, so opt out of the sign-in requirement.
+          AUTH__ALLOWANONYMOUS: "true"
 
       - name: Wait for services to be healthy
         run: |

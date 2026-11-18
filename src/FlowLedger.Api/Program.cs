@@ -63,7 +63,8 @@ builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = false);
 // Migrations are applied automatically only in Development to enable `dotnet run`
 // to work without a separate migration step. Production deployments use explicit
 // migration tooling (CI step or Aspire migration container).
-if (builder.Environment.IsDevelopment())
+// Database:MigrateOnStartup=true opts a non-Development host in (docker-compose sets it: it has no migration job).
+if (builder.Environment.IsDevelopment() || builder.Configuration.GetValue("Database:MigrateOnStartup", false))
 {
     builder.Services.AddDatabaseMigrationService();
 }
