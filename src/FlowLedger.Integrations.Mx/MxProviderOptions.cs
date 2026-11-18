@@ -63,4 +63,18 @@ public sealed class MxProviderOptions
 
     /// <summary>Kill switch: when true NO call is sent to MX (config reload takes effect immediately).</summary>
     public bool CallsPaused { get; set; }
+
+    /// <summary>
+    /// Interval in milliseconds between polls of the member status endpoint when waiting
+    /// for aggregation to complete after the Connect Widget flow. Set to 0 or a small value
+    /// in tests to avoid artificial delays. Defaults to 3000ms (3 seconds).
+    /// </summary>
+    public int PollIntervalMs { get; set; } = 3_000;
+
+    /// <summary>
+    /// Maximum number of status-poll attempts when waiting for a member's aggregation to
+    /// complete before giving up with a <see cref="NeedsUserActionProviderException"/>.
+    /// Defaults to 10 (about 30 seconds at the default <see cref="PollIntervalMs"/>).
+    /// </summary>
+    public int MaxPollAttempts { get; set; } = 10;
 }

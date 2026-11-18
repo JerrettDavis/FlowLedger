@@ -68,6 +68,9 @@ public sealed class MxWireMockFixture : IDisposable
             RecordsPerPage = recordsPerPage,
             DefaultInstitutionCode = "wiremock",
             ManualRefreshCooldown = TimeSpan.FromMinutes(15),
+            // Eliminate real delays in tests — status polls complete immediately.
+            PollIntervalMs = 0,
+            MaxPollAttempts = 10,
         });
 
         return new MxFinancialDataProvider(
@@ -114,7 +117,7 @@ public sealed class MxWireMockFixture : IDisposable
             .RespondWith(Response.Create()
                 .WithStatusCode(200)
                 .WithHeader("Content-Type", Vnd)
-                .WithBody("{\"members\":[{\"guid\":\"" + MemberGuid + "\",\"name\":\"" + InstitutionName + "\",\"connection_status\":\"CONNECTED\"}],\"pagination\":{\"current_page\":1,\"per_page\":100,\"total_entries\":1,\"total_pages\":1}}"));
+                .WithBody(MembersListJson("CONNECTED", isBeingAggregated: false)));
 
         // POST /users → create user
         _server
@@ -204,7 +207,7 @@ public sealed class MxWireMockFixture : IDisposable
         return Obj($"\"widget_url\":{widget}");
     }
 
-    private static string MemberJson(string status)
+    private static string MemberJson(string status, bool isBeingAggregated = false)
     {
         var member = Obj(
             $"\"guid\":\"{MemberGuid}\"," +
@@ -212,9 +215,23 @@ public sealed class MxWireMockFixture : IDisposable
             "\"institution_code\":\"wiremock\"," +
             $"\"connection_status\":\"{status}\"," +
             "\"connection_status_message\":\"OK\"," +
-            "\"is_being_aggregated\":false," +
+            $"\"is_being_aggregated\":{(isBeingAggregated ? "true" : "false")}," +
             $"\"user_guid\":\"{UserGuid}\"");
         return Obj($"\"member\":{member}");
+    }
+
+    private static string MembersListJson(string status, bool isBeingAggregated = false)
+    {
+        var member = Obj(
+            $"\"guid\":\"{MemberGuid}\"," +
+            $"\"name\":\"{InstitutionName}\"," +
+            "\"institution_code\":\"wiremock\"," +
+            $"\"connection_status\":\"{status}\"," +
+            "\"connection_status_message\":\"OK\"," +
+            $"\"is_being_aggregated\":{(isBeingAggregated ? "true" : "false")}," +
+            $"\"user_guid\":\"{UserGuid}\"");
+        var pagination = Obj("\"current_page\":1,\"per_page\":100,\"total_entries\":1,\"total_pages\":1");
+        return Obj($"\"members\":{Arr([member])},\"pagination\":{pagination}");
     }
 
     private static string AccountsJson()
