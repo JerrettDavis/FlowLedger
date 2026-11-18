@@ -2,7 +2,7 @@
 # Build context: repo root  (docker build -f src/FlowLedger.Worker/Dockerfile .)
 
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS restore
 WORKDIR /src
 
 # Central build / package management files
