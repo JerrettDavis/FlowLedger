@@ -65,6 +65,19 @@ public sealed class RecurringFlowDetectorTests
     }
 
     [Fact]
+    public void Discretionary_category_merchant_needs_an_exact_fixed_monthly_charge()
+    {
+        var klean = new[] { D(2026, 6, 18), D(2026, 7, 15), D(2026, 8, 15), D(2026, 9, 18), D(2026, 10, 15) }
+            .Select(d => new FlowTxn(Acct, d, 35m, false, "SUPER KLEAN SHERIDAN TULSA OK", Discretionary: true)).ToList();
+        RecurringFlowDetector.Detect(klean, new DateOnly(2026, 11, 18)).Should().ContainSingle(f => f.Frequency == "Monthly");
+
+        // A lunch spot hit near the same day each month with varying totals is still a habit.
+        var lunch = new[] { D(2026, 7, 14), D(2026, 8, 14), D(2026, 9, 15), D(2026, 10, 14) }
+            .Select((d, i) => new FlowTxn(Acct, d, 12m + i * 4m, false, "BIG PLATE EATERY", Discretionary: true)).ToList();
+        RecurringFlowDetector.Detect(lunch, new DateOnly(2026, 11, 18)).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Detects_biweekly_paycheck_with_anchor_weekday()
     {
         var tx = Series("QTR CORPORATION PAYROLL", true, 2100m, D(2026, 10, 2), D(2026, 10, 16), D(2026, 10, 30), D(2026, 11, 13)).ToList();

@@ -66,14 +66,13 @@ public sealed class RecurringSuggestionService(
         // categories below are skipped.
         // Discretionary spending (restaurants, groceries, fuel, shopping) is habit, not a bill: a weekly taco run is
         // not a recurring flow worth forecasting or alerting on.
-        var skipCategories = (await categories.ListAsync(ct))
-            .Where(c => IsIneligibleCategory(c.Path.Value))
-            .Select(c => c.Id).ToHashSet();
+        var categoryPaths = (await categories.ListAsync(ct)).ToDictionary(c => c.Id, c => c.Path.Value);
 
         var inputs = new List<FlowTxn>();
         foreach (var t in real)
         {
-            if ((t.CategoryId is { } c && skipCategories.Contains(c.Value)))
+            var category = t.CategoryId is { } c ? categoryPaths.GetValueOrDefault(c.Value) : null;
+            if (category is not null && category.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -84,7 +83,8 @@ public sealed class RecurringSuggestionService(
             }
 
             var text = string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName;
-            inputs.Add(new FlowTxn(account.Id, t.EffectiveDate, t.Amount.Amount, t.Direction == TransactionDirection.Credit, text));
+            inputs.Add(new FlowTxn(account.Id, t.EffectiveDate, t.Amount.Amount, t.Direction == TransactionDirection.Credit, text,
+                Discretionary: category is not null && IsDiscretionaryCategory(category)));
         }
 
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -201,11 +201,12 @@ public sealed class RecurringSuggestionService(
             s.DayOfMonth, s.SecondDayOfMonth, s.IntervalWeeks, s.AnchorDayOfWeek,
             StartDate: s.NextExpected, EndDate: null, CategoryId: null, Counterparty: s.Name), ct);
 
-    private static bool IsIneligibleCategory(string path) =>
-        path == "Shopping"
-        || path == "Transport/Fuel"
-        || path.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase)
-        || path.StartsWith("Food/", StringComparison.OrdinalIgnoreCase);
+    // Real category trees use both "Food/Dining" and "Food & Dining/Dining", "Shopping/Clothing" and "Transport/Fuel" or
+    // "Auto & Transport/Gas, Fuel, & Charging", so match on the top-level group rather than one exact spelling.
+    private static bool IsDiscretionaryCategory(string path) =>
+        path.StartsWith("Shopping", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("Food", StringComparison.OrdinalIgnoreCase)
+        || path.Contains("Fuel", StringComparison.OrdinalIgnoreCase);
 
     // Fixed bills are safe to add unasked. Income is added too even when the amount varies: forecasting bills without the
     // paychecks that cover them produces false overdraft alarms, so a regular, high-confidence paycheck must be modelled.

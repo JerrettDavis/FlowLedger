@@ -3,7 +3,7 @@ using FlowLedger.Application.Features.BillSheet;
 namespace FlowLedger.Application.Features.RecurringFlows;
 
 /// <summary>One real, posted transaction considered for recurrence detection.</summary>
-public sealed record FlowTxn(Guid AccountId, DateOnly Date, decimal Amount, bool IsCredit, string Text);
+public sealed record FlowTxn(Guid AccountId, DateOnly Date, decimal Amount, bool IsCredit, string Text, bool Discretionary = false);
 
 /// <summary>A recurring pattern found in the transactions, ready to become a <c>RecurringFlow</c>.</summary>
 public sealed record DetectedFlow(
@@ -88,6 +88,14 @@ public static class RecurringFlowDetector
                 {
                     // A pattern that missed two whole periods has stopped (cancelled subscription, ended job): not worth predicting.
                     var stopped = today.DayNumber - flow.LastSeen.DayNumber > PeriodDays(flow) * 2 + 3;
+                    // A merchant in a discretionary category (shopping, food, fuel) only counts when it is unmistakably a bill:
+                    // an exact fixed amount, once a month, over several months. A habit never has an identical charge each month.
+                    var habit = txns.All(t => t.Discretionary);
+                    if (habit && !(flow.AmountModel == "Fixed" && flow.Frequency == "Monthly" && flow.Occurrences >= 4))
+                    {
+                        continue;
+                    }
+
                     if (!stopped && flow.Confidence >= MinConfidence)
                     {
                         result.Add(flow);
