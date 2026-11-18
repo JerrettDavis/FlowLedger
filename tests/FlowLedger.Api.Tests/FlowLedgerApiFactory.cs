@@ -46,6 +46,9 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
 
     public static readonly Guid DemoTenantId = new("00000000-0000-0000-0000-000000000001");
 
+    /// <summary>Connection string of the test container, for tests that must tweak rows directly (e.g. expire a link code).</summary>
+    public string ConnectionString => _postgres.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
