@@ -83,6 +83,37 @@ static IResourceBuilder<T> WithMxConfig<T>(
         resource = resource.WithEnvironment("AssetValuation__AutoRefresh__FeedName", "realtyapi");
     }
 
+    // Off-site backup (restic -> Backblaze B2 / S3 / sftp). All values live in AppHost user-secrets, never in source:
+    //   dotnet user-secrets set "Backup:Restic:Repository"   "b2:BUCKET:flowledger"
+    //   dotnet user-secrets set "Backup:Restic:PasswordFile" "C:\secrets\flowledger-restic.pw"
+    //   dotnet user-secrets set "Backup:B2:AccountId"  "<application key id>"
+    //   dotnet user-secrets set "Backup:B2:AccountKey" "<application key>"
+    // restic itself reads B2_ACCOUNT_ID / B2_ACCOUNT_KEY from the environment.
+    foreach (var key in new[] { "Enabled", "CronExpression", "Directory", "KeepLocalSnapshots", "DrillAfterBackup" })
+    {
+        var value = configuration[$"Backup:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"Backup__{key}", value);
+        }
+    }
+
+    foreach (var key in new[] { "Repository", "PasswordFile", "Executable" })
+    {
+        var value = configuration[$"Backup:Restic:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"Backup__Restic__{key}", value);
+        }
+    }
+
+    if (!string.IsNullOrEmpty(configuration["Backup:B2:AccountId"]) && !string.IsNullOrEmpty(configuration["Backup:B2:AccountKey"]))
+    {
+        resource = resource
+            .WithEnvironment("B2_ACCOUNT_ID", configuration["Backup:B2:AccountId"]!)
+            .WithEnvironment("B2_ACCOUNT_KEY", configuration["Backup:B2:AccountKey"]!);
+    }
+
     // Tulsa County Assessor (public site, no key). Enabling registers the feed; it becomes the auto-refresh
     // feed only when RealtyAPI is not already selected.
     var tulsaEnabled = string.Equals(configuration["TulsaAssessor:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
