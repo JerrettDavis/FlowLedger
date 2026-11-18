@@ -2,6 +2,7 @@ using System.Globalization;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Auth;
 using FlowLedger.Web.Components;
+using FlowLedger.Web.Security;
 using FlowLedger.Web.Services;
 using MudBlazor.Services;
 
@@ -17,6 +18,7 @@ builder.AddServiceDefaults();
 
 // ── Authentication (provider-agnostic OIDC; disabled when Auth:Oidc:Authority is empty) ──
 var oidc = builder.AddFlowLedgerAuth();
+AuthSetup.EnsureSignInConfigured(oidc, builder.Environment, builder.Configuration); // refuse to run open outside Development
 builder.Services.AddSingleton(oidc);
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
@@ -60,6 +62,9 @@ else
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+// Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
+app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();

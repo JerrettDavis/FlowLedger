@@ -33,25 +33,50 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly ITenantContext _tenant;
     private readonly ISyncCursorStore _cursorStore;
     private readonly ILogger<FinancialSyncService> _logger;
+    private readonly Guid? _householdTenantId;
 
+    /// <param name="configuration">
+    /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
+    /// their credentials (e.g. the operator's single SimpleFIN access URL) belong to that tenant only. Tests that
+    /// construct the service directly may omit it.
+    /// </param>
     public FinancialSyncService(
         IFinancialDataProvider provider,
         FlowLedgerDbContext db,
         ITenantContext tenant,
         ISyncCursorStore cursorStore,
-        ILogger<FinancialSyncService> logger)
+        ILogger<FinancialSyncService> logger,
+        Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
     {
         _provider = provider;
         _db = db;
         _tenant = tenant;
         _cursorStore = cursorStore;
         _logger = logger;
+        _householdTenantId = configuration is null ? null : TenancySettings.Legacy(configuration).LegacyTenantId;
+    }
+
+    /// <summary>
+    /// Defense in depth behind the DI guard: operator-configured provider credentials must never be used for
+    /// (or provisioned into) any tenant other than the household tenant, or one user's bank data leaks to another.
+    /// </summary>
+    private void EnsureTenantMayUseProvider()
+    {
+        if (_householdTenantId is { } household
+            && _provider.ProviderName != "Simulated"
+            && _tenant.TenantId != household)
+        {
+            throw new NeedsUserActionProviderException(
+                $"The configured {_provider.ProviderName} connection belongs to the household tenant; it cannot be used for this tenant.",
+                "Per-user bank linking is not available yet. Add accounts manually or import a CSV.");
+        }
     }
 
     // ── Connect ───────────────────────────────────────────────────────────────
 
     public async Task<string> ConnectAsync(CancellationToken ct = default)
     {
+        EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
         var record = await GetOrProvisionConnectionAsync(tenantId, ct);
         return record.MemberProviderId;
@@ -97,12 +122,13 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
+        EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
         var memberRef = await GetOrProvisionConnectionAsync(
-            tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call
+            tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
 
         // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
         if (_provider is IMemberIdResolver resolver)

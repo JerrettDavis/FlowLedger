@@ -94,4 +94,49 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
             "a syntactically invalid webhook payload must return 400, not 500");
     }
+
+    // ── Webhook body cap (anonymous endpoint: bound memory before HMAC work) ──
+
+    private const int WebhookCap = 1024 * 1024;
+
+    private static HttpContent Body(byte[] bytes, bool chunked)
+    {
+        HttpContent content = chunked ? new StreamContent(new NonSeekableStream(bytes)) : new ByteArrayContent(bytes);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        return content;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Post_webhook_over_1MB_returns_413_even_with_a_valid_signature(bool chunked)
+    {
+        using var anon = factory.CreateClient();
+        var big = new byte[WebhookCap + 1];
+        Array.Fill(big, (byte)'a');
+        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildTestSignature(big));
+
+        var response = await anon.PostAsync("/api/integrations/mx/webhooks", Body(big, chunked));
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+    }
+
+    [Fact]
+    public async Task Post_webhook_of_exactly_1MB_is_still_processed()
+    {
+        using var anon = factory.CreateClient();
+        var body = new byte[WebhookCap];
+        Array.Fill(body, (byte)'a');
+        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildTestSignature(body));
+
+        var response = await anon.PostAsync("/api/integrations/mx/webhooks", Body(body, chunked: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "verified, then rejected as invalid JSON; not capped");
+    }
+
+    /// <summary>Forces chunked transfer (no Content-Length) so the server cannot rely on the header.</summary>
+    private sealed class NonSeekableStream(byte[] data) : MemoryStream(data)
+    {
+        public override bool CanSeek => false;
+    }
 }

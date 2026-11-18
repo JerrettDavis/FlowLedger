@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Integrations.Abstractions;
 
 namespace FlowLedger.Infrastructure.Sync;
 
@@ -10,8 +11,9 @@ namespace FlowLedger.Infrastructure.Sync;
 internal sealed class UnlinkedTenantSyncService : IFinancialSyncService
 {
     public Task<string> ConnectAsync(CancellationToken ct = default) =>
-        throw new InvalidOperationException(
-            "This account has no linked financial institution yet. Per-user provider linking is not available; the configured provider belongs to the household owner.");
+        throw new NeedsUserActionProviderException(
+            "This account has no linked financial institution yet. Per-user provider linking is not available; the configured provider belongs to the household owner.",
+            "Ask the household owner, or add accounts manually / via CSV import.");
 
     public Task<SyncResult> SyncAsync(CancellationToken ct = default) => Task.FromResult(new SyncResult(0, 0, 0, 0));
 }
