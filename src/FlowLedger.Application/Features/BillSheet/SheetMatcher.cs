@@ -170,7 +170,7 @@ public static class SheetMatcher
         }
 
         return raw.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(Normalize).Where(s => s.Length >= 2).Distinct().ToList();
+            .Select(Normalize).Where(s => s.Length >= 3).Distinct().ToList();
     }
 
     /// <summary>True when the bill would claim a transaction with this text (used to avoid duplicating rows).</summary>
