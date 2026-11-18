@@ -105,7 +105,35 @@ public static class RecurringFlowDetector
             }
         }
 
-        return result.OrderByDescending(f => f.Confidence).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        return MergeAliases(result).OrderByDescending(f => f.Confidence).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// The same bill often reaches the ledger under two spellings ("Adobe CC" / "ADOBE INC ADOBE", "Home Assistant Cloud" /
+    /// "NABU CASA"). Two detections on one account with the same direction, cadence, amount (within 3%) and billing day
+    /// (within a day, or the same weekday) are one charge: keep the one with the most evidence and the cleaner name.
+    /// Periodic extras are never merged with their base flow.
+    /// </summary>
+    private static List<DetectedFlow> MergeAliases(List<DetectedFlow> flows)
+    {
+        var kept = new List<DetectedFlow>();
+        foreach (var f in flows.OrderByDescending(f => f.Occurrences).ThenByDescending(f => f.Confidence).ThenBy(f => f.Name.Length))
+        {
+            var same = kept.Any(k => k.AccountId == f.AccountId
+                && k.Direction == f.Direction
+                && k.Frequency == f.Frequency
+                && k.IsPeriodicExtra == f.IsPeriodicExtra
+                && Math.Abs(k.Amount - f.Amount) <= Math.Max(0.5m, k.Amount * 0.03m)
+                && (f.Frequency == "Monthly"
+                    ? k.DayOfMonth is { } kd && f.DayOfMonth is { } fd && Math.Abs(kd - fd) <= 1
+                    : f.Frequency is "Weekly" or "EveryNWeeks" && k.AnchorDayOfWeek == f.AnchorDayOfWeek && k.IntervalWeeks == f.IntervalWeeks));
+            if (!same)
+            {
+                kept.Add(f);
+            }
+        }
+
+        return kept;
     }
 
     // Merchants people visit out of habit, not on a schedule: fuel, restaurants, groceries, coffee, delivery. Never a bill.
