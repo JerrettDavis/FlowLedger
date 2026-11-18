@@ -93,6 +93,25 @@ Connection string names used internally:
 - Database: `flowledger` → `ConnectionStrings__flowledger`
 - Redis:    `redis`      → `ConnectionStrings__redis`
 
+## Upgrading an existing compose install
+
+The compose file is now secure by default. Before `docker compose up` on an existing install:
+
+1. **Postgres password.** Postgres applies `POSTGRES_PASSWORD` only when the volume is first
+   created. If you never set one, your volume still uses the old default `dev_only_change_in_prod`:
+   put exactly that in `.env` first, start the stack, then rotate it
+   (`docker compose exec postgres psql -U flowledger -c "ALTER USER flowledger PASSWORD '<new>'"`)
+   and update `.env`. Setting a new value without `ALTER USER` locks the apps out of your data.
+2. **API key.** The old `dev-local-key-not-for-production` key is refused (apps now run as
+   Production). Set `API__KEY` to a random value; Web and API read the same variable.
+3. **Sign-in.** Configure OIDC (`AUTH__OIDC__*`) or set `AUTH__ALLOWANONYMOUS=true`, otherwise the
+   Web UI will not start.
+4. **Existing OIDC sessions.** Sign out and back in once: older cookies lack the household claim,
+   so *Data & Backups* stays hidden for them until they are re-issued.
+
+Seed/migrate scripts read `API__KEY` / `POSTGRES_PASSWORD` from the environment; export them
+(e.g. `set -a; . ./.env; set +a`). Seeding a Production stack needs `--force`.
+
 ## Applying migrations manually
 
 When running the full stack, the API applies migrations automatically at startup
