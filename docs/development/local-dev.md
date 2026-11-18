@@ -70,7 +70,11 @@ starting the other.
 | API key          | `dev-local-key-not-for-production`     | Defined in `appsettings.Development.json` |
 | Tenant ID        | `00000000-0000-0000-0000-000000000001` | Hard-coded demo tenant                     |
 | Postgres user    | `flowledger`                           | Database: `flowledger`                     |
-| Postgres password | `dev_only_change_in_prod` (compose)   | Or Aspire-generated in Aspire mode         |
+| Postgres password | `POSTGRES_PASSWORD` from your `.env` (compose; required, no default) | Or Aspire-generated in Aspire mode |
+
+Compose also requires `API__KEY` in `.env` (any value works for `--profile infra`; the dev
+key above only applies to `dotnet run`/Aspire in Development). The migrate/seed scripts read
+`POSTGRES_PASSWORD` / `API__KEY` from the environment, so export them (or source `.env`).
 
 ## MX Integration Toggle
 
