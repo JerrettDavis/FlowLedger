@@ -168,11 +168,11 @@ public sealed class GetDashboardActivityHandler(
 }
 
 /// <summary>Marks a flagged transaction as reviewed so it stops appearing under Suspicious Activity.</summary>
-public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissals)
+public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissals, FlowLedger.Application.Features.Categories.ICategorizationStore transactions)
 {
     public const int MaxNoteLength = 500;
 
-    public Task HandleAsync(Guid transactionId, string? note, CancellationToken ct = default)
+    public async Task HandleAsync(Guid transactionId, string? note, CancellationToken ct = default)
     {
         var trimmed = note?.Trim();
         if (trimmed is { Length: > MaxNoteLength })
@@ -180,6 +180,12 @@ public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissal
             throw new ArgumentException($"Note must be {MaxNoteLength} characters or fewer.");
         }
 
-        return dismissals.DismissAsync(transactionId, string.IsNullOrEmpty(trimmed) ? null : trimmed, ct);
+        await dismissals.DismissAsync(transactionId, string.IsNullOrEmpty(trimmed) ? null : trimmed, ct);
+
+        // Also keep the reason on the transaction itself, so it shows up with the note icon and in search.
+        if (!string.IsNullOrEmpty(trimmed) && await transactions.FindTrackedAsync(transactionId, ct) is { } tx && tx.AppendNote(trimmed))
+        {
+            await transactions.SaveAsync(ct);
+        }
     }
 }

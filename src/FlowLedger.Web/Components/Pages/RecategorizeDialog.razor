@@ -51,6 +51,10 @@
                 </span>
             </button>
         </div>
+
+        <MudTextField @bind-Value="_note" Label="Note (optional)" Lines="2" MaxLength="1000" Class="mt-3"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Placeholder="e.g. Split with Sam, reimbursable" aria-label="Note" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
@@ -71,6 +75,7 @@
 
     private CategoryDto? _selected;
     private bool _applyToAll;
+    private string? _note;
 
     private bool IsNew => _selected is { Id: var id } && id == Guid.Empty;
 
@@ -94,5 +99,5 @@
 
     private void Cancel() => MudDialog.Cancel();
 
-    private void Save() => MudDialog.Close(DialogResult.Ok((_selected!.Id, _selected.Path, _applyToAll)));
+    private void Save() => MudDialog.Close(DialogResult.Ok((_selected!.Id, _selected.Path, _applyToAll, string.IsNullOrWhiteSpace(_note) ? null : _note.Trim())));
 }

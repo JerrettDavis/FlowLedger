@@ -48,6 +48,9 @@ public sealed class Transaction : AggregateRoot
     public string? MerchantName { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>Longest stored note (matches the column size).</summary>
+    public const int MaxNotesLength = 2000;
+
     /// <summary>Cleaned-up merchant name derived from the bank descriptor by the ingestion pipeline. Never replaces <see cref="MerchantName"/> (the user's alias).</summary>
     public string? SuggestedName { get; private set; }
 
@@ -336,6 +339,20 @@ public sealed class Transaction : AggregateRoot
 
     /// <summary>Sets or clears (blank) the note.</summary>
     public void SetNote(string? note) => Notes = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+
+    /// <summary>Adds <paramref name="note"/> after any existing note (blank input is ignored). Returns true when the note changed.</summary>
+    public bool AppendNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return false;
+        }
+
+        var combined = string.IsNullOrEmpty(Notes) ? note.Trim() : $"{Notes}\n{note.Trim()}";
+        // Column limit: drop the oldest text rather than the new note.
+        Notes = combined.Length > MaxNotesLength ? combined[^MaxNotesLength..] : combined;
+        return true;
+    }
 
     public void AddNote(string note)
     {

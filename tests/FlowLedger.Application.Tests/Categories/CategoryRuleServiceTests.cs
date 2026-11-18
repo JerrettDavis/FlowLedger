@@ -126,6 +126,24 @@ public sealed class CategoryRuleServiceTests
     }
 
     [Fact]
+    public async Task Recategorize_with_a_note_appends_it_to_the_target_only()
+    {
+        var a = Tx("ACME HARDWARE");
+        var b = Tx("ACME HARDWARE");
+        a.SetNote("first");
+        var dest = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Home/Improvement"), "Improvement");
+        await _categories.AddAsync(dest);
+        var svc = Service(new RuleStore(), new TxStore([a, b]));
+
+        await svc.RecategorizeAsync(a.Id, dest.Id, applyToAll: true, note: "  reimbursable ");
+
+        a.Notes.Should().Be("first\nreimbursable");
+        b.Notes.Should().BeNull();
+        await FluentActions.Awaiting(() => svc.RecategorizeAsync(a.Id, dest.Id, false, note: new string('x', 1001)))
+            .Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task Recategorize_unknown_transaction_or_category_throws()
     {
         var svc = Service(new RuleStore(), new TxStore([Tx("X")]));
