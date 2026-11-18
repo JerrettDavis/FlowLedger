@@ -1,5 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.BillSheet;
+using FlowLedger.Application.Features.Shared;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.SharedKernel;
@@ -153,11 +154,11 @@ public sealed class RecurringSuggestionService(
     /// <summary>An existing active flow on the same account whose name/counterparty overlaps the merchant covers the pattern.</summary>
     private static bool Covered(DetectedFlow d, IReadOnlyList<RecurringFlow> existing)
     {
-        var merchant = RecurringDetector.Key(d.Name);
+        var merchant = MerchantKey.From(d.Name);
         return existing.Any(f => f.AccountId.Value == d.AccountId
             && new[] { f.Name, f.Counterparty }.Where(x => !string.IsNullOrWhiteSpace(x)).Any(x =>
             {
-                var k = RecurringDetector.Key(x!);
+                var k = MerchantKey.From(x!);
                 return k.Length >= 4 && merchant.Length >= 4 && (k.Contains(merchant) || merchant.Contains(k));
             }));
     }
