@@ -1,6 +1,6 @@
+using FlowLedger.Worker;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
-using FlowLedger.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

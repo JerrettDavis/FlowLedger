@@ -32,7 +32,10 @@ public sealed class MonthlySpendTests
     {
         var spend = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Food"] = 10m, ["Food/Groceries"] = 100m, ["food/dining"] = 30m, ["Foodie"] = 999m,
+            ["Food"] = 10m,
+            ["Food/Groceries"] = 100m,
+            ["food/dining"] = 30m,
+            ["Foodie"] = 999m,
         };
 
         MonthlySpend.SpentFor("Food", spend).Should().Be(140m);
