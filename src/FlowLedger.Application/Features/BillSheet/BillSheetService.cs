@@ -1,6 +1,7 @@
 using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.RecurringFlows;
+using FlowLedger.Application.Features.Shared;
 using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.BillSheet;
@@ -317,10 +318,10 @@ public sealed class BillSheetService(
             }
         }
 
-        var repeatingKeys = repeating.Select(f => RecurringDetector.Key(f.Name)).ToHashSet();
+        var repeatingKeys = repeating.Select(f => MerchantKey.From(f.Name)).ToHashSet();
         foreach (var d in RecurringDetector.Detect(txns))
         {
-            if (repeatingKeys.Contains(RecurringDetector.Key(d.Name)) || known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
+            if (repeatingKeys.Contains(MerchantKey.From(d.Name)) || known.Any(b => SheetMatcher.BillMatchesText(b, d.Name)))
             {
                 continue;
             }
