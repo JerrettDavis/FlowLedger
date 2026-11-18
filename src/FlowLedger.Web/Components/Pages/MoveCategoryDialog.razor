@@ -5,39 +5,69 @@
         <MudText Typo="Typo.h6" id="move-cat-title">Rename, move or merge</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Class="mb-3">
-            <strong>@Path</strong> and everything under it will live at the new path.
-            Pick an existing category to <strong>merge</strong> into it; type a new path to <strong>rename or move</strong>.
-        </MudText>
+        <div class="fl-pathflow" aria-label="From @Path to @(string.IsNullOrWhiteSpace(_newPath) ? "…" : _newPath)">
+            <span class="fl-pathchip">@Path</span>
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" Color="Color.Default" />
+            <span class="fl-pathchip @(string.IsNullOrWhiteSpace(_newPath) ? null : "fl-pathchip-new")">@(string.IsNullOrWhiteSpace(_newPath) ? "choose a path" : _newPath)</span>
+        </div>
+
         <MudAutocomplete T="string" Label="New path" Value="_newPath" ValueChanged="OnChanged" SearchFunc="SearchAsync"
-                         CoerceValue="true" CoerceText="true" AutoFocus="true" DebounceInterval="300"
-                         HelperText="e.g. Food/Eating Out — use / for levels" Class="mb-3" />
-        @if (_error is not null)
+                         CoerceValue="true" CoerceText="true" AutoFocus="true" OpenOnFocus="false" DebounceInterval="250" Variant="Variant.Outlined" Margin="Margin.Dense"
+                         Placeholder="e.g. Meals/Eating Out" MaxItems="30"
+                         HelperText="Pick an existing category to merge into it, or type a new path to rename or move. Use / for levels." />
+
+        @if (_loading)
         {
-            <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            <MudProgressLinear Indeterminate="true" Size="Size.Small" Class="mt-3" aria-label="Checking" />
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3 fl-fade-in">@_error</MudAlert>
         }
         else if (_preview is not null)
         {
-            <MudAlert Severity="@(_preview.Merged > 0 ? Severity.Warning : Severity.Info)" Dense="true">
-                @if (_preview.Moved > 0)
+            <div class="fl-changes fl-fade-in" aria-live="polite">
+                @foreach (var m in _preview.Merges.Take(Limit))
                 {
-                    <div>@_preview.Moved categor@(_preview.Moved == 1 ? "y" : "ies") will be renamed/moved.</div>
+                    <div class="fl-change fl-change-merge">
+                        <MudIcon Icon="@Icons.Material.Filled.CallMerge" Size="Size.Small" Color="Color.Warning" />
+                        <span class="fl-change-old">@m.OldPath</span>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                        <strong>@m.TargetPath</strong>
+                        <MudSpacer />
+                        <span class="fl-muted">merge</span>
+                    </div>
                 }
-                @foreach (var m in _preview.Merges)
+                @foreach (var m in _preview.Moves.Take(Math.Max(0, Limit - _preview.Merges.Count)))
                 {
-                    <div>@m.OldPath will be merged into existing <strong>@m.TargetPath</strong>.</div>
+                    <div class="fl-change">
+                        <MudIcon Icon="@Icons.Material.Filled.DriveFileMove" Size="Size.Small" Color="Color.Primary" />
+                        <span class="fl-change-old">@m.OldPath</span>
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                        <strong>@m.NewPath</strong>
+                    </div>
                 }
-            </MudAlert>
+                @if (_preview.Merges.Count + _preview.Moves.Count > Limit)
+                {
+                    <div class="fl-change-note">+ @(_preview.Merges.Count + _preview.Moves.Count - Limit) more</div>
+                }
+                <div class="fl-change-note">
+                    Transactions, splits, recurring flows, rules and budgets follow. @(_preview.Merged > 0 ? "Merged categories can't be split apart again." : "")
+                </div>
+            </div>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Apply" Disabled="@(_preview is null || _error is not null)"
-                   aria-label="Apply change">@(_preview is { Merged: > 0 } ? "Merge" : "Apply")</MudButton>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="@(_preview is { Merged: > 0 } ? Color.Warning : Color.Primary)" Variant="Variant.Filled" OnClick="Apply"
+                   Disabled="@(_preview is null || _error is not null || _loading)"
+                   aria-label="Apply change">@ActionLabel</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
+    private const int Limit = 6;
+
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter, EditorRequired] public string Path { get; set; } = "";
@@ -45,8 +75,17 @@
 
     private string? _newPath;
     private string? _error;
+    private bool _loading;
     private FlowLedger.Web.ApiClient.CategoryMoveResultDto? _preview;
     private int _seq;
+
+    private string ActionLabel => _preview switch
+    {
+        { Merged: > 0 } => $"Merge {_preview.Merged}",
+        { Moved: 1 } => "Rename",
+        { Moved: > 1 } => $"Move {_preview.Moved}",
+        _ => "Apply",
+    };
 
     private Task<IEnumerable<string>> SearchAsync(string? text, CancellationToken ct) =>
         Task.FromResult<IEnumerable<string>>(Categories
@@ -67,10 +106,12 @@
         _error = null;
         if (string.IsNullOrWhiteSpace(value))
         {
+            _loading = false;
             return;
         }
 
         var seq = ++_seq;
+        _loading = true;
         try
         {
             var result = await ApiClient.MoveCategoryAsync(Path, value, dryRun: true);
@@ -79,6 +120,10 @@
         catch (Exception ex)
         {
             if (seq == _seq) _error = ex.Message;
+        }
+        finally
+        {
+            if (seq == _seq) _loading = false;
         }
     }
 

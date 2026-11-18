@@ -10,7 +10,7 @@ public sealed record CategoryMerge(Guid SourceId, string OldPath, Guid TargetId,
 
 public sealed record CategoryRestructurePlan(IReadOnlyList<CategoryMove> Moves, IReadOnlyList<CategoryMerge> Merges);
 
-public sealed record CategoryRestructureResult(int Moved, int Merged, int TransactionsAffected, IReadOnlyList<CategoryMerge> Merges);
+public sealed record CategoryRestructureResult(int Moved, int Merged, int TransactionsAffected, IReadOnlyList<CategoryMerge> Merges, IReadOnlyList<CategoryMove> Moves);
 
 public interface ICategoryMaintenanceStore
 {
@@ -111,6 +111,6 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
     {
         var plan = await PlanAsync(oldPath, newPath, ct);
         var affected = dryRun ? 0 : await store.ApplyAsync(plan, ct);
-        return new CategoryRestructureResult(plan.Moves.Count, plan.Merges.Count, affected, plan.Merges);
+        return new CategoryRestructureResult(plan.Moves.Count, plan.Merges.Count, affected, plan.Merges, plan.Moves);
     }
 }

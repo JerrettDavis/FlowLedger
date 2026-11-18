@@ -6,10 +6,25 @@
 
 <PageTitle>Categories — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Categories</MudText>
+<div class="d-flex align-center justify-space-between mb-1" style="flex-wrap:wrap;gap:8px">
+    <MudText Typo="Typo.h5">Categories</MudText>
+    @if (!_loading && _nodes.Count > 0)
+    {
+        <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Immediate="true" DebounceInterval="120"
+                          Placeholder="Search categories" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="width:260px" aria-label="Search categories" />
+            <MudTooltip Text="Expand all">
+                <MudIconButton Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" OnClick="ExpandAll" aria-label="Expand all" />
+            </MudTooltip>
+            <MudTooltip Text="Collapse all">
+                <MudIconButton Icon="@Icons.Material.Filled.UnfoldLess" Size="Size.Small" OnClick="CollapseAll" aria-label="Collapse all" />
+            </MudTooltip>
+        </div>
+    }
+</div>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
-    Rename or move a category (and everything under it), or merge it into another one. Transactions, splits, recurring flows,
-    rules and budgets all follow.
+    Rename, move or merge a category and everything under it. Transactions, splits, recurring flows, rules and budgets follow.
 </MudText>
 
 @if (_error is not null)
@@ -19,27 +34,63 @@
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true" aria-label="Loading categories" />
+}
+else if (_nodes.Count == 0)
+{
+    <MudPaper Outlined="true" Class="fl-empty">
+        <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" />
+        <MudText Typo="Typo.subtitle1" Class="mt-2">No categories yet</MudText>
+        <MudText Typo="Typo.body2">Categories appear here as you categorize transactions on the Spending page.</MudText>
+    </MudPaper>
 }
 else
 {
-    <MudPaper Class="pa-2" Outlined="true">
-        @foreach (var node in Nodes())
+    var visible = Visible().ToList();
+    <MudPaper Outlined="true" Class="fl-tree" role="tree" aria-label="Categories">
+        @if (visible.Count == 0)
         {
-            var path = node.Path;
-            var depth = path.Count(ch => ch == '/');
-            <div class="d-flex justify-space-between align-center pa-1" style="padding-left:@(8 + depth * 24)px !important">
-                <MudText>@path.Split('/').Last()@(node.IsSystem ? " (system)" : "")</MudText>
-                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.DriveFileRenameOutline"
-                           Disabled="@node.IsSystem" OnClick="() => MoveAsync(path)"
-                           aria-label="@($"Rename, move or merge {path}")">Rename / move / merge</MudButton>
+            <div class="fl-empty">No categories match “@_search”.</div>
+        }
+        @foreach (var node in visible)
+        {
+            var n = node;
+            var open = IsOpen(n);
+            <div class="fl-tree-row" role="treeitem" aria-level="@(n.Depth + 1)" aria-expanded="@(n.Children > 0 ? (open ? "true" : "false") : null)"
+                 style="padding-left:@(4 + n.Depth * 22)px">
+                @if (n.Children > 0)
+                {
+                    <button type="button" class="fl-tree-toggle" aria-expanded="@(open ? "true" : "false")" aria-label="@(open ? "Collapse" : "Expand") @n.Name"
+                            @onclick="() => Toggle(n.Path)">
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                    </button>
+                }
+                else
+                {
+                    <span class="fl-tree-spacer"></span>
+                }
+                <span class="fl-catchip-dot" style="--fl-cat:@CategoryColors.For(n.Path)"></span>
+                <span class="fl-tree-name">@Highlight(n.Name)</span>
+                @if (n.IsSystem) { <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ma-0">system</MudChip> }
+                @if (n.Children > 0) { <span class="fl-tree-count" title="@n.Descendants categor@(n.Descendants == 1 ? "y" : "ies") inside">@n.Descendants</span> }
+                <span class="fl-tree-actions">
+                    <MudTooltip Text="@(n.IsSystem ? "System categories can't be changed" : "Rename, move or merge")">
+                        <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline" Size="Size.Small" Disabled="@n.IsSystem"
+                                       OnClick="() => MoveAsync(n.Path)" aria-label="@($"Rename, move or merge {n.Path}")" />
+                    </MudTooltip>
+                </span>
             </div>
         }
     </MudPaper>
 }
 
 @code {
+    private sealed record Node(string Path, string Name, int Depth, int Children, int Descendants, bool IsSystem);
+
     private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+    private List<Node> _nodes = [];
+    private HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
+    private string _search = "";
     private bool _loading = true;
     private string? _error;
 
@@ -47,10 +98,11 @@ else
 
     private async Task LoadAsync()
     {
-        _loading = true;
+        _loading = _nodes.Count == 0;
         try
         {
-            _categories = (await ApiClient.GetCategoriesAsync()).OrderBy(c => c.Path, StringComparer.OrdinalIgnoreCase).ToList();
+            _categories = (await ApiClient.GetCategoriesAsync()).ToList();
+            _nodes = BuildNodes();
             _error = null;
         }
         catch (Exception ex)
@@ -64,18 +116,82 @@ else
     }
 
     // Every category plus its implied parents ("Food" when only "Food/Dining" exists), in tree order.
-    private IEnumerable<(string Path, bool IsSystem)> Nodes()
+    private List<Node> BuildNodes()
     {
         var system = _categories.Where(c => c.IsSystem).Select(c => c.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return _categories.SelectMany(c =>
+        var paths = _categories.SelectMany(c =>
             {
                 var segs = c.Path.Split('/');
                 return Enumerable.Range(1, segs.Length).Select(n => string.Join('/', segs.Take(n)));
             })
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-            .Select(p => (p, system.Contains(p)));
+            .ToList();
+        return paths.Select(p =>
+        {
+            var inside = paths.Count(o => o.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase));
+            var direct = paths.Count(o => o.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase) && o.IndexOf('/', p.Length + 1) < 0);
+            return new Node(p, p.Split('/').Last(), p.Count(ch => ch == '/'), direct, inside, system.Contains(p));
+        }).ToList();
     }
+
+    private bool Searching => !string.IsNullOrWhiteSpace(_search);
+
+    private bool IsOpen(Node n) => Searching || _expanded.Contains(n.Path);
+
+    private IEnumerable<Node> Visible()
+    {
+        if (Searching)
+        {
+            // Matches plus their ancestors, so a hit is shown in context.
+            var hits = _nodes.Where(n => n.Path.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)).Select(n => n.Path).ToList();
+            return _nodes.Where(n => hits.Any(h => h.Equals(n.Path, StringComparison.OrdinalIgnoreCase)
+                                                    || h.StartsWith(n.Path + "/", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        return _nodes.Where(n =>
+        {
+            var slash = n.Path.LastIndexOf('/');
+            for (var parent = slash; parent > 0; parent = n.Path.LastIndexOf('/', parent - 1))
+            {
+                if (!_expanded.Contains(n.Path[..parent]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    private MarkupString Highlight(string name)
+    {
+        var encoded = System.Net.WebUtility.HtmlEncode(name);
+        if (!Searching)
+        {
+            return new MarkupString(encoded);
+        }
+
+        var term = System.Net.WebUtility.HtmlEncode(_search.Trim());
+        var i = encoded.IndexOf(term, StringComparison.OrdinalIgnoreCase);
+        return i < 0
+            ? new MarkupString(encoded)
+            : new MarkupString($"{encoded[..i]}<mark>{encoded.Substring(i, term.Length)}</mark>{encoded[(i + term.Length)..]}");
+    }
+
+    private void OnSearch(string? value) => _search = value ?? "";
+
+    private void Toggle(string path)
+    {
+        if (!_expanded.Remove(path))
+        {
+            _expanded.Add(path);
+        }
+    }
+
+    private void ExpandAll() { _search = ""; _expanded = _nodes.Where(n => n.Children > 0).Select(n => n.Path).ToHashSet(StringComparer.OrdinalIgnoreCase); }
+
+    private void CollapseAll() { _search = ""; _expanded.Clear(); }
 
     private async Task MoveAsync(string path)
     {
@@ -83,7 +199,7 @@ else
         {
             { x => x.Path, path },
             { x => x.Categories, _categories },
-        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
         var result = await dialog.Result;
         if (result is null || result.Canceled || result.Data is not string newPath)
         {
@@ -94,8 +210,16 @@ else
         {
             var r = await ApiClient.MoveCategoryAsync(path, newPath, dryRun: false);
             Snackbar.Add(r.Merged > 0
-                ? $"Merged {r.Merged} categor{(r.Merged == 1 ? "y" : "ies")} ({r.TransactionsAffected} transactions moved)"
-                : $"Moved {r.Moved} categor{(r.Moved == 1 ? "y" : "ies")} to {newPath}", Severity.Success);
+                ? $"Merged {r.Merged} categor{(r.Merged == 1 ? "y" : "ies")}. {r.TransactionsAffected} transaction{(r.TransactionsAffected == 1 ? "" : "s")} moved."
+                : $"Moved {r.Moved} categor{(r.Moved == 1 ? "y" : "ies")} to {newPath}.", Severity.Success);
+            // keep the user's place: re-open the destination so they can see where things landed
+            var segs = newPath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            for (var i = 1; i < segs.Length; i++)
+            {
+                _expanded.Add(string.Join('/', segs.Take(i)));
+            }
+
+            _expanded.Add(string.Join('/', segs));
             await LoadAsync();
         }
         catch (Exception ex)
