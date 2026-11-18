@@ -7,9 +7,9 @@ on:
   pull_request:
     branches: [main, master]
 
+# Least privilege: only the tag-only `push` job below is granted packages: write.
 permissions:
   contents: read
-  packages: write      # needed only on tagged push to push to GHCR
 
 jobs:
   build:
@@ -43,45 +43,32 @@ jobs:
         id: owner
         run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-      # ── Determine whether to push ────────────────────────────────────────
-      # Push only on tagged releases; build-only on PR / branch push.
-      - name: Compute push flag
+      # ── Image tag (release tag on tagged pushes, else "dev") ─────────────
+      # This job never pushes; the separate `push` job (tags only) does.
+      - name: Compute image tag
         id: meta
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "push=true"  >> "$GITHUB_OUTPUT"
-            TAG="${GITHUB_REF#refs/tags/}"
-            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
-            echo "push=false" >> "$GITHUB_OUTPUT"
-            echo "tag=dev"    >> "$GITHUB_OUTPUT"
+            echo "tag=dev" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Login to GHCR (tagged releases only) ────────────────────────────
-      - name: Log in to GitHub Container Registry
-        if: steps.meta.outputs.push == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # ── Build (and optionally push) ──────────────────────────────────────
+      # ── Build (local only) ───────────────────────────────────────────────
       - name: Build image
         id: build
         uses: docker/build-push-action@v7
         with:
           context:    .
           file:       ${{ matrix.dockerfile }}
-          push:       ${{ steps.meta.outputs.push == 'true' }}
+          push:       false
           tags: |
             ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:latest
           # Inline cache — speeds up PR builds using previously cached layers
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to:   type=gha,scope=${{ matrix.service }},mode=max
-          # Export the image to Docker daemon so Trivy can scan it
-          load:       ${{ steps.meta.outputs.push != 'true' }}
+          # Export the image to Docker daemon so Syft / Trivy can scan it
+          load:       true
 
       # ── Generate SBOM ────────────────────────────────────────────────────
       - name: Generate SBOM (Syft)
@@ -101,7 +88,8 @@ jobs:
 
       # ── Trivy vulnerability scan ─────────────────────────────────────────
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
+        # Pinned to a commit SHA (v0.36.0, annotated tag dereferenced); never a mutable branch/tag.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
           format:            sarif
@@ -117,6 +105,60 @@ jobs:
           name:              trivy-${{ matrix.service }}
           path:              trivy-${{ matrix.service }}.sarif
           if-no-files-found: warn
+
+  # ── Push to GHCR (tagged releases only; the only job with packages: write) ─
+  push:
+    name: Push (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service:    api
+            dockerfile: src/FlowLedger.Api/Dockerfile
+            image:      flowledger-api
+          - service:    web
+            dockerfile: src/FlowLedger.Web/Dockerfile
+            image:      flowledger-web
+          - service:    worker
+            dockerfile: src/FlowLedger.Worker/Dockerfile
+            image:      flowledger-worker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Lowercase owner
+        id: owner
+        run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Rebuilds from the gha layer cache warmed by the build job (same scope), then pushes.
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context:    .
+          file:       ${{ matrix.dockerfile }}
+          push:       true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ github.ref_name }}
+            ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
 
   # ── Smoke-test: full-stack compose up ─────────────────────────────────────
   compose-smoke:
