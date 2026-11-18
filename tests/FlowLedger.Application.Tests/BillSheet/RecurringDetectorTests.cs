@@ -18,6 +18,20 @@ public sealed class RecurringDetectorTests
     }
 
     [Fact]
+    public void Duplicate_pending_rows_and_state_variants_do_not_hide_a_monthly_charge()
+    {
+        // Real shape (Super Klean): a provider re-keys the same charge, and the pending copy swaps "OK" for "USA".
+        var r = RecurringDetector.Detect([
+            T("SUPER KLEAN SHERIDAN TULSA OK", 2026, 8, 15, 35m),
+            T("SUPER KLEAN SHERIDAN TULSA OK", 2026, 9, 18, 35m), T("SUPER KLEAN SHERIDAN TULSA OK", 2026, 9, 18, 35m),
+            T("SUPER KLEAN SHERIDAN TULSA OK", 2026, 10, 15, 35m), T("SUPER KLEAN SHERIDAN TULSA OK", 2026, 10, 15, 35m),
+            T("SUPER KLEAN SHERIDAN TULSA USA", 2026, 11, 15, 35m), T("SUPER KLEAN SHERIDAN TULSA USA", 2026, 11, 15, 35m),
+            T("SUPER KLEAN SHERIDAN TULSA USA", 2026, 11, 15, 35m)]);
+
+        r.Should().ContainSingle().Which.Should().Match<DetectedBill>(b => b.DueDay == 15 && b.Estimated == 35m);
+    }
+
+    [Fact]
     public void Utility_with_varying_amount_but_steady_day_is_detected()
     {
         var r = RecurringDetector.Detect([

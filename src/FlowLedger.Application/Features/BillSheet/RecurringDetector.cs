@@ -1,3 +1,4 @@
+using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Shared;
 
 namespace FlowLedger.Application.Features.BillSheet;
@@ -22,11 +23,14 @@ public static class RecurringDetector
         var result = new List<DetectedBill>();
         var groups = transactions
             .Where(t => !string.IsNullOrWhiteSpace(t.Label ?? t.Text))
-            .GroupBy(t => MerchantKey.From(t.Label ?? t.Text))
+            .GroupBy(t => MerchantNormalizer.Key(t.Label ?? t.Text))
             .Where(g => g.Key.Length >= 3);
 
-        foreach (var g in groups)
+        foreach (var group in groups)
         {
+            // The same charge is often present twice: pending, then posted, or re-keyed by the provider. Same day, same amount
+            // is one charge for pattern purposes.
+            var g = group.GroupBy(t => (t.Date, t.Amount)).Select(x => x.First()).ToList();
             var byMonth = g.GroupBy(t => (t.Date.Year, t.Date.Month)).ToList();
             if (byMonth.Count < MinMonths || byMonth.Any(m => m.Count() > 2))
             {
@@ -36,7 +40,7 @@ public static class RecurringDetector
             var amounts = g.Select(t => t.Amount).OrderBy(a => a).ToList();
             var medianAmount = Median(amounts);
             var amountStable = medianAmount > 0
-                && g.Count(t => Math.Abs(t.Amount - medianAmount) <= medianAmount * AmountTolerance) >= g.Count() * 0.7;
+                && g.Count(t => Math.Abs(t.Amount - medianAmount) <= medianAmount * AmountTolerance) >= g.Count * 0.7;
 
             var days = g.Select(t => t.Date.Day).OrderBy(d => d).ToList();
             var medianDay = (int)Math.Round(Median(days.Select(d => (decimal)d).ToList()));
