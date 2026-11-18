@@ -52,7 +52,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
         (await _client.PutAsJsonAsync("/api/budgets", new { category = "Food/Dining", monthlyLimit = 100m })).EnsureSuccessStatusCode();
         (await _client.PutAsJsonAsync("/api/category-rules", new { pattern = "cafe", categoryPath = "Food/Dining" })).EnsureSuccessStatusCode();
 
-        var resp = await _client.PostAsJsonAsync($"/api/categories/{food.Id}/move", new { newPath = "Meals" });
+        var resp = await _client.PostAsJsonAsync("/api/categories/move", new { path = "Food", newPath = "Meals" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var paths = (await Categories()).Select(c => c.Path).ToList();
@@ -76,11 +76,11 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
         (await _client.PutAsJsonAsync("/api/budgets", new { category = "Food", monthlyLimit = 100m })).EnsureSuccessStatusCode();
         (await _client.PutAsJsonAsync("/api/budgets", new { category = "Eating Out", monthlyLimit = 50m })).EnsureSuccessStatusCode();
 
-        var preview = await _client.PostAsJsonAsync($"/api/categories/{food.Id}/move", new { newPath = "Eating Out", dryRun = true });
+        var preview = await _client.PostAsJsonAsync("/api/categories/move", new { path = "Food", newPath = "Eating Out", dryRun = true });
         (await preview.Content.ReadFromJsonAsync<CategoryRestructureResult>())!.Merged.Should().Be(1);
         (await Categories()).Select(c => c.Path).Should().Contain("Food"); // preview changed nothing
 
-        var resp = await _client.PostAsJsonAsync($"/api/categories/{food.Id}/move", new { newPath = "Eating Out" });
+        var resp = await _client.PostAsJsonAsync("/api/categories/move", new { path = "Food", newPath = "Eating Out" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = (await resp.Content.ReadFromJsonAsync<CategoryRestructureResult>())!;
@@ -98,9 +98,9 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
     {
         var food = await Cat("Food");
 
-        (await _client.PostAsJsonAsync($"/api/categories/{food.Id}/move", new { newPath = "Food/Inside" })).StatusCode
+        (await _client.PostAsJsonAsync("/api/categories/move", new { path = "Food", newPath = "Food/Inside" })).StatusCode
             .Should().Be(HttpStatusCode.BadRequest);
-        (await _client.PostAsJsonAsync($"/api/categories/{Guid.NewGuid()}/move", new { newPath = "X" })).StatusCode
+        (await _client.PostAsJsonAsync("/api/categories/move", new { path = "Nope", newPath = "X" })).StatusCode
             .Should().Be(HttpStatusCode.NotFound);
     }
 }

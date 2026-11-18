@@ -41,7 +41,7 @@ public sealed class CategoryRestructureServiceTests
         var food = await AddAsync("Food");
         await AddAsync("Food/Dining");
 
-        var plan = await Service().PlanAsync(food.Id, "Meals");
+        var plan = await Service().PlanAsync("Food", "Meals");
 
         plan.Merges.Should().BeEmpty();
         plan.Moves.Select(m => (m.OldPath, m.NewPath)).Should().BeEquivalentTo(
@@ -50,12 +50,24 @@ public sealed class CategoryRestructureServiceTests
     }
 
     [Fact]
+    public async Task A_parent_that_only_exists_implicitly_can_be_renamed()
+    {
+        await AddAsync("Food/Dining");
+        await AddAsync("Food/Groceries");
+
+        var plan = await Service().PlanAsync("Food", "Meals");
+
+        plan.Moves.Select(m => m.NewPath).Should().BeEquivalentTo(["Meals/Dining", "Meals/Groceries"]);
+        plan.Moves.Should().OnlyContain(m => m.ParentId == null);
+    }
+
+    [Fact]
     public async Task Moving_under_another_parent_relinks_the_parent()
     {
         var dining = await AddAsync("Food/Dining");
         var life = await AddAsync("Life");
 
-        var plan = await Service().PlanAsync(dining.Id, "Life/Dining");
+        var plan = await Service().PlanAsync("Food/Dining", "Life/Dining");
 
         var move = plan.Moves.Single();
         move.NewPath.Should().Be("Life/Dining");
@@ -71,7 +83,7 @@ public sealed class CategoryRestructureServiceTests
         var diningTarget = await AddAsync("Eating Out/Dining");
         await AddAsync("Food/Snacks");
 
-        var plan = await Service().PlanAsync(food.Id, "Eating Out");
+        var plan = await Service().PlanAsync("Food", "Eating Out");
 
         plan.Merges.Select(m => (m.OldPath, m.TargetPath)).Should().BeEquivalentTo(
             [("Food", "Eating Out"), ("Food/Dining", "Eating Out/Dining")]);
@@ -85,9 +97,9 @@ public sealed class CategoryRestructureServiceTests
     {
         var food = await AddAsync("Food");
 
-        await FluentActions.Awaiting(() => Service().PlanAsync(food.Id, "Food/Sub/Deeper")).Should().ThrowAsync<ArgumentException>();
-        await FluentActions.Awaiting(() => Service().PlanAsync(food.Id, "Food")).Should().ThrowAsync<ArgumentException>();
-        await FluentActions.Awaiting(() => Service().PlanAsync(food.Id, " / ")).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Food", "Food/Sub/Deeper")).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Food", "Food")).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Food", " / ")).Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -96,9 +108,9 @@ public sealed class CategoryRestructureServiceTests
         var sys = await AddAsync("Transfer", system: true);
         var mine = await AddAsync("Misc");
 
-        await FluentActions.Awaiting(() => Service().PlanAsync(sys.Id, "Other")).Should().ThrowAsync<InvalidOperationException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Transfer", "Other")).Should().ThrowAsync<InvalidOperationException>();
 
-        var plan = await Service().PlanAsync(mine.Id, "Transfer");
+        var plan = await Service().PlanAsync("Misc", "Transfer");
         plan.Merges.Should().ContainSingle(m => m.TargetId == sys.Id);
     }
 
@@ -107,11 +119,11 @@ public sealed class CategoryRestructureServiceTests
     {
         var food = await AddAsync("Food");
 
-        var preview = await Service().MoveAsync(food.Id, "Meals", dryRun: true);
+        var preview = await Service().MoveAsync("Food", "Meals", dryRun: true);
         _store.Applied.Should().BeNull();
         preview.Moved.Should().Be(1);
 
-        var result = await Service().MoveAsync(food.Id, "Meals", dryRun: false);
+        var result = await Service().MoveAsync("Food", "Meals", dryRun: false);
         _store.Applied.Should().NotBeNull();
         result.TransactionsAffected.Should().Be(7);
     }
@@ -119,6 +131,6 @@ public sealed class CategoryRestructureServiceTests
     [Fact]
     public async Task Unknown_category_is_not_found()
     {
-        await FluentActions.Awaiting(() => Service().PlanAsync(Guid.NewGuid(), "X")).Should().ThrowAsync<KeyNotFoundException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Nope", "X")).Should().ThrowAsync<KeyNotFoundException>();
     }
 }
