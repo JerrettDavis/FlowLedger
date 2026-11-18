@@ -418,6 +418,14 @@ else if (_result is not null)
 
         try
         {
+            if (categoryId == Guid.Empty)
+            {
+                var created = await ApiClient.CreateCategoryAsync(path);
+                _categories!.Add(created);
+                categoryId = created.Id;
+                path = created.Path;
+            }
+
             var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all);
             Snackbar.Add(all ? $"Moved {changed} transaction(s) to {path}; future “{name}” transactions will follow" : $"Moved to {path}", Severity.Success);
             await LoadAsync();

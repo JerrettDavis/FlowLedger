@@ -459,6 +459,22 @@ public sealed class FlowLedgerApiClient
         return result ?? [];
     }
 
+    /// <summary>Creates a category at <paramref name="path"/> (e.g. "Food/Takeout") and returns it.</summary>
+    public async Task<CategoryDto> CreateCategoryAsync(string path, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("create category", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/categories",
+                new { path, displayName = path.Split('/').Last(), parentId = (Guid?)null }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException($"Couldn't create category (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return (await response.Content.ReadFromJsonAsync<CategoryDto>(JsonOptions, ct))!;
+        });
+    }
+
     // ── Recurring Flows ───────────────────────────────────────────────────────
 
     public async Task<List<RecurringFlowDto>> GetRecurringFlowsAsync(CancellationToken ct = default)

@@ -7,7 +7,7 @@
             <strong>@Merchant</strong> · currently <em>@CurrentCategory</em>
         </MudText>
         <MudAutocomplete T="CategoryDto" Label="New category" @bind-Value="_selected" SearchFunc="SearchAsync"
-                         ToStringFunc="@(c => c?.Path ?? "")" AutoFocus="true" CoerceText="false" ResetValueOnEmptyText="true"
+                         ToStringFunc="@(c => c?.Path ?? "")" HelperText="Type a new name (use Parent/Child for sub-categories) to create it" AutoFocus="true" CoerceText="false" ResetValueOnEmptyText="true"
                          Clearable="true" Class="mb-3" />
         <MudRadioGroup T="bool" @bind-Value="_applyToAll">
             <MudRadio T="bool" Value="false" Color="Color.Primary">Just this transaction</MudRadio>
@@ -34,10 +34,20 @@
     protected override void OnInitialized() =>
         _selected = Categories.FirstOrDefault(c => string.Equals(c.Path, CurrentCategory, StringComparison.OrdinalIgnoreCase));
 
-    private Task<IEnumerable<CategoryDto>> SearchAsync(string? text, CancellationToken ct) =>
-        Task.FromResult<IEnumerable<CategoryDto>>(Categories
+    private Task<IEnumerable<CategoryDto>> SearchAsync(string? text, CancellationToken ct)
+    {
+        var matches = Categories
             .Where(c => string.IsNullOrWhiteSpace(text) || c.Path.Contains(text, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(c => c.Path).Take(50).ToList());
+            .OrderBy(c => c.Path).Take(50).ToList();
+        var typed = (text ?? "").Trim().Trim('/');
+        if (typed.Length is > 0 and <= 200 && !Categories.Any(c => string.Equals(c.Path, typed, StringComparison.OrdinalIgnoreCase)))
+        {
+            // Id.Empty marks a category that doesn't exist yet; the page creates it before recategorizing.
+            matches.Insert(0, new CategoryDto(Guid.Empty, typed, typed.Split('/').Last(), false, null));
+        }
+
+        return Task.FromResult<IEnumerable<CategoryDto>>(matches);
+    }
 
     private void Cancel() => MudDialog.Cancel();
 
