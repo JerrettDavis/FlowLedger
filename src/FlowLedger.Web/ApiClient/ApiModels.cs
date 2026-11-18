@@ -236,7 +236,7 @@ public sealed record ProviderUsageDto(
 
 public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, ProviderUsageDto ProviderUsage);
 
-public sealed record AskQueryAnswer(string Question, string? Query, string? Error, int Attempts);
+public sealed record AskQueryAnswer(string Question, string? Query, string? Error, int Attempts, string? Note = null);
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0);
 

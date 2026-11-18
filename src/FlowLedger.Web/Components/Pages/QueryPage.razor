@@ -322,9 +322,9 @@
             }
 
             await SetQueryAsync(answer.Query);
-            _askNote = answer.Error is null
-                ? "Written by your local AI model from your question. Check the query below, edit it, and save it if useful."
-                : answer.Error;
+            _askNote = answer.Error
+                ?? answer.Note
+                ?? "Written by your local AI model from your question. Check the query below, edit it, and save it if useful.";
             await RunAsync();
         }
         catch (ApiClientException ex)

@@ -54,22 +54,28 @@ public static class ForecastBands
         return new SpendingProfile(Math.Round(mean, 2), Math.Round((decimal)Math.Sqrt(variance), 2), weeks.Length);
     }
 
+    /// <param name="startingTotal">Combined starting balance, used before the first scheduled event (or when none exist).</param>
+    /// <param name="horizonEnd">The last day to cover, so bands exist even when no flow is scheduled.</param>
     public static IReadOnlyList<ForecastBandPoint> Compute(
-        IReadOnlyList<AggregateForecastPoint> aggregate, DateOnly asOf, SpendingProfile profile)
+        IReadOnlyList<AggregateForecastPoint> aggregate, DateOnly asOf, DateOnly horizonEnd, decimal startingTotal, SpendingProfile profile)
     {
-        if (profile.Weeks < MinWeeks || aggregate.Count == 0)
+        if (profile.Weeks < MinWeeks)
         {
             return [];
         }
 
-        var points = new List<ForecastBandPoint>(aggregate.Count);
-        foreach (var p in aggregate)
+        // Event-stepped scheduled balance, plus the horizon's own start and end so the range always reaches the edge.
+        var steps = aggregate.OrderBy(a => a.Date).ToList();
+        var dates = steps.Select(a => a.Date).Append(asOf).Append(horizonEnd).Where(d => d >= asOf && d <= horizonEnd).Distinct().OrderBy(d => d);
+        var points = new List<ForecastBandPoint>();
+        foreach (var date in dates)
         {
-            var days = Math.Max(0, p.Date.DayNumber - asOf.DayNumber);
+            var balance = steps.LastOrDefault(a => a.Date <= date)?.Balance.Amount ?? startingTotal;
+            var days = date.DayNumber - asOf.DayNumber;
             var weeksAhead = days / 7.0;
-            var expected = p.Balance.Amount - profile.MeanWeekly * (decimal)weeksAhead;
+            var expected = balance - profile.MeanWeekly * (decimal)weeksAhead;
             var spread = (decimal)(Z80 * (double)profile.StdWeekly * Math.Sqrt(weeksAhead));
-            points.Add(new ForecastBandPoint(p.Date, Math.Round(expected, 2), Math.Round(expected - spread, 2), Math.Round(expected + spread, 2)));
+            points.Add(new ForecastBandPoint(date, Math.Round(expected, 2), Math.Round(expected - spread, 2), Math.Round(expected + spread, 2)));
         }
 
         return points;

@@ -50,14 +50,14 @@ public sealed class AskQueryTests
     [Fact]
     public async Task Valid_query_is_returned_after_one_attempt_and_fences_are_stripped()
     {
-        var reply = "<think>hmm</think>\n" + Fence + "\ntransactions | where direction == \"Debit\" | summarize total = sum(amount)\n" + Fence;
+        var reply = "<think>hmm</think>\n" + Fence + "\ntransactions | summarize total = sum(amount)\n" + Fence;
         var t = new ScriptedTranslator(reply);
 
         var r = await Handler(t).HandleAsync("how much have I spent?");
 
         r.Error.Should().BeNull();
         r.Attempts.Should().Be(1);
-        r.Query.Should().Be("transactions | where direction == \"Debit\" | summarize total = sum(amount)");
+        r.Query.Should().Be("transactions | summarize total = sum(amount)");
     }
 
     [Fact]
@@ -83,6 +83,45 @@ public sealed class AskQueryTests
         r.Query.Should().NotBeNull();
         r.Error.Should().Contain("rephras");
         r.Attempts.Should().Be(AskQueryHandler.MaxAttempts);
+    }
+
+    [Fact]
+    public async Task Filter_that_matches_nothing_gets_one_repair_turn_then_a_visible_note()
+    {
+        var t = new ScriptedTranslator("transactions | where category == \"Nope\" | count", "transactions | where category contains \"nope\" | count");
+
+        var r = await Handler(t).HandleAsync("how many?");
+
+        r.Error.Should().BeNull();
+        r.Note.Should().Contain("matched no rows");
+        t.Seen.Should().HaveCount(2);
+        t.Seen[1].Last().Content.Should().Contain("matched no rows");
+    }
+
+    [Fact]
+    public async Task Unfiltered_empty_result_is_a_normal_answer()
+    {
+        var t = new ScriptedTranslator("transactions | count");
+
+        var r = await Handler(t).HandleAsync("how many?");
+
+        r.Note.Should().BeNull();
+        r.Attempts.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Slow_model_is_reported_as_loading_not_unreachable()
+    {
+        var r = await Handler(new SlowTranslator()).HandleAsync("anything");
+
+        r.Query.Should().BeNull();
+        r.Error.Should().Contain("loading");
+    }
+
+    private sealed class SlowTranslator : IQueryTranslator
+    {
+        public Task<string> CompleteAsync(string system, IReadOnlyList<(string Role, string Content)> conversation, CancellationToken ct = default)
+            => throw new TaskCanceledException("timed out");
     }
 
     [Fact]

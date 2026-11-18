@@ -160,10 +160,25 @@ public sealed class GetForecastHandler
                 .Select(x => BillSheet.RecurringDetector.Key(x!))
                 .Where(k => k.Length >= 4).Distinct().ToList();
 
+            var debitFlows = activeFlows.Where(f => f.Direction == Domain.Aggregates.TransactionDirection.Debit).ToList();
+
             bool Scheduled(Transactions.TransactionDto t)
             {
                 var k = BillSheet.RecurringDetector.Key(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName);
-                return k.Length >= 4 && flowKeys.Any(f => k.Contains(f) || f.Contains(k));
+                if (k.Length >= 4 && flowKeys.Any(f => k.Contains(f) || f.Contains(k)))
+                {
+                    return true;
+                }
+
+                // Bank descriptors rarely match a flow's name ("AEP" vs "AMER ELECT PWR"), so also treat a charge on the same
+                // account near a monthly flow's billing day, at a similar amount, as that flow. Otherwise the bill would be
+                // projected by the schedule AND counted again as everyday spending.
+                var day = (t.PostedDate ?? t.EffectiveDate).Day;
+                return debitFlows.Any(f => f.AccountId.Value == t.AccountId
+                    && f.Pattern.DayOfMonth is { } dom
+                    && Math.Abs(dom - day) <= 3
+                    && f.Amount.Amount > 0
+                    && Math.Abs(t.Amount - f.Amount.Amount) <= f.Amount.Amount * 0.4m);
             }
 
             var unscheduled = dtos
@@ -171,7 +186,8 @@ public sealed class GetForecastHandler
                 .Select(t => (t.PostedDate ?? t.EffectiveDate, t.Amount));
             var profile = ForecastBands.BuildProfile(unscheduled, query.AsOf);
             result.SpendingProfile = profile;
-            result.Bands = ForecastBands.Compute(result.AggregateSeries, query.AsOf, profile);
+            result.Bands = ForecastBands.Compute(
+                result.AggregateSeries, query.AsOf, horizonEnd, startingBalances.Values.Sum(m => m.Amount), profile);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
