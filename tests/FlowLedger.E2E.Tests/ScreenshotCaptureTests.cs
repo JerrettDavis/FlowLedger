@@ -28,6 +28,7 @@ using Microsoft.Playwright;
 ///   Light mode: &lt;page&gt;.png          (e.g. dashboard.png)
 ///   Dark mode:  &lt;page&gt;-dark.png     (e.g. dashboard-dark.png)
 /// </summary>
+[Collection("E2E Collection")] // shares the stack with the other E2E classes; running in parallel collides on /api/sync (409)
 [Trait("Category", "Screenshots")]
 public class ScreenshotCaptureTests : E2ETestBase
 {
