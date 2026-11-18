@@ -35,6 +35,18 @@ B2_ACCOUNT_ID=<key id>
 B2_ACCOUNT_KEY=<application key>
 ```
 
+Under Aspire (local dev / the AppHost), set the same values once as AppHost user-secrets and they are forwarded to the Api and Worker:
+
+```
+dotnet user-secrets set "Backup:Restic:Repository"   "b2:YOUR-BUCKET:flowledger" --project src/FlowLedger.AppHost
+dotnet user-secrets set "Backup:Restic:PasswordFile" "C:\secrets\flowledger-restic.pw" --project src/FlowLedger.AppHost
+dotnet user-secrets set "Backup:B2:AccountId"  "<key id>" --project src/FlowLedger.AppHost
+dotnet user-secrets set "Backup:B2:AccountKey" "<application key>" --project src/FlowLedger.AppHost
+```
+
+Use a B2 application key scoped to one bucket and a `flowledger/` prefix, separate from any other project's key, so a leaked
+key can only touch these backups. Keep the repository password in your password manager: without it the copies are unreadable.
+
 The repository is initialised automatically on first use. Other restic backends (S3, sftp, a NAS path) work the same way.
 With `Backup__Restic__Repository` unset the UI shows "No off-site backup configured" and, in production, a red warning chip.
 
