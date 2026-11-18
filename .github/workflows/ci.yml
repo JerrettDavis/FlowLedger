@@ -49,6 +49,21 @@ jobs:
           path: artifacts/tests/**/*.trx
           reporter: dotnet-trx
 
+      # Informational only: renders a line/branch coverage table in the job summary. It never fails the build.
+      # To gate later, measure the current baseline from this summary and add a threshold check just below it,
+      # so the gate only catches regressions.
+      - name: Coverage summary
+        if: always()
+        continue-on-error: true
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.4.4
+          reportgenerator \
+            "-reports:artifacts/tests/**/coverage.cobertura.xml" \
+            "-targetdir:artifacts/coverage-report" \
+            "-reporttypes:MarkdownSummaryGithub" \
+            "-assemblyfilters:+FlowLedger.*;-*.Tests"
+          cat artifacts/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v7
