@@ -140,6 +140,15 @@ public sealed class ForecastResult
 
     /// <summary>Goal affordability outcomes.</summary>
     public required IReadOnlyList<GoalAffordabilityResult> GoalOutcomes { get; init; }
+
+    /// <summary>
+    /// Expected balance with an 80% range once everyday (unscheduled) spending is accounted for. Empty when there is too little
+    /// history. Layered on afterwards by the handler; the deterministic series above is never altered.
+    /// </summary>
+    public IReadOnlyList<ForecastBandPoint> Bands { get; set; } = [];
+
+    /// <summary>The typical unscheduled weekly spend the bands are based on.</summary>
+    public SpendingProfile SpendingProfile { get; set; } = SpendingProfile.None;
 }
 
 /// <summary>The complete balance projection for a single account.</summary>

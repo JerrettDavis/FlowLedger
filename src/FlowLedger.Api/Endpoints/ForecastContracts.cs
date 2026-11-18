@@ -31,6 +31,18 @@ internal sealed class ForecastResponse
     public required AggregateLowWaterMarkResponse AggregateLowWaterMark { get; init; }
     public required IReadOnlyList<OverdraftWarningResponse> OverdraftWarnings { get; init; }
     public required IReadOnlyList<GoalAffordabilityResponse> GoalOutcomes { get; init; }
+    public IReadOnlyList<ForecastBandPointResponse> Bands { get; init; } = [];
+    public decimal TypicalWeeklySpend { get; init; }
+    public decimal WeeklySpendStdDev { get; init; }
+    public int SpendHistoryWeeks { get; init; }
+}
+
+internal sealed class ForecastBandPointResponse
+{
+    public required DateOnly Date { get; init; }
+    public required decimal Expected { get; init; }
+    public required decimal Low { get; init; }
+    public required decimal High { get; init; }
 }
 
 internal sealed class AccountForecastSeriesResponse
@@ -109,6 +121,10 @@ internal static class ForecastResponseMapper
     public static ForecastResponse ToResponse(this ForecastResult result) => new()
     {
         ForecastRunId = result.ForecastRunId,
+        Bands = result.Bands.Select(b => new ForecastBandPointResponse { Date = b.Date, Expected = b.Expected, Low = b.Low, High = b.High }).ToList(),
+        TypicalWeeklySpend = result.SpendingProfile.MeanWeekly,
+        WeeklySpendStdDev = result.SpendingProfile.StdWeekly,
+        SpendHistoryWeeks = result.SpendingProfile.Weeks,
         AsOf = result.AsOf,
         HorizonStart = result.Horizon.Start,
         // Horizon.End is nullable on the domain range, but the forecast handler always
