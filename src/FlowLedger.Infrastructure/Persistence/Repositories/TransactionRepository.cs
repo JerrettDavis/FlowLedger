@@ -23,7 +23,7 @@ internal sealed class TransactionRepository : ITransactionRepository
         int take = 100,
         CancellationToken ct = default)
     {
-        var query = _db.Transactions.AsQueryable();
+        var query = _db.Transactions.AsNoTracking();
 
         if (accountId.HasValue)
         {
@@ -45,6 +45,18 @@ internal sealed class TransactionRepository : ITransactionRepository
             .ThenByDescending(t => t.CreatedAt)
             .Skip(skip)
             .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Transaction>> ListForAccountsAsync(
+        IReadOnlyCollection<AccountId> accountIds, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var ids = accountIds.ToList();
+        return await _db.Transactions.AsNoTracking()
+            .Where(t => ids.Contains(EF.Property<AccountId>(t, "AccountId")))
+            .Where(t => t.EffectiveDate >= from && t.EffectiveDate <= to)
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenByDescending(t => t.CreatedAt)
             .ToListAsync(ct);
     }
 

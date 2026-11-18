@@ -13,6 +13,23 @@ public interface ICategorizationStore
     Task<IReadOnlyList<Transaction>> LoadTrackedAsync(int max, CancellationToken ct = default);
 
     Task SaveAsync(CancellationToken ct = default);
+
+    /// <summary>One tracked transaction by id (null when absent). Default falls back to a full load for simple stores.</summary>
+    async Task<Transaction?> FindTrackedAsync(Guid id, CancellationToken ct = default)
+        => (await LoadTrackedAsync(50_000, ct)).FirstOrDefault(t => t.Id == id);
+
+    /// <summary>Tracked real transactions that are uncategorized or auto-categorized (callers still filter precisely).</summary>
+    async Task<IReadOnlyList<Transaction>> LoadTrackedUncategorizedOrAutoAsync(int max, CancellationToken ct = default)
+        => await LoadTrackedAsync(max, ct);
+
+    /// <summary>Tracked transactions whose category was set automatically.</summary>
+    async Task<IReadOnlyList<Transaction>> LoadTrackedAutoCategorizedAsync(int max, CancellationToken ct = default)
+        => await LoadTrackedAsync(max, ct);
+
+    /// <summary>True when some real (not Planned/Skipped) transaction has no category.</summary>
+    async Task<bool> AnyUncategorizedAsync(CancellationToken ct = default)
+        => (await LoadTrackedAsync(50_000, ct)).Any(t => t.CategoryId is null
+            && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped);
 }
 
 public sealed record CategorizationResult(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized);
@@ -35,6 +52,11 @@ public sealed class CategorizationService(
 
     public async Task<CategorizationResult> RunAsync(CancellationToken ct = default)
     {
+        if (!await store.AnyUncategorizedAsync(ct))
+        {
+            return new CategorizationResult(0, 0, 0, 0, 0);
+        }
+
         var txs = await store.LoadTrackedAsync(Max, ct);
         var real = txs.Where(t => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped).ToList();
         var uncategorized = real.Where(t => t.CategoryId is null).ToList();
@@ -104,8 +126,7 @@ public sealed class CategorizationService(
     /// </summary>
     public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
     {
-        var txs = await store.LoadTrackedAsync(Max, ct);
-        var target = txs.FirstOrDefault(t => t.Id == transactionId)
+        var target = await store.FindTrackedAsync(transactionId, ct)
             ?? throw new KeyNotFoundException("Transaction not found.");
         // The id comes from the request body: it must be one of THIS tenant's categories (the repository is tenant-scoped).
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
@@ -117,7 +138,8 @@ public sealed class CategorizationService(
         if (applyToMerchant)
         {
             var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
-            foreach (var t in txs.Where(t => t.Id != target.Id
+            var candidates = await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct);
+            foreach (var t in candidates.Where(t => t.Id != target.Id
                          && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
                          && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped
                          && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key))
@@ -134,7 +156,7 @@ public sealed class CategorizationService(
     /// <summary>Clears every category the auto-categorizer set (manual categories are untouched) so it can be re-run with better rules.</summary>
     public async Task<int> ClearAutoCategoriesAsync(CancellationToken ct = default)
     {
-        var txs = await store.LoadTrackedAsync(Max, ct);
+        var txs = await store.LoadTrackedAutoCategorizedAsync(Max, ct);
         var cleared = txs.Count(t => t.ClearAutoCategory());
         await store.SaveAsync(ct);
         return cleared;

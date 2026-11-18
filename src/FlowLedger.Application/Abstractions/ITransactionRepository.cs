@@ -10,6 +10,14 @@ namespace FlowLedger.Application.Abstractions;
 public interface ITransactionRepository
 {
     Task<Transaction?> GetByIdAsync(TransactionId id, CancellationToken ct = default);
+    /// <summary>Transactions for any of the given accounts in a date window (account filter applied by the store).</summary>
+    async Task<IReadOnlyList<Transaction>> ListForAccountsAsync(
+        IReadOnlyCollection<AccountId> accountIds, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var ids = accountIds.ToHashSet();
+        return (await ListAsync(null, from, to, 0, int.MaxValue, ct)).Where(t => ids.Contains(t.AccountId)).ToList();
+    }
+
     Task<IReadOnlyList<Transaction>> ListAsync(
         AccountId? accountId = null,
         DateOnly? from = null,
