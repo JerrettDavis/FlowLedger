@@ -297,12 +297,11 @@ public sealed class ImportTransactionsHandler
         var absAmount = new Money(Math.Abs(rawAmount), new Currency("USD"));
 
         // Fingerprint
-        var normalizedDesc = NormalizeDescription(description);
-        var fingerprint = TransactionFingerprint.Create(
+        var fingerprint = TransactionFingerprint.FromRawDescription(
             accountId,
             date,
             absAmount.Amount,
-            normalizedDesc);
+            description);
 
         var tx = Transaction.RecordActual(
             tenantId,
@@ -395,16 +394,6 @@ public sealed class ImportTransactionsHandler
         }
 
         return true;
-    }
-
-    private static string NormalizeDescription(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return "UNKNOWN";
-        }
-
-        return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
     }
 }
 

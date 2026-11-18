@@ -36,5 +36,33 @@ public sealed record TransactionFingerprint
         return new TransactionFingerprint(raw);
     }
 
+    /// <summary>
+    /// Creates a fingerprint from a raw (un-normalised) description, normalising it with
+    /// <see cref="NormalizeDescription"/>. Shared by CSV import and provider sync so both dedupe identically.
+    /// </summary>
+    public static TransactionFingerprint FromRawDescription(
+        AccountId accountId,
+        DateOnly postedDate,
+        decimal amount,
+        string rawDescription,
+        string? providerTransactionId = null)
+        => Create(accountId, postedDate, amount, NormalizeDescription(rawDescription), providerTransactionId);
+
+    /// <summary>
+    /// Stable description normalisation for fingerprinting: trim, collapse every run of whitespace to a single
+    /// space, upper-case (invariant). Blank input becomes "UNKNOWN". Changing this changes every stored fingerprint.
+    /// </summary>
+    public static string NormalizeDescription(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "UNKNOWN";
+        }
+
+        return WhitespaceRun.Replace(raw.Trim(), " ").ToUpperInvariant();
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex WhitespaceRun = new(@"\s+");
+
     public override string ToString() => Value;
 }
