@@ -222,6 +222,10 @@ public static class DependencyInjection
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore(
             configuration.GetConnectionString("flowledger")
             ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddSingleton<FlowLedger.Application.Features.Budgets.IBudgetStore>(sp =>
+            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore>());
+        services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
+            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --
         services.AddSingleton(_ => FlowLedger.Infrastructure.DataSafety.BackupSettings.From(configuration));
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.BackupRunStore(

@@ -1,14 +1,13 @@
+using FlowLedger.Application.Features.Budgets;
 using Npgsql;
 
 namespace FlowLedger.Infrastructure.DataSafety;
-
-public sealed record BudgetRow(string Category, decimal MonthlyLimit);
 
 /// <summary>
 /// Per-tenant monthly category budgets. Created on first use (IF NOT EXISTS) like the other ad-hoc tables, so it needs no
 /// EF migration; it is included in every snapshot/backup/export. Category is the category PATH (e.g. "Food/Groceries").
 /// </summary>
-public sealed class NpgsqlBudgetStore
+public sealed class NpgsqlBudgetStore : IBudgetStore
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS budgets (

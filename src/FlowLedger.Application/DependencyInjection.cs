@@ -89,6 +89,11 @@ public static class DependencyInjection
         services.AddSingleton<IForecastEngine, ForecastEngine>();
         services.AddScoped<GetForecastHandler>();
 
+        // ── Handlers — Budgets & Alerts ───────────────────────────────────────────
+        services.AddScoped<FlowLedger.Application.Features.Budgets.GetMonthlySpendByCategoryHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Budgets.ListBudgetsHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Alerts.GetAlertsHandler>();
+
         // ── FluentValidation ─────────────────────────────────────────────────────
         services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);
 

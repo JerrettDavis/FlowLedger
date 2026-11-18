@@ -1,3 +1,4 @@
+using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Dashboard;
 using FlowLedger.Application.Features.Query;
 
@@ -48,8 +49,7 @@ internal static class DashboardEndpoints
             {
                 // Transfers between the user's own accounts are never spending or income.
                 var spending = await query.HandleAsync(
-                    "transactions | where direction == \"Debit\" and is_transfer == false and date >= startofmonth(today()) " +
-                    "| summarize total = sum(amount) by category | top 8 by total", ct);
+                    MonthlySpend.ByCategoryQuery + " | top 8 by total", ct);
                 var cashFlow = await query.HandleAsync(
                     "transactions | where date >= startofmonth(ago(5mo)) and is_transfer == false " +
                     "| summarize income = sumif(amount, direction == \"Credit\"), spending = sumif(amount, direction == \"Debit\") by month = startofmonth(date)", ct);

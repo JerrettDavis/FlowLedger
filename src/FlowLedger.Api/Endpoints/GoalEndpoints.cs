@@ -1,6 +1,6 @@
 using FlowLedger.Application.Features.Goals;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.SharedKernel;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;
@@ -8,8 +8,6 @@ namespace FlowLedger.Api.Endpoints;
 /// <summary>Savings goals with progress and the monthly amount needed to hit the target date.</summary>
 internal static class GoalEndpoints
 {
-    internal sealed record SaveGoalRequest(Guid? Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate);
-
     internal sealed record GoalStatus(
         Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete,
         DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete);
@@ -18,7 +16,7 @@ internal static class GoalEndpoints
     {
         var group = app.MapGroup("/api/goals").WithTags("Goals").RequireRateLimiting("api");
 
-        group.MapGet("/", async (NpgsqlGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapGet("/", async (IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var goals = (await store.ListAsync(tenant.TenantId, ct)).Select(g =>
@@ -33,12 +31,12 @@ internal static class GoalEndpoints
         .WithName("ListGoals")
         .WithSummary("Savings goals with progress");
 
-        group.MapPut("/", async ([FromBody] SaveGoalRequest r, NpgsqlGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapPut("/", async ([FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(r.Name) || r.Name.Length > 120 || r.TargetAmount <= 0 || r.TargetAmount > 1_000_000_000m
-                || r.SavedAmount < 0 || r.SavedAmount > 1_000_000_000m)
+            var validation = await validator.ValidateAsync(r, ct);
+            if (!validation.IsValid)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["goal"] = ["A name, a positive target and a non-negative saved amount are required."] });
+                return Results.ValidationProblem(validation.ToDictionary());
             }
 
             var id = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, ct);
@@ -48,7 +46,7 @@ internal static class GoalEndpoints
         .WithSummary("Create or update a savings goal")
         .RequireRateLimiting("write");
 
-        group.MapDelete("/{id:guid}", async (Guid id, NpgsqlGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
         {
             await store.RemoveAsync(tenant.TenantId, id, ct);
             return Results.NoContent();
