@@ -113,35 +113,15 @@ builder.Services.AddOptions<ApiOptions>()
     .ValidateOnStart();
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
-// Process-global fixed windows (self-host: single client). If multi-client is needed,
-// switch to GetPartition keyed by HttpContext.Connection.RemoteIpAddress.
+// Fixed windows partitioned per tenant (authenticated) or per remote IP (anonymous), so one user or one
+// noisy caller cannot exhaust everyone's budget. See RateLimitPartitions.
 builder.Services.AddRateLimiter(opts =>
 {
     opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    opts.AddFixedWindowLimiter("api", l =>
-    {
-        l.Window = TimeSpan.FromMinutes(1);
-        l.PermitLimit = 300;
-        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-        l.QueueLimit = 10;
-    });
-
-    opts.AddFixedWindowLimiter("write", l =>
-    {
-        l.Window = TimeSpan.FromMinutes(1);
-        l.PermitLimit = 60;
-        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-        l.QueueLimit = 5;
-    });
-
-    opts.AddFixedWindowLimiter("webhook", l =>
-    {
-        l.Window = TimeSpan.FromMinutes(1);
-        l.PermitLimit = 30;
-        l.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-        l.QueueLimit = 0; // No queue; reject immediately.
-    });
+    opts.AddFixedWindowPolicy("api", permitLimit: 300, queueLimit: 10);
+    opts.AddFixedWindowPolicy("write", permitLimit: 60, queueLimit: 5);
+    opts.AddFixedWindowPolicy("webhook", permitLimit: 30, queueLimit: 0); // No queue; reject immediately.
 });
 
 var app = builder.Build();
@@ -183,8 +163,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter(); // after authentication: partitions trust the tenant header only for valid API-key callers
 app.UseAuthorization();
 
 // ── Aspire health + liveness endpoints (anonymous, all environments) ─────────
