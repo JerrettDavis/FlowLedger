@@ -12,7 +12,6 @@ public sealed record SplitInput(decimal Amount, Guid? CategoryId, string? Notes)
 /// <summary>User annotations on a transaction: a free-text note and category splits (e.g. a $100 Target run = $70 Groceries + $30 Household).</summary>
 public sealed class TransactionAnnotationService(ICategorizationStore store, ICategoryRepository categories)
 {
-    private const int Max = 50_000;
     public const int MaxNoteLength = 1000;
 
     public async Task SetNoteAsync(Guid transactionId, string? note, CancellationToken ct = default)
@@ -80,6 +79,6 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
     }
 
     private async Task<Transaction> FindAsync(Guid id, CancellationToken ct)
-        => (await store.LoadTrackedAsync(Max, ct)).FirstOrDefault(t => t.Id == id)
+        => await store.FindTrackedAsync(id, ct)
            ?? throw new KeyNotFoundException("Transaction not found.");
 }
