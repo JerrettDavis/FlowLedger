@@ -19,7 +19,7 @@ public interface ICategoryMaintenanceStore
 }
 
 /// <summary>
-/// Wholesale category rename / move / merge as ONE operation: "make category X (and everything under it) live at path P".
+/// Wholesale category rename / move / merge as ONE operation: "make path X (and everything under it) live at path P".
 /// If P is free the subtree is renamed/moved; wherever a path in the target already exists the source node is merged into it
 /// (its transactions, splits, recurring flows, rules and budgets follow). System categories can't be moved or renamed away.
 /// </summary>
@@ -33,11 +33,15 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
         return string.Join('/', segments);
     }
 
-    /// <summary>Computes what moving <paramref name="id"/> to <paramref name="newPath"/> would do, without changing anything.</summary>
-    public async Task<CategoryRestructurePlan> PlanAsync(Guid id, string newPath, CancellationToken ct = default)
+    /// <summary>
+    /// Computes what moving <paramref name="oldPathInput"/> (a category and/or everything under that path prefix) to
+    /// <paramref name="newPath"/> would do, without changing anything. A parent that only exists implicitly
+    /// ("Food" when only "Food/Dining" has a row) can be moved too.
+    /// </summary>
+    public async Task<CategoryRestructurePlan> PlanAsync(string oldPathInput, string newPath, CancellationToken ct = default)
     {
         var all = await categories.ListAsync(ct);
-        var source = all.FirstOrDefault(c => c.Id == id) ?? throw new KeyNotFoundException("Category not found.");
+        var oldPath = NormalizePath(oldPathInput);
         var target = NormalizePath(newPath);
         if (target.Length == 0)
         {
@@ -49,8 +53,7 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
             throw new ArgumentException($"Category paths must be {MaxPathLength} characters or fewer.");
         }
 
-        var oldPath = source.Path.Value;
-        if (string.Equals(oldPath, target, StringComparison.OrdinalIgnoreCase) && oldPath == target)
+        if (oldPath == target)
         {
             throw new ArgumentException("That is already this category's path.");
         }
@@ -64,6 +67,11 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
             string.Equals(p, oldPath, StringComparison.OrdinalIgnoreCase) || p.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase);
 
         var subtree = all.Where(c => InSubtree(c.Path.Value)).OrderBy(c => c.Path.Value.Count(ch => ch == '/')).ToList();
+        if (subtree.Count == 0)
+        {
+            throw new KeyNotFoundException("Category not found.");
+        }
+
         if (subtree.Any(c => c.IsSystem))
         {
             throw new InvalidOperationException("System categories (or categories containing them) can't be moved or renamed.");
@@ -87,7 +95,7 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
 
             var oldLast = node.Path.Value.Split('/').Last();
             var newLast = newNodePath.Split('/').Last();
-            var display = string.Equals(node.DisplayName, oldLast, StringComparison.OrdinalIgnoreCase) || node.Id == id
+            var display = string.Equals(node.DisplayName, oldLast, StringComparison.OrdinalIgnoreCase) || string.Equals(node.Path.Value, oldPath, StringComparison.OrdinalIgnoreCase)
                 ? newLast
                 : node.DisplayName;
             var slash = newNodePath.LastIndexOf('/');
@@ -99,9 +107,9 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
         return new CategoryRestructurePlan(moves, merges);
     }
 
-    public async Task<CategoryRestructureResult> MoveAsync(Guid id, string newPath, bool dryRun, CancellationToken ct = default)
+    public async Task<CategoryRestructureResult> MoveAsync(string oldPath, string newPath, bool dryRun, CancellationToken ct = default)
     {
-        var plan = await PlanAsync(id, newPath, ct);
+        var plan = await PlanAsync(oldPath, newPath, ct);
         var affected = dryRun ? 0 : await store.ApplyAsync(plan, ct);
         return new CategoryRestructureResult(plan.Moves.Count, plan.Merges.Count, affected, plan.Merges);
     }

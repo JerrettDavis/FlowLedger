@@ -24,15 +24,15 @@
 else
 {
     <MudPaper Class="pa-2" Outlined="true">
-        @foreach (var c in _categories)
+        @foreach (var node in Nodes())
         {
-            var cat = c;
-            var depth = cat.Path.Count(ch => ch == '/');
+            var path = node.Path;
+            var depth = path.Count(ch => ch == '/');
             <div class="d-flex justify-space-between align-center pa-1" style="padding-left:@(8 + depth * 24)px !important">
-                <MudText>@cat.Path.Split('/').Last()@(cat.IsSystem ? " (system)" : "")</MudText>
+                <MudText>@path.Split('/').Last()@(node.IsSystem ? " (system)" : "")</MudText>
                 <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.DriveFileRenameOutline"
-                           Disabled="@cat.IsSystem" OnClick="() => MoveAsync(cat)"
-                           aria-label="@($"Rename, move or merge {cat.Path}")">Rename / move / merge</MudButton>
+                           Disabled="@node.IsSystem" OnClick="() => MoveAsync(path)"
+                           aria-label="@($"Rename, move or merge {path}")">Rename / move / merge</MudButton>
             </div>
         }
     </MudPaper>
@@ -63,11 +63,25 @@ else
         }
     }
 
-    private async Task MoveAsync(FlowLedger.Web.ApiClient.CategoryDto cat)
+    // Every category plus its implied parents ("Food" when only "Food/Dining" exists), in tree order.
+    private IEnumerable<(string Path, bool IsSystem)> Nodes()
+    {
+        var system = _categories.Where(c => c.IsSystem).Select(c => c.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _categories.SelectMany(c =>
+            {
+                var segs = c.Path.Split('/');
+                return Enumerable.Range(1, segs.Length).Select(n => string.Join('/', segs.Take(n)));
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .Select(p => (p, system.Contains(p)));
+    }
+
+    private async Task MoveAsync(string path)
     {
         var dialog = await Dialogs.ShowAsync<MoveCategoryDialog>("Rename, move or merge", new DialogParameters<MoveCategoryDialog>
         {
-            { x => x.Category, cat },
+            { x => x.Path, path },
             { x => x.Categories, _categories },
         }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
@@ -78,7 +92,7 @@ else
 
         try
         {
-            var r = await ApiClient.MoveCategoryAsync(cat.Id, newPath, dryRun: false);
+            var r = await ApiClient.MoveCategoryAsync(path, newPath, dryRun: false);
             Snackbar.Add(r.Merged > 0
                 ? $"Merged {r.Merged} categor{(r.Merged == 1 ? "y" : "ies")} ({r.TransactionsAffected} transactions moved)"
                 : $"Moved {r.Moved} categor{(r.Moved == 1 ? "y" : "ies")} to {newPath}", Severity.Success);

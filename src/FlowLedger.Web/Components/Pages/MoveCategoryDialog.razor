@@ -6,7 +6,7 @@
     </TitleContent>
     <DialogContent>
         <MudText Typo="Typo.body2" Class="mb-3">
-            <strong>@Category.Path</strong> and everything under it will live at the new path.
+            <strong>@Path</strong> and everything under it will live at the new path.
             Pick an existing category to <strong>merge</strong> into it; type a new path to <strong>rename or move</strong>.
         </MudText>
         <MudAutocomplete T="string" Label="New path" Value="_newPath" ValueChanged="OnChanged" SearchFunc="SearchAsync"
@@ -40,7 +40,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    [Parameter, EditorRequired] public FlowLedger.Web.ApiClient.CategoryDto Category { get; set; } = default!;
+    [Parameter, EditorRequired] public string Path { get; set; } = "";
     [Parameter] public List<FlowLedger.Web.ApiClient.CategoryDto> Categories { get; set; } = [];
 
     private string? _newPath;
@@ -50,7 +50,7 @@
 
     private Task<IEnumerable<string>> SearchAsync(string? text, CancellationToken ct) =>
         Task.FromResult<IEnumerable<string>>(Categories.Select(c => c.Path)
-            .Where(p => p != Category.Path && !p.StartsWith(Category.Path + "/", StringComparison.OrdinalIgnoreCase)
+            .Where(p => p != Path && !p.StartsWith(Path + "/", StringComparison.OrdinalIgnoreCase)
                         && (string.IsNullOrWhiteSpace(text) || p.Contains(text, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(p => p).Take(30).ToList());
 
@@ -67,7 +67,7 @@
         var seq = ++_seq;
         try
         {
-            var result = await ApiClient.MoveCategoryAsync(Category.Id, value, dryRun: true);
+            var result = await ApiClient.MoveCategoryAsync(Path, value, dryRun: true);
             if (seq == _seq) _preview = result;
         }
         catch (Exception ex)

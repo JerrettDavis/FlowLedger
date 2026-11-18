@@ -7,7 +7,7 @@ namespace FlowLedger.Api.Endpoints;
 
 internal static class CategoryEndpoints
 {
-    internal sealed record MoveCategoryRequest(string NewPath, bool DryRun = false);
+    internal sealed record MoveCategoryRequest(string Path, string NewPath, bool DryRun = false);
 
     internal static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder app)
     {
@@ -46,15 +46,14 @@ internal static class CategoryEndpoints
         .WithSummary("Create a new category")
         .RequireRateLimiting("write");
 
-        group.MapPost("/{id:guid}/move", async (
-            Guid id,
+        group.MapPost("/move", async (
             [FromBody] MoveCategoryRequest request,
             CategoryRestructureService service,
             CancellationToken ct) =>
         {
             try
             {
-                return Results.Ok(await service.MoveAsync(id, request.NewPath, request.DryRun, ct));
+                return Results.Ok(await service.MoveAsync(request.Path, request.NewPath, request.DryRun, ct));
             }
             catch (KeyNotFoundException)
             {

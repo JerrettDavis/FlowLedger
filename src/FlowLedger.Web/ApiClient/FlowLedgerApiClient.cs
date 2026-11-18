@@ -475,12 +475,12 @@ public sealed class FlowLedgerApiClient
         });
     }
 
-    /// <summary>Renames/moves a category subtree to <paramref name="newPath"/>; existing paths there are merged into. <paramref name="dryRun"/> only previews.</summary>
-    public async Task<CategoryMoveResultDto> MoveCategoryAsync(Guid id, string newPath, bool dryRun, CancellationToken ct = default)
+    /// <summary>Renames/moves a category path (and everything under it) to <paramref name="newPath"/>; existing paths there are merged into. <paramref name="dryRun"/> only previews.</summary>
+    public async Task<CategoryMoveResultDto> MoveCategoryAsync(string path, string newPath, bool dryRun, CancellationToken ct = default)
     {
         return await ExecuteAsync("move category", async () =>
         {
-            var response = await _http.PostAsJsonAsync($"/api/categories/{id}/move", new { newPath, dryRun }, ct);
+            var response = await _http.PostAsJsonAsync("/api/categories/move", new { path, newPath, dryRun }, ct);
             if (!response.IsSuccessStatusCode)
             {
                 var detail = response.StatusCode == System.Net.HttpStatusCode.BadRequest ? await ReadValidationMessageAsync(response, ct) : null;
