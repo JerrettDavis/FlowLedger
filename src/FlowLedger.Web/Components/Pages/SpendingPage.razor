@@ -53,6 +53,11 @@
     <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
 }
 
+@if (_loading && _result is not null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" aria-label="Refreshing" />
+}
+
 @if (_loading && _result is null)
 {
     <CardSkeleton Height="320px" />
@@ -427,8 +432,17 @@ else if (_result is not null)
             }
 
             var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all);
-            Snackbar.Add(all ? $"Moved {changed} transaction(s) to {path}; future “{name}” transactions will follow" : $"Moved to {path}", Severity.Success);
+            // Show the new category immediately, then reload totals/charts/groups from the server.
+            if (_result is not null)
+            {
+                _result = _result with
+                {
+                    Transactions = _result.Transactions.Select(t => t.Id == tx.Id ? t with { Category = path } : t).ToList(),
+                };
+            }
+
             await LoadAsync();
+            Snackbar.Add(all ? $"Moved {changed} transaction(s) to {path}; future “{name}” transactions will follow" : $"Moved to {path}", Severity.Success);
         }
         catch (Exception ex)
         {
