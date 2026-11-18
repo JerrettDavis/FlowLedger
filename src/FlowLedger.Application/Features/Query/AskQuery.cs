@@ -13,7 +13,7 @@ public interface IQueryTranslator
 
 public sealed record AskQueryRequest(string Question);
 
-public sealed record AskQueryResult(string Question, string? Query, string? Error, int Attempts);
+public sealed record AskQueryResult(string Question, string? Query, string? Error, int Attempts, string? Note = null);
 
 /// <summary>Builds the model prompt and cleans the model's reply. Pure, so it is unit-tested without a model.</summary>
 public static class QueryPrompt
@@ -22,6 +22,8 @@ public static class QueryPrompt
         IReadOnlyList<DatasetInfo> datasets, IReadOnlyList<string> functions, IReadOnlyList<string> aggregates,
         IReadOnlyList<string> categories, IReadOnlyList<string> accounts, DateOnly today)
     {
+        var exampleCategory = categories.FirstOrDefault(c => c.Contains("Dining", StringComparison.OrdinalIgnoreCase))
+            ?? categories.FirstOrDefault() ?? "Groceries";
         var sb = new StringBuilder();
         sb.AppendLine("You translate questions about a person's finances into ONE query in a Kusto-style pipeline language.");
         sb.AppendLine("Reply with ONLY the query. No explanation, no markdown fences. Read-only: you cannot change data.");
@@ -45,6 +47,7 @@ public static class QueryPrompt
 
         sb.AppendLine();
         sb.AppendLine("Spending means direction == \"Debit\"; income means direction == \"Credit\". Amounts are positive numbers.");
+        sb.AppendLine("Filter merchants and categories with `contains` and a SHORT lowercase fragment (matching is case-insensitive), e.g. `merchant contains \"netflix\"` or `category contains \"dining\"`. Bank merchant names are messy (PAYPAL *NETFLIX.COM), so never use == for a merchant. Copy category names only from the list above; never invent a path.");
         sb.AppendLine("Exclude transfers between the person's own accounts from income/spending with is_transfer == false.");
         sb.AppendLine("After `summarize`, ONLY the group keys and the named aggregates exist as columns (date, amount, etc. are gone). Always name computed keys: `by month = month(date)`. Never `sort by` a function call; sort by a column name.");
         sb.AppendLine("As a pipeline operator, count takes NO parentheses: `| count`. `count()` is only an aggregate inside summarize. To count matching rows: `transactions | where ... | count`.");
@@ -60,8 +63,8 @@ public static class QueryPrompt
 
         sb.AppendLine();
         sb.AppendLine("Examples:");
-        sb.AppendLine("Q: How much did I spend on dining out last month?");
-        sb.AppendLine("transactions | where direction == \"Debit\" and category startswith \"Food/Dining\" and date >= startofmonth(ago(1mo)) and date < startofmonth(today()) | summarize total = sum(amount)");
+        sb.AppendLine("Q: How much did I spend on \"" + exampleCategory + "\" last month?");
+        sb.AppendLine("transactions | where direction == \"Debit\" and category contains \"" + exampleCategory + "\" and date >= startofmonth(ago(1mo)) and date < startofmonth(today()) | summarize total = sum(amount)");
         sb.AppendLine("Q: Top 10 merchants by spending in the last 90 days");
         sb.AppendLine("transactions | where direction == \"Debit\" and date >= ago(90d) | summarize total = sum(amount), n = count() by merchant | top 10 by total");
         sb.AppendLine("Q: Monthly spending trend this year");
@@ -121,6 +124,7 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
         var turns = new List<(string Role, string Content)> { ("user", question) };
         string? lastError = null;
         string? lastQuery = null;
+        string? emptyQuery = null;
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             string reply;
@@ -128,10 +132,12 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
             {
                 reply = await translator.CompleteAsync(system, turns, ct);
             }
-            catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException or InvalidOperationException) && !ct.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                return new AskQueryResult(question, null,
-                    "The local AI model isn't reachable. Make sure Ollama is running (ollama serve) and the configured model is installed.", attempt);
+                var slow = ex is TaskCanceledException or TimeoutException;
+                return new AskQueryResult(question, null, slow
+                    ? "The local AI model is still loading (the first question after it has been idle can take a couple of minutes). Try again shortly."
+                    : "The local AI model isn't reachable. Make sure Ollama is running (ollama serve) and the configured model is installed.", attempt);
             }
 
             var query = QueryPrompt.ExtractQuery(reply);
@@ -144,8 +150,25 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
             {
                 try
                 {
-                    QueryEngine.Execute(query, tables, today);   // parse + semantic check against the real data
-                    return new AskQueryResult(question, query, null, attempt);
+                    var result = QueryEngine.Execute(query, tables, today);   // parse + semantic check against the real data
+                    if (!IsEmpty(result) || !query.Contains('"'))
+                    {
+                        return new AskQueryResult(question, query, null, attempt);
+                    }
+
+                    // A filter that matches nothing is almost always a wrong category/merchant spelling, not a real "$0".
+                    if (emptyQuery is not null || attempt == MaxAttempts)
+                    {
+                        return new AskQueryResult(question, query, null, attempt,
+                            "That query matched no rows. Check the category or merchant spelling in the query, or rephrase the question.");
+                    }
+
+                    emptyQuery = query;
+                    lastError = "it matched no rows";
+                    turns.Add(("assistant", query));
+                    turns.Add(("user", "That query matched no rows, which usually means a filter value is wrong. "
+                        + "Use `contains` with a short fragment, and only category names from the list. Reply with a corrected query only."));
+                    continue;
                 }
                 catch (QueryException ex)
                 {
@@ -159,6 +182,10 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
 
         return new AskQueryResult(question, lastQuery, $"Couldn't turn that into a working query ({lastError}). Try rephrasing, or write it in the workbench.", MaxAttempts);
     }
+
+    private static bool IsEmpty(QueryResult r) =>
+        r.Rows.Count == 0
+        || (r.Rows.Count == 1 && r.Rows[0].All(v => v is null || (v is IConvertible c && v is not string && Convert.ToDecimal(c) == 0m)));
 
     private static List<string> Distinct(IReadOnlyDictionary<string, QueryTable> tables, string query, DateOnly today)
     {

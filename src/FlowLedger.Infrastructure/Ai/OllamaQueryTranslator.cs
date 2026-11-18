@@ -9,7 +9,11 @@ public sealed class OllamaOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "qwen3:8b";
-    public int TimeoutSeconds { get; set; } = 90;
+    /// <summary>Generous: the first question after the model was unloaded must wait for it to load into memory.</summary>
+    public int TimeoutSeconds { get; set; } = 240;
+
+    /// <summary>How long Ollama keeps the model loaded after a request.</summary>
+    public string KeepAlive { get; set; } = "30m";
 }
 
 /// <summary>Talks to a local Ollama server. Temperature 0 and thinking off so the same question yields the same query, fast.</summary>
@@ -19,7 +23,7 @@ public sealed class OllamaQueryTranslator(HttpClient http, OllamaOptions options
     {
         var messages = new List<ChatMessage> { new("system", system) };
         messages.AddRange(conversation.Select(t => new ChatMessage(t.Role, t.Content)));
-        var request = new ChatRequest(options.Model, messages, false, false, new ChatOptions(0));
+        var request = new ChatRequest(options.Model, messages, false, false, options.KeepAlive, new ChatOptions(0));
 
         using var response = await http.PostAsJsonAsync("api/chat", request, ct);
         response.EnsureSuccessStatusCode();
@@ -37,6 +41,7 @@ public sealed class OllamaQueryTranslator(HttpClient http, OllamaOptions options
         [property: JsonPropertyName("messages")] List<ChatMessage> Messages,
         [property: JsonPropertyName("stream")] bool Stream,
         [property: JsonPropertyName("think")] bool Think,
+        [property: JsonPropertyName("keep_alive")] string KeepAlive,
         [property: JsonPropertyName("options")] ChatOptions Options);
 
     private sealed record ChatResponse([property: JsonPropertyName("message")] ChatMessage? Message);

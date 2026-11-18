@@ -27,7 +27,7 @@ public sealed class ForecastBandsTests
         var profile = ForecastBands.BuildProfile(Weekly(100, 100, 100), AsOf);
 
         profile.Should().Be(SpendingProfile.None);
-        ForecastBands.Compute([Point(AsOf.AddDays(14), 1000)], AsOf, profile).Should().BeEmpty();
+        ForecastBands.Compute([Point(AsOf.AddDays(14), 1000)], AsOf, AsOf.AddDays(30), 1000m, profile).Should().BeEmpty();
     }
 
     [Fact]
@@ -35,14 +35,26 @@ public sealed class ForecastBandsTests
     {
         var profile = new SpendingProfile(150m, 50m, 20);
         var bands = ForecastBands.Compute(
-            [Point(AsOf.AddDays(7), 1000), Point(AsOf.AddDays(28), 1000)], AsOf, profile);
+            [Point(AsOf.AddDays(7), 1000), Point(AsOf.AddDays(28), 1000)], AsOf, AsOf.AddDays(28), 1000m, profile);
 
-        bands[0].Expected.Should().Be(850m);
-        bands[1].Expected.Should().Be(400m);
-        var w1 = bands[0].High - bands[0].Expected;
-        var w4 = bands[1].High - bands[1].Expected;
+        bands.Select(b => b.Date).Should().BeEquivalentTo([AsOf, AsOf.AddDays(7), AsOf.AddDays(28)], o => o.WithStrictOrdering());
+        bands[0].Expected.Should().Be(1000m);                    // today: no drift, no spread
+        bands[0].Low.Should().Be(1000m);
+        bands[1].Expected.Should().Be(850m);
+        bands[2].Expected.Should().Be(400m);
+        var w1 = bands[1].High - bands[1].Expected;
+        var w4 = bands[2].High - bands[2].Expected;
         (w4 / w1).Should().BeApproximately(2m, 0.01m);          // sqrt(4 weeks / 1 week)
-        bands[1].Low.Should().BeLessThan(bands[1].Expected);
+        bands[2].Low.Should().BeLessThan(bands[2].Expected);
+    }
+
+    [Fact]
+    public void With_no_scheduled_events_bands_still_cover_the_horizon_from_the_starting_balance()
+    {
+        var bands = ForecastBands.Compute([], AsOf, AsOf.AddDays(14), 2000m, new SpendingProfile(100m, 30m, 20));
+
+        bands.Select(b => b.Date).Should().Equal(AsOf, AsOf.AddDays(14));
+        bands[1].Expected.Should().Be(1800m);
     }
 
     [Fact]

@@ -180,7 +180,7 @@ else if (_forecast is not null)
                 <MudCardContent>
                     <MudText Typo="Typo.body2" Class="mb-2">
                         The schedule above only counts bills and income. You also spend about
-                        <strong class="fl-num">@Format.Money(_forecast.TypicalWeeklySpend)</strong> a week on everything else
+                        <strong class="fl-num">@Format.Money(_forecast.TypicalWeeklySpend)</strong> a week on everything else (including credit card payments)
                         (±<span class="fl-num">@Format.Money(_forecast.WeeklySpendStdDev)</span>, from the last @_forecast.SpendHistoryWeeks weeks).
                     </MudText>
                     <MudText Typo="Typo.body1">
