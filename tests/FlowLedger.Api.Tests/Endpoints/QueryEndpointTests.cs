@@ -32,6 +32,18 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     }
 
     [Fact]
+    public async Task Ask_with_a_blank_question_is_answered_without_calling_any_model()
+    {
+        var response = await _client.PostAsJsonAsync("/api/query/ask", new AskQueryRequest("   "));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<AskQueryResult>();
+        body!.Query.Should().BeNull();
+        body.Error.Should().NotBeNullOrWhiteSpace();
+        body.Attempts.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Run_returns_aggregated_rows_for_the_callers_data_only()
     {
         var mine = await Account(_client, "Mine");
