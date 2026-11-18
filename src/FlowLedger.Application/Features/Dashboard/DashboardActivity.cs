@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
 
 namespace FlowLedger.Application.Features.Dashboard;
@@ -41,7 +42,7 @@ public static class DashboardActivityAnalyzer
 
     public static DashboardActivityDto Analyze(
         IReadOnlyList<TransactionDto> all, DateOnly today, int listSize = 8, IReadOnlySet<Guid>? transferIds = null,
-        IReadOnlySet<Guid>? dismissedIds = null)
+        IReadOnlySet<Guid>? dismissedIds = null, IReadOnlyDictionary<Guid, string>? categoryPathById = null)
     {
         // Planned rows are forecast placeholders, never real activity.
         var real = all.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
@@ -68,7 +69,8 @@ public static class DashboardActivityAnalyzer
             .OrderByDescending(t => t.Amount).Take(listSize).ToList();
 
         var reviewable = dismissedIds is { Count: > 0 } ? inWindow.Where(t => !dismissedIds.Contains(t.Id)).ToList() : inWindow;
-        var suspicious = FindSuspicious(counted, reviewable, threshold, today, listSize);
+        var anomalies = AnomalyDetector.Detect(counted, reviewable, categoryPathById ?? new Dictionary<Guid, string>());
+        var suspicious = FindSuspicious(counted, reviewable, threshold, today, listSize, anomalies);
 
         return new DashboardActivityDto(
             recent, pending.Take(listSize * 2).ToList(), pending.Sum(Signed),
@@ -93,7 +95,8 @@ public static class DashboardActivityAnalyzer
         (string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName).Trim().ToUpperInvariant();
 
     private static IReadOnlyList<FlaggedTransactionDto> FindSuspicious(
-        List<TransactionDto> real, List<TransactionDto> candidates, decimal threshold, DateOnly today, int take)
+        List<TransactionDto> real, List<TransactionDto> candidates, decimal threshold, DateOnly today, int take,
+        IReadOnlyDictionary<Guid, List<string>> anomalies)
     {
         var historyStart = today.AddDays(-HistoryDays);
         var history = real.Where(t => (t.PostedDate ?? t.EffectiveDate) >= historyStart).ToList();
@@ -126,6 +129,13 @@ public static class DashboardActivityAnalyzer
                 reasons.Add("Large charge from a merchant not seen before");
             }
 
+            if (anomalies.TryGetValue(t.Id, out var extra))
+            {
+                // The legacy "× the usual amount" rule already covers a merchant outlier; don't double-report it.
+                var hasOutlier = reasons.Any(r => r.Contains("the usual amount"));
+                reasons.AddRange(extra.Where(r => !(hasOutlier && r.StartsWith(AnomalyDetector.MerchantOutlierPrefix))));
+            }
+
             if (reasons.Count > 0)
             {
                 flagged.Add(new FlaggedTransactionDto(t, reasons));
@@ -139,17 +149,21 @@ public static class DashboardActivityAnalyzer
 
 /// <summary>Loads recent history and runs the analyzer.</summary>
 public sealed class GetDashboardActivityHandler(
-    ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals)
+    ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals, ICategoryRepository categories)
 {
+    /// <summary>Anomaly rules (price increases, merchant/category outliers) need months of history; the 30/90-day panels slice from it.</summary>
+    private const int LoadDays = 365;
+
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var from = today.AddDays(-DashboardActivityAnalyzer.HistoryDays);
+        var from = today.AddDays(-LoadDays);
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, 5000, ct);
         var dtos = txs.Select(TransactionMapper.ToDto).ToList();
         var types = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
         return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types),
-            dismissedIds: await dismissals.ListIdsAsync(ct));
+            dismissedIds: await dismissals.ListIdsAsync(ct),
+            categoryPathById: (await categories.ListAsync(ct)).ToDictionary(c => c.Id, c => c.Path.Value));
     }
 }
 
