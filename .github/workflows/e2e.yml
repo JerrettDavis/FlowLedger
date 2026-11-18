@@ -13,6 +13,11 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci_test_password
+      API__KEY: ci-test-api-key-not-for-production
+      # The ephemeral CI stack has no identity provider.
+      AUTH__ALLOWANONYMOUS: "true"
 
     steps:
       - name: Checkout
@@ -31,11 +36,6 @@ jobs:
 
       - name: Start full stack
         run: docker compose --profile full up --build -d
-        env:
-          POSTGRES_PASSWORD: ci_test_password
-          API__KEY: ci-test-api-key-not-for-production
-          # Compose runs as Production; the ephemeral CI stack has no IdP, so opt out of the sign-in requirement.
-          AUTH__ALLOWANONYMOUS: "true"
 
       - name: Wait for API health
         run: |
