@@ -146,4 +146,25 @@ public sealed class SimpleFinProviderTests
         var acct = new SfAccount { Id = "x", Name = name, Org = new SfOrg { Name = org } };
         SimpleFinMapper.InferType(acct).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData("Chase Bank", "JDH Pro - J. DAVIS (9689)", "-45.60", "CREDIT_CARD")] // card named after the holder: only the sign gives it away
+    [InlineData("Chase Bank", "JDH Pro - J. DAVIS (9689)", "250.00", "CHECKING")]
+    [InlineData("Arvest Bank", "Everyday Checking", "-20.00", "CHECKING")] // an overdrawn account that says checking stays checking
+    [InlineData("Arvest Bank", "Premium Savings", "-5.00", "SAVINGS")]
+    [InlineData("Ameriprise Financial", "SPS ADVISOR (9133)", "-1.00", "INVESTMENT")]
+    public void Unlabelled_negative_balance_is_a_card_but_named_products_win(string org, string name, string balance, string expected)
+    {
+        var acct = new SfAccount { Id = "x", Name = name, Balance = balance, Org = new SfOrg { Name = org } };
+        SimpleFinMapper.InferType(acct).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Inferred_card_balance_is_stored_as_a_positive_amount_owed()
+    {
+        var acct = new SfAccount { Id = "x", Name = "J. DAVIS (9689)", Balance = "-45.60", Currency = "USD", Org = new SfOrg { Name = "Chase Bank" } };
+        var mapped = SimpleFinMapper.ToAccount(acct);
+        mapped.AccountType.Should().Be("CREDIT_CARD");
+        mapped.Balance.Amount.Should().Be(45.60m);
+    }
 }

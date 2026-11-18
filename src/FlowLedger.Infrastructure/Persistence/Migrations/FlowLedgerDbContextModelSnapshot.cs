@@ -17,7 +17,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -67,6 +67,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<bool>("TypeLockedByUser")
+                        .HasColumnType("boolean")
+                        .HasColumnName("type_locked_by_user");
 
                     b.HasKey("Id");
 

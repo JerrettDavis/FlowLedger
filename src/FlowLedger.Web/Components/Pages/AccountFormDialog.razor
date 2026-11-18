@@ -27,9 +27,17 @@
             }
             else
             {
-                <!-- Edit mode: name only -->
+                <!-- Edit mode: name and type. A type chosen here is pinned: provider sync will not overwrite it. -->
                 <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
                               aria-required="true" aria-label="Account name" Class="mb-3" />
+                <MudSelect @bind-Value="_accountType" Label="Account Type"
+                           HelperText="@TypeHelperText"
+                           aria-label="Account type" Class="mb-3">
+                    @foreach (var t in AccountTypes)
+                    {
+                        <MudSelectItem Value="@t">@t</MudSelectItem>
+                    }
+                </MudSelect>
             }
         </MudForm>
     </DialogContent>
@@ -70,6 +78,13 @@
         }
     }
 
+    private string TypeHelperText =>
+        Account is { TypeLockedByUser: true } ? "Set manually - sync will not change it."
+        : "Changing the type pins it so sync will not change it back.";
+
+    /// <summary>Outcome of the edit dialog: which parts (name, type) actually changed.</summary>
+    public sealed record AccountEditResult(string? NewName, string? NewType);
+
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
@@ -80,7 +95,9 @@
         object result = Account is null
             ? new FlowLedger.Web.ApiClient.CreateAccountRequest(
                 _name, _accountType, _startingBalance, _currency, _institution, null)
-            : new FlowLedger.Web.ApiClient.UpdateAccountRequest(_name);
+            : new AccountEditResult(
+                _name != Account.Name ? _name : null,
+                _accountType != Account.AccountType ? _accountType : null);
 
         MudDialog.Close(DialogResult.Ok(result));
     }

@@ -103,6 +103,46 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // ── Change type (manual override) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Put_type_changes_the_type_and_pins_it()
+    {
+        var created = await CreateAccount();
+
+        var response = await _client.PutAsJsonAsync(
+            $"/api/accounts/{created.Id}/type", new ChangeAccountTypeRequest("CreditCard"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await response.Content.ReadFromJsonAsync<AccountDto>();
+        dto!.AccountType.Should().Be("CreditCard");
+        dto.TypeLockedByUser.Should().BeTrue();
+
+        var fetched = await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{created.Id}");
+        fetched!.AccountType.Should().Be("CreditCard");
+        fetched.TypeLockedByUser.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Put_type_with_unknown_type_returns_400()
+    {
+        var created = await CreateAccount();
+
+        var response = await _client.PutAsJsonAsync(
+            $"/api/accounts/{created.Id}/type", new ChangeAccountTypeRequest("NotARealType"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Put_type_returns_404_for_missing_account()
+    {
+        var response = await _client.PutAsJsonAsync(
+            $"/api/accounts/{Guid.NewGuid()}/type", new ChangeAccountTypeRequest("Savings"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ── Delete ────────────────────────────────────────────────────────────────
 
     [Fact]
