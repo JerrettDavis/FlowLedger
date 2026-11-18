@@ -42,8 +42,12 @@ public static class AuthSetup
                 o.Cookie.Name = "flowledger.auth";
                 o.Cookie.HttpOnly = true;
                 o.Cookie.SameSite = SameSiteMode.Lax;
+                // Secure-only outside Development (remote access must go through a TLS proxy); plain-http localhost dev still works.
+                o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 o.ExpireTimeSpan = TimeSpan.FromDays(14);
                 o.SlidingExpiration = true;
+                // Re-check login -> tenant every few minutes so an unlinked/moved login loses the old tenant's data.
+                o.Events.OnValidatePrincipal = TenantMappingValidator.ValidateAsync;
             })
             .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, o =>
             {
@@ -107,6 +111,10 @@ public static class AuthSetup
                         {
                             id.AddClaim(new Claim(HouseholdAccess.Claim, "true"));
                         }
+
+                        // Just resolved: the first periodic mapping re-check is due one interval from now.
+                        ctx.Properties!.Items[TenantMappingValidator.CheckedItem] =
+                            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
                     },
                     OnRemoteFailure = ctx =>
                     {
