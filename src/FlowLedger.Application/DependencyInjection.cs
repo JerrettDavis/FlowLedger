@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRuleService>();
+        services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRestructureService>();
         services.AddScoped<TransactionAnnotationService>();
         services.AddScoped<FlowLedger.Application.Features.Investments.InvestmentPerformanceService>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();

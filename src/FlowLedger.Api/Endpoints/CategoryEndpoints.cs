@@ -7,6 +7,8 @@ namespace FlowLedger.Api.Endpoints;
 
 internal static class CategoryEndpoints
 {
+    internal sealed record MoveCategoryRequest(string NewPath, bool DryRun = false);
+
     internal static IEndpointRouteBuilder MapCategoryEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/categories").WithTags("Categories")
@@ -42,6 +44,29 @@ internal static class CategoryEndpoints
         })
         .WithName("CreateCategory")
         .WithSummary("Create a new category")
+        .RequireRateLimiting("write");
+
+        group.MapPost("/{id:guid}/move", async (
+            Guid id,
+            [FromBody] MoveCategoryRequest request,
+            CategoryRestructureService service,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.MoveAsync(id, request.NewPath, request.DryRun, ct));
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["category"] = [ex.Message] });
+            }
+        })
+        .WithName("MoveCategory")
+        .WithSummary("Rename/move a category and its subtree to a new path; where the path already exists the categories are merged. dryRun previews.")
         .RequireRateLimiting("write");
 
         group.MapPut("/{id:guid}", async (

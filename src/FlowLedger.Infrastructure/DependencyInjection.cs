@@ -217,6 +217,11 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 TenancySettings.Legacy(configuration)));
 
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryMaintenanceStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryRuleStore(
                 configuration.GetConnectionString("flowledger")

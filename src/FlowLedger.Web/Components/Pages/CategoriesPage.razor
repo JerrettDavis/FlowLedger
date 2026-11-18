@@ -1,0 +1,92 @@
+@page "/categories"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Categories — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Categories</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Rename or move a category (and everything under it), or merge it into another one. Transactions, splits, recurring flows,
+    rules and budgets all follow.
+</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3">@_error</MudAlert>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-2" Outlined="true">
+        @foreach (var c in _categories)
+        {
+            var cat = c;
+            var depth = cat.Path.Count(ch => ch == '/');
+            <div class="d-flex justify-space-between align-center pa-1" style="padding-left:@(8 + depth * 24)px !important">
+                <MudText>@cat.Path.Split('/').Last()@(cat.IsSystem ? " (system)" : "")</MudText>
+                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.DriveFileRenameOutline"
+                           Disabled="@cat.IsSystem" OnClick="() => MoveAsync(cat)"
+                           aria-label="@($"Rename, move or merge {cat.Path}")">Rename / move / merge</MudButton>
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _categories = (await ApiClient.GetCategoriesAsync()).OrderBy(c => c.Path, StringComparer.OrdinalIgnoreCase).ToList();
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task MoveAsync(FlowLedger.Web.ApiClient.CategoryDto cat)
+    {
+        var dialog = await Dialogs.ShowAsync<MoveCategoryDialog>("Rename, move or merge", new DialogParameters<MoveCategoryDialog>
+        {
+            { x => x.Category, cat },
+            { x => x.Categories, _categories },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not string newPath)
+        {
+            return;
+        }
+
+        try
+        {
+            var r = await ApiClient.MoveCategoryAsync(cat.Id, newPath, dryRun: false);
+            Snackbar.Add(r.Merged > 0
+                ? $"Merged {r.Merged} categor{(r.Merged == 1 ? "y" : "ies")} ({r.TransactionsAffected} transactions moved)"
+                : $"Moved {r.Moved} categor{(r.Moved == 1 ? "y" : "ies")} to {newPath}", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}
