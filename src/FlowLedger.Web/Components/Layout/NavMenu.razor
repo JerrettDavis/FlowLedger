@@ -48,10 +48,27 @@
 <MudNavLink Href="rules" Icon="@Icons.Material.Filled.Rule">
     Rules
 </MudNavLink>
-<MudNavLink Href="data" Icon="@Icons.Material.Filled.Shield">
-    Data &amp; Backups
-</MudNavLink>
+@if (_household)
+{
+    <MudNavLink Href="data" Icon="@Icons.Material.Filled.Shield">
+        Data &amp; Backups
+    </MudNavLink>
+}
 <MudNavLink Href="account/logins" Icon="@Icons.Material.Filled.ManageAccounts">
     Linked logins
 </MudNavLink>
 </MudNavMenu>
+
+@code {
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+
+    [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    private bool _household;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(user, Oidc);
+    }
+}

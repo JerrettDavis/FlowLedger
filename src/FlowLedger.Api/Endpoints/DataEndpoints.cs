@@ -8,7 +8,9 @@ internal static class DataEndpoints
 {
     internal static IEndpointRouteBuilder MapDataEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api");
+        // Every /api/data endpoint reports on or acts on the WHOLE database (all tenants): household tenant only.
+        var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api")
+            .AddEndpointFilter(HouseholdTenantOnlyAsync);
 
         group.MapGet("/status", async (
             BackupRunStore store,
@@ -101,6 +103,26 @@ internal static class DataEndpoints
     }
 
     private const string MxProvider = "MX";
+
+    /// <summary>
+    /// Backup state, provider usage, export, import and backup-now are global (they span every tenant), so they are
+    /// restricted to the household (legacy) tenant, the same tenant that owns the operator's provider credentials
+    /// (<see cref="FlowLedger.Infrastructure.TenancySettings"/>). Any other tenant gets 403 before any work is done.
+    /// With OIDC on and no Tenancy:LegacyOwner* configured nobody is mapped to that tenant, so nobody gets in (fail closed).
+    /// </summary>
+    internal static async ValueTask<object?> HouseholdTenantOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
+    {
+        var services = ctx.HttpContext.RequestServices;
+        var household = FlowLedger.Infrastructure.TenancySettings.Legacy(services.GetRequiredService<IConfiguration>()).LegacyTenantId;
+        if (services.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId != household)
+        {
+            return Results.Problem(
+                title: "Data administration is limited to the household owner",
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return await next(ctx);
+    }
 
     /// <summary>
     /// Export, import and backup-now act on the WHOLE database (every tenant). They are therefore reachable only from

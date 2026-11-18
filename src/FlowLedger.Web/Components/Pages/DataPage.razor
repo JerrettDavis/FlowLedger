@@ -9,7 +9,11 @@
 <MudText Typo="Typo.h5" Class="mb-1">Data &amp; Backups</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">Where your data lives, how safe it is, and what the bank connection costs.</MudText>
 
-@if (_loading)
+@if (!_household)
+{
+    <MudAlert Severity="Severity.Info">Data &amp; Backups covers the whole installation and is only available to the household owner.</MudAlert>
+}
+else if (_loading)
 {
     <MudProgressLinear Indeterminate="true" />
 }
@@ -119,10 +123,20 @@ else
     private bool _loading = true;
     private bool _running;
     private bool _exporting;
+    private bool _household;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadAsync();
+        // UI gate only; the API refuses /api/data for any non-household tenant regardless (403).
+        _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
+        if (_household)
+        {
+            await LoadAsync();
+        }
     }
 
     private async Task LoadAsync()
