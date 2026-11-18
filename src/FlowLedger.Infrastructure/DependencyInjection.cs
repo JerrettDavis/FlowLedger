@@ -145,6 +145,18 @@ public static class DependencyInjection
             services.AddSimulatedProvider(configuration);
         }
 
+        // Local LLM (Ollama) for "ask a question" -> query. Loopback by default; data never leaves the machine.
+        var ollama = new FlowLedger.Infrastructure.Ai.OllamaOptions();
+        configuration.GetSection("Ai:Ollama").Bind(ollama);
+        services.AddSingleton(ollama);
+        services.AddHttpClient<FlowLedger.Application.Features.Query.IQueryTranslator, FlowLedger.Infrastructure.Ai.OllamaQueryTranslator>(
+            (sp, c) =>
+            {
+                var o = sp.GetRequiredService<FlowLedger.Infrastructure.Ai.OllamaOptions>();
+                c.BaseAddress = new Uri(o.BaseUrl.TrimEnd('/') + "/");
+                c.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+            });
+
         // ── Asset valuation feeds (generic HTTP JSON feed; disabled unless AssetFeeds:Http:Enabled) ──
         services.Configure<FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeedOptions>(
             configuration.GetSection(FlowLedger.Infrastructure.Assets.HttpJsonAppraisalFeedOptions.SectionName));

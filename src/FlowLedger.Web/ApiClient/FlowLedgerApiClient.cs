@@ -394,6 +394,15 @@ public sealed class FlowLedgerApiClient
     public Task<QuerySchemaDto?> GetQuerySchemaAsync(CancellationToken ct = default)
         => GetJsonAsync<QuerySchemaDto>("/api/query/schema", "load query schema", ct: ct);
 
+    public Task<AskQueryAnswer> AskQueryAsync(string question, CancellationToken ct = default)
+        => ExecuteAsync("ask a question", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/query/ask", new { question }, JsonOptions, ct);
+            await ThrowIfFailedAsync(response, "ask a question", ct);
+            return await response.Content.ReadFromJsonAsync<AskQueryAnswer>(JsonOptions, ct)
+                ?? new AskQueryAnswer(question, null, "No answer came back.", 0);
+        });
+
     public Task<QueryRunOutcome> RunQueryAsync(string query, CancellationToken ct = default)
         => ExecuteAsync("run query", async () =>
         {

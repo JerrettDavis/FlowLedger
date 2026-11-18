@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
+        services.AddScoped<FlowLedger.Application.Features.Query.AskQueryHandler>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();

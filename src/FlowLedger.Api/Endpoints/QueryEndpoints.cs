@@ -26,6 +26,12 @@ internal static class QueryEndpoints
             }
         }).WithName("RunQuery").WithSummary("Run a pipeline query against your data");
 
+        query.MapPost("/ask", async ([FromBody] AskQueryRequest request, AskQueryHandler h, CancellationToken ct) =>
+                Results.Ok(await h.HandleAsync(request.Question ?? "", ct)))
+            .WithName("AskQuery")
+            .WithSummary("Turn a plain-English question into a validated query using a local model (nothing leaves the machine)")
+            .RequireRateLimiting("write");
+
         var reports = app.MapGroup("/api/reports").WithTags("Reports").RequireRateLimiting("api");
 
         reports.MapGet("/", async (ListReportsHandler h, CancellationToken ct) => Results.Ok(await h.HandleAsync(ct)))

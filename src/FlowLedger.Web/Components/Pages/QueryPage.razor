@@ -32,6 +32,17 @@
             {
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Editing: @_loadedTitle</MudText>
             }
+            <div class="d-flex gap-2 align-center mb-3">
+                <MudTextField T="string" @bind-Value="_question" Label="Ask in plain English" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Placeholder="e.g. How much did I spend on dining last month?" Immediate="true" MaxLength="500"
+                              OnKeyDown="OnAskKeyDown" Disabled="_asking" aria-label="Ask a question about your money" />
+                <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="AskAsync" Disabled="@(_asking || string.IsNullOrWhiteSpace(_question))"
+                           StartIcon="@Icons.Material.Filled.AutoAwesome">@(_asking ? "Thinking…" : "Ask")</MudButton>
+            </div>
+            @if (_askNote is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mb-2" aria-live="polite">@_askNote</MudText>
+            }
             @* JS owns the contents of this block (highlight overlay, textarea, popups). Blazor never re-renders inside it. *@
             <div class="fl-editor" @ref="_editorHost">
                 <pre class="fl-editor-overlay" aria-hidden="true"></pre>
@@ -281,6 +292,48 @@
         catch (ApiClientException)
         {
             return [];
+        }
+    }
+
+    private string _question = string.Empty;
+    private bool _asking;
+    private string? _askNote;
+
+    private async Task OnAskKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_question) && !_asking)
+        {
+            await AskAsync();
+        }
+    }
+
+    /// <summary>Plain-English question -> a query written by a LOCAL model, validated server-side, then run in the normal workbench.</summary>
+    private async Task AskAsync()
+    {
+        _asking = true;
+        _askNote = null;
+        try
+        {
+            var answer = await ApiClient.AskQueryAsync(_question);
+            if (answer.Query is null)
+            {
+                _askNote = answer.Error ?? "Couldn't answer that.";
+                return;
+            }
+
+            await SetQueryAsync(answer.Query);
+            _askNote = answer.Error is null
+                ? "Written by your local AI model from your question. Check the query below, edit it, and save it if useful."
+                : answer.Error;
+            await RunAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            _askNote = ex.Message;
+        }
+        finally
+        {
+            _asking = false;
         }
     }
 
