@@ -3,6 +3,7 @@
 @using FlowLedger.Web.ApiClient
 @inject FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService Dialogs
 @inject ILogger<SpendingPage> Logger
 
 <PageTitle>Spending — FlowLedger</PageTitle>
@@ -240,7 +241,12 @@ else if (_result is not null)
                         <tr>
                             <td>@Format.FullDate(t.Date)</td>
                             <td>@(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)</td>
-                            <td>@t.Category</td>
+                            <td>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.Edit"
+                                           Color="@(t.Category == "Uncategorized" ? Color.Default : Color.Primary)"
+                                           OnClick="() => Recategorize(t)"
+                                           aria-label="@($"Recategorize {(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)}")">@t.Category</MudButton>
+                            </td>
                             <td>@t.Account</td>
                             <td>@string.Join(", ", t.Tags)</td>
                             <td style="text-align:right" class="fl-num">@Format.Money(t.Amount)</td>
@@ -272,6 +278,7 @@ else if (_result is not null)
     private string _bucket = "month";
     private IReadOnlyCollection<Guid> _accountIds = new HashSet<Guid>();
     private List<AccountDto> _accounts = [];
+    private List<CategoryDto>? _categories;
     private BreakdownResultDto? _result;
     private int _requestSeq;
 
@@ -379,6 +386,45 @@ else if (_result is not null)
         finally
         {
             if (seq == _requestSeq) _loading = false;
+        }
+    }
+
+    // ── recategorize ─────────────────────────────────────────────────────────
+
+    private async Task Recategorize(BreakdownTransactionDto tx)
+    {
+        try
+        {
+            _categories ??= await ApiClient.GetCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(tx.Merchant) ? tx.Description : tx.Merchant;
+        var dialog = await Dialogs.ShowAsync<RecategorizeDialog>("Recategorize", new DialogParameters<RecategorizeDialog>
+        {
+            { x => x.Merchant, name },
+            { x => x.CurrentCategory, tx.Category },
+            { x => x.Categories, _categories },
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not ValueTuple<Guid, string, bool> (var categoryId, var path, var all))
+        {
+            return;
+        }
+
+        try
+        {
+            var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all);
+            Snackbar.Add(all ? $"Moved {changed} transaction(s) to {path}; future “{name}” transactions will follow" : $"Moved to {path}", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 

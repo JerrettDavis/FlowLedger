@@ -87,6 +87,53 @@ public sealed class CategoryRuleServiceTests
     }
 
     [Fact]
+    public async Task Recategorize_just_this_changes_only_the_target()
+    {
+        var a = Tx("ACME HARDWARE #1");
+        var b = Tx("ACME HARDWARE #1");
+        var dest = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Home/Improvement"), "Improvement");
+        await _categories.AddAsync(dest);
+        var rules = new RuleStore();
+
+        var changed = await Service(rules, new TxStore([a, b])).RecategorizeAsync(a.Id, dest.Id, applyToAll: false);
+
+        changed.Should().Be(1);
+        a.CategoryId.Should().Be(dest.CategoryId);
+        a.CategorySource.Should().Be(CategorySource.Manual);
+        b.CategoryId.Should().BeNull();
+        rules.Rules.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Recategorize_all_matching_overrides_hand_set_categories_and_saves_a_rule()
+    {
+        var a = Tx("ACME HARDWARE");
+        var b = Tx("ACME HARDWARE");
+        var other = Tx("Bluejay Grocery");
+        var old = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Old"), "Old");
+        var dest = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Home/Improvement"), "Improvement");
+        await _categories.AddAsync(old);
+        await _categories.AddAsync(dest);
+        b.Categorize(old.CategoryId);
+        var rules = new RuleStore();
+
+        var changed = await Service(rules, new TxStore([a, b, other])).RecategorizeAsync(a.Id, dest.Id, applyToAll: true);
+
+        changed.Should().Be(2);
+        b.CategoryId.Should().Be(dest.CategoryId);
+        other.CategoryId.Should().BeNull();
+        rules.Rules.Should().ContainKey("ACME HARDWARE").WhoseValue.Should().Be("Home/Improvement");
+    }
+
+    [Fact]
+    public async Task Recategorize_unknown_transaction_or_category_throws()
+    {
+        var svc = Service(new RuleStore(), new TxStore([Tx("X")]));
+
+        await FluentActions.Awaiting(() => svc.RecategorizeAsync(Guid.NewGuid(), Guid.NewGuid(), false)).Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
     public async Task Blank_pattern_or_category_is_rejected()
     {
         var svc = Service(new RuleStore(), new TxStore([]));

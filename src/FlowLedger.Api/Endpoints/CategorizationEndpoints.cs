@@ -8,8 +8,26 @@ internal static class CategorizationEndpoints
 {
     internal sealed record SetCategoryRequest(Guid CategoryId, bool ApplyToMerchant = false);
 
+    internal sealed record RecategorizeRequest(Guid CategoryId, bool ApplyToAll = false);
+
     internal static IEndpointRouteBuilder MapCategorizationEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapPut("/api/transactions/{id:guid}/recategorize", async (
+                Guid id, [FromBody] RecategorizeRequest request, CategoryRuleService service, CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(new { changed = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct) });
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound();
+                }
+            })
+            .WithTags("Transactions").WithName("RecategorizeTransaction")
+            .WithSummary("Set a transaction's category by hand; optionally re-label every matching merchant and remember a rule for future syncs")
+            .RequireRateLimiting("write");
+
         app.MapPost("/api/categorization/run", async (CategorizationService service, CancellationToken ct) =>
                 Results.Ok(await service.RunAsync(ct)))
             .WithTags("Categories").WithName("RunCategorization")
