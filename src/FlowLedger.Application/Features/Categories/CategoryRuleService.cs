@@ -61,6 +61,57 @@ public sealed class CategoryRuleService(
 
     public Task<bool> RemoveAsync(string pattern, CancellationToken ct = default) => store.RemoveAsync(NormalizePattern(pattern), ct);
 
+    /// <summary>
+    /// Mint-style "recategorize": sets one transaction's category by hand and, when <paramref name="applyToAll"/>, also
+    /// re-labels EVERY transaction of the same merchant (including ones categorized by hand earlier) and saves a rule so
+    /// future syncs of that merchant land in the same category. Returns how many transactions changed.
+    /// </summary>
+    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default)
+    {
+        var target = await transactions.FindTrackedAsync(transactionId, ct)
+            ?? throw new KeyNotFoundException("Transaction not found.");
+        var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
+            ?? throw new KeyNotFoundException("Category not found.");
+        var id = category.CategoryId;
+
+        var changed = target.CategoryId == id && target.CategorySource == CategorySource.Manual ? 0 : 1;
+        target.Categorize(id);
+
+        string? pattern = null;
+        if (applyToAll)
+        {
+            var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
+            if (key.Length > 0)
+            {
+                foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
+                {
+                    if (t.Id == target.Id || t.Status is TransactionStatus.Planned or TransactionStatus.Skipped
+                        || AutoCategorizer.MerchantKey(t.MerchantName, t.Description) != key)
+                    {
+                        continue;
+                    }
+
+                    if (t.CategoryId != id || t.CategorySource != CategorySource.Manual)
+                    {
+                        t.Categorize(id);
+                        changed++;
+                    }
+                }
+
+                pattern = NormalizePattern(key);
+            }
+        }
+
+        await transactions.SaveAsync(ct);
+
+        if (pattern is { Length: > 0 and <= MaxLength })
+        {
+            await store.SetAsync(pattern, category.Path.Value, ct);
+        }
+
+        return changed;
+    }
+
     /// <summary>Applies all rules. Idempotent; returns how many transactions changed category.</summary>
     public async Task<int> ApplyAsync(CancellationToken ct = default)
     {

@@ -1,0 +1,45 @@
+<MudDialog aria-labelledby="recat-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="recat-dialog-title">Recategorize</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            <strong>@Merchant</strong> · currently <em>@CurrentCategory</em>
+        </MudText>
+        <MudAutocomplete T="CategoryDto" Label="New category" @bind-Value="_selected" SearchFunc="SearchAsync"
+                         ToStringFunc="@(c => c?.Path ?? "")" AutoFocus="true" CoerceText="false" ResetValueOnEmptyText="true"
+                         Clearable="true" Class="mb-3" />
+        <MudRadioGroup T="bool" @bind-Value="_applyToAll">
+            <MudRadio T="bool" Value="false" Color="Color.Primary">Just this transaction</MudRadio>
+            <MudRadio T="bool" Value="true" Color="Color.Primary">All transactions matching “@Merchant” (also future syncs)</MudRadio>
+        </MudRadioGroup>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(_selected is null)"
+                   aria-label="Apply category">Apply</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Merchant { get; set; } = "";
+    [Parameter] public string CurrentCategory { get; set; } = "Uncategorized";
+    [Parameter] public List<CategoryDto> Categories { get; set; } = [];
+
+    private CategoryDto? _selected;
+    private bool _applyToAll;
+
+    protected override void OnInitialized() =>
+        _selected = Categories.FirstOrDefault(c => string.Equals(c.Path, CurrentCategory, StringComparison.OrdinalIgnoreCase));
+
+    private Task<IEnumerable<CategoryDto>> SearchAsync(string? text, CancellationToken ct) =>
+        Task.FromResult<IEnumerable<CategoryDto>>(Categories
+            .Where(c => string.IsNullOrWhiteSpace(text) || c.Path.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(c => c.Path).Take(50).ToList());
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Save() => MudDialog.Close(DialogResult.Ok((_selected!.Id, _selected.Path, _applyToAll)));
+}
