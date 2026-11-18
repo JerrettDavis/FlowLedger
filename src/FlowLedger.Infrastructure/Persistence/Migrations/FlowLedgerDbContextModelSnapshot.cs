@@ -17,7 +17,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -289,6 +289,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("account_id");
 
+                    b.Property<double?>("CategoryConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("category_confidence");
+
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -350,6 +354,14 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("status");
+
+                    b.Property<Guid?>("SuggestedCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_category_id");
+
+                    b.Property<double?>("SuggestedConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("suggested_confidence");
 
                     b.Property<string>("SuggestedName")
                         .HasMaxLength(300)

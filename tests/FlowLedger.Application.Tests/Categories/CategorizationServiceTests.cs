@@ -181,4 +181,78 @@ public sealed class CategorizationServiceTests
         auto.CategoryId.Should().BeNull();
         manual.CategoryId.Should().Be(mine.CategoryId);
     }
+
+    private async Task<(CategorizationService svc, Domain.ValueObjects.CategoryId dining, Domain.ValueObjects.CategoryId pay)> SetUpTrainedAsync(CategorizationOptions? options = null)
+    {
+        var tenantId = TenantId.From(_tenant.TenantId);
+        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd));
+        await _accounts.AddAsync(_checking);
+        var dining = Category.Create(tenantId, new CategoryPath("Food/Dining"), "Dining");
+        var pay = Category.Create(tenantId, new CategoryPath("Income/Paycheck"), "Paycheck");
+        await _categories.AddAsync(dining);
+        await _categories.AddAsync(pay);
+        for (var i = 0; i < 15; i++)
+        {
+            Add(_checking, 20, TransactionDirection.Debit, $"Zorba Eats {i}").Categorize(dining.CategoryId, "Zorba Eats " + i);
+            Add(_checking, 2000, TransactionDirection.Credit, $"Quark Industries {i}").Categorize(pay.CategoryId, "Quark Industries " + i);
+        }
+
+        return (new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, options), dining.CategoryId, pay.CategoryId);
+    }
+
+    [Fact]
+    public async Task Model_applies_confident_prediction_as_auto_with_confidence()
+    {
+        var (svc, dining, _) = await SetUpTrainedAsync(new CategorizationOptions { MlThreshold = 0.7 });
+        var fresh = Add(_checking, 22, TransactionDirection.Debit, "Zorba Eats 77");
+
+        var result = await svc.RunAsync();
+
+        result.ByModel.Should().Be(1);
+        fresh.CategoryId.Should().Be(dining);
+        fresh.CategorySource.Should().Be(CategorySource.Auto);
+        fresh.CategoryConfidence.Should().BeGreaterThan(0.8);
+    }
+
+    [Fact]
+    public async Task Model_stores_midconfidence_as_suggestion_only()
+    {
+        var (svc, dining, _) = await SetUpTrainedAsync(new CategorizationOptions { SuggestionFloor = 0.35 });
+        var fresh = Add(_checking, 22, TransactionDirection.Debit, "Zorba Eats 77");
+
+        var result = await svc.RunAsync();
+
+        result.Suggested.Should().Be(1);
+        fresh.CategoryId.Should().BeNull();
+        fresh.SuggestedCategoryId.Should().Be(dining);
+        fresh.SuggestedConfidence.Should().BeGreaterThan(0.35);
+    }
+
+    [Fact]
+    public async Task Model_never_touches_manual_categories()
+    {
+        var (svc, dining, pay) = await SetUpTrainedAsync(new CategorizationOptions { MlThreshold = 0.7 });
+        var manual = Add(_checking, 22, TransactionDirection.Debit, "Zorba Eats 77");
+        manual.Categorize(pay);
+
+        await svc.RunAsync();
+
+        manual.CategoryId.Should().Be(pay);
+        manual.CategorySource.Should().Be(CategorySource.Manual);
+    }
+
+    [Fact]
+    public async Task Manual_recategorize_clears_suggestion_and_confidence()
+    {
+        var (svc, dining, pay) = await SetUpTrainedAsync(new CategorizationOptions());
+        var fresh = Add(_checking, 22, TransactionDirection.Debit, "Zorba Eats 77");
+        await svc.RunAsync();
+        fresh.SuggestedCategoryId.Should().NotBeNull();
+
+        fresh.Categorize(pay);
+
+        fresh.SuggestedCategoryId.Should().BeNull();
+        fresh.SuggestedConfidence.Should().BeNull();
+        fresh.CategoryConfidence.Should().BeNull();
+    }
 }

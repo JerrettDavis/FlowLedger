@@ -221,7 +221,7 @@ public sealed record ProviderUsageDto(
 
 public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, ProviderUsageDto ProviderUsage);
 
-public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized);
+public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0);
 
 public sealed record CategorySpendDto(string Category, decimal Amount);
 
@@ -458,7 +458,8 @@ public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? M
 public sealed record BreakdownGroupDto(string Key, string Label, decimal Amount, int Count, decimal Percent, bool HasChildren);
 public sealed record TrendPointDto(string Bucket, decimal Amount);
 public sealed record BreakdownTransactionDto(
-    Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, List<string> Tags);
+    Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, List<string> Tags,
+    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null);
 
 public sealed record BreakdownResultDto(
     DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,

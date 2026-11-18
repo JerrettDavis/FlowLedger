@@ -21,7 +21,10 @@ public sealed record TransactionDto(
     DateTimeOffset CreatedAt,
     string? SuggestedName = null,
     IReadOnlyList<string>? Tags = null,
-    IReadOnlyList<TransactionSplitDto>? Splits = null);
+    IReadOnlyList<TransactionSplitDto>? Splits = null,
+    double? CategoryConfidence = null,
+    Guid? SuggestedCategoryId = null,
+    double? SuggestedConfidence = null);
 
 /// <summary>One portion of a split transaction.</summary>
 public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);

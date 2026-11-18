@@ -88,6 +88,14 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasDefaultValue(CategorySource.Manual)
             .IsRequired();
 
+        builder.Property(t => t.CategoryConfidence).HasColumnName("category_confidence");
+
+        builder.Property<CategoryId?>("SuggestedCategoryId")
+            .HasColumnName("suggested_category_id")
+            .HasConversion(StronglyTypedIdConverters.NullableCategoryIdConverter);
+
+        builder.Property(t => t.SuggestedConfidence).HasColumnName("suggested_confidence");
+
         builder.Property(t => t.MerchantName)
             .HasColumnName("merchant_name")
             .HasMaxLength(300);
