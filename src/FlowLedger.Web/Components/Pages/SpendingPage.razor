@@ -249,6 +249,17 @@ else if (_result is not null)
                             <td>
                                 <CategoryChip Path="@t.Category" OnClick="() => Recategorize(t)"
                                               AriaLabel="@($"Change category of {(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)}, currently {t.Category}")" />
+                                @if (t.Confidence is { } conf)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" title="Categorized automatically by the learned model">ML @((int)Math.Round(conf * 100))%</MudChip>
+                                }
+                                else if (t.SuggestedCategory is { } sug)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined"
+                                             title="Click to accept this suggestion" OnClick="() => AcceptSuggestion(t)">
+                                        Suggested: @sug (@((int)Math.Round((t.SuggestedConfidence ?? 0) * 100))%)
+                                    </MudChip>
+                                }
                             </td>
                             <td>@t.Account</td>
                             <td>@string.Join(", ", t.Tags)</td>
@@ -401,6 +412,28 @@ else if (_result is not null)
     {
         _flash = ids.ToHashSet();
         _ = Task.Delay(1800).ContinueWith(_ => InvokeAsync(() => { _flash = []; StateHasChanged(); }));
+    }
+
+    private async Task AcceptSuggestion(BreakdownTransactionDto tx)
+    {
+        try
+        {
+            _categories ??= await ApiClient.GetCategoriesAsync();
+            var target = _categories.FirstOrDefault(c => string.Equals(c.Path, tx.SuggestedCategory, StringComparison.OrdinalIgnoreCase));
+            if (target is null)
+            {
+                Snackbar.Add("That suggested category no longer exists.", Severity.Warning);
+                return;
+            }
+
+            await ApiClient.RecategorizeAsync(tx.Id, target.Id, false);
+            Snackbar.Add($"Categorized as {target.Path}.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
     }
 
     private async Task Recategorize(BreakdownTransactionDto tx)

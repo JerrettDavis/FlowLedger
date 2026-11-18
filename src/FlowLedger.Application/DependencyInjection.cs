@@ -7,6 +7,7 @@ using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Transactions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FlowLedger.Application;
 
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ListTransactionsHandler>();
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<CreateTransactionHandler>();
+        services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();

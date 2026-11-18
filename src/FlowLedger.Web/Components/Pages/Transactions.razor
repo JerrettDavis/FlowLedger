@@ -392,7 +392,7 @@
         try
         {
             var r = await ApiClient.RunCategorizationAsync();
-            Snackbar.Add(r is null ? "Done" : $"Categorized {r.Categorized} ({r.Transfers} transfers); {r.StillUncategorized} left for you to review", Severity.Success);
+            Snackbar.Add(r is null ? "Done" : $"Categorized {r.Categorized} ({r.Transfers} transfers, {r.ByModel} by the learned model); {r.Suggested} suggestions and {r.StillUncategorized} left for you to review", Severity.Success);
             _categories = await ApiClient.GetCategoriesAsync();
             RebuildLookups();
             await LoadAsync();

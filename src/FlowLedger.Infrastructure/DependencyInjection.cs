@@ -30,6 +30,21 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // ML categorizer tuning ("Categorization:MlThreshold" / ":SuggestionFloor"); defaults keep auto-apply off.
+        var categorization = new FlowLedger.Application.Features.Categories.CategorizationOptions();
+        if (double.TryParse(configuration["Categorization:MlThreshold"], System.Globalization.CultureInfo.InvariantCulture, out var mlThreshold))
+        {
+            categorization.MlThreshold = mlThreshold;
+        }
+
+        if (double.TryParse(configuration["Categorization:SuggestionFloor"], System.Globalization.CultureInfo.InvariantCulture, out var mlFloor))
+        {
+            categorization.SuggestionFloor = mlFloor;
+        }
+
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.Categories.CategorizationOptions>(services);
+        services.AddSingleton(categorization);
+
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".

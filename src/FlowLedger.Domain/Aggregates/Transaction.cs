@@ -38,6 +38,13 @@ public sealed class Transaction : AggregateRoot
 
     /// <summary>Who set <see cref="CategoryId"/>: the user (Manual, never overwritten) or the auto-categorizer (Auto, replaceable).</summary>
     public CategorySource CategorySource { get; private set; } = CategorySource.Manual;
+
+    /// <summary>Model confidence (0..1) when <see cref="CategorySource"/> is Auto and the ML categorizer chose the category; otherwise null.</summary>
+    public double? CategoryConfidence { get; private set; }
+
+    /// <summary>A low-confidence ML suggestion awaiting the user's accept. Never changes <see cref="CategoryId"/> by itself.</summary>
+    public CategoryId? SuggestedCategoryId { get; private set; }
+    public double? SuggestedConfidence { get; private set; }
     public string? MerchantName { get; private set; }
     public string? Notes { get; private set; }
 
@@ -217,10 +224,13 @@ public sealed class Transaction : AggregateRoot
     }
 
     /// <summary>Categorises the transaction. Raises <see cref="TransactionCategorized"/>.</summary>
-    public void Categorize(CategoryId categoryId, string? merchantName = null, CategorySource source = CategorySource.Manual)
+    public void Categorize(CategoryId categoryId, string? merchantName = null, CategorySource source = CategorySource.Manual, double? confidence = null)
     {
         CategoryId = categoryId;
         CategorySource = source;
+        CategoryConfidence = source == CategorySource.Auto ? confidence : null;
+        SuggestedCategoryId = null;
+        SuggestedConfidence = null;
         if (!string.IsNullOrWhiteSpace(merchantName))
         {
             MerchantName = merchantName.Trim();
@@ -283,6 +293,20 @@ public sealed class Transaction : AggregateRoot
         }
 
         CategoryId = null;
+        CategoryConfidence = null;
+        return true;
+    }
+
+    /// <summary>Records (or clears, with null) an ML suggestion without categorizing. Returns true when it changed.</summary>
+    public bool SetSuggestion(CategoryId? categoryId, double? confidence)
+    {
+        if (SuggestedCategoryId == categoryId && SuggestedConfidence == confidence)
+        {
+            return false;
+        }
+
+        SuggestedCategoryId = categoryId;
+        SuggestedConfidence = categoryId is null ? null : confidence;
         return true;
     }
 

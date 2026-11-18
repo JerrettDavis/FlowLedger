@@ -32,7 +32,21 @@ public interface ICategorizationStore
             && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped);
 }
 
-public sealed record CategorizationResult(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized);
+public sealed record CategorizationResult(
+    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0);
+
+/// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
+public sealed class CategorizationOptions
+{
+    /// <summary>
+    /// Predictions at or above this probability are applied as Auto categories. Default 1.01 = auto-apply OFF (suggest only):
+    /// held-out-merchant cross-validation on real data measured only ~60% precision at 0.70 and ~72% at 0.80.
+    /// </summary>
+    public double MlThreshold { get; set; } = 1.01;
+
+    /// <summary>Predictions between this and <see cref="MlThreshold"/> are stored as one-click suggestions only.</summary>
+    public double SuggestionFloor { get; set; } = 0.40;
+}
 
 /// <summary>
 /// Fills in MISSING categories only: a transaction that already has a category (manual or earlier run) is never changed.
@@ -46,8 +60,11 @@ public sealed class CategorizationService(
     ICategorizationStore store,
     ICategoryRepository categories,
     IAccountRepository accounts,
-    ITenantContext tenant)
+    ITenantContext tenant,
+    CategorizationOptions? options = null)
 {
+    private readonly CategorizationOptions _options = options ?? new CategorizationOptions();
+
     private const int Max = 50_000;
 
     public async Task<CategorizationResult> RunAsync(CancellationToken ct = default)
@@ -89,7 +106,15 @@ public sealed class CategorizationService(
             return created.CategoryId;
         }
 
-        int byLearned = 0, byKeyword = 0, transfers = 0, left = 0;
+        // ML step: trained on the user's own manual categories (Transfer excluded). Null when there is too little data.
+        var pathById = existing.Values.ToDictionary(c => c.CategoryId, c => c.Path.Value);
+        var model = NaiveBayesCategoryPredictor.Train(real
+            .Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual)
+            .Select(t => (t, path: pathById.GetValueOrDefault(t.CategoryId!.Value)))
+            .Where(x => x.path is not null && !string.Equals(x.path, AutoCategorizer.TransferCategory, StringComparison.OrdinalIgnoreCase))
+            .Select(x => new TrainingExample(x.t.MerchantName, x.t.Description, x.t.Direction.ToString(), x.t.Amount.Amount, x.path!)));
+
+        int byLearned = 0, byKeyword = 0, byModel = 0, suggested = 0, transfers = 0, left = 0;
         foreach (var t in uncategorized)
         {
             var key = AutoCategorizer.MerchantKey(t.MerchantName, t.Description);
@@ -110,13 +135,29 @@ public sealed class CategorizationService(
             }
             else
             {
-                left++;
+                var p = model?.Predict(t.MerchantName, t.Description, t.Direction.ToString(), t.Amount.Amount);
+                if (p is not null && p.Probability >= _options.MlThreshold)
+                {
+                    t.Categorize(await EnsureAsync(p.Label), null, CategorySource.Auto, p.Probability);
+                    byModel++;
+                }
+                else if (p is not null && p.Probability >= _options.SuggestionFloor)
+                {
+                    t.SetSuggestion((await EnsureAsync(p.Label)), p.Probability);
+                    suggested++;
+                    left++;
+                }
+                else
+                {
+                    t.SetSuggestion(null, null);
+                    left++;
+                }
             }
         }
 
         await categories.SaveChangesAsync(ct);
         await store.SaveAsync(ct);
-        return new CategorizationResult(byLearned + byKeyword + transfers, byLearned, byKeyword, transfers, left);
+        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested);
     }
 
     /// <summary>

@@ -20,7 +20,8 @@ public sealed record BreakdownQuery(
 public sealed record BreakdownGroup(string Key, string Label, decimal Amount, int Count, decimal Percent, bool HasChildren);
 public sealed record TrendPoint(string Bucket, decimal Amount);
 public sealed record BreakdownTransaction(
-    Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, IReadOnlyList<string> Tags);
+    Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, IReadOnlyList<string> Tags,
+    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null);
 
 public sealed record BreakdownResult(
     DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,
@@ -43,7 +44,8 @@ public static class SpendingInsightsAnalyzer
     private const int MaxTransactions = 200;
 
     private sealed record Row(
-        Guid Id, DateOnly Date, string Description, string? Merchant, string Category, Guid AccountId, decimal Amount, IReadOnlyList<string> Tags);
+        Guid Id, DateOnly Date, string Description, string? Merchant, string Category, Guid AccountId, decimal Amount, IReadOnlyList<string> Tags,
+        double? Confidence = null, string? Suggested = null, double? SuggestedConfidence = null);
 
     public static BreakdownResult Analyze(
         BreakdownQuery q,
@@ -73,7 +75,8 @@ public static class SpendingInsightsAnalyzer
             }
             else
             {
-                yield return new Row(t.Id, date, t.Description, t.MerchantName, CatOf(t.CategoryId), t.AccountId, t.Amount, tags);
+                yield return new Row(t.Id, date, t.Description, t.MerchantName, CatOf(t.CategoryId), t.AccountId, t.Amount, tags,
+                    t.CategoryConfidence, t.SuggestedCategoryId is { } sg && categoryPathById.TryGetValue(sg, out var sp) ? sp : null, t.SuggestedConfidence);
             }
         }
 
@@ -120,7 +123,8 @@ public static class SpendingInsightsAnalyzer
             .Take(MaxTransactions)
             .Select(r => new BreakdownTransaction(
                 r.Id, r.Date, r.Description, r.Merchant, r.Category,
-                accountNameById.GetValueOrDefault(r.AccountId, "Account"), r.Amount, r.Tags))
+                accountNameById.GetValueOrDefault(r.AccountId, "Account"), r.Amount, r.Tags,
+                r.Confidence, r.Suggested, r.SuggestedConfidence))
             .ToList();
 
         return new BreakdownResult(

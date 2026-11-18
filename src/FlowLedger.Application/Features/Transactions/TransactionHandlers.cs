@@ -110,5 +110,8 @@ internal static class TransactionMapper
         t.CreatedAt,
         t.SuggestedName,
         t.Tags,
-        t.Splits.Count == 0 ? null : t.Splits.Select(s => new TransactionSplitDto(s.Amount.Amount, s.CategoryId?.Value, s.Notes)).ToList());
+        t.Splits.Count == 0 ? null : t.Splits.Select(s => new TransactionSplitDto(s.Amount.Amount, s.CategoryId?.Value, s.Notes)).ToList(),
+        t.CategoryConfidence,
+        t.SuggestedCategoryId?.Value,
+        t.SuggestedConfidence);
 }
