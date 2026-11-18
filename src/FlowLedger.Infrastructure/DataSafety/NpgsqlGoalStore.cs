@@ -1,14 +1,13 @@
+using FlowLedger.Application.Features.Goals;
 using Npgsql;
 
 namespace FlowLedger.Infrastructure.DataSafety;
-
-public sealed record GoalRow(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate);
 
 /// <summary>
 /// Per-tenant savings goals (name, target, amount saved so far, optional target date). Created on first use like the other
 /// ad-hoc tables, so it needs no EF migration; it is part of every snapshot/backup/export.
 /// </summary>
-public sealed class NpgsqlGoalStore
+public sealed class NpgsqlGoalStore : IGoalStore
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS savings_goals (

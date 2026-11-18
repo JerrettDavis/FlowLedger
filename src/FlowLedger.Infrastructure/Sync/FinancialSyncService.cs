@@ -365,7 +365,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     private static TransactionFingerprint BuildFingerprint(AccountId accountId, ProviderTransaction pt)
     {
-        var normalizedDesc = NormalizeDescription(pt.RawDescription);
+        var normalizedDesc = TransactionFingerprint.NormalizeDescription(pt.RawDescription);
         return TransactionFingerprint.Create(
             accountId,
             pt.PostedDate,

@@ -1,3 +1,5 @@
+using FlowLedger.Application.Features.Shared;
+
 namespace FlowLedger.Application.Features.BillSheet;
 
 /// <summary>A monthly-repeating expense found in the transactions, ready to become a sheet row.</summary>
@@ -20,7 +22,7 @@ public static class RecurringDetector
         var result = new List<DetectedBill>();
         var groups = transactions
             .Where(t => !string.IsNullOrWhiteSpace(t.Label ?? t.Text))
-            .GroupBy(t => Key(t.Label ?? t.Text))
+            .GroupBy(t => MerchantKey.From(t.Label ?? t.Text))
             .Where(g => g.Key.Length >= 3);
 
         foreach (var g in groups)
@@ -58,9 +60,8 @@ public static class RecurringDetector
         return result.OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    /// <summary>Grouping key: letters only, so "ATT*BILL 1234" and "ATT*BILL 5678" are one merchant.</summary>
-    internal static string Key(string text)
-        => new(text.Where(char.IsLetter).Select(char.ToLowerInvariant).ToArray());
+    /// <summary>Grouping key; forwards to <see cref="MerchantKey.From"/> (kept for existing callers).</summary>
+    internal static string Key(string text) => MerchantKey.From(text);
 
     /// <summary>Text up to the first digit (card references and dates vary), falling back to the whole label.</summary>
     internal static string MatchTextFor(string label)

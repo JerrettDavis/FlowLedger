@@ -3,8 +3,8 @@ namespace FlowLedger.Domain.ValueObjects;
 /// <summary>
 /// Describes how a recurring flow repeats. Encapsulates the schedule model from PLAN.md §6.5.
 /// The pattern is used by the domain to generate <see cref="Aggregates.PlannedFlowOccurrence"/>
-/// dates; it never performs I/O or complex calendar arithmetic itself — that is deferred to
-/// the Forecasting Engine (Milestone 4).
+/// dates; it never performs I/O or complex calendar arithmetic itself — that lives in
+/// <see cref="RecurrenceExpander"/>.
 /// </summary>
 public sealed record RecurrencePattern
 {

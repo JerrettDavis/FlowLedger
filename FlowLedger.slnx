@@ -9,7 +9,6 @@
     <Project Path="src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj" />
     <Project Path="src/FlowLedger.Integrations.SimpleFin/FlowLedger.Integrations.SimpleFin.csproj" />
     <Project Path="src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj" />
-    <Project Path="src/FlowLedger.Plugins.Abstractions/FlowLedger.Plugins.Abstractions.csproj" />
     <Project Path="src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj" />
     <Project Path="src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj" />
     <Project Path="src/FlowLedger.Web.Client/FlowLedger.Web.Client.csproj" />
