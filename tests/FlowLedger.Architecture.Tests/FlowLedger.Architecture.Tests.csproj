@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Api\FlowLedger.Api.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Web\FlowLedger.Web.csproj" />
   </ItemGroup>
 
 </Project>
