@@ -15,7 +15,10 @@ public sealed class SpendingInsightsAnalyzerTests
 
     private static readonly Dictionary<Guid, string> Cats = new()
     {
-        [Groceries] = "Food/Groceries", [Restaurants] = "Food/Restaurants", [Food] = "Food", [Utilities] = "Bills/Utilities",
+        [Groceries] = "Food/Groceries",
+        [Restaurants] = "Food/Restaurants",
+        [Food] = "Food",
+        [Utilities] = "Bills/Utilities",
     };
     private static readonly Dictionary<Guid, string> Names = new() { [Checking] = "Checking", [Card] = "Card" };
     private static readonly Dictionary<Guid, string> Types = new() { [Checking] = "Checking", [Card] = "CreditCard" };
