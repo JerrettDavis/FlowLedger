@@ -13,7 +13,11 @@ public sealed record AccountDto(
     string? ExternalAccountRef,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? LastBalanceConfirmedAt);
+    DateTimeOffset? LastBalanceConfirmedAt,
+    bool TypeLockedByUser = false);
+
+/// <summary>Request DTO for correcting an account's type by hand (pins it against provider sync).</summary>
+public sealed record ChangeAccountTypeRequest(string AccountType);
 
 /// <summary>Request DTO for creating an account.</summary>
 public sealed record CreateAccountRequest(

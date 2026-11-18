@@ -169,6 +169,47 @@ public sealed class FlowLedgerApiClient
         });
     }
 
+    /// <summary>Corrects an account's type by hand; the server pins it so provider sync never overwrites it.</summary>
+    public async Task<AccountDto?> ChangeAccountTypeAsync(Guid id, ChangeAccountTypeRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("change account type", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/accounts/{id}/type", request, JsonOptions, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Non-success status {StatusCode} changing type of account {Id}", (int)response.StatusCode, id);
+                var detail = response.StatusCode == HttpStatusCode.BadRequest
+                    ? await ReadProblemDetailAsync(response, ct)
+                    : null;
+                throw new ApiClientException(
+                    detail ?? $"Couldn't change account type (server returned {(int)response.StatusCode}).",
+                    response.StatusCode);
+            }
+
+            return await response.Content.ReadFromJsonAsync<AccountDto>(JsonOptions, ct);
+        });
+    }
+
+    private static async Task<string?> ReadProblemDetailAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            return doc.RootElement.TryGetProperty("detail", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String
+                ? d.GetString()
+                : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
     // ── Transactions ──────────────────────────────────────────────────────────
 
     public async Task<List<TransactionDto>> GetTransactionsAsync(

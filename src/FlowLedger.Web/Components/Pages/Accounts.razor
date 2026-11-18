@@ -56,7 +56,17 @@
              aria-label="Accounts table">
     <Columns>
         <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
-        <PropertyColumn Property="x => x.AccountType" Title="Type" Sortable="true" />
+        <TemplateColumn Title="Type" Sortable="true" SortBy="x => x.AccountType">
+            <CellTemplate>
+                @context.Item.AccountType
+                @if (context.Item.TypeLockedByUser)
+                {
+                    <MudTooltip Text="Set manually - sync will not change it">
+                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="ml-1" aria-label="Type set manually" />
+                    </MudTooltip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
         <PropertyColumn Property="x => x.Institution" Title="Institution" Sortable="true" />
         <TemplateColumn Title="Balance" Sortable="true" SortBy="x => x.BalanceAmount">
             <CellTemplate>
@@ -143,12 +153,21 @@
         var dialog = await DialogService.ShowAsync<AccountFormDialog>("Edit Account",
             new DialogParameters<AccountFormDialog> { { x => x.Account, account } });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.UpdateAccountRequest req })
+        if (result is { Canceled: false, Data: AccountFormDialog.AccountEditResult edit })
         {
             try
             {
-                await ApiClient.UpdateAccountAsync(account.Id, req);
-                Snackbar.Add("Account updated", Severity.Success);
+                if (edit.NewName is not null)
+                {
+                    await ApiClient.UpdateAccountAsync(account.Id, new FlowLedger.Web.ApiClient.UpdateAccountRequest(edit.NewName));
+                }
+
+                if (edit.NewType is not null)
+                {
+                    await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Web.ApiClient.ChangeAccountTypeRequest(edit.NewType));
+                }
+
+                Snackbar.Add(edit.NewType is not null ? "Account updated - type pinned" : "Account updated", Severity.Success);
                 await LoadAsync();
             }
             catch (Exception ex)
