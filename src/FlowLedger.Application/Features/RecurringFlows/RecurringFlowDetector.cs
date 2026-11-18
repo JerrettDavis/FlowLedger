@@ -51,7 +51,7 @@ public static class RecurringFlowDetector
         {
             // Group by normalized merchant (processor prefix, phone numbers and state codes removed).
             var byNorm = bucket
-                .Select(t => (Txn: t, Norm: MerchantNormalizer.Normalize(t.Text)))
+                .Select(t => (Txn: t, Norm: GroupingName(t)))
                 .Where(x => RecurringDetector.Key(x.Norm).Length >= 3)
                 .GroupBy(x => x.Norm)
                 .ToDictionary(g => g.Key, g => g.Select(x => x.Txn).ToList());
@@ -84,10 +84,10 @@ public static class RecurringFlowDetector
                 }
 
                 var found = false;
-                foreach (var flow in Analyze(bucket.Key.AccountId, isCredit, RecurringDetector.Key(root), txns, today, root))
+                foreach (var flow in Analyze(bucket.Key.AccountId, isCredit, FlowKey(root), txns, today, root))
                 {
                     // A pattern that missed two whole periods has stopped (cancelled subscription, ended job): not worth predicting.
-                    var stopped = today.DayNumber - flow.LastSeen.DayNumber > PeriodDays(flow.Frequency) * 2 + 3;
+                    var stopped = today.DayNumber - flow.LastSeen.DayNumber > PeriodDays(flow) * 2 + 3;
                     if (!stopped && flow.Confidence >= MinConfidence)
                     {
                         result.Add(flow);
@@ -149,6 +149,54 @@ public static class RecurringFlowDetector
         "SAM'S CLUB", "HOMELAND", "DOLLAR GENERAL", "DOLLAR TREE", "WALGREENS", "CVS", "BASS PRO", "AMAZON MKTP", "AMZN MKTP",
     ];
 
+    // "Transfer to Checking *1436 - Online Banking": the account suffix is what tells one standing transfer from another, and
+    // the amount tells a $260 biweekly top-up from a $50 monthly one on the very same account pair. Merchant normalization
+    // drops the suffix (it contains digits), so transfers carry their reference and amount into the grouping name.
+    private static readonly System.Text.RegularExpressions.Regex TransferText = new(
+        @"(transfer|xfer)\s+(to|from)\s", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly System.Text.RegularExpressions.Regex AccountRef = new(
+        @"[*#x]\s*(\d{3,})", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private const char TransferMarker = '§';
+
+    public static bool IsTransferText(string? text) => !string.IsNullOrWhiteSpace(text) && TransferText.IsMatch(text);
+
+    /// <summary>The account suffix of a transfer description ("1436" in "Transfer to Checking *1436"), or empty.</summary>
+    public static string TransferRef(string? text)
+    {
+        var m = text is null ? null : AccountRef.Match(text);
+        return m is { Success: true } ? m.Groups[1].Value : string.Empty;
+    }
+
+    private static string GroupingName(FlowTxn t)
+    {
+        var norm = MerchantNormalizer.Normalize(t.Text);
+        return IsTransferText(t.Text)
+            ? $"{norm} {TransferMarker}{TransferRef(t.Text)}{TransferMarker}{t.Amount:0.##}"
+            : norm;
+    }
+
+    /// <summary>Suppression/identity key for a grouping name: letters of the merchant, plus reference and amount for transfers.</summary>
+    private static string FlowKey(string grouping)
+    {
+        var at = grouping.IndexOf(TransferMarker);
+        if (at < 0)
+        {
+            return RecurringDetector.Key(grouping);
+        }
+
+        var head = RecurringDetector.Key(grouping[..at]);
+        var parts = grouping[(at + 1)..].Split(TransferMarker);
+        return $"{head}_{parts[0]}_{(parts.Length > 1 ? parts[1] : string.Empty)}_";
+    }
+
+    private static string StripMarker(string grouping)
+    {
+        var at = grouping.IndexOf(TransferMarker);
+        return at < 0 ? grouping : grouping[..at].TrimEnd();
+    }
+
     private static bool IsHabitMerchant(string normalized)
     {
         var padded = normalized + " ";
@@ -202,7 +250,11 @@ public static class RecurringFlowDetector
         var (median, isFixed, stableShare) = AmountStats(amounts);
 
         var last = days[^1].Date;
-        var label = BestLabel(txns, normalizedName);
+        var label = BestLabel(txns, StripMarker(normalizedName));
+        if (normalizedName.Contains(TransferMarker))
+        {
+            label = $"{label} (${median:0.##})";
+        }
 
         // A weekly/biweekly paycheck with one bigger check each month (a bonus week) is two flows: the regular check plus a
         // monthly extra for the difference. The base statistics then ignore the bonus checks so they don't look "variable".
@@ -229,6 +281,15 @@ public static class RecurringFlowDetector
             extraFlow = BuildExtra(split, key, accountId, isCredit, label, baseMedian, today);
             return Build(key, accountId, isCredit, label, baseMedian, baseFixed, "EveryNWeeks", null, null, 2, dow,
                 last, NextWeekly(last, 14, today), days.Count, biweekly, expectedN: 4);
+        }
+
+        // Every three weeks (≥3), e.g. a standing transfer that moves money out every third Friday.
+        var triweekly = Share(gaps, 20, 22);
+        if (triweekly >= 0.7 && (baseFixed || baseStable >= 0.7))
+        {
+            var dow = ModeDayOfWeek(days.Select(d => d.Date));
+            return Build(key, accountId, isCredit, label, median, isFixed, "EveryNWeeks", null, null, 3, dow,
+                last, NextWeekly(last, 21, today), days.Count, triweekly, expectedN: 3);
         }
 
         // Twice a month on two stable days (≥4 occurrences covering ≥2 months).
@@ -374,8 +435,8 @@ public static class RecurringFlowDetector
         return Math.Min(d, 30 - d);
     }
 
-    private static int PeriodDays(string frequency) =>
-        frequency switch { "Weekly" => 7, "EveryNWeeks" => 14, "TwiceMonthly" => 16, _ => 31 };
+    private static int PeriodDays(DetectedFlow flow) =>
+        flow.Frequency switch { "Weekly" => 7, "EveryNWeeks" => 7 * (flow.IntervalWeeks ?? 2), "TwiceMonthly" => 16, _ => 31 };
 
     private static double Share(List<int> gaps, int min, int max) =>
         gaps.Count(g => g >= min && g <= max) / (double)gaps.Count;

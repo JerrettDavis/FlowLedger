@@ -235,9 +235,22 @@ public sealed class RecurringSuggestionService(
                 && Math.Abs(f.Amount.Amount - d.Amount) <= Math.Max(0.5m, d.Amount * 0.03m)
                 && (d.Frequency == "Monthly"
                     ? f.Pattern.DayOfMonth is { } day && d.DayOfMonth is { } dd && Math.Abs(day - dd) <= 1
-                    : f.Pattern.AnchorDayOfWeek?.ToString() == d.AnchorDayOfWeek)))
+                    : f.Pattern.AnchorDayOfWeek?.ToString() == d.AnchorDayOfWeek
+                        && (f.Pattern.IntervalWeeks ?? 0) == (d.IntervalWeeks ?? 0))))
         {
             return true;
+        }
+
+        // Standing transfers all read "Transfer to Checking ..." so a name overlap would let one flow hide every other
+        // destination and amount. They are covered only by a flow for the same account suffix and (near) the same amount.
+        if (RecurringFlowDetector.IsTransferText(d.Name))
+        {
+            var reference = RecurringFlowDetector.TransferRef(d.Name);
+            return existing.Any(f => f.AccountId.Value == d.AccountId
+                && f.Direction == direction
+                && Math.Abs(f.Amount.Amount - d.Amount) <= Math.Max(0.5m, d.Amount * 0.03m)
+                && new[] { f.Name, f.Counterparty }.Any(x => RecurringFlowDetector.IsTransferText(x)
+                    && RecurringFlowDetector.TransferRef(x) == reference));
         }
 
         return existing.Any(f => f.AccountId.Value == d.AccountId

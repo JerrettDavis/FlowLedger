@@ -30,6 +30,41 @@ public sealed class RecurringFlowDetectorTests
     }
 
     [Fact]
+    public void Detects_super_klean_real_shape()
+    {
+        var tx = Series("SUPER KLEAN SHERIDAN TULSA OK", false, 35m, D(2026, 6, 18), D(2026, 7, 15), D(2026, 8, 15), D(2026, 9, 18), D(2026, 10, 15)).ToList();
+        RecurringFlowDetector.Detect(tx, new DateOnly(2026, 11, 18)).Should().ContainSingle(f => f.Frequency == "Monthly");
+    }
+
+    [Fact]
+    public void Standing_transfers_to_different_accounts_and_amounts_are_separate_flows()
+    {
+        // Real shape: the same checking account sends $260 every second Friday and $50 monthly to one account, and $400
+        // every third Friday to another. All read "Transfer to Checking *NNNN - Online Banking".
+        var tx = new List<FlowTxn>();
+        tx.AddRange(Series("Transfer to Checking *1436 - Online Banking", false, 260m, D(2026, 8, 28), D(2026, 9, 11), D(2026, 9, 25), D(2026, 10, 9), D(2026, 10, 23), D(2026, 11, 6)));
+        tx.AddRange(Series("Transfer to Checking *1436 - Online Banking", false, 50m, D(2026, 8, 20), D(2026, 9, 21), D(2026, 10, 20)));
+        tx.AddRange(Series("Transfer to Checking *2589 - Online Banking", false, 400m, D(2026, 8, 27), D(2026, 9, 18), D(2026, 10, 9)));
+        var flows = RecurringFlowDetector.Detect(tx, new DateOnly(2026, 11, 18));
+
+        flows.Should().HaveCount(3);
+        flows.Single(f => f.Amount == 260m).Should().Match<DetectedFlow>(f => f.Frequency == "EveryNWeeks" && f.IntervalWeeks == 2);
+        flows.Single(f => f.Amount == 50m).Frequency.Should().Be("Monthly");
+        var triweekly = flows.Single(f => f.Amount == 400m);
+        triweekly.Frequency.Should().Be("EveryNWeeks");
+        triweekly.IntervalWeeks.Should().Be(3);
+        flows.Select(f => f.Name).Should().OnlyHaveUniqueItems();
+        flows.Select(f => f.Key).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void Monthly_transfer_with_drifting_day_is_detected()
+    {
+        var tx = Series("Transfer to Checking *5591 - Online Banking", false, 20m, D(2026, 9, 15), D(2026, 10, 12), D(2026, 11, 12)).ToList();
+        RecurringFlowDetector.Detect(tx, new DateOnly(2026, 11, 18)).Should().ContainSingle(f => f.Frequency == "Monthly" && f.Amount == 20m);
+    }
+
+    [Fact]
     public void Detects_biweekly_paycheck_with_anchor_weekday()
     {
         var tx = Series("QTR CORPORATION PAYROLL", true, 2100m, D(2026, 10, 2), D(2026, 10, 16), D(2026, 10, 30), D(2026, 11, 13)).ToList();
