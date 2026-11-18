@@ -103,6 +103,10 @@ public static class AuthSetup
                         var id = (ClaimsIdentity)principal.Identity!;
                         id.AddClaim(new Claim(TenantClaim, user.TenantId.ToString()));
                         id.AddClaim(new Claim(UserClaim, user.UserId.ToString()));
+                        if (user.IsHousehold)
+                        {
+                            id.AddClaim(new Claim(HouseholdAccess.Claim, "true"));
+                        }
                     },
                     OnRemoteFailure = ctx =>
                     {
@@ -150,5 +154,5 @@ public static class AuthSetup
     private static string SafeLocal(string? url) =>
         !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") ? url : "/";
 
-    private sealed record ResolveResponse(Guid UserId, Guid TenantId);
+    private sealed record ResolveResponse(Guid UserId, Guid TenantId, bool IsHousehold = false);
 }

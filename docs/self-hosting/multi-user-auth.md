@@ -32,5 +32,9 @@ or by email, honoured only when the IdP reports `email_verified=true`:
 this, point `app_users.tenant_id` for your row at the household tenant (or ask for a helper).
 
 ## Notes
-* Linked bank connections (SimpleFIN/MX) belong to the household owner only; other users start empty.
+* Linked bank connections (SimpleFIN/MX) belong to the household owner only; other users start empty. Scheduled syncs
+  for other tenants are a no-op; they never touch the household's SimpleFIN/MX credentials.
+* **Data & Backups** (`/data`, `/api/data/*`: backup state, export/import/backup-now of the *whole* database) is limited
+  to logins mapped to the household tenant; other tenants get 403 and the menu item is hidden. With OIDC on and no
+  `Tenancy__LegacyOwner*` configured, nobody is mapped to the household tenant, so nobody can use it (fail closed).
 * The shared `Api__Key` is the Web↔API trust boundary: keep the API on a private network.
