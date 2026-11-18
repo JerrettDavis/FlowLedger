@@ -475,6 +475,46 @@ public sealed class FlowLedgerApiClient
         });
     }
 
+    /// <summary>Renames/moves a category subtree to <paramref name="newPath"/>; existing paths there are merged into. <paramref name="dryRun"/> only previews.</summary>
+    public async Task<CategoryMoveResultDto> MoveCategoryAsync(Guid id, string newPath, bool dryRun, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("move category", async () =>
+        {
+            var response = await _http.PostAsJsonAsync($"/api/categories/{id}/move", new { newPath, dryRun }, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = response.StatusCode == System.Net.HttpStatusCode.BadRequest ? await ReadValidationMessageAsync(response, ct) : null;
+                throw new ApiClientException(detail ?? $"Couldn't move category (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            return (await response.Content.ReadFromJsonAsync<CategoryMoveResultDto>(JsonOptions, ct))!;
+        });
+    }
+
+    private static async Task<string?> ReadValidationMessageAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
+            if (body.TryGetProperty("errors", out var errors))
+            {
+                foreach (var prop in errors.EnumerateObject())
+                {
+                    foreach (var msg in prop.Value.EnumerateArray())
+                    {
+                        return msg.GetString();
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // fall through to the generic message
+        }
+
+        return null;
+    }
+
     // ── Recurring Flows ───────────────────────────────────────────────────────
 
     public async Task<List<RecurringFlowDto>> GetRecurringFlowsAsync(CancellationToken ct = default)

@@ -1,0 +1,82 @@
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<MudDialog aria-labelledby="move-cat-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="move-cat-title">Rename, move or merge</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            <strong>@Category.Path</strong> and everything under it will live at the new path.
+            Pick an existing category to <strong>merge</strong> into it; type a new path to <strong>rename or move</strong>.
+        </MudText>
+        <MudAutocomplete T="string" Label="New path" Value="_newPath" ValueChanged="OnChanged" SearchFunc="SearchAsync"
+                         CoerceValue="true" CoerceText="true" AutoFocus="true" DebounceInterval="300"
+                         HelperText="e.g. Food/Eating Out — use / for levels" Class="mb-3" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+        }
+        else if (_preview is not null)
+        {
+            <MudAlert Severity="@(_preview.Merged > 0 ? Severity.Warning : Severity.Info)" Dense="true">
+                @if (_preview.Moved > 0)
+                {
+                    <div>@_preview.Moved categor@(_preview.Moved == 1 ? "y" : "ies") will be renamed/moved.</div>
+                }
+                @foreach (var m in _preview.Merges)
+                {
+                    <div>@m.OldPath will be merged into existing <strong>@m.TargetPath</strong>.</div>
+                }
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Apply" Disabled="@(_preview is null || _error is not null)"
+                   aria-label="Apply change">@(_preview is { Merged: > 0 } ? "Merge" : "Apply")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public FlowLedger.Web.ApiClient.CategoryDto Category { get; set; } = default!;
+    [Parameter] public List<FlowLedger.Web.ApiClient.CategoryDto> Categories { get; set; } = [];
+
+    private string? _newPath;
+    private string? _error;
+    private FlowLedger.Web.ApiClient.CategoryMoveResultDto? _preview;
+    private int _seq;
+
+    private Task<IEnumerable<string>> SearchAsync(string? text, CancellationToken ct) =>
+        Task.FromResult<IEnumerable<string>>(Categories.Select(c => c.Path)
+            .Where(p => p != Category.Path && !p.StartsWith(Category.Path + "/", StringComparison.OrdinalIgnoreCase)
+                        && (string.IsNullOrWhiteSpace(text) || p.Contains(text, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(p => p).Take(30).ToList());
+
+    private async Task OnChanged(string? value)
+    {
+        _newPath = value;
+        _preview = null;
+        _error = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var seq = ++_seq;
+        try
+        {
+            var result = await ApiClient.MoveCategoryAsync(Category.Id, value, dryRun: true);
+            if (seq == _seq) _preview = result;
+        }
+        catch (Exception ex)
+        {
+            if (seq == _seq) _error = ex.Message;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Apply() => MudDialog.Close(DialogResult.Ok(_newPath));
+}
