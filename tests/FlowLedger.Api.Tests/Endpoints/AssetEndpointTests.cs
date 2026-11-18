@@ -72,7 +72,9 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         third.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var reread = await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}");
-        reread!.CurrentValue.Should().Be(1400m);
+        // Blending: latest valuation per distinct source within +/-7 days is averaged:
+        // Appraiser 1500 and the latest Manual (1400, not the original 2000) => 1450.
+        reread!.CurrentValue.Should().Be(1450m);
         reread.Valuations.Should().HaveCount(3);
         reread.Valuations!.Select(v => v.Source).Should().Contain(["Appraiser", "Manual"]);
     }
@@ -154,8 +156,32 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
             new RecordValuationRequest(320000m, null, "Appraiser", null))).EnsureSuccessStatusCode();
 
         var account = await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{acct.Id}");
-        account!.BalanceAmount.Should().Be(320000m);
-        (await Summary()).NetWorth.NetWorth.Should().Be(320000m);
+        // Initial Manual 300000 and Appraiser 320000 (same day, different sources) blend to 310000.
+        account!.BalanceAmount.Should().Be(310000m);
+        (await Summary()).NetWorth.NetWorth.Should().Be(310000m);
+    }
+
+    [Fact]
+    public async Task Valuations_from_different_sources_within_window_are_blended_and_outside_window_latest_wins()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var a = await Create(NewAsset(value: 1000m, valuedOn: today));
+
+        // Different source, same window: average of 1000 (Manual) and 2000 (Appraiser).
+        var blended = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
+            new RecordValuationRequest(2000m, today, "Appraiser", null));
+        blended.EnsureSuccessStatusCode();
+        (await blended.Content.ReadFromJsonAsync<AssetDto>())!.CurrentValue.Should().Be(1500m);
+
+        // Same source twice counts once (latest per source), so the feed does not outweigh others.
+        (await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
+            new RecordValuationRequest(3000m, today, "Appraiser", null))).EnsureSuccessStatusCode();
+        (await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}"))!.CurrentValue.Should().Be(2000m);
+
+        // A valuation dated more than 7 days later leaves earlier ones outside the window: latest wins.
+        (await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
+            new RecordValuationRequest(500m, today.AddDays(8), "Manual", null))).EnsureSuccessStatusCode();
+        (await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}"))!.CurrentValue.Should().Be(500m);
     }
 
     private async Task<decimal> Balance(Guid accountId)
