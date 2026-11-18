@@ -250,7 +250,8 @@ public sealed record AlertDto(string Severity, string Title, string Detail);
 
 public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
 public sealed record CategoryMergeDto(Guid SourceId, string OldPath, Guid TargetId, string TargetPath);
-public sealed record CategoryMoveResultDto(int Moved, int Merged, int TransactionsAffected, List<CategoryMergeDto> Merges);
+public sealed record CategoryMoveDto(Guid Id, string OldPath, string NewPath, string DisplayName, Guid? ParentId);
+public sealed record CategoryMoveResultDto(int Moved, int Merged, int TransactionsAffected, List<CategoryMergeDto> Merges, List<CategoryMoveDto> Moves);
 
 public sealed record PeriodPerformanceDto(string Period, int Days, decimal StartBalance, decimal NetContributions, decimal Gain, double? GainPercent);
 

@@ -1,0 +1,31 @@
+@* A category as a pill: colour dot keyed to the top-level category, muted parent path, bold leaf. Clickable when OnClick is set. *@
+@{
+    var uncategorized = string.IsNullOrWhiteSpace(Path) || string.Equals(Path, "Uncategorized", StringComparison.OrdinalIgnoreCase);
+    var segments = uncategorized ? [] : Path!.Split('/');
+    var leaf = segments.Length > 0 ? segments[^1] : "Categorize";
+    var parent = segments.Length > 1 ? string.Join(" › ", segments[..^1]) + " ›" : null;
+}
+@if (OnClick.HasDelegate)
+{
+    <button type="button" class="fl-catchip @(uncategorized ? "fl-catchip-empty" : null)" style="--fl-cat:@CategoryColors.For(Path)"
+            @onclick="OnClick" aria-label="@AriaLabel" title="@(uncategorized ? "Choose a category" : $"{Path} — change category")">
+        @if (!uncategorized) { <span class="fl-catchip-dot"></span> }
+        @if (parent is not null) { <span class="fl-catchip-parent">@parent</span> }
+        <span class="fl-catchip-leaf">@leaf</span>
+        <MudIcon Icon="@Icons.Material.Filled.Edit" Class="fl-catchip-edit" />
+    </button>
+}
+else
+{
+    <span class="fl-catchip" style="--fl-cat:@CategoryColors.For(Path);cursor:default">
+        @if (!uncategorized) { <span class="fl-catchip-dot"></span> }
+        @if (parent is not null) { <span class="fl-catchip-parent">@parent</span> }
+        <span class="fl-catchip-leaf">@leaf</span>
+    </span>
+}
+
+@code {
+    [Parameter] public string? Path { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+}

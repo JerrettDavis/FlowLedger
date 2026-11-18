@@ -243,14 +243,12 @@ else if (_result is not null)
                     <tbody>
                     @foreach (var t in r.Transactions)
                     {
-                        <tr>
+                        <tr class="@(_flash.Contains(t.Id) ? "fl-row-flash" : null)">
                             <td>@Format.FullDate(t.Date)</td>
                             <td>@(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)</td>
                             <td>
-                                <MudButton Size="Size.Small" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.Edit"
-                                           Color="@(t.Category == "Uncategorized" ? Color.Default : Color.Primary)"
-                                           OnClick="() => Recategorize(t)"
-                                           aria-label="@($"Recategorize {(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)}")">@t.Category</MudButton>
+                                <CategoryChip Path="@t.Category" OnClick="() => Recategorize(t)"
+                                              AriaLabel="@($"Change category of {(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)}, currently {t.Category}")" />
                             </td>
                             <td>@t.Account</td>
                             <td>@string.Join(", ", t.Tags)</td>
@@ -396,6 +394,15 @@ else if (_result is not null)
 
     // ── recategorize ─────────────────────────────────────────────────────────
 
+    private HashSet<Guid> _flash = [];
+
+    /// <summary>Briefly highlights the rows that just changed so the eye finds them.</summary>
+    private void FlashRows(IEnumerable<Guid> ids)
+    {
+        _flash = ids.ToHashSet();
+        _ = Task.Delay(1800).ContinueWith(_ => InvokeAsync(() => { _flash = []; StateHasChanged(); }));
+    }
+
     private async Task Recategorize(BreakdownTransactionDto tx)
     {
         try
@@ -409,12 +416,18 @@ else if (_result is not null)
         }
 
         var name = string.IsNullOrWhiteSpace(tx.Merchant) ? tx.Description : tx.Merchant;
-        var dialog = await Dialogs.ShowAsync<RecategorizeDialog>("Recategorize", new DialogParameters<RecategorizeDialog>
+        string Key(BreakdownTransactionDto t) => (string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant).Trim().ToUpperInvariant();
+        var matching = _result?.Transactions.Where(t => Key(t) == Key(tx)).Select(t => t.Id).ToHashSet() ?? [tx.Id];
+        var previousId = _categories.FirstOrDefault(c => string.Equals(c.Path, tx.Category, StringComparison.OrdinalIgnoreCase))?.Id;
+        var dialog = await Dialogs.ShowAsync<RecategorizeDialog>("Change category", new DialogParameters<RecategorizeDialog>
         {
             { x => x.Merchant, name },
             { x => x.CurrentCategory, tx.Category },
+            { x => x.Amount, tx.Amount },
+            { x => x.Date, tx.Date },
+            { x => x.MatchCount, matching.Count },
             { x => x.Categories, _categories },
-        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
         var result = await dialog.Result;
         if (result is null || result.Canceled || result.Data is not ValueTuple<Guid, string, bool> (var categoryId, var path, var all))
         {
@@ -442,7 +455,36 @@ else if (_result is not null)
             }
 
             await LoadAsync();
-            Snackbar.Add(all ? $"Moved {changed} transaction(s) to {path}; future “{name}” transactions will follow" : $"Moved to {path}", Severity.Success);
+            FlashRows(all ? matching : [tx.Id]);
+            var message = all
+                ? $"Moved {changed} transaction{(changed == 1 ? "" : "s")} to {path}. Future “{name}” transactions will follow."
+                : $"Moved to {path}.";
+            if (!all && previousId is { } undoTo)
+            {
+                Snackbar.Add(message, Severity.Success, c =>
+                {
+                    c.Action = "Undo";
+                    c.ActionColor = Color.Inherit;
+                    c.OnClick = async _ =>
+                    {
+                        try
+                        {
+                            await ApiClient.RecategorizeAsync(tx.Id, undoTo, false);
+                            await LoadAsync();
+                            FlashRows([tx.Id]);
+                            await InvokeAsync(StateHasChanged);
+                        }
+                        catch (Exception ex)
+                        {
+                            Snackbar.Add(ex.Message, Severity.Error);
+                        }
+                    };
+                });
+            }
+            else
+            {
+                Snackbar.Add(message, Severity.Success);
+            }
         }
         catch (Exception ex)
         {

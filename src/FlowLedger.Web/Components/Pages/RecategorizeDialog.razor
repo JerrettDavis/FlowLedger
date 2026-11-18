@@ -1,23 +1,61 @@
 <MudDialog aria-labelledby="recat-dialog-title">
     <TitleContent>
-        <MudText Typo="Typo.h6" id="recat-dialog-title">Recategorize</MudText>
+        <MudText Typo="Typo.h6" id="recat-dialog-title">Change category</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Class="mb-3">
-            <strong>@Merchant</strong> · currently <em>@CurrentCategory</em>
-        </MudText>
-        <MudAutocomplete T="CategoryDto" Label="New category" @bind-Value="_selected" SearchFunc="SearchAsync"
-                         ToStringFunc="@(c => c?.Path ?? "")" HelperText="Type a new name (use Parent/Child for sub-categories) to create it" AutoFocus="true" CoerceText="false" ResetValueOnEmptyText="true"
-                         Clearable="true" Class="mb-3" />
-        <MudRadioGroup T="bool" @bind-Value="_applyToAll">
-            <MudRadio T="bool" Value="false" Color="Color.Primary">Just this transaction</MudRadio>
-            <MudRadio T="bool" Value="true" Color="Color.Primary">All transactions matching “@Merchant” (also future syncs)</MudRadio>
-        </MudRadioGroup>
+        <div class="fl-txsummary">
+            <div style="min-width:0">
+                <div class="fl-txsummary-name" title="@Merchant">@Merchant</div>
+                <div class="fl-txsummary-meta">@(Date is { } d ? Format.FullDate(d) : "")</div>
+            </div>
+            <div class="d-flex flex-column align-end" style="gap:4px;flex:none">
+                @if (Amount is { } amt) { <span class="fl-num" style="font-weight:600">@Format.Money(amt)</span> }
+                <CategoryChip Path="@CurrentCategory" />
+            </div>
+        </div>
+
+        <MudAutocomplete T="CategoryDto" Label="Move to" @bind-Value="_selected" SearchFunc="SearchAsync"
+                         ToStringFunc="@(c => c?.Path ?? "")" AutoFocus="true" OpenOnFocus="false" CoerceText="false" ResetValueOnEmptyText="true"
+                         Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" MaxItems="40"
+                         Placeholder="Search, or type a new category" OpenIcon="@Icons.Material.Filled.Search"
+                         HelperText="@(IsNew ? "This category doesn't exist yet. It will be created." : "Use Parent/Child to make a sub-category.")"
+                         Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Folder" AdornmentColor="Color.Default">
+            <ItemTemplate Context="c">
+                @if (c.Id == Guid.Empty)
+                {
+                    <div class="fl-option fl-option-new"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />Create “@c.Path”</div>
+                }
+                else
+                {
+                    <div class="fl-option"><span class="fl-catchip-dot" style="--fl-cat:@CategoryColors.For(c.Path)"></span>@c.Path</div>
+                }
+            </ItemTemplate>
+        </MudAutocomplete>
+
+        <div class="fl-scope" role="radiogroup" aria-label="Apply to">
+            <button type="button" class="fl-scope-card" role="radio" aria-checked="@(!_applyToAll ? "true" : "false")" @onclick="() => _applyToAll = false">
+                <span class="fl-scope-radio"></span>
+                <span>
+                    <div class="fl-scope-title">Just this transaction</div>
+                    <div class="fl-scope-desc">Nothing else changes.</div>
+                </span>
+            </button>
+            <button type="button" class="fl-scope-card" role="radio" aria-checked="@(_applyToAll ? "true" : "false")" @onclick="() => _applyToAll = true">
+                <span class="fl-scope-radio"></span>
+                <span>
+                    <div class="fl-scope-title">All transactions from “@Merchant”</div>
+                    <div class="fl-scope-desc">
+                        @(MatchCount > 1 ? $"{MatchCount} in this view, plus any others and future syncs." : "Includes past ones and future syncs.")
+                        Overrides categories you set earlier for this merchant.
+                    </div>
+                </span>
+            </button>
+        </div>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" aria-label="Cancel">Cancel</MudButton>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(_selected is null)"
-                   aria-label="Apply category">Apply</MudButton>
+                   aria-label="Apply category">@(_applyToAll ? "Move all matching" : "Move transaction")</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -26,10 +64,15 @@
 
     [Parameter] public string Merchant { get; set; } = "";
     [Parameter] public string CurrentCategory { get; set; } = "Uncategorized";
+    [Parameter] public decimal? Amount { get; set; }
+    [Parameter] public DateOnly? Date { get; set; }
+    [Parameter] public int MatchCount { get; set; }
     [Parameter] public List<CategoryDto> Categories { get; set; } = [];
 
     private CategoryDto? _selected;
     private bool _applyToAll;
+
+    private bool IsNew => _selected is { Id: var id } && id == Guid.Empty;
 
     protected override void OnInitialized() =>
         _selected = Categories.FirstOrDefault(c => string.Equals(c.Path, CurrentCategory, StringComparison.OrdinalIgnoreCase));
