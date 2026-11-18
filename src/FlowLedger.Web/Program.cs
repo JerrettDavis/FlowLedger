@@ -2,6 +2,7 @@ using System.Globalization;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Auth;
 using FlowLedger.Web.Components;
+using FlowLedger.Web.Security;
 using FlowLedger.Web.Services;
 using MudBlazor.Services;
 
@@ -61,6 +62,9 @@ else
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+// Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
+app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
