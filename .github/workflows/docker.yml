@@ -164,6 +164,11 @@ jobs:
   compose-smoke:
     name: Compose smoke test
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci_test_password
+      API__KEY: ci-test-api-key-not-for-production
+      # The ephemeral CI stack has no identity provider.
+      AUTH__ALLOWANONYMOUS: "true"
     needs: build
     # Run on push to default branch or on tagged release; skip on PRs to save minutes
     if: github.event_name == 'push'
@@ -175,11 +180,6 @@ jobs:
       - name: Start full stack
         run: |
           docker compose --profile full up --build -d
-        env:
-          POSTGRES_PASSWORD: ci_test_password
-          API__KEY: ci-test-api-key-not-for-production
-          # Compose runs as Production; the ephemeral CI stack has no IdP, so opt out of the sign-in requirement.
-          AUTH__ALLOWANONYMOUS: "true"
 
       - name: Wait for services to be healthy
         run: |

@@ -12,7 +12,10 @@ public sealed record AccountDto(
     string? ExternalAccountRef,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? LastBalanceConfirmedAt);
+    DateTimeOffset? LastBalanceConfirmedAt,
+    bool TypeLockedByUser = false);
+
+public sealed record ChangeAccountTypeRequest(string AccountType);
 
 public sealed record CreateAccountRequest(
     string Name,

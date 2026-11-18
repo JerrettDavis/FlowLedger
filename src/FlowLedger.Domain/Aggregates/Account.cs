@@ -29,6 +29,9 @@ public sealed class Account : AggregateRoot
     public DateTimeOffset? LastBalanceConfirmedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>True once the user set the type by hand; provider sync must then leave the type alone.</summary>
+    public bool TypeLockedByUser { get; private set; }
+
     private Account()
     {
         // EF Core constructor — not for direct use. Fields initialised by EF.
@@ -128,7 +131,8 @@ public sealed class Account : AggregateRoot
     /// </summary>
     public bool ChangeType(AccountType newType)
     {
-        if (newType == AccountType)
+        // A type the user chose by hand is never overwritten by provider inference.
+        if (TypeLockedByUser || newType == AccountType)
         {
             return false;
         }
@@ -142,6 +146,37 @@ public sealed class Account : AggregateRoot
         AccountType = newType;
         return true;
     }
+
+    /// <summary>
+    /// User-initiated type correction. Unlike <see cref="ChangeType"/> (provider inference) it always applies and
+    /// pins the type (<see cref="TypeLockedByUser"/>) so later syncs never overwrite it, even when the type is unchanged.
+    /// Liability balances are stored as a positive amount owed, so a negative balance moved onto a liability type is
+    /// flipped. Returns true when the type itself changed.
+    /// </summary>
+    /// <exception cref="InvalidBalanceException">An asset type was requested for a negative balance with no credit limit.</exception>
+    public bool SetTypeManually(AccountType newType)
+    {
+        if (IsAssetType(newType) && CurrentBalance.IsNegative && CreditLimit is null)
+        {
+            throw new InvalidBalanceException(
+                $"Account '{Name}' has a negative balance, so it cannot be an asset account ({newType}) without a credit limit.");
+        }
+
+        var changed = newType != AccountType;
+        if (IsLiabilityType(newType) && CurrentBalance.IsNegative)
+        {
+            var previous = CurrentBalance;
+            CurrentBalance = CurrentBalance.Abs();
+            RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, CurrentBalance));
+        }
+
+        AccountType = newType;
+        TypeLockedByUser = true;
+        return changed;
+    }
+
+    /// <summary>Releases a manual type pin so provider inference may update the type again.</summary>
+    public void ReleaseTypeLock() => TypeLockedByUser = false;
 
     public static bool IsLiabilityType(AccountType type) =>
         type is AccountType.CreditCard or AccountType.Loan or AccountType.Mortgage or AccountType.ManualLiability;

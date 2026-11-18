@@ -161,7 +161,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             // Append-only history: CurrentBalance is overwritten each sync, the snapshot is not.
             await _db.BalanceSnapshots.AddAsync(AccountBalanceSnapshotRecord.Create(
                 _tenant.TenantId, domainAccount.AccountId.Value, _provider.ProviderName, pa.ProviderId,
-                pa.Balance.Amount, pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
+                domainAccount.TypeLockedByUser && Account.IsLiabilityType(domainAccount.AccountType)
+                    ? Math.Abs(pa.Balance.Amount)
+                    : pa.Balance.Amount,
+                pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
 
             // Step 4: sync transactions for this account
             var (added, skipped) = await SyncTransactionsAsync(domainAccount, pa.ProviderId, tenantId, ct);
@@ -197,11 +200,21 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         if (existing is not null)
         {
+            // A type the user pinned by hand wins over provider inference. The provider only normalises liability
+            // balances (positive = owed) for types IT inferred, so re-apply that convention for the pinned type.
+            var providerAmount = pa.Balance.Amount;
+            if (existing.TypeLockedByUser
+                && Account.IsLiabilityType(existing.AccountType)
+                && !(TryMapProviderAccountType(pa.AccountType, out var providerType) && Account.IsLiabilityType(providerType)))
+            {
+                providerAmount = Math.Abs(providerAmount);
+            }
+
             // Update balance if changed (account may carry a stale balance from last sync)
-            if (existing.CurrentBalance.Amount != pa.Balance.Amount ||
+            if (existing.CurrentBalance.Amount != providerAmount ||
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)
             {
-                var updatedBalance = new Money(pa.Balance.Amount, new Currency(pa.CurrencyCode));
+                var updatedBalance = new Money(providerAmount, new Currency(pa.CurrencyCode));
                 try { existing.UpdateBalance(updatedBalance); }
                 catch (Domain.Exceptions.InvalidBalanceException)
                 {

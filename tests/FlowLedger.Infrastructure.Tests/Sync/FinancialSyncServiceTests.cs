@@ -110,6 +110,38 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task SyncAsync_DoesNotOverwriteATypePinnedByTheUser()
+    {
+        var tenant = TestTenantContext.New();
+        await using (var db1 = _fixture.CreateDbContext(tenant))
+        {
+            await CreateSyncService(db1, tenant).SyncAsync();
+        }
+
+        Guid pinnedId;
+        AccountType providerType;
+        await using (var pinDb = _fixture.CreateDbContext(tenant))
+        {
+            var account = await pinDb.Accounts.FirstAsync(a => a.AccountType == AccountType.Checking);
+            pinnedId = account.Id;
+            providerType = account.AccountType;
+            account.SetTypeManually(AccountType.Savings);
+            await pinDb.SaveChangesAsync();
+        }
+
+        await using (var db2 = _fixture.CreateDbContext(tenant))
+        {
+            await CreateSyncService(db2, tenant).SyncAsync();
+        }
+
+        await using var verify = _fixture.CreateDbContext(tenant);
+        var after = await verify.Accounts.SingleAsync(a => a.Id == pinnedId);
+        providerType.Should().Be(AccountType.Checking);
+        after.AccountType.Should().Be(AccountType.Savings);
+        after.TypeLockedByUser.Should().BeTrue("the flag must round-trip through the new column");
+    }
+
+    [DockerFact]
     public async Task SyncAsync_TenantIsolation_DoesNotCrossContaminate()
     {
         // Arrange: two separate tenants sync independently

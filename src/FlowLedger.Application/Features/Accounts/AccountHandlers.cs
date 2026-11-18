@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Categories;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.SharedKernel;
@@ -94,6 +95,45 @@ public sealed class UpdateAccountHandler
     }
 }
 
+/// <summary>
+/// Corrects an account's type by hand and pins it so provider sync never reverts it. Everything that depends on the type
+/// is read live (net worth, forecast liquidity, credit-card alerts, spending/insight transfer detection), except the
+/// auto-assigned "Transfer" categories, which are persisted: those are cleared and re-derived so card/loan payments become
+/// (or stop being) transfers under the new type. Categories the user chose by hand are never touched.
+/// </summary>
+public sealed class ChangeAccountTypeHandler
+{
+    private readonly IAccountRepository _repo;
+    private readonly CategorizationService _categorization;
+
+    public ChangeAccountTypeHandler(IAccountRepository repo, CategorizationService categorization)
+    {
+        _repo = repo;
+        _categorization = categorization;
+    }
+
+    /// <exception cref="Domain.Exceptions.InvalidBalanceException">The type is incompatible with the balance.</exception>
+    public async Task<AccountDto?> HandleAsync(Guid id, ChangeAccountTypeRequest request, CancellationToken ct = default)
+    {
+        var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
+        if (account is null)
+        {
+            return null;
+        }
+
+        var newType = Enum.Parse<AccountType>(request.AccountType, ignoreCase: true);
+        var changed = account.SetTypeManually(newType);
+        await _repo.SaveChangesAsync(ct);
+
+        if (changed)
+        {
+            await _categorization.RecategorizeAfterAccountTypeChangeAsync(ct);
+        }
+
+        return AccountMapper.ToDto(account);
+    }
+}
+
 /// <summary>Deactivates an account (soft delete).</summary>
 public sealed class DeactivateAccountHandler
 {
@@ -128,5 +168,6 @@ internal static class AccountMapper
         a.ExternalAccountRef,
         a.IsActive,
         a.CreatedAt,
-        a.LastBalanceConfirmedAt);
+        a.LastBalanceConfirmedAt,
+        a.TypeLockedByUser);
 }

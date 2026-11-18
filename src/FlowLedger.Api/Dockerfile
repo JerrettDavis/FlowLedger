@@ -4,7 +4,7 @@
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
 # Copy only the manifest files first so the restore layer is cached until a
 # .csproj or central-package file changes.
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS restore
 WORKDIR /src
 
 # Central build / package management files

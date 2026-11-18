@@ -89,6 +89,10 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasDefaultValue(true)
             .IsRequired();
 
+        builder.Property(a => a.TypeLockedByUser)
+            .HasColumnName("type_locked_by_user")
+            .IsRequired();
+
         // Indexes per PLAN §23
         builder.HasIndex("TenantId").HasDatabaseName("ix_accounts_tenant_id");
     }
