@@ -72,15 +72,38 @@ internal sealed class MxApiClient
         return null;
     }
 
-    /// <summary>GET /users/{userGuid}/members — existing members (first page; a tenant has very few).</summary>
+    private const int MemberLookupRecordsPerPage = 100;
+    private const int MemberLookupMaxPages = 50; // Safety bound against a runaway pagination loop.
+
+    /// <summary>
+    /// GET /users/{userGuid}/members — lists ALL members for the user, paging until MX reports no
+    /// further pages. Used to discover widget-created members; the sync path never POSTs members
+    /// (MX rejects server-side member creation without credentials).
+    /// </summary>
     public async Task<IReadOnlyList<MxMember>> ListMembersAsync(string userGuid, CancellationToken ct)
     {
-        var response = await SendAsync(
-            HttpMethod.Get, $"/users/{userGuid}/members?page=1&records_per_page=100", request: (object?)null,
-            jsonTypeInfo: null, "ListMembers", ct).ConfigureAwait(false);
-        var body = await ReadAsync(response, MxJsonContext.Default.MxMembersResponse, "ListMembers", ct)
-            .ConfigureAwait(false);
-        return body.Members ?? [];
+        var result = new List<MxMember>();
+        for (var page = 1; page <= MemberLookupMaxPages; page++)
+        {
+            var response = await SendAsync(
+                HttpMethod.Get, $"/users/{userGuid}/members?page={page}&records_per_page={MemberLookupRecordsPerPage}",
+                request: (object?)null, jsonTypeInfo: null, "ListMembers", ct).ConfigureAwait(false);
+            var body = await ReadAsync(response, MxJsonContext.Default.MxMembersResponse, "ListMembers", ct)
+                .ConfigureAwait(false);
+
+            if (body.Members is { Count: > 0 } members)
+            {
+                result.AddRange(members);
+            }
+
+            // Stop when MX reports no further pages (or omits pagination → single page).
+            if (body.Pagination?.TotalPages is not { } total || page >= total)
+            {
+                break;
+            }
+        }
+
+        return result;
     }
 
     // ── Members ────────────────────────────────────────────────────────────────
