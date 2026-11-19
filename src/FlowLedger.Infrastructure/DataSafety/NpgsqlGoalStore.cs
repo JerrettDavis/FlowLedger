@@ -9,6 +9,8 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// </summary>
 public sealed class NpgsqlGoalStore : IGoalStore
 {
+    public const int MaxGoals = 200;
+
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS savings_goals (
             tenant_id uuid NOT NULL,
@@ -48,7 +50,9 @@ public sealed class NpgsqlGoalStore : IGoalStore
         var goalId = id ?? Guid.NewGuid();
         await using var conn = await OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(
-            "INSERT INTO savings_goals (tenant_id, id, name, target_amount, saved_amount, target_date) VALUES (@t, @i, @n, @a, @s, @d) " +
+            "INSERT INTO savings_goals (tenant_id, id, name, target_amount, saved_amount, target_date) " +
+            "SELECT @t, @i, @n, @a, @s, @d WHERE (SELECT count(*) FROM savings_goals WHERE tenant_id = @t) < " + MaxGoals + " " +
+            "OR EXISTS (SELECT 1 FROM savings_goals WHERE tenant_id = @t AND id = @i) " +
             "ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name, target_amount = EXCLUDED.target_amount, " +
             "saved_amount = EXCLUDED.saved_amount, target_date = EXCLUDED.target_date, updated_utc = now()", conn);
         cmd.Parameters.AddWithValue("t", tenantId);
@@ -57,7 +61,11 @@ public sealed class NpgsqlGoalStore : IGoalStore
         cmd.Parameters.AddWithValue("a", target);
         cmd.Parameters.AddWithValue("s", saved);
         cmd.Parameters.Add(new NpgsqlParameter("d", NpgsqlTypes.NpgsqlDbType.Date) { Value = targetDate is { } d ? d : DBNull.Value });
-        await cmd.ExecuteNonQueryAsync(ct);
+        if (await cmd.ExecuteNonQueryAsync(ct) == 0)
+        {
+            throw new InvalidOperationException($"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
+        }
+
         return goalId;
     }
 
