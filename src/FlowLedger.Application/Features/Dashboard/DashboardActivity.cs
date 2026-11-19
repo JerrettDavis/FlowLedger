@@ -102,12 +102,16 @@ public static class DashboardActivityAnalyzer
         var history = real.Where(t => (t.PostedDate ?? t.EffectiveDate) >= historyStart).ToList();
         var flagged = new List<FlaggedTransactionDto>();
 
+        // Group history by merchant key once: both rules below only compare against same-merchant rows, so this keeps the
+        // pass linear in history size instead of re-scanning (and copying) all of it for every candidate.
+        var historyByKey = history.GroupBy(Key).ToDictionary(g => g.Key, g => g.ToList());
+
         foreach (var t in candidates.Where(c => c.Direction == "Debit"))
         {
             var reasons = new List<string>();
             var key = Key(t);
             var date = t.PostedDate ?? t.EffectiveDate;
-            var others = history.Where(o => o.Id != t.Id).ToList();
+            var others = historyByKey.TryGetValue(key, out var sameKey) ? sameKey.Where(o => o.Id != t.Id).ToList() : [];
 
             if (others.Any(o => o.AccountId == t.AccountId && o.Direction == t.Direction && o.Amount == t.Amount
                 && Key(o) == key && Math.Abs(((o.PostedDate ?? o.EffectiveDate).DayNumber) - date.DayNumber) <= DuplicateWindowDays))
