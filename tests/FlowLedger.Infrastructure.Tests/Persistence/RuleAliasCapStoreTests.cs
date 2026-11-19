@@ -14,7 +14,35 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
 
     public Task InitializeAsync() => _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    private readonly List<Guid> _tenants = [];
+
+    private Guid NewTenant()
+    {
+        var id = Guid.NewGuid();
+        _tenants.Add(id);
+        return id;
+    }
+
+    // Ad-hoc tables are created at runtime and are not in Respawn's reset set, so remove everything these tests wrote;
+    // otherwise thousands of leftover rows leak into later tests (e.g. the restore drill).
+    public async Task DisposeAsync()
+    {
+        await using var conn = new Npgsql.NpgsqlConnection(_fixture.ConnectionString);
+        await conn.OpenAsync();
+        foreach (var table in new[] { "category_rules", "merchant_aliases", "budgets", "savings_goals" })
+        {
+            await using var cmd = new Npgsql.NpgsqlCommand($"DELETE FROM {table} WHERE tenant_id = ANY(@t)", conn);
+            cmd.Parameters.AddWithValue("t", _tenants.ToArray());
+            try
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+            {
+                // table never created by this test run; nothing to clean
+            }
+        }
+    }
 
     private sealed class Tenant(Guid id) : ITenantContext
     {
@@ -25,7 +53,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Rule_store_enforces_the_per_tenant_cap_in_sql_but_still_allows_replacing()
     {
-        var store = new NpgsqlCategoryRuleStore(_fixture.ConnectionString, new Tenant(Guid.NewGuid()));
+        var store = new NpgsqlCategoryRuleStore(_fixture.ConnectionString, new Tenant(NewTenant()));
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "Food");
@@ -43,7 +71,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Alias_store_enforces_the_per_tenant_cap_in_sql()
     {
-        var store = new NpgsqlMerchantAliasStore(_fixture.ConnectionString, new Tenant(Guid.NewGuid()));
+        var store = new NpgsqlMerchantAliasStore(_fixture.ConnectionString, new Tenant(NewTenant()));
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "A");
@@ -57,7 +85,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Budget_and_goal_stores_reject_new_rows_over_the_cap_but_allow_updates()
     {
-        var tenant = Guid.NewGuid();
+        var tenant = NewTenant();
         var budgets = new NpgsqlBudgetStore(_fixture.ConnectionString);
         for (var i = 0; i < NpgsqlBudgetStore.MaxBudgets; i++)
         {

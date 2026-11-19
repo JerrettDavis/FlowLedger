@@ -145,6 +145,7 @@ public sealed class ImportTransactionsHandler
 
         if (toInsert.Count > 0)
         {
+            await FlowLedger.Application.Features.Transactions.TransactionQuota.EnsureRoomAsync(_txRepo, toInsert.Count, ct);
             await _txRepo.AddRangeAsync(toInsert.Select(x => x.Tx), ct);
             await _txRepo.SaveChangesAsync(ct);
         }

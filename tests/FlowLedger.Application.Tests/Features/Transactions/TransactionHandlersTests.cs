@@ -56,6 +56,18 @@ public sealed class TransactionHandlersTests
         dto.CategoryId.Should().BeNull("a merchant name alone must not invent a random category id");
     }
 
+    [Fact]
+    public async Task CreateTransaction_AtTheTenantQuota_IsRejected()
+    {
+        _repo.ReportedCount = TransactionQuota.MaxPerTenant;
+        var handler = new CreateTransactionHandler(_repo, _tenant);
+
+        var act = () => handler.HandleAsync(ValidRequest());
+
+        await act.Should().ThrowAsync<TransactionQuotaExceededException>();
+        _repo.All.Should().BeEmpty();
+    }
+
     // ── GetTransactionHandler ─────────────────────────────────────────────────
 
     [Fact]

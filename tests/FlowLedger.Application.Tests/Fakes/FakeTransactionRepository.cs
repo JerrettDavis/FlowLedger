@@ -9,6 +9,11 @@ public sealed class FakeTransactionRepository : ITransactionRepository
 {
     private readonly List<Transaction> _store = [];
 
+    /// <summary>When set, <see cref="CountAsync"/> reports this instead of the stored count (quota tests).</summary>
+    public int? ReportedCount { get; set; }
+
+    public Task<int> CountAsync(CancellationToken ct = default) => Task.FromResult(ReportedCount ?? _store.Count);
+
     public Task<Transaction?> GetByIdAsync(TransactionId id, CancellationToken ct = default)
         => Task.FromResult(_store.FirstOrDefault(t => t.Id == id.Value));
 

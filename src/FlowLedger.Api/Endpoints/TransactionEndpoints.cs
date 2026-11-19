@@ -49,8 +49,15 @@ internal static class TransactionEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var result = await handler.HandleAsync(request, ct);
-            return Results.Created($"/api/transactions/{result.Id}", result);
+            try
+            {
+                var result = await handler.HandleAsync(request, ct);
+                return Results.Created($"/api/transactions/{result.Id}", result);
+            }
+            catch (TransactionQuotaExceededException ex)
+            {
+                return Results.Problem(title: "Transaction limit reached", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
         })
         .WithName("CreateTransaction")
         .WithSummary("Record a manual transaction")

@@ -24,7 +24,7 @@ Work through this before giving anyone else a login. Each item links to the deta
   owner. They can add accounts and import CSVs manually. Self-service linking is planned
   ([ADR 0009](../adr/0009-multi-provider-self-service-linking.md)).
 - Paid lookups (MX connect, named asset-valuation feeds) are household-only; the built-in valuation model is available to all.
-- Per-user limits: 5 MB per CSV upload and 50,000 rows per import; 1,000 rules, 1,000 merchant aliases, 500 budgets, 200 goals.
+- Per-user limits: 5 MB per CSV upload and 50,000 rows per import; 1,000 rules, 1,000 merchant aliases, 500 budgets, 200 goals, 500,000 transactions.
 - There is no in-app "delete my account" yet. See the FAQ in [onboarding.md](../onboarding.md) for the manual steps.
 
 ## 4. Hand them the guide
