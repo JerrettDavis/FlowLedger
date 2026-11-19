@@ -1,0 +1,146 @@
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<MudDialog aria-labelledby="account-connector-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="account-connector-title">Data source for @Account.Name</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3 fl-muted">
+            Choose which connector feeds this account. A manual account is never synced. Connectors are enabled for the whole instance;
+            each account uses exactly one.
+        </MudText>
+
+        <MudSelect T="string" Value="_connector" ValueChanged="OnConnectorChanged" Label="Data source" Class="mb-3" aria-label="Data source">
+            <MudSelectItem Value="@Manual">Manual (never synced)</MudSelectItem>
+            @foreach (var c in Connectors.Where(c => c.Active))
+            {
+                <MudSelectItem Value="@c.Id">@c.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (_connector != Manual)
+        {
+            @if (_loadingOptions)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_options.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    This connector has no unlinked provider accounts. Run a sync so it can report its accounts, or unlink another account first.
+                </MudAlert>
+            }
+            else
+            {
+                <MudSelect T="string" @bind-Value="_providerAccount" Label="Provider account" Class="mb-3" aria-label="Provider account">
+                    @foreach (var o in _options)
+                    {
+                        <MudSelectItem Value="@o.ProviderAccountId">@o.Name (@o.Balance.ToString("N2") @o.Currency)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        }
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        @if (CurrentConnector is not null)
+        {
+            <MudButton Color="Color.Warning" OnClick="RemoveLink">Remove link</MudButton>
+        }
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@(_connector != Manual && string.IsNullOrEmpty(_providerAccount))">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const string Manual = "manual";
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public FlowLedger.Web.ApiClient.AccountDto Account { get; set; } = default!;
+    [Parameter] public List<FlowLedger.Web.ApiClient.ConnectorDto> Connectors { get; set; } = [];
+    [Parameter] public string? CurrentConnector { get; set; }
+    [Parameter] public string? CurrentProviderAccountId { get; set; }
+
+    private string _connector = Manual;
+    private string? _providerAccount;
+    private List<FlowLedger.Web.ApiClient.AvailableProviderAccountDto> _options = [];
+    private bool _loadingOptions;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _connector = CurrentConnector ?? Manual;
+        _providerAccount = CurrentProviderAccountId;
+        if (_connector != Manual)
+        {
+            await LoadOptionsAsync();
+        }
+    }
+
+    private async Task OnConnectorChanged(string connector)
+    {
+        _connector = connector;
+        _providerAccount = connector == CurrentConnector ? CurrentProviderAccountId : null;
+        _error = null;
+        if (connector != Manual)
+        {
+            await LoadOptionsAsync();
+        }
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        _loadingOptions = true;
+        try
+        {
+            _options = await ApiClient.GetAvailableProviderAccountsAsync(_connector);
+            // The account's current provider account is linked (so not "available") but must stay selectable.
+            if (_connector == CurrentConnector && CurrentProviderAccountId is { } cur && _options.All(o => o.ProviderAccountId != cur))
+            {
+                _options.Insert(0, new FlowLedger.Web.ApiClient.AvailableProviderAccountDto(cur, "Current: " + cur, "", 0m, "", DateTimeOffset.UtcNow));
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _options = [];
+        }
+        finally
+        {
+            _loadingOptions = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            await ApiClient.SetAccountConnectorAsync(Account.Id, new FlowLedger.Web.ApiClient.SetAccountConnectorRequest(_connector, _connector == Manual ? null : _providerAccount));
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RemoveLink()
+    {
+        try
+        {
+            await ApiClient.ClearAccountConnectorAsync(Account.Id);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
