@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.SharedKernel;
 using FlowLedger.Worker;
@@ -55,6 +56,33 @@ public sealed class TenantFanOutTests
         await TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, (_, t) => { seen.Add(t); return Task.CompletedTask; }, CancellationToken.None);
 
         seen.Should().Equal(A, B, C);
+    }
+
+    [Fact]
+    public async Task Parallel_mode_runs_every_tenant_in_its_own_scope_and_isolates_failures()
+    {
+        var cfg = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = "3" }).Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IUserDirectory>(new FakeDirectory(A, B, C));
+        services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
+        services.AddScoped(_ => new ConfiguredTenantContext(Guid.Empty));
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<ConfiguredTenantContext>());
+        await using var sp = services.BuildServiceProvider();
+        var seen = new System.Collections.Concurrent.ConcurrentBag<(Guid Asked, Guid Active)>();
+
+        await TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, async (scope, t) =>
+        {
+            await Task.Delay(20);
+            seen.Add((t, scope.GetRequiredService<ConfiguredTenantContext>().TenantId));
+            if (t == B)
+            {
+                throw new InvalidOperationException("boom");
+            }
+        }, CancellationToken.None);
+
+        seen.Should().HaveCount(3);
+        seen.Should().OnlyContain(x => x.Asked == x.Active, "each tenant gets its own scope with that tenant active");
     }
 
     [Fact]

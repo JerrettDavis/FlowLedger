@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Users;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -20,9 +21,12 @@ internal static class TenantFanOut
                 : await dir.ListTenantIdsAsync(ct);
         }
 
-        foreach (var tenant in tenants)
+        // Worker:MaxParallelTenants (default 1 = strictly serial, the historical behaviour). Raise it to sync many tenants within one
+        // cron window; each tenant still has its own DI scope/DbContext. Keep it small so provider rate limits and the connection pool hold.
+        var parallelism = Math.Clamp(root.GetService<IConfiguration>()?.GetValue("Worker:MaxParallelTenants", 1) ?? 1, 1, 16);
+
+        async Task RunOne(Guid tenant)
         {
-            ct.ThrowIfCancellationRequested();
             await using var scope = root.CreateAsyncScope();
             scope.ServiceProvider.GetService<ConfiguredTenantContext>()?.Use(tenant);
             try
@@ -34,5 +38,19 @@ internal static class TenantFanOut
                 logger.LogError(ex, "Background work failed for tenant {TenantId}; continuing with the next tenant.", tenant);
             }
         }
+
+        if (parallelism == 1)
+        {
+            foreach (var tenant in tenants)
+            {
+                ct.ThrowIfCancellationRequested();
+                await RunOne(tenant);
+            }
+
+            return;
+        }
+
+        await Parallel.ForEachAsync(tenants, new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
+            async (tenant, _) => await RunOne(tenant));
     }
 }
