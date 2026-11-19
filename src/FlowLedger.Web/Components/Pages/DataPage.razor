@@ -11,7 +11,11 @@
 
 @if (!_household)
 {
-    <MudAlert Severity="Severity.Info">Data &amp; Backups covers the whole installation and is only available to the household owner.</MudAlert>
+    <MudAlert Severity="Severity.Info">
+Data &amp; Backups covers the whole installation and is only available to the household owner.
+If you are the owner and signed in before this was added, sign in again to refresh your access.
+<MudButton Variant="Variant.Outlined" Size="Size.Small" Class="ml-2" Href="/auth/relogin?returnUrl=%2Fdata" ForceLoad="true">Sign in again</MudButton>
+</MudAlert>
 }
 else if (_loading)
 {
