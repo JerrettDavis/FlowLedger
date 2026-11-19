@@ -53,4 +53,31 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
 
         (await store.ListAsync()).Should().HaveCount(1000).And.NotContain(a => a.Pattern == "OVER THE CAP");
     }
+
+    [DockerFact]
+    public async Task Budget_and_goal_stores_reject_new_rows_over_the_cap_but_allow_updates()
+    {
+        var tenant = Guid.NewGuid();
+        var budgets = new NpgsqlBudgetStore(_fixture.ConnectionString);
+        for (var i = 0; i < NpgsqlBudgetStore.MaxBudgets; i++)
+        {
+            await budgets.SetAsync(tenant, $"Cat{i}", 10m);
+        }
+
+        var overBudget = () => budgets.SetAsync(tenant, "One too many", 10m);
+        await overBudget.Should().ThrowAsync<InvalidOperationException>();
+        await budgets.SetAsync(tenant, "Cat1", 99m);
+
+        var goals = new NpgsqlGoalStore(_fixture.ConnectionString);
+        Guid first = default;
+        for (var i = 0; i < NpgsqlGoalStore.MaxGoals; i++)
+        {
+            var id = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
+            if (i == 0) { first = id; }
+        }
+
+        var overGoal = () => goals.UpsertAsync(tenant, null, "one too many", 100m, 0m, null);
+        await overGoal.Should().ThrowAsync<InvalidOperationException>();
+        await goals.UpsertAsync(tenant, first, "renamed", 100m, 5m, null);
+    }
 }

@@ -9,6 +9,8 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// </summary>
 public sealed class NpgsqlBudgetStore : IBudgetStore
 {
+    public const int MaxBudgets = 500;
+
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS budgets (
             tenant_id uuid NOT NULL,
@@ -42,12 +44,17 @@ public sealed class NpgsqlBudgetStore : IBudgetStore
     {
         await using var conn = await OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(
-            "INSERT INTO budgets (tenant_id, category, monthly_limit) VALUES (@t, @c, @l) " +
+            "INSERT INTO budgets (tenant_id, category, monthly_limit) " +
+            "SELECT @t, @c, @l WHERE (SELECT count(*) FROM budgets WHERE tenant_id = @t) < " + MaxBudgets + " " +
+            "OR EXISTS (SELECT 1 FROM budgets WHERE tenant_id = @t AND category = @c) " +
             "ON CONFLICT (tenant_id, category) DO UPDATE SET monthly_limit = EXCLUDED.monthly_limit, updated_utc = now()", conn);
         cmd.Parameters.AddWithValue("t", tenantId);
         cmd.Parameters.AddWithValue("c", category);
         cmd.Parameters.AddWithValue("l", monthlyLimit);
-        await cmd.ExecuteNonQueryAsync(ct);
+        if (await cmd.ExecuteNonQueryAsync(ct) == 0)
+        {
+            throw new InvalidOperationException($"You can have at most {MaxBudgets} budgets. Remove one before adding another.");
+        }
     }
 
     public async Task RemoveAsync(Guid tenantId, string category, CancellationToken ct = default)
