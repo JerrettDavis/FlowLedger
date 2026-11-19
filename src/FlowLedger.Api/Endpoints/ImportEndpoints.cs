@@ -78,6 +78,7 @@ internal static class ImportEndpoints
                     statusCode: StatusCodes.Status422UnprocessableEntity);
             }
         })
+        .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(5 * 1024 * 1024))
         .WithName("ImportTransactions")
         .WithTags("Imports")
         .WithSummary("Import transactions from CSV")

@@ -104,6 +104,11 @@ internal static class DataEndpoints
 
     private const string MxProvider = "MX";
 
+    /// <summary>True when the current tenant is the household (operator) tenant that owns the provider credentials.</summary>
+    internal static bool IsHouseholdTenant(IServiceProvider services) =>
+        services.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId
+        == FlowLedger.Infrastructure.TenancySettings.Legacy(services.GetRequiredService<IConfiguration>()).LegacyTenantId;
+
     /// <summary>
     /// Backup state, provider usage, export, import and backup-now are global (they span every tenant), so they are
     /// restricted to the household (legacy) tenant, the same tenant that owns the operator's provider credentials
