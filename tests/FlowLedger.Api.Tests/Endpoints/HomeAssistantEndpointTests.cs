@@ -50,11 +50,26 @@ public sealed class HomeAssistantEndpointTests(FlowLedgerApiFactory factory) : I
     [InlineData("https://ha.example.com/api/webhook/short")]
     [InlineData("https://u:p@ha.example.com/api/webhook/" + Secret)]
     [InlineData("http://169.254.169.254/api/webhook/" + Secret)]
+    [InlineData("https://[::ffff:169.254.169.254]/api/webhook/" + Secret)]
+    [InlineData("http://192.168.1.5:8123/api/webhook/" + Secret)]
+    [InlineData("http://redis:6379/api/webhook/" + Secret)]
+    [InlineData("http://localhost:5432/api/webhook/" + Secret)]
+    [InlineData("https://[::1]/api/webhook/" + Secret)]
     public async Task Rejects_unsafe_webhook_urls(string url)
     {
         var response = await _client.PutAsJsonAsync("/api/home-assistant", Body(true, url));
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().NotContain(Secret);
+    }
+
+    [Fact]
+    public async Task Only_the_household_owner_may_target_the_local_network()
+    {
+        const string lan = "http://homeassistant.local:8123/api/webhook/" + Secret;
+        (await _client.PutAsJsonAsync("/api/home-assistant", Body(true, lan))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var household = factory.CreateAuthenticatedClient(); // the demo tenant is the household (legacy) tenant
+        (await household.PutAsJsonAsync("/api/home-assistant", Body(false, lan))).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

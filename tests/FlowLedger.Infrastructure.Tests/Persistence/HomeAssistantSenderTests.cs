@@ -15,7 +15,7 @@ public sealed class HomeAssistantSenderTests
     {
         var services = new ServiceCollection();
         services.AddHttpClient(HomeAssistantWebhookSender.HttpClientName)
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            .ConfigurePrimaryHttpMessageHandler(HomeAssistantWebhookSender.CreateHandler);
         return new HomeAssistantWebhookSender(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>());
     }
 
@@ -54,7 +54,7 @@ public sealed class HomeAssistantSenderTests
         });
         using var _ = listener;
 
-        var error = await NewSender().SendAsync(url, new Dictionary<string, object?> { ["kind"] = "bill_due_soon", ["title"] = "Bill due soon" });
+        var error = await NewSender().SendAsync(url, new Dictionary<string, object?> { ["kind"] = "bill_due_soon", ["title"] = "Bill due soon" }, allowLocalNetwork: true);
 
         error.Should().BeNull();
         method.Should().Be("POST");
@@ -68,7 +68,7 @@ public sealed class HomeAssistantSenderTests
         var (listener, url) = Listen(ctx => { ctx.Response.StatusCode = 500; ctx.Response.Close(); return Task.CompletedTask; });
         using var _ = listener;
 
-        var error = await NewSender().SendAsync(url, new { kind = "x" });
+        var error = await NewSender().SendAsync(url, new { kind = "x" }, allowLocalNetwork: true);
 
         error.Should().Be("Home Assistant answered HTTP 500.");
         error.Should().NotContain(Id);
@@ -89,7 +89,7 @@ public sealed class HomeAssistantSenderTests
         });
         using var _ = listener;
 
-        var error = await NewSender().SendAsync(url, new { kind = "x" });
+        var error = await NewSender().SendAsync(url, new { kind = "x" }, allowLocalNetwork: true);
 
         error.Should().Be("Home Assistant answered HTTP 307.");
         hits.Should().Be(0);
@@ -103,12 +103,37 @@ public sealed class HomeAssistantSenderTests
         var port = ((IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
 
-        (await NewSender().SendAsync($"http://localhost:{port}/api/webhook/{Id}", new { kind = "x" }))
+        (await NewSender().SendAsync($"http://localhost:{port}/api/webhook/{Id}", new { kind = "x" }, allowLocalNetwork: true))
             .Should().Be("Could not reach Home Assistant.");
     }
 
     [Fact]
+    public async Task A_non_household_tenant_cannot_reach_loopback_even_if_a_stale_url_was_stored()
+    {
+        var hits = 0;
+        var (listener, url) = Listen(ctx => { Interlocked.Increment(ref hits); ctx.Response.Close(); return Task.CompletedTask; });
+        using var _ = listener;
+
+        (await NewSender().SendAsync(url, new { kind = "x" }, allowLocalNetwork: false)).Should().Contain("no longer valid");
+        hits.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task The_connect_guard_refuses_a_public_looking_name_that_resolves_to_loopback()
+    {
+        var hits = 0;
+        var (listener, url) = Listen(ctx => { Interlocked.Increment(ref hits); ctx.Response.Close(); return Task.CompletedTask; });
+        using var _ = listener;
+        // "localtest.me" is a public DNS name that resolves to 127.0.0.1: validation sees a public https host, only the connect guard can stop it.
+        var port = new Uri(url).Port;
+        var rebound = $"https://localtest.me:{port}/api/webhook/{Id}";
+
+        (await NewSender().SendAsync(rebound, new { kind = "x" }, allowLocalNetwork: false)).Should().Be("Could not reach Home Assistant.");
+        hits.Should().Be(0);
+    }
+
+    [Fact]
     public async Task An_invalid_stored_url_is_never_contacted()
-        => (await NewSender().SendAsync("http://example.com/api/webhook/" + Id, new { kind = "x" }))
+        => (await NewSender().SendAsync("http://example.com/api/webhook/" + Id, new { kind = "x" }, allowLocalNetwork: true))
             .Should().Contain("no longer valid");
 }

@@ -111,6 +111,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 ["Api:Key"] = DevApiKey,
                 ["Mx:Enabled"] = "false",
                 ["ObjectStorage:RootPath"] = _objectStoragePath,
+                ["HomeAssistant:EncryptionKey"] = Convert.ToBase64String(new byte[32].Select((_, i) => (byte)(i + 7)).ToArray()),
             });
         });
     }

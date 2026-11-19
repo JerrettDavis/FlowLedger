@@ -602,15 +602,17 @@ can tell you what is coming. It is **off by default** and shares **alerts, not n
 3. In the automation, act on `trigger.json`, e.g. a phone notification with `{{ trigger.json.title }}: {{ trigger.json.message }}`.
 
 **What can be sent** (each is optional): a bill coming due, a bill paid, a paycheck coming, a paycheck landed, an account overdrawn,
-a forecast overdraft in the next 7 days, a budget nearly used or over. Each condition is sent once (not every hour).
+a forecast overdraft in the next 7 days, a budget nearly used or over. Bill, paycheck and budget events are sent once per occurrence; overdraft alerts repeat at most once a day while the condition lasts.
 
 **Privacy**
 
 * Default events contain a title, message, severity, date and days-until-due only. Amounts and balances are sent **only** if you
   turn on *Also share amounts and balances*. *Include names* can be switched off to hide bill and account names.
-* The webhook URL is write-only: it is never shown again (only its host), is validated, and is encrypted at rest when
-  `HomeAssistant__EncryptionKey` (base64, 32 random bytes) is set. Plain `http` is allowed only for a local-network HA; use `https`
-  otherwise.
+* The webhook URL is write-only: it is never shown again (only its host), is validated, and is always encrypted at rest. The
+  operator must set `HomeAssistant__EncryptionKey` (base64, 32 random bytes, on the API and worker); without it FlowLedger refuses to
+  store a webhook. Use an `https` address; plain `http` or a local-network address works only for the household owner.
+* *Include names* sends bill, paycheck and account names as written (an account called "Chase Freedom 7156" would include its
+  last digits), so rename the account or turn names off if that matters.
 * Disabled accounts and accounts with hidden transactions are not used.
 
 Design and event format: [ADR 0012](adr/0012-home-assistant-alerts.md).

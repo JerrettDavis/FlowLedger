@@ -321,8 +321,10 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 configuration["HomeAssistant:EncryptionKey"]));
         services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
-            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler { AllowAutoRedirect = false })
+            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
             .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantNetworkPolicy,
+            FlowLedger.Infrastructure.DataSafety.HouseholdHomeAssistantNetworkPolicy>();
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
             FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --
