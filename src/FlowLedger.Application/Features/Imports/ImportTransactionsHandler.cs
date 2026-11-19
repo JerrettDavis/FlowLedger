@@ -316,7 +316,7 @@ public sealed class ImportTransactionsHandler
 
         if (!string.IsNullOrWhiteSpace(merchant))
         {
-            tx.Categorize(CategoryId.New(), merchant);
+            tx.SetMerchantName(merchant);
         }
 
         return (tx, fingerprint.Value);
