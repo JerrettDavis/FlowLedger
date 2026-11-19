@@ -158,3 +158,7 @@ permanently lost.
 ## Reverse proxy / TLS
 
 If a proxy terminates TLS in front of the Web app, set `ForwardedHeaders__Enabled=true` so the OIDC `redirect_uri` is built as https from `X-Forwarded-Proto`/`Host`. Enable it only when the Web port is reachable solely through that proxy; otherwise clients could spoof those headers.
+
+## Many tenants
+
+Scheduled jobs visit tenants one at a time by default. With more than a handful of users set `Worker__MaxParallelTenants` (1-16, e.g. 4) on the worker to sync several tenants concurrently; keep it small so provider rate limits and the database connection pool hold.
