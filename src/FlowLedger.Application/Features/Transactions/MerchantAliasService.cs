@@ -23,6 +23,7 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
 {
     private const int Max = 50_000;
     public const int MaxLength = 200;
+    public const int MaxAliases = 1000;
 
     public static string NormalizePattern(string? pattern)
         => string.Join(' ', (pattern ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
@@ -42,6 +43,12 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
         if (key.Length > MaxLength || name.Length > MaxLength)
         {
             throw new ArgumentException($"Pattern and alias must be {MaxLength} characters or fewer.");
+        }
+
+        var existing = await store.ListAsync(ct);
+        if (existing.Count >= MaxAliases && !existing.Any(a => string.Equals(a.Pattern, key, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException($"You can have at most {MaxAliases} merchant aliases. Remove one before adding another.");
         }
 
         await store.SetAsync(key, name, ct);

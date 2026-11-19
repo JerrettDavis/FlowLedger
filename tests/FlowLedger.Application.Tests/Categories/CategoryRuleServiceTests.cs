@@ -34,6 +34,24 @@ public sealed class CategoryRuleServiceTests
     private CategoryRuleService Service(RuleStore rules, TxStore txs) => new(rules, txs, _categories, _tenant);
 
     [Fact]
+    public async Task Setting_a_rule_beyond_the_per_tenant_cap_is_rejected_but_replacing_one_is_allowed()
+    {
+        var rules = new RuleStore();
+        for (var i = 0; i < CategoryRuleService.MaxRules; i++)
+        {
+            rules.Rules[$"P{i}"] = "Food";
+        }
+
+        var service = Service(rules, new TxStore([]));
+
+        var add = () => service.SetAsync("BRAND NEW", "Food");
+        await add.Should().ThrowAsync<ArgumentException>().WithMessage("*at most*");
+
+        var replace = () => service.SetAsync("P1", "Food");
+        await replace.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public void Longest_matching_pattern_wins()
     {
         var rules = new[] { new CategoryRuleDto("SHELL", "Auto/Gas"), new CategoryRuleDto("SHELL OIL CAFE", "Food/Coffee") };

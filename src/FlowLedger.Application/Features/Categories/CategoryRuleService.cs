@@ -28,6 +28,7 @@ public sealed class CategoryRuleService(
 {
     private const int Max = 50_000;
     public const int MaxLength = 200;
+    public const int MaxRules = 1000;
     public const int MaxNoteLength = 1000;
 
     public static string NormalizePattern(string? pattern) => MerchantAliasService.NormalizePattern(pattern);
@@ -54,6 +55,12 @@ public sealed class CategoryRuleService(
         if (key.Length > MaxLength || path.Length > MaxLength)
         {
             throw new ArgumentException($"Pattern and category must be {MaxLength} characters or fewer.");
+        }
+
+        var existing = await store.ListAsync(ct);
+        if (existing.Count >= MaxRules && !existing.Any(r => string.Equals(r.Pattern, key, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException($"You can have at most {MaxRules} rules. Remove one before adding another.");
         }
 
         await store.SetAsync(key, path, ct);
