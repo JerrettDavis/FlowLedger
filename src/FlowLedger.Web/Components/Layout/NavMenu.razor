@@ -56,6 +56,12 @@
     <MudNavLink Href="data" Icon="@Icons.Material.Filled.Shield">
         Data &amp; Backups
     </MudNavLink>
+    @if (Config.GetValue("Features:ConnectorsPage", true))
+    {
+        <MudNavLink Href="connectors" Icon="@Icons.Material.Filled.Hub">
+            Connectors
+        </MudNavLink>
+    }
 }
 <MudNavLink Href="account/logins" Icon="@Icons.Material.Filled.ManageAccounts">
     Linked logins
@@ -66,6 +72,8 @@
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
 
     [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    [Inject] private IConfiguration Config { get; set; } = default!;
 
     private bool _household;
 

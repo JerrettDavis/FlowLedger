@@ -559,3 +559,19 @@ than one login and not on the one you are using).
 - Linked logins have identical access: there is no read-only or admin role. (Shared
   households with roles are listed as future work in ADR 0008.)
 - The page only makes sense when sign-in is enabled. Without sign-in there is only one household, so there is nothing to link.
+
+## Connectors
+
+**What it is for.** The household owner's overview of the financial data feeds FlowLedger knows about: Simulated demo data,
+SimpleFIN Bridge and MX. It is not shown to other users, and operators can switch it off entirely for production with
+`Features__ConnectorsPage=false` (API and Web).
+
+**What you see per connector**
+- **In use / Enabled, not active / Not in use**, and whether credentials are configured (never the credentials themselves).
+- The active connector's capabilities, last successful sync, and API calls today and this month (with the daily and monthly
+  budget and the kill-switch state for MX).
+- The institutions linked through that connector, and the configuration keys that control it.
+
+**Choosing the feed.** Today the active connector is chosen by configuration at startup (`SimpleFin__Enabled`,
+`Mx__Enabled`; only one real connector at a time) and needs a restart to change. Selecting feeds from the page, and several feeds
+per user, depend on the provider work in [ADR 0009](adr/0009-multi-provider-self-service-linking.md).
