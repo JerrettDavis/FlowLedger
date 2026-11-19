@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
 
@@ -52,9 +53,15 @@ public static class SpendingInsightsAnalyzer
         IReadOnlyList<TransactionDto> all,
         IReadOnlyDictionary<Guid, string> categoryPathById,
         IReadOnlyDictionary<Guid, string> accountNameById,
-        IReadOnlyDictionary<Guid, string> accountTypeById)
+        IReadOnlyDictionary<Guid, string> accountTypeById,
+        IReadOnlySet<Guid>? excludedAccountIds = null)
     {
         var transferIds = TransferDetector.Detect(all, accountTypeById);
+        if (excludedAccountIds is { Count: > 0 })
+        {
+            all = all.Where(t => !excludedAccountIds.Contains(t.AccountId)).ToList();
+        }
+
         var wantDirection = q.Income ? "Credit" : "Debit";
         var span = q.To.DayNumber - q.From.DayNumber + 1;
         var prevFrom = q.From.AddDays(-span);
@@ -260,6 +267,7 @@ public sealed class GetSpendingBreakdownHandler(
         return SpendingInsightsAnalyzer.Analyze(
             q, dtos, cats,
             accountEntities.ToDictionary(a => a.Id, a => a.Name),
-            accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()));
+            accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()),
+            await AccountVisibility.ExcludedIdsAsync(accounts, q.AccountIds, ct));
     }
 }

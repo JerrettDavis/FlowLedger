@@ -187,6 +187,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 continue;
             }
 
+            if (!domainAccount.IsActive)
+            {
+                // Disabled by the user: stop tracking it entirely (no snapshots, no transactions, no flows).
+                continue;
+            }
+
             accountsUpserted++;
             providerIdToAccount[pa.ProviderId] = domainAccount;
 

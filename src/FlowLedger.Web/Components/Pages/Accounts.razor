@@ -96,8 +96,20 @@
                          Size="Size.Small"
                          Variant="Variant.Text"
                          Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
-                    @(context.Item.IsActive ? "Active" : "Inactive")
+                    @(context.Item.IsActive ? "Enabled" : "Disabled")
                 </MudChip>
+                @if (context.Item.IsActive && context.Item.Mode == "Holding")
+                {
+                    <MudTooltip Text="Holding: counts toward net worth; transactions hidden from everyday views">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ml-1">Holding</MudChip>
+                    </MudTooltip>
+                }
+                else if (context.Item.IsActive && context.Item.HideTransactions)
+                {
+                    <MudTooltip Text="Transactions hidden from everyday views">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Class="ml-1">Hidden</MudChip>
+                    </MudTooltip>
+                }
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
@@ -156,7 +168,7 @@
         _error = null;
         try
         {
-            _accounts = await ApiClient.GetAccountsAsync();
+            _accounts = await ApiClient.GetAccountsAsync(includeInactive: true);
             _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
             _links = (await ApiClient.GetAccountConnectorsAsync()).ToDictionary(l => l.AccountId);
             _connectors = _household ? (await ApiClient.GetConnectorsAsync())?.Connectors ?? [] : [];
@@ -212,6 +224,11 @@
                 if (edit.NewType is not null)
                 {
                     await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Web.ApiClient.ChangeAccountTypeRequest(edit.NewType));
+                }
+
+                if (edit.Settings is not null)
+                {
+                    await ApiClient.UpdateAccountSettingsAsync(account.Id, edit.Settings);
                 }
 
                 Snackbar.Add(edit.NewType is not null ? "Account updated - type pinned" : "Account updated", Severity.Success);

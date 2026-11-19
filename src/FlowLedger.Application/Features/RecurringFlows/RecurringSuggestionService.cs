@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.BillSheet;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
@@ -59,7 +60,8 @@ public sealed class RecurringSuggestionService(
         var byId = acctList.ToDictionary(a => a.Id);
         var all = await transactions.ListAllAsync(ScanLimit, ct);
 
-        var real = all.Where(t => t.Status is TransactionStatus.Posted or TransactionStatus.Matched or TransactionStatus.Reconciled).ToList();
+        var excludedAccounts = await AccountVisibility.ExcludedIdsAsync(accounts, null, ct);
+        var real = all.Where(t => !excludedAccounts.Contains(t.AccountId.Value)).Where(t => t.Status is TransactionStatus.Posted or TransactionStatus.Matched or TransactionStatus.Reconciled).ToList();
 
         // Recurring transfers (a monthly move to savings, a standing card payment) are kept on purpose: the money really
         // leaves one account and lands in another, so each account's forecast needs its own leg. Only the investment

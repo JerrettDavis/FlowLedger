@@ -26,7 +26,8 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         DateOnly? to = null,
         int skip = 0,
         int take = 100,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool everydayOnly = false)
     {
         var query = _store.AsEnumerable();
         if (accountId.HasValue)

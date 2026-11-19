@@ -61,6 +61,22 @@ account type, and currency.
 Everyday Visa (credit), Apex Rewards Card (credit), Horizon Brokerage (investment),
 and Home Mortgage. Each row shows the current balance and account type.*
 
+### Tracking and reporting settings
+
+Click the pencil on an account to open **Tracking & reporting**:
+
+- **Enabled** - turn an account off to stop tracking it altogether. Sync stops and it disappears from every screen,
+  report and total. Nothing is deleted; turn it back on and it resumes.
+- **Treat this account as** - *Everyday account* (default) or *Holding*. A holding (investments, retirement) still
+  counts toward net worth and keeps its balance history, and you can open it to see its activity, but its transactions
+  stay out of Transactions, the dashboard, spending, recurring detection and reports. New investment accounts are
+  holdings by default.
+- **Hide transactions from everyday views** - the same hiding for any other account.
+
+Hidden transactions are still one click away: pick the account in a filter, or tick **Include hidden accounts** on the
+Transactions page. Transfers between your accounts and a hidden one are still recognised, so they are not counted as
+spending.
+
 ### Account types
 
 | Type | Description |

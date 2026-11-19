@@ -115,8 +115,14 @@ public sealed class QueryDatasetProvider(
         var txRows = new List<object?[]>();
         var loadedDtos = loaded.Take(MaxTransactions).Select(TransactionMapper.ToDto).ToList();
         var transferIds = TransferDetector.Detect(loadedDtos, accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()));
+        var excludedAccounts = await AccountVisibility.ExcludedIdsAsync(accounts, null, ct);
         foreach (var t in loadedDtos)
         {
+            if (excludedAccounts.Contains(t.AccountId))
+            {
+                continue;
+            }
+
             if (t.Status is "Planned" or "Skipped")
             {
                 continue;

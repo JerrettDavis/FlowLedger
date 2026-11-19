@@ -54,9 +54,23 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("HideTransactions")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("hide_transactions");
+
                     b.Property<DateTimeOffset?>("LastBalanceConfirmedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_balance_confirmed_at");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Standard")
+                        .HasColumnName("mode");
 
                     b.Property<string>("Name")
                         .IsRequired()

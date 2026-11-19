@@ -14,9 +14,11 @@ public sealed class ListAccountsHandler
     public ListAccountsHandler(IAccountRepository repo)
         => _repo = repo;
 
-    public async Task<IReadOnlyList<AccountDto>> HandleAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<AccountDto>> HandleAsync(CancellationToken ct = default) => HandleAsync(false, ct);
+
+    public async Task<IReadOnlyList<AccountDto>> HandleAsync(bool includeInactive, CancellationToken ct = default)
     {
-        var accounts = await _repo.ListAsync(ct);
+        var accounts = includeInactive ? await _repo.ListIncludingInactiveAsync(ct) : await _repo.ListAsync(ct);
         return accounts.Select(AccountMapper.ToDto).ToList().AsReadOnly();
     }
 }
@@ -134,6 +136,23 @@ public sealed class ChangeAccountTypeHandler
     }
 }
 
+/// <summary>Changes an account's tracking settings: enabled, mode (standard/holding) and hidden transactions.</summary>
+public sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
+{
+    public async Task<AccountDto?> HandleAsync(Guid id, AccountSettingsRequest request, CancellationToken ct = default)
+    {
+        var account = await repo.GetByIdAsync(AccountId.From(id), ct);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.ApplySettings(request.IsActive, Enum.Parse<AccountMode>(request.Mode, ignoreCase: true), request.HideTransactions);
+        await repo.SaveChangesAsync(ct);
+        return AccountMapper.ToDto(account);
+    }
+}
+
 /// <summary>Deactivates an account (soft delete).</summary>
 public sealed class DeactivateAccountHandler
 {
@@ -169,5 +188,7 @@ internal static class AccountMapper
         a.IsActive,
         a.CreatedAt,
         a.LastBalanceConfirmedAt,
-        a.TypeLockedByUser);
+        a.TypeLockedByUser,
+        a.Mode.ToString(),
+        a.HideTransactions);
 }

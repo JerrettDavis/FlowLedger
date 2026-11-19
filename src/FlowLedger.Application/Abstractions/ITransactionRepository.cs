@@ -28,7 +28,11 @@ public interface ITransactionRepository
         DateOnly? to = null,
         int skip = 0,
         int take = 100,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        bool everydayOnly = false);
+
+    // everydayOnly: when no account is given, leave out transactions of disabled accounts and of hidden accounts
+    // (holdings / "hide transactions"). Pass an account id to drill into one regardless.
 
     /// <summary>
     /// Read-only snapshot of up to <paramref name="max"/> transactions in a stable total order

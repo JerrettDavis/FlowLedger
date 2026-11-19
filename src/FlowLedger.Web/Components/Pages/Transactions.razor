@@ -48,6 +48,10 @@
                           aria-label="Search transactions" />
         </MudItem>
         <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
+            <MudCheckBox T="bool" @bind-Value="_includeHidden" Label="Include hidden accounts" Dense="true"
+                         aria-label="Include hidden accounts" />
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
             <MudCheckBox T="bool" @bind-Value="_applyToMerchant" Label="Apply category changes to same merchant" Dense="true" />
         </MudItem>
         <MudItem xs="12" sm="12" md="3" Class="d-flex align-end">
@@ -191,6 +195,7 @@
     private DateTime? _fromDate;
     private DateTime? _toDate;
     private Guid? _filterAccountId;
+    private bool _includeHidden;
     private string? _search;
     private bool _applyToMerchant = true;
     private bool _categorizing;
@@ -272,7 +277,8 @@
                 accountId: _filterAccountId,
                 from: from,
                 to: to,
-                take: TakeLimit);
+                take: TakeLimit,
+                includeHidden: _includeHidden);
             RecomputeVisible();
         }
         catch (Exception ex)
