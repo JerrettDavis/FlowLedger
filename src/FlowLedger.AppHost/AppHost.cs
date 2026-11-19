@@ -183,6 +183,11 @@ if (string.Equals(builder.Configuration["Tenancy:RequireTenantHeader"], "true", 
 // tenant that the Web app signed. A leaked API key alone then cannot act as another tenant.
 if (!string.IsNullOrEmpty(builder.Configuration["Api:TenantSigningKey"]))
 {
+    if (builder.Configuration["Api:TenantSigningKey"]!.Length < 32)
+    {
+        throw new InvalidOperationException("Api:TenantSigningKey must be at least 32 characters (e.g. `openssl rand -hex 32`).");
+    }
+
     api.WithEnvironment("Api__TenantSigningKey", builder.Configuration["Api:TenantSigningKey"]!);
     web.WithEnvironment("Api__TenantSigningKey", builder.Configuration["Api:TenantSigningKey"]!);
 }

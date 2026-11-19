@@ -93,14 +93,25 @@ public static class TenantMappingValidator
 
     private static async Task<IReadOnlyCollection<Guid>?> ListUserIdsAsync(IServiceProvider services, Guid tenant, CancellationToken ct)
     {
-        var apiKey = services.GetRequiredService<IOptions<FlowLedger.Web.ApiClient.ApiAuthOptions>>().Value.Key;
+        var authOptions = services.GetRequiredService<IOptions<FlowLedger.Web.ApiClient.ApiAuthOptions>>().Value;
+        var apiKey = authOptions.Key;
         var http = services.GetRequiredService<IHttpClientFactory>().CreateClient(AuthSetup.IdentityClientName);
         using var req = new HttpRequestMessage(HttpMethod.Get, "/api/users/identities");
         req.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
         req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenant.ToString());
+        if (!string.IsNullOrEmpty(authOptions.TenantSigningKey))
+        {
+            req.Headers.TryAddWithoutValidation("X-Tenant-Sig", FlowLedger.Web.ApiClient.TenantAssertionSigner.Sign(authOptions.TenantSigningKey, tenant, DateTimeOffset.UtcNow));
+        }
         using var resp = await http.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode)
         {
+            if (resp.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            {
+                services.GetService<ILoggerFactory>()?.CreateLogger(typeof(TenantMappingValidator))
+                    .LogError("The API rejected the session re-validation call ({Status}); check Api:Key and Api:TenantSigningKey match on API and Web. Sessions are NOT being re-validated.", (int)resp.StatusCode);
+            }
+
             return null; // 401/5xx etc: not a definite answer about the mapping
         }
 
