@@ -38,13 +38,23 @@ public sealed class NpgsqlMerchantAliasStore(string connectionString, ITenantCon
     public async Task SetAsync(string pattern, string alias, CancellationToken ct = default)
     {
         await using var conn = await OpenAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        await using (var lck = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext('merchant_aliases:' || @t::text))", conn, tx))
+        {
+            lck.Parameters.AddWithValue("t", tenant.TenantId);
+            await lck.ExecuteNonQueryAsync(ct);
+        }
+
         await using var cmd = new NpgsqlCommand(
-            "INSERT INTO merchant_aliases (tenant_id, pattern, alias) VALUES (@t, @p, @a) " +
-            "ON CONFLICT (tenant_id, pattern) DO UPDATE SET alias = EXCLUDED.alias, updated_utc = now()", conn);
+            "INSERT INTO merchant_aliases (tenant_id, pattern, alias) " +
+            "SELECT @t, @p, @a WHERE (SELECT count(*) FROM merchant_aliases WHERE tenant_id = @t) < 1000 " +
+            "OR EXISTS (SELECT 1 FROM merchant_aliases WHERE tenant_id = @t AND pattern = @p) " +
+            "ON CONFLICT (tenant_id, pattern) DO UPDATE SET alias = EXCLUDED.alias, updated_utc = now()", conn, tx);
         cmd.Parameters.AddWithValue("t", tenant.TenantId);
         cmd.Parameters.AddWithValue("p", pattern);
         cmd.Parameters.AddWithValue("a", alias);
         await cmd.ExecuteNonQueryAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task<bool> RemoveAsync(string pattern, CancellationToken ct = default)

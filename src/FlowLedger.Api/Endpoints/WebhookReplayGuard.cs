@@ -7,6 +7,7 @@ public static class WebhookReplayGuard
     private const int MaxEntries = 4096;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> Seen = new();
 
+    /// <summary>True when an identical body was already accepted inside the window (a replay). Per-process only.</summary>
     public static bool SeenRecently(byte[] body, DateTimeOffset? now = null)
     {
         var t = now ?? DateTimeOffset.UtcNow;
@@ -14,23 +15,30 @@ public static class WebhookReplayGuard
         {
             foreach (var kv in Seen.Where(kv => t - kv.Value > Window).ToList())
             {
-                Seen.TryRemove(kv.Key, out _);
+                Seen.TryRemove(new KeyValuePair<string, DateTimeOffset>(kv.Key, kv.Value));
             }
         }
 
         var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(body));
-        var prior = Seen.GetOrAdd(key, t);
-        if (prior == t)
+        if (Seen.TryAdd(key, t))
         {
-            return false; // first sighting
+            return false; // first sighting (atomic: exactly one concurrent caller wins)
         }
 
-        if (t - prior > Window)
+        while (Seen.TryGetValue(key, out var prior))
         {
-            Seen[key] = t; // expired: treat as new
-            return false;
+            if (t - prior <= Window)
+            {
+                return true; // replay inside the window
+            }
+
+            // Expired: exactly one caller replaces the stale entry and is treated as new.
+            if (Seen.TryUpdate(key, t, prior))
+            {
+                return false;
+            }
         }
 
-        return true;
+        return !Seen.TryAdd(key, t);
     }
 }
