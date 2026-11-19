@@ -28,6 +28,7 @@ Behavior below is taken from the application source. Where the UI offers no way 
 16. [Bill Sheet](#bill-sheet)
 17. [Data and Backups (owner only)](#data-and-backups-owner-only)
 18. [Linked logins](#linked-logins)
+19. [Home Assistant alerts](#home-assistant-alerts)
 
 ---
 
@@ -586,3 +587,30 @@ link it to one; the other connector's copy is a separate account you can leave u
 - `Connectors__<Id>__AutoCreateAccounts=false` (for example `Connectors__MX__AutoCreateAccounts=false`): the connector only *catalogues*
   the provider accounts it finds; you link them to accounts yourself instead of getting new accounts automatically.
 - `Connectors__Simulated=true` adds demo accounts next to real connectors (only for trying things out; it creates fake accounts).
+
+---
+
+## Home Assistant alerts
+
+**Home Assistant** (left nav) pushes heads-up alerts to your Home Assistant (HA) so your phone, dashboards and voice assistants
+can tell you what is coming. It is **off by default** and shares **alerts, not numbers**.
+
+**Set up**
+
+1. In HA, create an automation with a **Webhook** trigger and copy its URL (`https://…/api/webhook/<id>`).
+2. In FlowLedger, paste it, switch **Share alerts** on, press **Save**, then **Send test event**.
+3. In the automation, act on `trigger.json`, e.g. a phone notification with `{{ trigger.json.title }}: {{ trigger.json.message }}`.
+
+**What can be sent** (each is optional): a bill coming due, a bill paid, a paycheck coming, a paycheck landed, an account overdrawn,
+a forecast overdraft in the next 7 days, a budget nearly used or over. Each condition is sent once (not every hour).
+
+**Privacy**
+
+* Default events contain a title, message, severity, date and days-until-due only. Amounts and balances are sent **only** if you
+  turn on *Also share amounts and balances*. *Include names* can be switched off to hide bill and account names.
+* The webhook URL is write-only: it is never shown again (only its host), is validated, and is encrypted at rest when
+  `HomeAssistant__EncryptionKey` (base64, 32 random bytes) is set. Plain `http` is allowed only for a local-network HA; use `https`
+  otherwise.
+* Disabled accounts and accounts with hidden transactions are not used.
+
+Design and event format: [ADR 0012](adr/0012-home-assistant-alerts.md).

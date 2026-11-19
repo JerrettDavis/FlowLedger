@@ -39,7 +39,7 @@ public sealed class WorkerHostTests
         var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler();
         var keys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals("FlowLedger"));
         keys.Select(k => k.Name).Should().BeEquivalentTo(
-            nameof(ScheduledSyncJob), nameof(ScheduledBackupJob), nameof(ScheduledAssetValuationJob));
+            nameof(ScheduledSyncJob), nameof(ScheduledBackupJob), nameof(ScheduledAssetValuationJob), nameof(ScheduledHomeAssistantJob));
     }
 
     [Fact]

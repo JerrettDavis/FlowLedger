@@ -89,6 +89,17 @@ static IResourceBuilder<T> WithMxConfig<T>(
     //   dotnet user-secrets set "Backup:B2:AccountId"  "<application key id>"
     //   dotnet user-secrets set "Backup:B2:AccountKey" "<application key>"
     // restic itself reads B2_ACCOUNT_ID / B2_ACCOUNT_KEY from the environment.
+    // Home Assistant alerts: the webhook URL is encrypted at rest with this key (AppHost user-secrets; Api and Worker both need it).
+    //   dotnet user-secrets set "HomeAssistant:EncryptionKey" "<base64 of 32 random bytes>"
+    foreach (var key in new[] { "EncryptionKey", "Enabled", "CronExpression" })
+    {
+        var value = configuration[$"HomeAssistant:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"HomeAssistant__{key}", value);
+        }
+    }
+
     foreach (var key in new[] { "Enabled", "CronExpression", "Directory", "KeepLocalSnapshots", "DrillAfterBackup" })
     {
         var value = configuration[$"Backup:{key}"];

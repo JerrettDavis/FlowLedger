@@ -1,0 +1,195 @@
+@page "/home-assistant"
+@rendermode InteractiveServer
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Home Assistant — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Home Assistant</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Send heads-up alerts to Home Assistant: a bill coming due or paid, a paycheck on the way or landed, an overdraft.
+    By default only the <em>alert</em> is shared, never your balances or amounts.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_state is null)
+{
+    <MudAlert Severity="Severity.Warning">Couldn't load the Home Assistant settings.</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="Share alerts with Home Assistant" />
+
+        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Webhook</MudText>
+        <MudText Typo="Typo.caption" Class="fl-muted mb-2">
+            In Home Assistant, create an automation with a <strong>Webhook</strong> trigger and copy its URL
+            (<code>https://…/api/webhook/&lt;id&gt;</code>). Treat it like a password: FlowLedger stores it
+            @(_state.Settings.HasWebhook ? "and never shows it again." : "write-only and never shows it again.")
+        </MudText>
+        @if (_state.Settings.HasWebhook)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" /> Saved for <strong>@_state.Settings.WebhookHost</strong>
+            </MudText>
+        }
+        <div class="d-flex align-center gap-3 flex-wrap">
+            <MudTextField T="string" @bind-Value="_url" Label="@(_state.Settings.HasWebhook ? "Replace webhook URL" : "Webhook URL")"
+                          InputType="InputType.Password" Style="min-width:360px" Margin="Margin.Dense" Immediate="true" />
+            @if (_state.Settings.HasWebhook)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Disconnect">Remove webhook</MudButton>
+            }
+        </div>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.subtitle2" Class="mb-1">What to share</MudText>
+        @foreach (var kind in _state.Kinds)
+        {
+            var k = kind;
+            <div>
+                <MudCheckBox T="bool" Value="@_kinds.Contains(k)" ValueChanged="@(v => Toggle(k, v))" Label="@Describe(k)" Dense="true" />
+            </div>
+        }
+
+        <MudNumericField T="int" @bind-Value="_lead" Label="Warn this many days ahead" Min="0" Max="30" Style="max-width:240px" Margin="Margin.Dense" Class="mt-3" />
+
+        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-1">Privacy</MudText>
+        <MudSwitch T="bool" @bind-Value="_names" Color="Color.Primary" Label="Include bill, paycheck and account names" />
+        <MudSwitch T="bool" @bind-Value="_amounts" Color="Color.Warning" Label="Also share amounts and balances (off by default)" />
+        @if (_amounts)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                Amounts and balances will be included in events. Anyone who can see Home Assistant's event log or your automations can read them.
+            </MudAlert>
+        }
+    </MudPaper>
+
+    <div class="d-flex align-center gap-3 flex-wrap mb-3">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Save())" Disabled="_busy">Save</MudButton>
+        <MudButton Variant="Variant.Outlined" OnClick="Test" Disabled="@(_busy || !_state.Settings.HasWebhook)">Send test event</MudButton>
+    </div>
+
+    @if (_state.Settings.LastSentUtc is { } sent)
+    {
+        <MudText Typo="Typo.caption" Class="fl-muted">Last delivered @sent.ToLocalTime().ToString("g").</MudText>
+    }
+    @if (!string.IsNullOrEmpty(_state.Settings.LastError))
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">Last delivery failed: @_state.Settings.LastError</MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mt-4" Outlined="true">
+        <MudText Typo="Typo.subtitle2" Class="mb-1">Using it in Home Assistant</MudText>
+        <MudText Typo="Typo.body2">
+            Each event is a JSON body on the webhook trigger, available as <code>trigger.json</code>:
+            <code>kind</code> (<code>bill_due_soon</code>, <code>bill_paid</code>, <code>paycheck_expected</code>, <code>paycheck_received</code>,
+            <code>overdraft</code>, <code>low_balance_forecast</code>, <code>budget_alert</code>), <code>severity</code>, <code>title</code>, <code>message</code>,
+            and, when allowed, <code>subject</code>, <code>date</code>, <code>due_in_days</code>, <code>amount</code>, <code>balance</code>.
+            For example, notify your phone with <code>{{ trigger.json.title }}: {{ trigger.json.message }}</code>.
+        </MudText>
+    </MudPaper>
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.HomeAssistantStateDto? _state;
+    private bool _loading = true;
+    private bool _busy;
+    private bool _enabled;
+    private bool _names = true;
+    private bool _amounts;
+    private int _lead = 3;
+    private string? _url;
+    private HashSet<string> _kinds = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _state = await ApiClient.GetHomeAssistantAsync();
+        if (_state is not null)
+        {
+            var s = _state.Settings;
+            _enabled = s.Enabled; _names = s.IncludeNames; _amounts = s.ShareAmounts; _lead = s.LeadDays;
+            _kinds = [.. s.Kinds];
+        }
+
+        _url = null;
+        _loading = false;
+    }
+
+    private void Toggle(string kind, bool on)
+    {
+        if (on) { _kinds.Add(kind); } else { _kinds.Remove(kind); }
+    }
+
+    private static string Describe(string kind) => kind switch
+    {
+        "bill_due_soon" => "A bill is coming due",
+        "bill_paid" => "A bill was paid",
+        "paycheck_expected" => "A paycheck is coming",
+        "paycheck_received" => "A paycheck landed",
+        "overdraft" => "An account is overdrawn",
+        "low_balance_forecast" => "Your balance is forecast to go negative",
+        "budget_alert" => "A budget is nearly used or over",
+        _ => kind,
+    };
+
+    private async Task Save(bool clearWebhook = false)
+    {
+        _busy = true;
+        try
+        {
+            await ApiClient.SaveHomeAssistantAsync(new FlowLedger.Web.ApiClient.HomeAssistantSaveRequest(
+                _enabled, string.IsNullOrWhiteSpace(_url) ? null : _url.Trim(), clearWebhook, _amounts, _names, _lead, [.. _kinds]));
+            Snackbar.Add("Saved.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Disconnect()
+    {
+        _enabled = false;
+        await Save(clearWebhook: true);
+    }
+
+    private async Task Test()
+    {
+        _busy = true;
+        try
+        {
+            var error = await ApiClient.TestHomeAssistantAsync();
+            if (error is null)
+            {
+                Snackbar.Add("Test event sent. Check your Home Assistant automation trace.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(error, Severity.Error);
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
