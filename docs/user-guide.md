@@ -15,6 +15,10 @@
 5. [Recurring Flows](#recurring-flows)
 6. [Forecasts](#forecasts)
 
+See also: [Onboarding: your first 30 minutes + FAQ](onboarding.md) and the
+[Advanced User Guide](user-guide-advanced.md) (Spending, Categories, Rules, Budgets, Goals,
+Debt, Investments, Reports, Ask, Bill Sheet, Data & Backups, Linked logins).
+
 ---
 
 ## Dashboard
