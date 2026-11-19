@@ -87,6 +87,19 @@ public static class WorkerHostBuilderFactory
                     .WithIdentity($"{nameof(ScheduledAssetValuationJob)}-trigger", "FlowLedger")
                     .WithCronSchedule(valCron));
             }
+
+            // Home Assistant alert push (hourly by default). A no-op for households that have not enabled sharing.
+            var haEnabled = builder.Configuration.GetValue("HomeAssistant:Enabled", defaultValue: true);
+            var haCron = builder.Configuration.GetValue("HomeAssistant:CronExpression", defaultValue: "0 5 * * * ?")!;
+            var haKey = new JobKey(nameof(ScheduledHomeAssistantJob), "FlowLedger");
+            q.AddJob<ScheduledHomeAssistantJob>(opts => opts.WithIdentity(haKey).StoreDurably());
+            if (haEnabled)
+            {
+                q.AddTrigger(opts => opts
+                    .ForJob(haKey)
+                    .WithIdentity($"{nameof(ScheduledHomeAssistantJob)}-trigger", "FlowLedger")
+                    .WithCronSchedule(haCron));
+            }
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);

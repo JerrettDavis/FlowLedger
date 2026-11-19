@@ -314,6 +314,17 @@ public static class DependencyInjection
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore>());
         services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
+        // -- Home Assistant sharing (per-tenant settings + sent ledger; alerts only by default) --
+        services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlHomeAssistantStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                configuration["HomeAssistant:EncryptionKey"]));
+        services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler { AllowAutoRedirect = false })
+            .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
+            FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --
         services.AddSingleton(_ => FlowLedger.Infrastructure.DataSafety.BackupSettings.From(configuration));
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.BackupRunStore(
