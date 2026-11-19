@@ -50,8 +50,9 @@ public sealed class NpgsqlCategoryMaintenanceStore(string connectionString, ITen
                 "UPDATE transactions SET category_id = @to WHERE category_id = @from AND tenant_id = @t",
                 ("to", m.TargetId), ("from", m.SourceId), ("t", tenantId));
             await ExecAsync(
-                "UPDATE transaction_splits SET category_id = @to WHERE category_id = @from",
-                ("to", m.TargetId), ("from", m.SourceId));
+                "UPDATE transaction_splits s SET category_id = @to FROM transactions t " +
+                "WHERE s.transaction_id = t.id AND t.tenant_id = @t AND s.category_id = @from",
+                ("to", m.TargetId), ("from", m.SourceId), ("t", tenantId));
             await ExecAsync(
                 "UPDATE recurring_flows SET category_id = @to WHERE category_id = @from AND tenant_id = @t",
                 ("to", m.TargetId), ("from", m.SourceId), ("t", tenantId));
