@@ -97,7 +97,12 @@ public sealed class QueryDatasetProvider(
 {
     private const int MaxTransactions = 50_000;
 
-    public async Task<IReadOnlyDictionary<string, QueryTable>> BuildAsync(CancellationToken ct = default)
+    private Task<IReadOnlyDictionary<string, QueryTable>>? _cached;
+
+    /// <summary>Scoped provider: the (expensive, full-history) tables are built once per request and reused by every query in it.</summary>
+    public Task<IReadOnlyDictionary<string, QueryTable>> BuildAsync(CancellationToken ct = default) => _cached ??= BuildCoreAsync(ct);
+
+    private async Task<IReadOnlyDictionary<string, QueryTable>> BuildCoreAsync(CancellationToken ct)
     {
         var accountEntities = await accounts.ListAsync(ct);
         var accountDtos = accountEntities.Select(AccountMapper.ToDto).ToList();
