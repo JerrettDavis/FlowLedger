@@ -4,6 +4,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject ILogger<Accounts> Logger
+@using Microsoft.AspNetCore.Components.Authorization
 
 <PageTitle>Accounts — FlowLedger</PageTitle>
 
@@ -68,6 +69,18 @@
             </CellTemplate>
         </TemplateColumn>
         <PropertyColumn Property="x => x.Institution" Title="Institution" Sortable="true" />
+        <TemplateColumn Title="Data source" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="fl-data-source">@SourceLabel(context.Item.Id)</MudChip>
+                @if (_household)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                   Size="Size.Small"
+                                   OnClick="() => OpenConnectorDialog(context.Item)"
+                                   aria-label="@($"Change data source for {context.Item.Name}")" />
+                }
+            </CellTemplate>
+        </TemplateColumn>
         <TemplateColumn Title="Balance" Sortable="true" SortBy="x => x.BalanceAmount">
             <CellTemplate>
                 <MudText Class="fl-num"
@@ -103,6 +116,37 @@
     private bool _loading = true;
     private string? _error;
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private Dictionary<Guid, FlowLedger.Web.ApiClient.AccountConnectorLinkDto> _links = [];
+    private List<FlowLedger.Web.ApiClient.ConnectorDto> _connectors = [];
+    private bool _household;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    private string SourceLabel(Guid accountId) =>
+        !_links.TryGetValue(accountId, out var l) ? "Not linked"
+        : l.ConnectorId == "manual" ? "Manual"
+        : _connectors.FirstOrDefault(c => c.Id == l.ConnectorId)?.Name ?? l.ConnectorId;
+
+    private async Task OpenConnectorDialog(FlowLedger.Web.ApiClient.AccountDto account)
+    {
+        _links.TryGetValue(account.Id, out var link);
+        var dialog = await DialogService.ShowAsync<AccountConnectorDialog>("Data source",
+            new DialogParameters<AccountConnectorDialog>
+            {
+                { x => x.Account, account },
+                { x => x.Connectors, _connectors },
+                { x => x.CurrentConnector, link?.ConnectorId },
+                { x => x.CurrentProviderAccountId, link?.ProviderAccountId },
+            });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Data source updated", Severity.Success);
+            await LoadAsync();
+        }
+    }
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -113,6 +157,9 @@
         try
         {
             _accounts = await ApiClient.GetAccountsAsync();
+            _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
+            _links = (await ApiClient.GetAccountConnectorsAsync()).ToDictionary(l => l.AccountId);
+            _connectors = _household ? (await ApiClient.GetConnectorsAsync())?.Connectors ?? [] : [];
         }
         catch (Exception ex)
         {

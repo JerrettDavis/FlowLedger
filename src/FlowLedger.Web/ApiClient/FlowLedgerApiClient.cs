@@ -1103,6 +1103,49 @@ public sealed class FlowLedgerApiClient
                 : null;
         });
 
+    /// <summary>Which connector feeds each of this user's accounts.</summary>
+    public async Task<List<AccountConnectorLinkDto>> GetAccountConnectorsAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read account connectors", async () =>
+        {
+            var response = await _http.GetAsync("/api/accounts/connectors", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<AccountConnectorLinkDto>>(JsonOptions, ct) ?? []
+                : [];
+        });
+
+    /// <summary>Provider accounts a connector has seen that no account uses yet.</summary>
+    public async Task<List<AvailableProviderAccountDto>> GetAvailableProviderAccountsAsync(string connectorId, CancellationToken ct = default) =>
+        await ExecuteAsync("read available provider accounts", async () =>
+        {
+            var response = await _http.GetAsync($"/api/integrations/connectors/{Uri.EscapeDataString(connectorId)}/available-accounts", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<AvailableProviderAccountDto>>(JsonOptions, ct) ?? []
+                : [];
+        });
+
+    /// <summary>Feeds an account from a connector's provider account, or pins it manual (<c>connectorId = "manual"</c>).</summary>
+    public async Task SetAccountConnectorAsync(Guid accountId, SetAccountConnectorRequest request, CancellationToken ct = default) =>
+        await ExecuteAsync("set account connector", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/accounts/{accountId}/connector", request, JsonOptions, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException(
+                    $"Couldn't change the data source (server returned {(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(ct)}",
+                    response.StatusCode);
+            }
+
+            return true;
+        });
+
+    /// <summary>Removes an account's connector link.</summary>
+    public async Task ClearAccountConnectorAsync(Guid accountId, CancellationToken ct = default) =>
+        await ExecuteAsync("clear account connector", async () =>
+        {
+            var response = await _http.DeleteAsync($"/api/accounts/{accountId}/connector", ct);
+            return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+        });
+
     public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync("connect bank", async () =>

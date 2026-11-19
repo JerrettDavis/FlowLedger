@@ -8,7 +8,7 @@
 
 <MudText Typo="Typo.h5" Class="mb-1">Connectors</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
-    The financial data feeds FlowLedger knows about, which one is in use, and what each has linked. Credentials are never shown here.
+    The financial data feeds FlowLedger knows about, which are enabled, and which accounts each one feeds. Credentials are never shown here.
 </MudText>
 
 @if (!_household)
@@ -30,7 +30,7 @@ else if (_overview is null)
 else
 {
     <MudAlert Severity="Severity.Normal" Class="mb-4" Dense="true">
-        Active connector: <strong>@_overview.ActiveProvider</strong>. @_overview.SelectionNote
+        Enabled on this instance: <strong>@string.Join(", ", _overview.Connectors.Where(c => c.Active).Select(c => c.Name))</strong>. @_overview.SelectionNote
     </MudAlert>
 
     <MudGrid>
@@ -42,15 +42,15 @@ else
                         <MudText Typo="Typo.subtitle1">@c.Name</MudText>
                         @if (c.Active)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Success">In use</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Enabled</MudChip>
                         }
                         else if (c.EnabledInConfig)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">Enabled, not active</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">Enabled, not running</MudChip>
                         }
                         else
                         {
-                            <MudChip T="string" Size="Size.Small">Not in use</MudChip>
+                            <MudChip T="string" Size="Size.Small">Not enabled</MudChip>
                         }
                         @if (c.Id != "Simulated")
                         {
@@ -84,6 +84,21 @@ else
                         <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">Calls are paused (kill switch is on).</MudAlert>
                     }
 
+                    <MudText Typo="Typo.subtitle2" Class="mt-3">Accounts using this connector (@c.Accounts.Count)</MudText>
+                    @if (c.Accounts.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="fl-muted">None.</MudText>
+                    }
+                    else
+                    {
+                        <ul class="fl-connector-accounts" style="margin:0; padding-left:18px">
+                            @foreach (var a in c.Accounts)
+                            {
+                                <li><MudText Typo="Typo.body2">@a.Name</MudText></li>
+                            }
+                        </ul>
+                    }
+
                     <MudText Typo="Typo.subtitle2" Class="mt-3">Linked institutions</MudText>
                     @if (c.Connections.Count == 0)
                     {
@@ -112,6 +127,27 @@ else
             </MudItem>
         }
     </MudGrid>
+
+    <MudPaper Class="pa-4 mt-4" Outlined="true">
+        <MudText Typo="Typo.subtitle1">Accounts with no connector (@_overview.UnassignedAccounts.Count)</MudText>
+        <MudText Typo="Typo.body2" Class="fl-muted mb-2">
+            Manual accounts, accounts pinned as manual, and accounts no sync has matched yet. Change an account's data source on the
+            <MudLink Href="accounts">Accounts</MudLink> page.
+        </MudText>
+        @if (_overview.UnassignedAccounts.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="fl-muted">Every account is fed by a connector.</MudText>
+        }
+        else
+        {
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+                @foreach (var a in _overview.UnassignedAccounts)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@a.Name@(a.PinnedManual ? " (manual)" : "")</MudChip>
+                }
+            </div>
+        }
+    </MudPaper>
 
     <MudButton Class="mt-4" Variant="Variant.Outlined" OnClick="LoadAsync">Refresh</MudButton>
 }

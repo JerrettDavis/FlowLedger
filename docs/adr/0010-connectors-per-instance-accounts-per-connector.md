@@ -1,6 +1,6 @@
 # ADR 0010 — Connectors enabled per instance, linked per account
 
-Status: Accepted (implementation staged; see "Rollout")
+Status: Accepted and implemented (rollout steps 1-3 shipped; per-user connectors remain future work)
 
 ## Context
 Until now exactly one provider (Simulated, SimpleFIN Bridge or MX) was selected for the whole process and every account synced
@@ -44,3 +44,13 @@ account via none.
 - Duplicate real-world accounts (the same account visible via SimpleFIN and MX) are resolved by linking, not by merging data.
 - Resolves ADR 0009 items 1, 3 (connector descriptor), 4 (several connections per tenant), 5 (household guard per connector scope).
   Still open from ADR 0009: per-user credentials/consent, webhooks routed per connection, user/tenant deletion revoking consent.
+
+## Implementation notes
+- `IConnectorRegistry` (enabled connectors, resolve by id), keyed `IFinancialDataProvider` registrations, un-keyed primary for older call sites.
+- `account_connector_links` and `connector_provider_accounts` (a catalog of provider accounts each connector reported) are ad-hoc tables, included
+  in backups and covered by the restore-drill test.
+- `MultiConnectorSyncService` runs one `FinancialSyncService` per usable connector. `Connectors:<Id>:AutoCreateAccounts=false` makes a connector
+  catalogue-only. Pinned-manual accounts use the pseudo-connector `manual`.
+- API: `GET /api/accounts/connectors`, `GET /api/integrations/connectors/{id}/available-accounts`, `PUT|DELETE /api/accounts/{id}/connector`.
+- Not done yet: per-user credentials, merging two accounts that mirror the same real account, and connector enablement from the UI
+  (enablement stays configuration so credentials never pass through the app).

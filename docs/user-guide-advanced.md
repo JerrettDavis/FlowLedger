@@ -562,16 +562,27 @@ than one login and not on the one you are using).
 
 ## Connectors
 
-**What it is for.** The household owner's overview of the financial data feeds FlowLedger knows about: Simulated demo data,
-SimpleFIN Bridge and MX. It is not shown to other users, and operators can switch it off entirely for production with
-`Features__ConnectorsPage=false` (API and Web).
+**What it is for.** The household owner's overview of the financial data feeds FlowLedger knows about (Simulated demo data, SimpleFIN
+Bridge, MX), which are **enabled for this instance**, and which **accounts** each one feeds. It is not shown to other users, and operators
+can hide it for production with `Features__ConnectorsPage=false` (API and Web).
 
-**What you see per connector**
-- **In use / Enabled, not active / Not in use**, and whether credentials are configured (never the credentials themselves).
-- The active connector's capabilities, last successful sync, and API calls today and this month (with the daily and monthly
-  budget and the kill-switch state for MX).
-- The institutions linked through that connector, and the configuration keys that control it.
+**How it works**
+- *Instance level:* the operator enables connectors by configuration (`SimpleFin__Enabled`, `Mx__Enabled`; a restart applies it). You can
+  enable several at once.
+- *Account level:* every account is fed by at most one connector. New accounts a connector discovers are created and linked to it;
+  existing accounts are matched and linked on the next sync.
 
-**Choosing the feed.** Today the active connector is chosen by configuration at startup (`SimpleFin__Enabled`,
-`Mx__Enabled`; only one real connector at a time) and needs a restart to change. Selecting feeds from the page, and several feeds
-per user, depend on the provider work in [ADR 0009](adr/0009-multi-provider-self-service-linking.md).
+**Changing an account's data source** (household owner): on **Accounts**, the *Data source* column shows what feeds each account.
+Click the swap icon to open the dialog:
+1. Pick **Manual (never synced)** to stop syncing the account, or pick a connector.
+2. For a connector, choose the **provider account** it should mirror. Only provider accounts that no other account uses are listed, plus
+   the account's current one.
+3. **Save**. **Remove link** clears the link (the next sync may match it again).
+
+Provider accounts appear in the list after the connector has synced once. If the same real account is visible through two connectors,
+link it to one; the other connector's copy is a separate account you can leave unlinked or ignore.
+
+**Settings**
+- `Connectors__<Id>__AutoCreateAccounts=false` (for example `Connectors__MX__AutoCreateAccounts=false`): the connector only *catalogues*
+  the provider accounts it finds; you link them to accounts yourself instead of getting new accounts automatically.
+- `Connectors__Simulated=true` adds demo accounts next to real connectors (only for trying things out; it creates fake accounts).

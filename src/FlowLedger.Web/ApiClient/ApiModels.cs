@@ -476,11 +476,25 @@ public sealed record ConnectorUsageDto(long CallsToday, long CallsThisMonth, int
 
 public sealed record ConnectorLinkDto(string Institution, string Status, DateTimeOffset LinkedAt, DateTimeOffset UpdatedAt);
 
-public sealed record ConnectorDto(
-    string Id, string Name, string Kind, string Description, bool Active, bool EnabledInConfig, bool CredentialsConfigured,
-    List<string> ConfigKeys, List<string>? Capabilities, DateTimeOffset? LastSyncedAt, ConnectorUsageDto Usage, List<ConnectorLinkDto> Connections);
+public sealed record ConnectorAccountDto(Guid AccountId, string Name, string ProviderAccountId);
 
-public sealed record ConnectorsOverviewDto(string ActiveProvider, string SelectionMode, string SelectionNote, List<ConnectorDto> Connectors);
+public sealed record UnassignedAccountDto(Guid AccountId, string Name, bool PinnedManual);
+
+/// <param name="Active">Enabled on this instance (the property keeps its original name for compatibility).</param>
+/// <param name="Primary">The connector older single-provider call sites use.</param>
+public sealed record ConnectorDto(
+    string Id, string Name, string Kind, string Description, bool Active, bool Primary, bool EnabledInConfig, bool CredentialsConfigured,
+    List<string> ConfigKeys, List<string>? Capabilities, List<ConnectorAccountDto> Accounts, DateTimeOffset? LastSyncedAt,
+    ConnectorUsageDto Usage, List<ConnectorLinkDto> Connections);
+
+public sealed record ConnectorsOverviewDto(
+    string ActiveProvider, string SelectionMode, string SelectionNote, List<ConnectorDto> Connectors, List<UnassignedAccountDto> UnassignedAccounts);
+
+public sealed record AccountConnectorLinkDto(Guid AccountId, string ConnectorId, string ProviderAccountId);
+
+public sealed record AvailableProviderAccountDto(string ProviderAccountId, string Name, string AccountType, decimal Balance, string Currency, DateTimeOffset LastSeenUtc);
+
+public sealed record SetAccountConnectorRequest(string ConnectorId, string? ProviderAccountId);
 
 // ── Spending insights (Mint-style breakdown) ─────────────────────────────────
 

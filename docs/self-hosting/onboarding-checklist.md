@@ -27,7 +27,7 @@ Work through this before giving anyone else a login. Each item links to the deta
 - Per-user limits: 5 MB per CSV upload and 50,000 rows per import; 1,000 rules, 1,000 merchant aliases, 500 budgets, 200 goals, 500,000 transactions.
 - There is no in-app "delete my account" yet. See the FAQ in [onboarding.md](../onboarding.md) for the manual steps.
 
-- The household-only **Connectors** page (/connectors) shows which data feeds exist and which is in use; set `Features__ConnectorsPage=false` to hide it in production.
+- The household-only **Connectors** page (/connectors) shows which data feeds are enabled and which accounts each feeds (several connectors can be enabled at once; each account uses one); set `Features__ConnectorsPage=false` to hide it in production.
 
 ## 4. Hand them the guide
 - [ ] Send [onboarding.md](../onboarding.md) (first 30 minutes) and [user-guide-advanced.md](../user-guide-advanced.md).
