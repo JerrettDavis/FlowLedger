@@ -46,6 +46,16 @@ public sealed class TransactionHandlersTests
         dto.Direction.Should().Be("Credit");
     }
 
+    [Fact]
+    public async Task CreateTransaction_MerchantWithoutCategory_LeavesTransactionUncategorized()
+    {
+        var handler = new CreateTransactionHandler(_repo, _tenant);
+        var dto = await handler.HandleAsync(ValidRequest() with { MerchantName = "Corner Cafe" });
+
+        dto.MerchantName.Should().Be("Corner Cafe");
+        dto.CategoryId.Should().BeNull("a merchant name alone must not invent a random category id");
+    }
+
     // ── GetTransactionHandler ─────────────────────────────────────────────────
 
     [Fact]

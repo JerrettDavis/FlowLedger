@@ -75,7 +75,7 @@ public sealed class CreateTransactionHandler
         }
         else if (!string.IsNullOrWhiteSpace(request.MerchantName))
         {
-            tx.Categorize(CategoryId.New(), request.MerchantName);
+            tx.SetMerchantName(request.MerchantName);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Notes))
