@@ -220,6 +220,7 @@ app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();
 app.MapConnectorEndpoints();
+app.MapAccountConnectorEndpoints();
 app.MapMxEndpoints();
 app.MapForecastEndpoints();
 app.MapImportEndpoints();

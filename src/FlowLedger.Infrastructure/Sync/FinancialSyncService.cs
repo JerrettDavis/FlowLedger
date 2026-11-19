@@ -35,6 +35,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly ILogger<FinancialSyncService> _logger;
     private readonly Guid? _householdTenantId;
     private readonly IAccountConnectorLinkStore? _links;
+    private readonly IProviderAccountCatalog? _catalog;
+    private readonly bool _autoCreateAccounts;
 
     /// <param name="configuration">
     /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
@@ -48,9 +50,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         ISyncCursorStore cursorStore,
         ILogger<FinancialSyncService> logger,
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null,
-        IAccountConnectorLinkStore? links = null)
+        IAccountConnectorLinkStore? links = null,
+        IProviderAccountCatalog? catalog = null)
     {
         _links = links;
+        _catalog = catalog;
+        // Connectors:<id>:AutoCreateAccounts (default true): when false, provider accounts that match no existing account are only
+        // catalogued; the owner links them to an account by hand.
+        _autoCreateAccounts = !(bool.TryParse(configuration?[$"Connectors:{provider.ProviderName}:AutoCreateAccounts"], out var autoCreate) && !autoCreate);
         _provider = provider;
         _db = db;
         _tenant = tenant;
@@ -147,6 +154,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Step 2: fetch provider accounts
         var providerAccounts = await _provider.GetAccountsAsync(memberRef.MemberProviderId, ct);
         _logger.LogDebug("Provider returned {Count} accounts", providerAccounts.Count);
+
+        if (_catalog is not null)
+        {
+            try
+            {
+                var seen = DateTimeOffset.UtcNow;
+                await _catalog.UpsertAsync(providerAccounts
+                    .Select(pa => new DiscoveredProviderAccount(
+                        _provider.ProviderName, pa.ProviderId, pa.Name, pa.AccountType, pa.Balance.Amount, pa.CurrencyCode, seen))
+                    .ToList(), ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Could not update the provider-account catalog; continuing the sync.");
+            }
+        }
 
         int accountsUpserted = 0;
         int transactionsAdded = 0;
@@ -285,6 +308,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             }
 
             return existing;
+        }
+
+        if (!_autoCreateAccounts)
+        {
+            return null; // catalogued only: the owner links it to an account
         }
 
         // Create new account.
