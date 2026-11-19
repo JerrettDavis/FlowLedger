@@ -166,7 +166,7 @@ public static class AuthSetup
 
         // After linking a login the tenant claim in the cookie is stale: clear only the local cookie, then re-challenge
         // (the IdP session is still alive, so the user is not prompted again) to re-resolve identity -> tenant.
-        app.MapGet("/auth/relogin", async (HttpContext ctx) =>
+        app.MapGet("/auth/relogin", async (HttpContext ctx, string? returnUrl) =>
             {
                 // State-changing GET: refuse requests initiated from another site (login CSRF). Browsers always send Sec-Fetch-Site.
                 var site = ctx.Request.Headers["Sec-Fetch-Site"].ToString();
@@ -176,7 +176,7 @@ public static class AuthSetup
                 }
 
                 await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                return Results.Challenge(new AuthenticationProperties { RedirectUri = "/account/logins" },
+                return Results.Challenge(new AuthenticationProperties { RedirectUri = string.IsNullOrEmpty(returnUrl) ? "/account/logins" : SafeLocal(returnUrl) },
                     [OpenIdConnectDefaults.AuthenticationScheme]);
             })
             .RequireAuthorization();
