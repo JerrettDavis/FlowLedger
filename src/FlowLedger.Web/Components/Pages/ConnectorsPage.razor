@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Authorization
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject NavigationManager Nav
 
 <PageTitle>Connectors — FlowLedger</PageTitle>
 
@@ -15,7 +16,7 @@
     <MudAlert Severity="Severity.Info">
         Connectors cover the whole installation and are only available to the household owner.
         If you are the owner and signed in before this was added, sign in again to refresh your access.
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="ml-2" Href="/auth/relogin?returnUrl=%2Fconnectors" ForceLoad="true">Sign in again</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="ml-2" OnClick="SignInAgain">Sign in again</MudButton>
     </MudAlert>
 }
 else if (_loading)
@@ -150,4 +151,6 @@ else
             _loading = false;
         }
     }
+
+    private void SignInAgain() => Nav.NavigateTo("/auth/relogin?returnUrl=%2Fconnectors", forceLoad: true);
 }
