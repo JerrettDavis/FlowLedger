@@ -168,6 +168,13 @@ public static class AuthSetup
         // (the IdP session is still alive, so the user is not prompted again) to re-resolve identity -> tenant.
         app.MapGet("/auth/relogin", async (HttpContext ctx) =>
             {
+                // State-changing GET: refuse requests initiated from another site (login CSRF). Browsers always send Sec-Fetch-Site.
+                var site = ctx.Request.Headers["Sec-Fetch-Site"].ToString();
+                if (site.Length > 0 && site is not ("same-origin" or "none"))
+                {
+                    return Results.StatusCode(StatusCodes.Status400BadRequest);
+                }
+
                 await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 return Results.Challenge(new AuthenticationProperties { RedirectUri = "/account/logins" },
                     [OpenIdConnectDefaults.AuthenticationScheme]);

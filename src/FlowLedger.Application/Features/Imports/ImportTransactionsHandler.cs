@@ -37,6 +37,9 @@ public sealed class ImportTransactionsHandler
         "MMM d,yyyy",
     ];
 
+    /// <summary>Upper bound on rows per import, so a single request cannot flood a tenant (and the database).</summary>
+    public const int MaxImportRows = 50_000;
+
     private readonly ITransactionRepository _txRepo;
     private readonly IAccountRepository _accountRepo;
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;
@@ -76,6 +79,11 @@ public sealed class ImportTransactionsHandler
 
         // Parse CSV
         var rows = CsvParser.Parse(command.CsvContent, mapping.Delimiter);
+        if (rows.Count > MaxImportRows)
+        {
+            throw new InvalidOperationException($"CSV has {rows.Count} rows; the limit per import is {MaxImportRows}. Split the file and import it in parts.");
+        }
+
         if (rows.Count == 0)
         {
             return new ImportSummaryDto(Guid.NewGuid(), 0, 0, 0, 0, []);

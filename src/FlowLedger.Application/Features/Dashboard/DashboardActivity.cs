@@ -154,11 +154,14 @@ public sealed class GetDashboardActivityHandler(
     /// <summary>Anomaly rules (price increases, merchant/category outliers) need months of history; the 30/90-day panels slice from it.</summary>
     private const int LoadDays = 365;
 
+    private const int MaxRows = 15_000;
+
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = today.AddDays(-LoadDays);
-        var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, 5000, ct);
+        // Newest first, so hitting the cap only drops the oldest baseline months, never the recent panels.
+        var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, MaxRows, ct);
         var dtos = txs.Select(TransactionMapper.ToDto).ToList();
         var types = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
         return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types),
