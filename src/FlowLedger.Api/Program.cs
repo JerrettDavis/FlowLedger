@@ -36,7 +36,9 @@ builder.Services.AddOpenApi();
 // → 401) when no valid X-Tenant-Id header is supplied.
 builder.Services.AddHttpContextAccessor();
 // Tenancy:RequireTenantHeader=true makes even Development fail closed (no demo-tenant fallback) - set it on any stack with real users.
-if (builder.Environment.IsDevelopment() && !builder.Configuration.GetValue("Tenancy:RequireTenantHeader", false))
+if (builder.Environment.IsDevelopment()
+    && !builder.Configuration.GetValue("Tenancy:RequireTenantHeader", false)
+    && string.IsNullOrEmpty(builder.Configuration["Api:TenantSigningKey"]))
 {
     builder.Services.AddScoped<ITenantContext, DevTenantContext>();
 }

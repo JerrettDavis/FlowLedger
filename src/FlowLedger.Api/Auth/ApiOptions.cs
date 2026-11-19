@@ -36,6 +36,13 @@ public sealed class ApiOptions
     /// </summary>
     public Guid? TenantId { get; set; }
 
+    /// <summary>
+    /// Optional second secret (Api:TenantSigningKey), distinct from <see cref="Key"/>. When set, every HTTP request must carry a valid
+    /// <c>X-Tenant-Sig</c> from the Web app proving it vouches for the <c>X-Tenant-Id</c>; a leaked API key alone then cannot act as
+    /// an arbitrary tenant. Must match Api:TenantSigningKey on the Web app.
+    /// </summary>
+    public string? TenantSigningKey { get; set; }
+
     /// <summary>The effective household tenant id for background jobs.</summary>
     public Guid EffectiveTenantId =>
         TenantId is { } id && id != Guid.Empty ? id : DefaultTenantId;
