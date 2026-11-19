@@ -105,6 +105,12 @@ internal static class MxEndpoints
                 return Results.Unauthorized();
             }
 
+            // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
+            if (WebhookReplayGuard.SeenRecently(rawBody))
+            {
+                return Results.Accepted(value: new { duplicate = true });
+            }
+
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)

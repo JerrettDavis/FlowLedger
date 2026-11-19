@@ -23,6 +23,8 @@ public static class SnapshotImport
         return zip;
     }
 
+    private const long MaxUncompressedBytes = 8L * 1024 * 1024 * 1024;
+
     public static async Task<RestoreDrillResult> ImportZipAsync(
         string targetConnectionString, Stream zip, string workDir, CancellationToken ct = default)
     {
@@ -32,6 +34,12 @@ public static class SnapshotImport
         {
             using (var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true))
             {
+                // Zip-bomb guard: refuse bundles whose declared uncompressed size is implausible.
+                if (archive.Entries.Sum(x => x.Length) > MaxUncompressedBytes)
+                {
+                    return Fail($"Bundle expands to more than {MaxUncompressedBytes / (1024 * 1024 * 1024)} GB; refusing to extract it.");
+                }
+
                 foreach (var entry in archive.Entries)
                 {
                     // Flat bundle only; reject anything with a path (zip-slip).
