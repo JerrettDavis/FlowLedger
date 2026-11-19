@@ -386,6 +386,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "EffectiveDate")
                         .HasDatabaseName("ix_transactions_tenant_date");
 
+                    b.HasIndex("TenantId", "EffectiveDate", "CreatedAt")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_transactions_tenant_date_created");
+
                     b.HasIndex("TenantId", "AccountId", "EffectiveDate")
                         .HasDatabaseName("ix_transactions_tenant_account_date");
 
