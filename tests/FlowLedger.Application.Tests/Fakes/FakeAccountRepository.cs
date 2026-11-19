@@ -15,6 +15,9 @@ public sealed class FakeAccountRepository : IAccountRepository
     public Task<IReadOnlyList<Account>> ListAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Account>>(_store.Where(a => a.IsActive).ToList());
 
+    public Task<IReadOnlyList<Account>> ListIncludingInactiveAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Account>>(_store.ToList());
+
     public Task AddAsync(Account account, CancellationToken ct = default)
     {
         _store.Add(account);

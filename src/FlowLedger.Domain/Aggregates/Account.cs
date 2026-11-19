@@ -29,6 +29,15 @@ public sealed class Account : AggregateRoot
     public DateTimeOffset? LastBalanceConfirmedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>Standard accounts feed every view; Holdings (investments, property) are tracked for balance and net worth only.</summary>
+    public AccountMode Mode { get; private set; } = AccountMode.Standard;
+
+    /// <summary>When true the account's transactions stay out of the everyday views (transactions, dashboard, spending, reports) unless filtered to it.</summary>
+    public bool HideTransactions { get; private set; }
+
+    /// <summary>True when the account's transactions should be left out of default (unfiltered) views.</summary>
+    public bool TransactionsHidden => HideTransactions || Mode == AccountMode.Holding;
+
     /// <summary>True once the user set the type by hand; provider sync must then leave the type alone.</summary>
     public bool TypeLockedByUser { get; private set; }
 
@@ -88,6 +97,12 @@ public sealed class Account : AggregateRoot
             creditLimit,
             institution?.Trim(),
             DateTimeOffset.UtcNow);
+
+        // Investments are tracked as holdings by default: their buy/sell/dividend lines are noise in everyday views.
+        if (accountType == AccountType.Investment)
+        {
+            account.Mode = AccountMode.Holding;
+        }
 
         account.RaiseEvent(new AccountConnected(
             account.AccountId,
@@ -200,9 +215,32 @@ public sealed class Account : AggregateRoot
         IsActive = false;
     }
 
+    public void Activate()
+    {
+        IsActive = true;
+    }
+
+    /// <summary>Applies the user's tracking preferences in one step.</summary>
+    public void ApplySettings(bool isActive, AccountMode mode, bool hideTransactions)
+    {
+        IsActive = isActive;
+        Mode = mode;
+        HideTransactions = hideTransactions;
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private bool IsAssetAccount => IsAssetType(AccountType);
+}
+
+/// <summary>How an account participates in reporting.</summary>
+public enum AccountMode
+{
+    /// <summary>A normal account: transactions appear in every view and report.</summary>
+    Standard,
+
+    /// <summary>A tracked holding (e.g. brokerage, retirement): balance and history count toward net worth, but its transactions are hidden from everyday views.</summary>
+    Holding,
 }
 
 public enum AccountType

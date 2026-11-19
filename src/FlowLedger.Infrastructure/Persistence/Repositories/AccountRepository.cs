@@ -18,6 +18,9 @@ internal sealed class AccountRepository : IAccountRepository
     public async Task<IReadOnlyList<Account>> ListAsync(CancellationToken ct = default)
         => await _db.Accounts.Where(a => a.IsActive).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Account>> ListIncludingInactiveAsync(CancellationToken ct = default)
+        => await _db.Accounts.ToListAsync(ct);
+
     public async Task AddAsync(Account account, CancellationToken ct = default)
         => await _db.Accounts.AddAsync(account, ct);
 

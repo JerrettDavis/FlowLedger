@@ -38,6 +38,40 @@
                         <MudSelectItem Value="@t">@t</MudSelectItem>
                     }
                 </MudSelect>
+
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Tracking &amp; reporting</MudText>
+
+                <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="Enabled"
+                           aria-label="Account enabled" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3 d-block">
+                    @(_enabled
+                        ? "Syncing, and included in balances, net worth, reports and forecasts."
+                        : "Turned off: sync stops and the account disappears from every screen, report and total. Your data is kept - turn it back on any time.")
+                </MudText>
+
+                @if (_enabled)
+                {
+                    <MudSelect T="string" @bind-Value="_mode" Label="Treat this account as" Class="mb-1"
+                               aria-label="Account mode">
+                        <MudSelectItem Value="@("Standard")">Everyday account</MudSelectItem>
+                        <MudSelectItem Value="@("Holding")">Holding (balance tracking)</MudSelectItem>
+                    </MudSelect>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3 d-block">
+                        @(_mode == "Holding"
+                            ? "For investments, retirement and other holdings. Balance and history count toward net worth and you can open the account to see its activity, but its transactions stay out of Transactions, the dashboard, spending, recurring detection and reports."
+                            : "A normal account: its transactions appear everywhere.")
+                    </MudText>
+
+                    <MudSwitch T="bool" Value="@(_mode == "Holding" || _hideTransactions)" ValueChanged="@((bool v) => _hideTransactions = v)"
+                               Disabled="@(_mode == "Holding")" Color="Color.Primary" Label="Hide transactions from everyday views"
+                               aria-label="Hide transactions" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">
+                        @(_mode == "Holding"
+                            ? "Always on for holdings."
+                            : "Keeps this account's activity out of the default Transactions list, dashboard, spending and reports. Pick the account in a filter to see it.")
+                    </MudText>
+                }
             }
         </MudForm>
     </DialogContent>
@@ -60,6 +94,9 @@
     private decimal _startingBalance = 0m;
     private string _currency = "USD";
     private string? _institution;
+    private bool _enabled = true;
+    private string _mode = "Standard";
+    private bool _hideTransactions;
 
     private static readonly string[] AccountTypes =
     [
@@ -75,6 +112,9 @@
             _accountType = Account.AccountType;
             _currency = Account.BalanceCurrency;
             _institution = Account.Institution;
+            _enabled = Account.IsActive;
+            _mode = Account.Mode;
+            _hideTransactions = Account.HideTransactions;
         }
     }
 
@@ -83,7 +123,7 @@
         : "Changing the type pins it so sync will not change it back.";
 
     /// <summary>Outcome of the edit dialog: which parts (name, type) actually changed.</summary>
-    public sealed record AccountEditResult(string? NewName, string? NewType);
+    public sealed record AccountEditResult(string? NewName, string? NewType, FlowLedger.Web.ApiClient.AccountSettingsRequest? Settings = null);
 
     private void Cancel() => MudDialog.Cancel();
 
@@ -97,7 +137,10 @@
                 _name, _accountType, _startingBalance, _currency, _institution, null)
             : new AccountEditResult(
                 _name != Account.Name ? _name : null,
-                _accountType != Account.AccountType ? _accountType : null);
+                _accountType != Account.AccountType ? _accountType : null,
+                _enabled != Account.IsActive || _mode != Account.Mode || _hideTransactions != Account.HideTransactions
+                    ? new FlowLedger.Web.ApiClient.AccountSettingsRequest(_enabled, _mode, _mode == "Holding" || _hideTransactions)
+                    : null);
 
         MudDialog.Close(DialogResult.Ok(result));
     }

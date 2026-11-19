@@ -21,13 +21,19 @@ internal sealed class TransactionRepository : ITransactionRepository
         DateOnly? to = null,
         int skip = 0,
         int take = 100,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool everydayOnly = false)
     {
         var query = _db.Transactions.AsNoTracking();
 
         if (accountId.HasValue)
         {
+            // Explicitly drilling into one account always shows it, even a hidden holding.
             query = query.Where(t => EF.Property<AccountId>(t, "AccountId") == accountId.Value);
+        }
+        else if (everydayOnly)
+        {
+            query = await ExcludeHiddenAsync(query, ct);
         }
 
         if (from.HasValue)
@@ -48,10 +54,30 @@ internal sealed class TransactionRepository : ITransactionRepository
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Default (unfiltered) views leave out transactions of disabled accounts and of accounts the user hides
+    /// (holdings / "hide transactions"). Selecting an account explicitly bypasses this.
+    /// </summary>
+    private async Task<IQueryable<Transaction>> ExcludeHiddenAsync(IQueryable<Transaction> query, CancellationToken ct)
+    {
+        var hidden = await _db.Accounts.AsNoTracking()
+            .Where(a => !a.IsActive || a.HideTransactions || a.Mode == AccountMode.Holding)
+            .Select(a => a.Id)
+            .ToListAsync(ct);
+        if (hidden.Count == 0)
+        {
+            return query;
+        }
+
+        var hiddenIds = hidden.Select(AccountId.From).ToList();
+        return query.Where(t => !hiddenIds.Contains(EF.Property<AccountId>(t, "AccountId")));
+    }
+
     public async Task<IReadOnlyList<Transaction>> ListForAccountsAsync(
         IReadOnlyCollection<AccountId> accountIds, DateOnly from, DateOnly to, CancellationToken ct = default)
     {
-        var ids = accountIds.ToList();
+        var disabled = await _db.Accounts.AsNoTracking().Where(a => !a.IsActive).Select(a => a.Id).ToListAsync(ct);
+        var ids = accountIds.Where(i => !disabled.Contains(i.Value)).ToList();
         return await _db.Transactions.AsNoTracking()
             .Where(t => ids.Contains(EF.Property<AccountId>(t, "AccountId")))
             .Where(t => t.EffectiveDate >= from && t.EffectiveDate <= to)

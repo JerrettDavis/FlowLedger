@@ -12,6 +12,9 @@ public interface IAccountRepository
 {
     Task<Account?> GetByIdAsync(AccountId id, CancellationToken ct = default);
     Task<IReadOnlyList<Account>> ListAsync(CancellationToken ct = default);
+
+    /// <summary>Every account, including disabled ones (for the management screen).</summary>
+    Task<IReadOnlyList<Account>> ListIncludingInactiveAsync(CancellationToken ct = default);
     Task AddAsync(Account account, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }

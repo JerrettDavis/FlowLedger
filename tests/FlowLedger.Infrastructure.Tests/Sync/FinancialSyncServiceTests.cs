@@ -110,6 +110,40 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task SyncAsync_StopsTrackingADisabledAccount()
+    {
+        var tenant = TestTenantContext.New();
+        await using (var db1 = _fixture.CreateDbContext(tenant))
+        {
+            await CreateSyncService(db1, tenant).SyncAsync();
+        }
+
+        Guid disabledId;
+        await using (var offDb = _fixture.CreateDbContext(tenant))
+        {
+            var account = await offDb.Accounts.FirstAsync();
+            disabledId = account.Id;
+            account.ApplySettings(false, AccountMode.Standard, false);
+            await offDb.SaveChangesAsync();
+        }
+
+        int snapshotsBefore;
+        await using (var before = _fixture.CreateDbContext(tenant))
+        {
+            snapshotsBefore = await before.BalanceSnapshots.CountAsync(s => s.AccountId == disabledId);
+        }
+
+        await using (var db2 = _fixture.CreateDbContext(tenant))
+        {
+            await CreateSyncService(db2, tenant).SyncAsync();
+        }
+
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.BalanceSnapshots.CountAsync(s => s.AccountId == disabledId)).Should().Be(snapshotsBefore);
+        (await verify.Accounts.CountAsync()).Should().Be(await verify.Accounts.Select(a => a.Id).Distinct().CountAsync());
+    }
+
+    [DockerFact]
     public async Task SyncAsync_DoesNotOverwriteATypePinnedByTheUser()
     {
         var tenant = TestTenantContext.New();

@@ -13,8 +13,8 @@ internal static class AccountEndpoints
         var group = app.MapGroup("/api/accounts").WithTags("Accounts")
             .RequireRateLimiting("api");
 
-        group.MapGet("/", async (ListAccountsHandler handler, CancellationToken ct) =>
-            Results.Ok(await handler.HandleAsync(ct)))
+        group.MapGet("/", async (ListAccountsHandler handler, CancellationToken ct, bool includeInactive = false) =>
+            Results.Ok(await handler.HandleAsync(includeInactive, ct)))
             .WithName("ListAccounts")
             .WithSummary("List all active accounts for the current tenant");
 
@@ -90,6 +90,24 @@ internal static class AccountEndpoints
         })
         .WithName("ChangeAccountType")
         .WithSummary("Correct an account's type by hand; the type is pinned so provider sync never overwrites it")
+        .RequireRateLimiting("write");
+
+        group.MapPut("/{id:guid}/settings", async (
+            Guid id,
+            [FromBody] AccountSettingsRequest request,
+            UpdateAccountSettingsHandler handler,
+            CancellationToken ct) =>
+        {
+            if (!Enum.TryParse<FlowLedger.Domain.Aggregates.AccountMode>(request.Mode, ignoreCase: true, out _))
+            {
+                return Results.Problem("Mode must be 'Standard' or 'Holding'.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var result = await handler.HandleAsync(id, request, ct);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        })
+        .WithName("UpdateAccountSettings")
+        .WithSummary("Enable/disable an account, set its mode (Standard or Holding) and whether its transactions are hidden from everyday views")
         .RequireRateLimiting("write");
 
         group.MapDelete("/{id:guid}", async (Guid id, DeactivateAccountHandler handler, CancellationToken ct) =>

@@ -120,10 +120,37 @@ public sealed class FlowLedgerApiClient
     // ── Accounts ─────────────────────────────────────────────────────────────
 
     public async Task<List<AccountDto>> GetAccountsAsync(CancellationToken ct = default)
+        => await GetAccountsAsync(includeInactive: false, ct);
+
+    /// <summary>Lists accounts; includeInactive also returns disabled ones (for the management screen).</summary>
+    public async Task<List<AccountDto>> GetAccountsAsync(bool includeInactive, CancellationToken ct = default)
     {
         var result = await GetJsonAsync<List<AccountDto>>(
-            "/api/accounts", "load accounts", ct: ct);
+            includeInactive ? "/api/accounts?includeInactive=true" : "/api/accounts", "load accounts", ct: ct);
         return result ?? [];
+    }
+
+    /// <summary>Enable/disable an account, set its mode (Standard/Holding) and whether its transactions are hidden.</summary>
+    public async Task<AccountDto?> UpdateAccountSettingsAsync(Guid id, AccountSettingsRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("update account settings", async () =>
+        {
+            var response = await _http.PutAsJsonAsync($"/api/accounts/{id}/settings", request, JsonOptions, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Non-success status {StatusCode} updating settings of account {Id}", (int)response.StatusCode, id);
+                throw new ApiClientException(
+                    $"Couldn't update account settings (server returned {(int)response.StatusCode}).",
+                    response.StatusCode);
+            }
+
+            return await response.Content.ReadFromJsonAsync<AccountDto>(JsonOptions, ct);
+        });
     }
 
     public async Task<AccountDto?> GetAccountAsync(Guid id, CancellationToken ct = default)
@@ -218,9 +245,15 @@ public sealed class FlowLedgerApiClient
         DateOnly? to = null,
         int skip = 0,
         int take = 100,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool includeHidden = false)
     {
         var qs = new List<string>();
+        if (includeHidden)
+        {
+            qs.Add("includeHidden=true");
+        }
+
         if (accountId.HasValue)
         {
             qs.Add($"accountId={accountId}");

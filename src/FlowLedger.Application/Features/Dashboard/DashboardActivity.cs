@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
 
@@ -168,7 +169,10 @@ public sealed class GetDashboardActivityHandler(
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, MaxRows, ct);
         var dtos = txs.Select(TransactionMapper.ToDto).ToList();
         var types = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
-        return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: TransferDetector.Detect(dtos, types),
+        var transferIds = TransferDetector.Detect(dtos, types);
+        var excluded = await AccountVisibility.ExcludedIdsAsync(accounts, null, ct);
+        dtos = dtos.Where(t => !excluded.Contains(t.AccountId)).ToList();
+        return DashboardActivityAnalyzer.Analyze(dtos, today, transferIds: transferIds,
             dismissedIds: await dismissals.ListIdsAsync(ct),
             categoryPathById: (await categories.ListAsync(ct)).ToDictionary(c => c.Id, c => c.Path.Value));
     }

@@ -13,7 +13,11 @@ public sealed record AccountDto(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset? LastBalanceConfirmedAt,
-    bool TypeLockedByUser = false);
+    bool TypeLockedByUser = false,
+    string Mode = "Standard",
+    bool HideTransactions = false);
+
+public sealed record AccountSettingsRequest(bool IsActive, string Mode, bool HideTransactions);
 
 public sealed record ChangeAccountTypeRequest(string AccountType);
 

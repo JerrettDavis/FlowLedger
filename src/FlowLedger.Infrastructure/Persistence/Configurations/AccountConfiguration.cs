@@ -89,6 +89,20 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasDefaultValue(true)
             .IsRequired();
 
+        builder.Property(a => a.Mode)
+            .HasColumnName("mode")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(AccountMode.Standard)
+            .IsRequired();
+
+        builder.Property(a => a.HideTransactions)
+            .HasColumnName("hide_transactions")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Ignore(a => a.TransactionsHidden);
+
         builder.Property(a => a.TypeLockedByUser)
             .HasColumnName("type_locked_by_user")
             .IsRequired();
