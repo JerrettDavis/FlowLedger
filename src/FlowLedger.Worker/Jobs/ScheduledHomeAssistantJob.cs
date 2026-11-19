@@ -17,7 +17,7 @@ public sealed class ScheduledHomeAssistantJob(IServiceProvider services, ILogger
         await TenantFanOut.ForEachTenantAsync(services, logger, async (sp, tenantId) =>
         {
             var result = await sp.GetRequiredService<HomeAssistantService>()
-                .RunAsync(DateOnly.FromDateTime(DateTime.Now), cancellationToken);
+                .RunAsync(cancellationToken);
             if (result.Sent > 0 || result.Failed > 0)
             {
                 logger.LogInformation("Home Assistant: tenant {TenantId} sent {Sent}, failed {Failed}, already sent {Already}.",

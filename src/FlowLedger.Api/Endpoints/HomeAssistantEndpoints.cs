@@ -19,19 +19,27 @@ internal static class HomeAssistantEndpoints
         var group = app.MapGroup("/api/home-assistant").WithTags("Home Assistant").RequireRateLimiting("api");
 
         group.MapGet("/", async (IHomeAssistantStore store, ITenantContext tenant, CancellationToken ct) =>
-            Results.Ok(new { settings = await store.GetAsync(tenant.TenantId, ct), kinds = HaEventKinds.All }))
+            Results.Ok(new { settings = await store.GetAsync(tenant.TenantId, ct), kinds = HaEventKinds.All, canStoreWebhook = store.CanStoreWebhook }))
         .WithName("GetHomeAssistantSettings")
         .WithSummary("Home Assistant sharing settings (never includes the webhook URL)");
 
-        group.MapPut("/", async ([FromBody] SaveRequest r, IHomeAssistantStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapPut("/", async ([FromBody] SaveRequest r, IHomeAssistantStore store, IHomeAssistantNetworkPolicy network, ITenantContext tenant, CancellationToken ct) =>
         {
             string? url = null;
             if (!string.IsNullOrWhiteSpace(r.WebhookUrl))
             {
-                if (!HomeAssistantWebhookUrl.TryValidate(r.WebhookUrl, out url, out var error))
+                if (!HomeAssistantWebhookUrl.TryValidate(r.WebhookUrl, network.AllowLocalNetwork(tenant.TenantId), out url, out var error))
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["webhookUrl"] = [error!] });
                 }
+            }
+
+            if (url is not null && !store.CanStoreWebhook)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["webhookUrl"] = ["The server has no HomeAssistant:EncryptionKey, so it will not store the webhook URL. Ask the operator to set one."],
+                });
             }
 
             var kinds = (r.Kinds ?? [.. HaEventKinds.All]).Where(HaEventKinds.All.Contains).Distinct().ToList();
@@ -55,7 +63,7 @@ internal static class HomeAssistantEndpoints
         .RequireRateLimiting("write");
 
         group.MapGet("/preview", async (HomeAssistantService service, CancellationToken ct) =>
-            Results.Ok((await service.PreviewAsync(DateOnly.FromDateTime(DateTime.UtcNow), ct)).Select(HomeAssistantService.ToPayload)))
+            Results.Ok((await service.PreviewAsync(ct)).Select(HomeAssistantService.ToPayload)))
         .WithName("PreviewHomeAssistantEvents")
         .WithSummary("What would be sent right now, with amounts omitted (nothing is sent)");
 
@@ -71,7 +79,7 @@ internal static class HomeAssistantEndpoints
         .RequireRateLimiting("write");
 
         group.MapPost("/send", async (HomeAssistantService service, CancellationToken ct) =>
-            Results.Ok(await service.RunAsync(DateOnly.FromDateTime(DateTime.UtcNow), ct)))
+            Results.Ok(await service.RunAsync(ct)))
         .WithName("SendHomeAssistantEvents")
         .WithSummary("Detect and send any new events now")
         .RequireRateLimiting("write");

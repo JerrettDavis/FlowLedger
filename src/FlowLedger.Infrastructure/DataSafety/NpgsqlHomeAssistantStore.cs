@@ -7,8 +7,8 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// <summary>
 /// Per-tenant Home Assistant sharing settings plus the "already sent" ledger. Created on first use like the other ad-hoc
 /// tables (no EF migration) and included in every snapshot. The webhook URL is a secret: it is encrypted at rest with
-/// AES-256-GCM when <c>HomeAssistant:EncryptionKey</c> (base64, 32 bytes) is configured, is never returned by any read model,
-/// and the ledger stores only opaque dedupe keys, never amounts.
+/// AES-256-GCM using <c>HomeAssistant:EncryptionKey</c> (base64, 32 bytes) and is refused (never stored in clear text) when no
+/// key is configured. It is never returned by any read model. The ledger stores only opaque dedupe keys, never amounts.
 /// </summary>
 public sealed class NpgsqlHomeAssistantStore : IHomeAssistantStore
 {
@@ -35,6 +35,8 @@ public sealed class NpgsqlHomeAssistantStore : IHomeAssistantStore
 
     private readonly string _connectionString;
     private readonly byte[]? _key;
+
+    public bool CanStoreWebhook => _key is not null;
 
     public NpgsqlHomeAssistantStore(string connectionString, string? base64Key = null)
     {
@@ -76,6 +78,11 @@ public sealed class NpgsqlHomeAssistantStore : IHomeAssistantStore
     public async Task SaveAsync(Guid tenantId, bool enabled, string? webhookUrl, bool clearWebhook, bool shareAmounts, bool includeNames,
         int leadDays, IReadOnlyList<string> kinds, CancellationToken ct = default)
     {
+        if (webhookUrl is not null && _key is null)
+        {
+            throw new InvalidOperationException("Set HomeAssistant:EncryptionKey before storing a webhook URL.");
+        }
+
         await using var conn = await OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(
             "INSERT INTO home_assistant_settings (tenant_id, enabled, webhook, share_amounts, include_names, lead_days, kinds) " +
@@ -88,7 +95,7 @@ public sealed class NpgsqlHomeAssistantStore : IHomeAssistantStore
         cmd.Parameters.AddWithValue("e", enabled);
         cmd.Parameters.Add(new NpgsqlParameter("w", NpgsqlTypes.NpgsqlDbType.Text)
         {
-            Value = webhookUrl is null ? DBNull.Value : SecretBox.Seal(webhookUrl, _key),
+            Value = webhookUrl is null ? DBNull.Value : SecretBox.Seal(webhookUrl, _key!),
         });
         cmd.Parameters.AddWithValue("clear", clearWebhook);
         cmd.Parameters.AddWithValue("hasw", webhookUrl is not null);
@@ -148,7 +155,7 @@ public sealed class NpgsqlHomeAssistantStore : IHomeAssistantStore
     }
 }
 
-/// <summary>Tiny AES-256-GCM envelope for stored secrets. "v1:" = encrypted, "p:" = stored without a key configured.</summary>
+/// <summary>Tiny AES-256-GCM envelope for stored secrets ("v1:" + base64(nonce|tag|ciphertext)).</summary>
 internal static class SecretBox
 {
     public static byte[]? ParseKey(string? base64)
@@ -162,13 +169,8 @@ internal static class SecretBox
         return key.Length == 32 ? key : throw new InvalidOperationException("HomeAssistant:EncryptionKey must be 32 bytes, base64 encoded.");
     }
 
-    public static string Seal(string plain, byte[]? key)
+    public static string Seal(string plain, byte[] key)
     {
-        if (key is null)
-        {
-            return "p:" + plain;
-        }
-
         var nonce = RandomNumberGenerator.GetBytes(12);
         var data = System.Text.Encoding.UTF8.GetBytes(plain);
         var cipher = new byte[data.Length];
@@ -181,11 +183,6 @@ internal static class SecretBox
     /// <summary>Returns null when an encrypted value cannot be opened (key missing or changed), never throws.</summary>
     public static string? Open(string stored, byte[]? key)
     {
-        if (stored.StartsWith("p:", StringComparison.Ordinal))
-        {
-            return stored[2..];
-        }
-
         if (!stored.StartsWith("v1:", StringComparison.Ordinal) || key is null)
         {
             return null;

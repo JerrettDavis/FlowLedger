@@ -3,6 +3,9 @@ namespace FlowLedger.Application.Features.HomeAssistant;
 /// <summary>Per-household Home Assistant settings, the webhook secret and the "already sent" ledger.</summary>
 public interface IHomeAssistantStore
 {
+    /// <summary>False when no encryption key is configured: the webhook URL is a secret and is never stored in clear text.</summary>
+    bool CanStoreWebhook { get; }
+
     /// <summary>The settings read model. Never contains the webhook URL.</summary>
     Task<HomeAssistantSettings> GetAsync(Guid tenantId, CancellationToken ct = default);
 
@@ -30,5 +33,11 @@ public interface IHomeAssistantStore
 public interface IHomeAssistantSender
 {
     /// <returns>Null on success, otherwise a short, safe error summary (never the URL or response body).</returns>
-    Task<string?> SendAsync(string webhookUrl, object payload, CancellationToken ct = default);
+    Task<string?> SendAsync(string webhookUrl, object payload, bool allowLocalNetwork, CancellationToken ct = default);
+}
+
+/// <summary>Decides whether a tenant may send to local-network addresses (only the household owner may).</summary>
+public interface IHomeAssistantNetworkPolicy
+{
+    bool AllowLocalNetwork(Guid tenantId);
 }

@@ -17,6 +17,7 @@ public sealed record HaRunResult(int Detected, int Sent, int AlreadySent, int Fa
 public sealed class HomeAssistantService(
     IHomeAssistantStore store,
     IHomeAssistantSender sender,
+    IHomeAssistantNetworkPolicy network,
     IAccountRepository accounts,
     IRecurringFlowRepository flows,
     ITransactionRepository transactions,
@@ -30,11 +31,16 @@ public sealed class HomeAssistantService(
     public const int HistoryDays = 12;
     public const decimal BudgetWarnPercent = 80m;
 
-    public Task<IReadOnlyList<HaEvent>> PreviewAsync(DateOnly today, CancellationToken ct = default)
-        => DetectAsync(today, HomeAssistantSettings.Default with { Kinds = HaEventKinds.All }, ct);
+    /// <summary>The single clock for events (server-local date), so a manual send and the scheduled run share dedupe keys.</summary>
+    public static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
 
-    public async Task<HaRunResult> RunAsync(DateOnly today, CancellationToken ct = default)
+    /// <summary>What would be sent now under the saved settings, with amounts and balances always omitted.</summary>
+    public async Task<IReadOnlyList<HaEvent>> PreviewAsync(CancellationToken ct = default)
+        => await DetectAsync(Today, (await store.GetAsync(tenant.TenantId, ct)) with { ShareAmounts = false }, ct);
+
+    public async Task<HaRunResult> RunAsync(CancellationToken ct = default)
     {
+        var today = Today;
         var settings = await store.GetAsync(tenant.TenantId, ct);
         if (!settings.Enabled || !settings.HasWebhook)
         {
@@ -58,7 +64,7 @@ public sealed class HomeAssistantService(
                 continue;
             }
 
-            var error = await sender.SendAsync(url, ToPayload(e), ct);
+            var error = await sender.SendAsync(url, ToPayload(e), network.AllowLocalNetwork(tenant.TenantId), ct);
             if (error is null)
             {
                 sent++;
@@ -98,7 +104,7 @@ public sealed class HomeAssistantService(
             ["title"] = "FlowLedger test",
             ["message"] = "Home Assistant can hear FlowLedger.",
             ["event_id"] = Guid.NewGuid().ToString("N"),
-        }, ct);
+        }, network.AllowLocalNetwork(tenant.TenantId), ct);
         await store.RecordResultAsync(tenant.TenantId, error, ct);
         return error;
     }

@@ -518,7 +518,7 @@ public sealed record HomeAssistantSettingsDto(
     bool Enabled, bool HasWebhook, string? WebhookHost, bool ShareAmounts, bool IncludeNames, int LeadDays,
     List<string> Kinds, DateTimeOffset? LastSentUtc, string? LastError);
 
-public sealed record HomeAssistantStateDto(HomeAssistantSettingsDto Settings, List<string> Kinds);
+public sealed record HomeAssistantStateDto(HomeAssistantSettingsDto Settings, List<string> Kinds, bool CanStoreWebhook);
 
 public sealed record HomeAssistantSaveRequest(
     bool Enabled, string? WebhookUrl, bool ClearWebhook, bool ShareAmounts, bool IncludeNames, int LeadDays, List<string> Kinds);

@@ -63,6 +63,28 @@ public sealed class HomeAssistantEventDetectorTests
     }
 
     [Fact]
+    public void A_same_merchant_charge_for_a_different_amount_is_not_the_bill_being_paid()
+    {
+        var recent = new[] { new HaRecentTransaction("MORTGAGE REFUND", null, false, 40m, Today) };
+        var events = Run([Bill("Mortgage", Today)], recent: recent);
+        events.Should().ContainSingle().Which.Kind.Should().Be(HaEventKinds.BillDueSoon);
+    }
+
+    [Fact]
+    public void Short_names_do_not_match_inside_other_words()
+    {
+        var recent = new[] { new HaRecentTransaction("CASINO VEGAS", null, false, 1234.56m, Today) };
+        Run([Bill("Gas", Today)], recent: recent).Should().ContainSingle().Which.Kind.Should().Be(HaEventKinds.BillDueSoon);
+    }
+
+    [Fact]
+    public void Variable_bills_within_tolerance_still_count_as_paid()
+    {
+        var recent = new[] { new HaRecentTransaction("ACH MORTGAGE PMT", null, false, 1300m, Today) };
+        Run([Bill("Mortgage", Today)], recent: recent).Should().ContainSingle().Which.Kind.Should().Be(HaEventKinds.BillPaid);
+    }
+
+    [Fact]
     public void Paycheck_coming_and_landed_use_income_kinds()
     {
         Run([Pay("Acme Payroll", Today.AddDays(1))]).Single().Kind.Should().Be(HaEventKinds.PaycheckExpected);
@@ -118,12 +140,29 @@ public sealed class HomeAssistantWebhookUrlTests
 
     [Theory]
     [InlineData("https://ha.example.com/api/webhook/" + Id)]
+    [InlineData("https://ha.example.com:8123/api/webhook/" + Id)]
+    public void Everyone_may_use_https_to_a_public_host(string url)
+    {
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: false, out _, out _).Should().BeTrue();
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: true, out _, out _).Should().BeTrue();
+    }
+
+    [Theory]
     [InlineData("http://homeassistant.local:8123/api/webhook/" + Id)]
     [InlineData("http://192.168.1.20:8123/api/webhook/" + Id)]
     [InlineData("http://10.0.0.5:8123/api/webhook/" + Id)]
+    [InlineData("http://100.64.1.2:8123/api/webhook/" + Id)]
     [InlineData("http://homeassistant:8123/api/webhook/" + Id)]
-    public void Accepts_https_and_local_network_http(string url)
-        => HomeAssistantWebhookUrl.TryValidate(url, out _, out _).Should().BeTrue();
+    [InlineData("https://nas.lan/api/webhook/" + Id)]
+    [InlineData("https://[::1]/api/webhook/" + Id)]
+    [InlineData("https://[fd12:3456::1]/api/webhook/" + Id)]
+    [InlineData("https://[::ffff:192.168.1.5]/api/webhook/" + Id)]
+    public void The_local_network_is_for_the_household_owner_only(string url)
+    {
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: true, out _, out _).Should().BeTrue();
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: false, out _, out var error).Should().BeFalse();
+        error.Should().Contain("household owner");
+    }
 
     [Theory]
     [InlineData("")]
@@ -136,8 +175,27 @@ public sealed class HomeAssistantWebhookUrlTests
     [InlineData("https://ha.example.com/api/webhook/" + Id + "/more")]
     [InlineData("http://169.254.169.254/api/webhook/" + Id)]
     [InlineData("https://169.254.169.254/api/webhook/" + Id)]
-    public void Rejects_unsafe_or_malformed_urls(string url)
-        => HomeAssistantWebhookUrl.TryValidate(url, out _, out var error).Should().BeFalse(error);
+    [InlineData("https://[::ffff:169.254.169.254]/api/webhook/" + Id)]
+    [InlineData("https://[fe80::1]/api/webhook/" + Id)]
+    [InlineData("https://224.0.0.1/api/webhook/" + Id)]
+    [InlineData("https://0.0.0.0/api/webhook/" + Id)]
+    public void Rejects_unsafe_or_malformed_urls_for_everyone(string url)
+    {
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: true, out _, out var error).Should().BeFalse(error);
+        HomeAssistantWebhookUrl.TryValidate(url, allowLocalNetwork: false, out _, out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("8.8.8.8", HomeAssistantWebhookUrl.NetworkKind.Public)]
+    [InlineData("127.0.0.1", HomeAssistantWebhookUrl.NetworkKind.Local)]
+    [InlineData("172.16.0.1", HomeAssistantWebhookUrl.NetworkKind.Local)]
+    [InlineData("172.32.0.1", HomeAssistantWebhookUrl.NetworkKind.Public)]
+    [InlineData("::ffff:10.0.0.1", HomeAssistantWebhookUrl.NetworkKind.Local)]
+    [InlineData("::ffff:169.254.169.254", HomeAssistantWebhookUrl.NetworkKind.Forbidden)]
+    [InlineData("fe80::1", HomeAssistantWebhookUrl.NetworkKind.Forbidden)]
+    [InlineData("2606:4700::1111", HomeAssistantWebhookUrl.NetworkKind.Public)]
+    public void Resolved_addresses_are_classified(string address, HomeAssistantWebhookUrl.NetworkKind expected)
+        => HomeAssistantWebhookUrl.Classify(System.Net.IPAddress.Parse(address)).Should().Be(expected);
 
     [Fact]
     public void Display_host_never_includes_the_secret_id()

@@ -12,6 +12,12 @@ public static class HomeAssistantEventDetector
     /// <summary>A transaction counts as the flow's payment when it lands within this many days of a scheduled date.</summary>
     public const int PaidWindowDays = 5;
 
+    /// <summary>A payment must be within this fraction of the flow's amount (utilities vary; refunds and other purchases do not match).</summary>
+    public const decimal AmountTolerance = 0.35m;
+
+    /// <summary>Shortest letters-only name a transaction is matched on (stops "gas" matching "vegas").</summary>
+    public const int MinKeyLength = 4;
+
     public static IReadOnlyList<HaEvent> Detect(
         DateOnly today,
         IReadOnlyList<HaFlow> flows,
@@ -103,7 +109,7 @@ public static class HomeAssistantEventDetector
         var keys = new[] { f.Name, f.Counterparty }
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => MerchantKey.From(s!))
-            .Where(k => k.Length >= 3)
+            .Where(k => k.Length >= MinKeyLength)
             .ToArray();
         if (keys.Length == 0)
         {
@@ -113,7 +119,8 @@ public static class HomeAssistantEventDetector
         return recent
             .Where(t => t.IsIncome == f.IsIncome
                 && t.Date <= today
-                && Math.Abs(t.Date.DayNumber - scheduled.DayNumber) <= PaidWindowDays)
+                && Math.Abs(t.Date.DayNumber - scheduled.DayNumber) <= PaidWindowDays
+                && (f.Amount <= 0 || Math.Abs(t.Amount - f.Amount) <= f.Amount * AmountTolerance))
             .FirstOrDefault(t =>
             {
                 var text = MerchantKey.From($"{t.Merchant} {t.Description}");

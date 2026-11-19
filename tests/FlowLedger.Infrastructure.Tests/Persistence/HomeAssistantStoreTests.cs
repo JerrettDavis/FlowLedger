@@ -29,6 +29,19 @@ public sealed class HomeAssistantStoreTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task A_webhook_is_refused_when_no_encryption_key_is_configured()
+    {
+        var store = new NpgsqlHomeAssistantStore(_fixture.ConnectionString);
+        store.CanStoreWebhook.Should().BeFalse();
+
+        var act = () => store.SaveAsync(Guid.NewGuid(), true, Url, false, false, true, 3, HaEventKinds.All);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        // Settings without a URL are fine.
+        await store.SaveAsync(Guid.NewGuid(), false, null, false, false, true, 3, HaEventKinds.All);
+    }
+
+    [DockerFact]
     public async Task Webhook_is_encrypted_at_rest_and_never_in_the_read_model()
     {
         var store = new NpgsqlHomeAssistantStore(_fixture.ConnectionString, Key);
@@ -92,7 +105,7 @@ public sealed class HomeAssistantStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Delivery_result_is_recorded()
     {
-        var store = new NpgsqlHomeAssistantStore(_fixture.ConnectionString);
+        var store = new NpgsqlHomeAssistantStore(_fixture.ConnectionString, Key);
         var tenant = Guid.NewGuid();
         await store.SaveAsync(tenant, true, Url, false, false, true, 3, HaEventKinds.All);
 

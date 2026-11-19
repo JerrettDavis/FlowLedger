@@ -21,14 +21,22 @@ else if (_state is null)
 }
 else
 {
+    @if (!_state.CanStoreWebhook)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            This server has no <code>HomeAssistant__EncryptionKey</code>, so it will not store a webhook URL (it is a secret and is never kept in clear text).
+            Ask whoever runs FlowLedger to set one (a base64 32-byte value, e.g. <code>openssl rand -base64 32</code>) on the API and worker.
+        </MudAlert>
+    }
+
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="Share alerts with Home Assistant" />
 
         <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Webhook</MudText>
         <MudText Typo="Typo.caption" Class="fl-muted mb-2">
             In Home Assistant, create an automation with a <strong>Webhook</strong> trigger and copy its URL
-            (<code>https://…/api/webhook/&lt;id&gt;</code>). Treat it like a password: FlowLedger stores it
-            @(_state.Settings.HasWebhook ? "and never shows it again." : "write-only and never shows it again.")
+            (<code>https://…/api/webhook/&lt;id&gt;</code>). Treat it like a password: FlowLedger stores it encrypted
+            and never shows it again. Use an https address; plain http to a local address is reserved for the household owner.
         </MudText>
         @if (_state.Settings.HasWebhook)
         {

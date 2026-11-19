@@ -13,7 +13,9 @@ public static class HomeAssistantWebhookUrl
     public const int MinIdLength = 16;
     public const int MaxLength = 512;
 
-    public static bool TryValidate(string? raw, out string? normalized, out string? error)
+    /// <param name="allowLocalNetwork">True only for the household (operator) tenant: it may target Home Assistant on the LAN over plain
+    /// http. Every other tenant must use https to a public host, so the server cannot be pointed at internal services (SSRF).</param>
+    public static bool TryValidate(string? raw, bool allowLocalNetwork, out string? normalized, out string? error)
     {
         normalized = null;
         error = null;
@@ -44,13 +46,22 @@ public static class HomeAssistantWebhookUrl
             return false;
         }
 
-        if (IsLinkLocal(uri.Host))
+        var host = uri.DnsSafeHost;
+        var kind = ClassifyHost(host);
+        if (kind == NetworkKind.Forbidden)
         {
-            error = "Link-local addresses are not allowed.";
+            error = "That address is not allowed (link-local, multicast or unspecified).";
             return false;
         }
 
-        if (uri.Scheme == "http" && !IsLocalNetwork(uri.Host))
+        var local = kind == NetworkKind.Local;
+        if (local && !allowLocalNetwork)
+        {
+            error = "Only the household owner can send to a local-network address. Use the public https address of your Home Assistant.";
+            return false;
+        }
+
+        if (uri.Scheme == "http" && !local)
         {
             error = "Use https for a Home Assistant reachable over the internet (plain http is only allowed on your local network).";
             return false;
@@ -64,29 +75,53 @@ public static class HomeAssistantWebhookUrl
     public static string? DisplayHost(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Authority : null;
 
-    private static bool IsLinkLocal(string host)
-        => IPAddress.TryParse(host, out var ip)
-            && (ip.IsIPv6LinkLocal || (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && ip.GetAddressBytes() is [169, 254, ..]));
+    public enum NetworkKind { Public, Local, Forbidden }
 
-    private static bool IsLocalNetwork(string host)
+    /// <summary>Classifies a URL host. IP literals are classified exactly; names are judged by local-network naming (the real
+    /// destination of a public-looking name is checked again at connect time, see the sender's connect guard).</summary>
+    public static NetworkKind ClassifyHost(string host)
     {
-        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)
-            || host.EndsWith(".lan", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".home.arpa", StringComparison.OrdinalIgnoreCase)
-            || !host.Contains('.'))
+        host = host.Trim('[', ']');
+        if (IPAddress.TryParse(host, out var ip))
         {
-            return true;
+            return Classify(ip);
         }
 
-        if (!IPAddress.TryParse(host, out var ip))
+        var h = host.TrimEnd('.');
+        return h.Equals("localhost", StringComparison.OrdinalIgnoreCase) || h.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+            || h.EndsWith(".local", StringComparison.OrdinalIgnoreCase) || h.EndsWith(".lan", StringComparison.OrdinalIgnoreCase)
+            || h.EndsWith(".internal", StringComparison.OrdinalIgnoreCase) || h.EndsWith(".home.arpa", StringComparison.OrdinalIgnoreCase)
+            || !h.Contains('.')
+            ? NetworkKind.Local
+            : NetworkKind.Public;
+    }
+
+    /// <summary>Classifies a resolved address. IPv4-mapped IPv6 is unwrapped first so it cannot hide a blocked IPv4 range.</summary>
+    public static NetworkKind Classify(IPAddress ip)
+    {
+        if (ip.IsIPv4MappedToIPv6)
         {
-            return false;
+            ip = ip.MapToIPv4();
         }
 
-        if (IPAddress.IsLoopback(ip) || ip.IsIPv6UniqueLocal || ip.IsIPv6SiteLocal)
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
         {
-            return true;
+            var b = ip.GetAddressBytes();
+            if (b[0] == 0 || b[0] >= 224 || b is [169, 254, ..])
+            {
+                return NetworkKind.Forbidden; // unspecified, multicast, reserved/broadcast, link-local (cloud metadata)
+            }
+
+            return b is [127, ..] or [10, ..] or [192, 168, ..] or [172, >= 16 and <= 31, ..] or [100, >= 64 and <= 127, ..]
+                ? NetworkKind.Local
+                : NetworkKind.Public;
         }
 
-        return ip.GetAddressBytes() is [10, ..] or [192, 168, ..] or [172, >= 16 and <= 31, ..];
+        if (ip.IsIPv6LinkLocal || ip.IsIPv6Multicast || ip.Equals(IPAddress.IPv6Any))
+        {
+            return NetworkKind.Forbidden;
+        }
+
+        return IPAddress.IsLoopback(ip) || ip.IsIPv6UniqueLocal || ip.IsIPv6SiteLocal ? NetworkKind.Local : NetworkKind.Public;
     }
 }
