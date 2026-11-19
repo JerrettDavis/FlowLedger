@@ -55,6 +55,7 @@ public sealed class CreateTransactionHandler
 
     public async Task<TransactionDto> HandleAsync(CreateTransactionRequest request, CancellationToken ct = default)
     {
+        await TransactionQuota.EnsureRoomAsync(_repo, 1, ct);
         var direction = Enum.Parse<TransactionDirection>(request.Direction, ignoreCase: true);
         var currency = new Currency(request.Currency.ToUpperInvariant());
         var amount = new Money(request.Amount, currency);

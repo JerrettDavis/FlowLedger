@@ -60,6 +60,8 @@ internal sealed class TransactionRepository : ITransactionRepository
             .ToListAsync(ct);
     }
 
+    public Task<int> CountAsync(CancellationToken ct = default) => _db.Transactions.CountAsync(ct);
+
     public async Task<IReadOnlyList<Transaction>> ListAllAsync(int max, CancellationToken ct = default)
         => await _db.Transactions.AsNoTracking()
             .OrderByDescending(t => t.EffectiveDate)

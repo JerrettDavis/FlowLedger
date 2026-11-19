@@ -10,6 +10,10 @@ namespace FlowLedger.Application.Abstractions;
 public interface ITransactionRepository
 {
     Task<Transaction?> GetByIdAsync(TransactionId id, CancellationToken ct = default);
+
+    /// <summary>Total transactions stored for the current tenant (used for the per-tenant quota).</summary>
+    async Task<int> CountAsync(CancellationToken ct = default) => (await ListAllAsync(int.MaxValue, ct)).Count;
+
     /// <summary>Transactions for any of the given accounts in a date window (account filter applied by the store).</summary>
     async Task<IReadOnlyList<Transaction>> ListForAccountsAsync(
         IReadOnlyCollection<AccountId> accountIds, DateOnly from, DateOnly to, CancellationToken ct = default)
