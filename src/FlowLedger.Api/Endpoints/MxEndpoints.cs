@@ -23,7 +23,8 @@ internal static class MxEndpoints
 
         // ── Connect token ──────────────────────────────────────────────────────────
         group.MapPost("/connect-token", async (
-            IFinancialDataProvider provider,
+            IFinancialDataProvider primary,
+            IConnectorRegistry connectors,
             ITenantContext tenant,
             IProviderConnectionStore connections,
             HttpContext http,
@@ -35,6 +36,8 @@ internal static class MxEndpoints
                 return Results.Problem(title: "Bank linking via MX is limited to the household owner", statusCode: StatusCodes.Status403Forbidden);
             }
 
+            // With several connectors enabled the primary provider may not be MX: use the MX connector when it is on.
+            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
             if (provider is not MxFinancialDataProvider mx)
             {
                 return Results.Problem(
@@ -73,11 +76,13 @@ internal static class MxEndpoints
         // ── Webhook ──────────────────────────────────────────────────────────────
         group.MapPost("/webhooks", async (
             HttpRequest request,
-            IFinancialDataProvider provider,
+            IFinancialDataProvider primary,
+            IConnectorRegistry connectors,
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
             CancellationToken ct) =>
         {
+            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
             // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
             if (request.ContentLength > MaxWebhookBodyBytes)
             {

@@ -27,7 +27,8 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMxProvider(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool registerAsDefault = true)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -116,11 +117,16 @@ public static class ServiceCollectionExtensions
         // ── Provider ───────────────────────────────────────────────────────────────
         // Factory registration (not ActivatorUtilities) so the provider can keep an internal
         // constructor that takes internal collaborators (MxApiClient, MxWebhookVerifier).
-        services.AddScoped<IFinancialDataProvider>(sp => new MxFinancialDataProvider(
+        services.AddScoped(sp => new MxFinancialDataProvider(
             sp.GetRequiredService<MxApiClient>(),
             sp.GetRequiredService<MxWebhookVerifier>(),
             sp.GetRequiredService<IOptions<MxProviderOptions>>(),
             sp.GetRequiredService<ILogger<MxFinancialDataProvider>>()));
+        services.AddKeyedScoped<IFinancialDataProvider>("MX", (sp, _) => sp.GetRequiredService<MxFinancialDataProvider>());
+        if (registerAsDefault)
+        {
+            services.AddScoped<IFinancialDataProvider>(sp => sp.GetRequiredService<MxFinancialDataProvider>());
+        }
 
         return services;
     }
