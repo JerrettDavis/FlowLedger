@@ -38,3 +38,6 @@ this, point `app_users.tenant_id` for your row at the household tenant (or ask f
   to logins mapped to the household tenant; other tenants get 403 and the menu item is hidden. With OIDC on and no
   `Tenancy__LegacyOwner*` configured, nobody is mapped to the household tenant, so nobody can use it (fail closed).
 * The shared `Api__Key` is the Web↔API trust boundary: keep the API on a private network.
+* **Restrict who can sign up.** By default any login your IdP authenticates is provisioned its own empty tenant. If the IdP is open to the public, set `Auth__Oidc__AllowedEmails__0=you@example.com` and/or `Auth__Oidc__AllowedEmailDomains__0=example.com`; when either list is non-empty only logins with a *verified* matching email are admitted. Prefer also restricting the application at the IdP.
+* Paid external lookups (MX connect, named asset-valuation feeds such as RealtyAPI) run on the operator's keys and are limited to the household tenant; CSV/sheet imports are capped at 5 MB per request.
+* Run the API with `ASPNETCORE_ENVIRONMENT=Production` and a real `Api__Key` when onboarding others: the Development tenant context falls back to the household tenant when no tenant header is sent, and Development ships a public dev key.
