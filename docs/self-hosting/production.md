@@ -154,3 +154,7 @@ permanently lost.
 - [ ] Secrets are stored in a secrets manager, not in `.env` on the server.
 - [ ] OTLP telemetry is wired up for observability (`OTEL_EXPORTER_OTLP_ENDPOINT`).
 - [ ] Backups are configured for the `postgres_data` volume.
+
+## Reverse proxy / TLS
+
+If a proxy terminates TLS in front of the Web app, set `ForwardedHeaders__Enabled=true` so the OIDC `redirect_uri` is built as https from `X-Forwarded-Proto`/`Host`. Enable it only when the Web port is reachable solely through that proxy; otherwise clients could spoof those headers.

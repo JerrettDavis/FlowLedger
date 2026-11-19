@@ -50,7 +50,27 @@ builder.Services.AddHttpClient<FlowLedgerApiClient>(client =>
 .AddHttpMessageHandler<ApiAuthHeaderHandler>()
 .AddServiceDiscovery();
 
+// Opt-in: behind a TLS-terminating reverse proxy, honour X-Forwarded-Proto/Host so the OIDC redirect_uri is https.
+// Only enable when the Web port is reachable solely through that proxy (otherwise clients could spoof the headers).
+var trustForwardedHeaders = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false);
+if (trustForwardedHeaders)
+{
+    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
+        o.KnownIPNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
+
 var app = builder.Build();
+
+if (trustForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())

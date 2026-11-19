@@ -21,9 +21,11 @@ public sealed class CategorizingSyncService(
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
         var result = await inner.SyncAsync(ct);
+        // Aliases, rules and enrichment only matter for rows this sync brought in; each re-loads the whole history, so skip them on a no-op sync.
+        var hasNew = result.TransactionsAdded > 0;
         try
         {
-            var renamed = await aliases.ApplyAsync(ct);
+            var renamed = hasNew ? await aliases.ApplyAsync(ct) : 0;
             if (renamed > 0)
             {
                 logger.LogInformation("Applied merchant aliases to {Count} transactions.", renamed);
@@ -36,7 +38,7 @@ public sealed class CategorizingSyncService(
 
         try
         {
-            var ruled = await rules.ApplyAsync(ct);
+            var ruled = hasNew ? await rules.ApplyAsync(ct) : 0;
             if (ruled > 0)
             {
                 logger.LogInformation("Applied categorization rules to {Count} transactions.", ruled);
@@ -63,7 +65,7 @@ public sealed class CategorizingSyncService(
 
         try
         {
-            var e = await enrichment.RunAsync(ct);
+            var e = hasNew ? await enrichment.RunAsync(ct) : new FlowLedger.Application.Features.Transactions.EnrichmentResult(0, 0);
             if (e.Tagged + e.Named > 0)
             {
                 logger.LogInformation("Enriched transactions: {Tagged} auto-tagged, {Named} given a suggested name.", e.Tagged, e.Named);
