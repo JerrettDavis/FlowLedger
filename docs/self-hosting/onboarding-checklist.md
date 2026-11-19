@@ -6,7 +6,7 @@ Work through this before giving anyone else a login. Each item links to the deta
 - [ ] **Production mode.** Run the API and Web with `ASPNETCORE_ENVIRONMENT=Production` and a real, random `Api__Key`
   ([production.md](production.md)). If you must stay in Development (e.g. under Aspire), set
   `Tenancy:RequireTenantHeader=true` so a request without a tenant is refused instead of falling back to your household.
-- [ ] **Signed tenants.** Set `Api__TenantSigningKey` (a different random value from `Api__Key`) on the API **and** the Web app.
+- [ ] **Signed tenants.** Set `Api__TenantSigningKey` (>= 32 random characters, different from `Api__Key`) on the API **and** the Web app.
   A leaked API key alone then cannot read or write another user's data ([multi-user-auth.md](multi-user-auth.md)).
 - [ ] **Sign-up gate.** If your identity provider accepts anyone, set `Auth__Oidc__AllowedEmails__0` /
   `Auth__Oidc__AllowedEmailDomains__0`, and restrict the application at the provider too.

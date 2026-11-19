@@ -11,7 +11,7 @@ namespace FlowLedger.Api.Tenancy;
 /// </summary>
 public static class TenantAssertion
 {
-    public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(60);
 
     public static string Sign(string key, Guid tenantId, DateTimeOffset now)
     {

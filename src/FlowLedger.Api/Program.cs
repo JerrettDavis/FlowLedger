@@ -129,6 +129,17 @@ builder.Services.AddRateLimiter(opts =>
 
 var app = builder.Build();
 
+// A signing key only adds protection if it is strong and distinct from the API key; refuse to start with a useless one.
+{
+    var apiOpts = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
+    if (!string.IsNullOrEmpty(apiOpts.TenantSigningKey)
+        && (apiOpts.TenantSigningKey.Length < 32 || string.Equals(apiOpts.TenantSigningKey, apiOpts.Key, StringComparison.Ordinal)))
+    {
+        throw new InvalidOperationException(
+            "Api:TenantSigningKey must be at least 32 characters and different from Api:Key (e.g. `openssl rand -hex 32`).");
+    }
+}
+
 // ── Production startup guard (secret hygiene) ────────────────────────────────
 // Refuse to start a non-Development instance with a missing or default API key.
 if (!app.Environment.IsDevelopment())
