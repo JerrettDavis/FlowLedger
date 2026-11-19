@@ -22,6 +22,7 @@ FlowLedger is a FOSS-first, self-hostable, cloud-native personal finance platfor
 
 See the [full user guide](docs/user-guide.md) for all pages including Money Plan and Recurring Flows.
 New here? Follow the [first-30-minutes onboarding and FAQ](docs/onboarding.md), then see the
+Operators inviting other people: work through the [onboarding checklist](docs/self-hosting/onboarding-checklist.md) first.
 [advanced user guide](docs/user-guide-advanced.md) (Spending, Categories, Rules, Budgets, Goals,
 Debt, Investments, Reports, Ask, Bill Sheet, Data & Backups, Linked logins).
 
