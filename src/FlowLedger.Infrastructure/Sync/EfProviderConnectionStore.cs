@@ -8,6 +8,12 @@ namespace FlowLedger.Infrastructure.Sync;
 
 internal sealed class EfProviderConnectionStore(FlowLedgerDbContext db, ITenantContext tenant) : IProviderConnectionStore
 {
+    public async Task<IReadOnlyList<ProviderConnectionInfo>> ListAsync(CancellationToken ct = default)
+        => await db.ProviderConnections.AsNoTracking()
+            .OrderByDescending(c => c.UpdatedAt)
+            .Select(c => new ProviderConnectionInfo(c.ProviderName, c.Institution, c.Status, c.CreatedAt, c.UpdatedAt))
+            .ToListAsync(ct);
+
     public async Task<string?> GetMemberProviderIdAsync(string providerName, CancellationToken ct = default)
         => (await db.ProviderConnections.FirstOrDefaultAsync(c => c.ProviderName == providerName, ct))?.MemberProviderId;
 

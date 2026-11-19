@@ -51,3 +51,9 @@ string checks or assume a single global provider. When adding a provider, implem
 ## Consequences
 - No behaviour change now; the checklist above is the definition of "ready" for self-service linking.
 - Provider-specific branching currently in `SyncEndpoints` and `FinancialSyncService` is known debt.
+
+## Update: Connectors overview (read-only)
+A household-only **Connectors** page (`/connectors`, `GET /api/integrations/connectors`, flag `Features:ConnectorsPage`) now lists
+Simulated, SimpleFIN and MX: configured vs active, capabilities, usage/budgets and linked institutions, without exposing credentials.
+It is the UI surface for item 3 above; when the provider factory (item 1) exists, per-connector enable/disable and per-user link
+actions belong on this page.

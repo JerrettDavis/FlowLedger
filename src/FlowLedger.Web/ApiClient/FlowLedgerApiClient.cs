@@ -1093,6 +1093,16 @@ public sealed class FlowLedgerApiClient
                 : null;
         });
 
+    /// <summary>Connector overview (configured / active / usage / linked institutions). Null when the page is disabled or not allowed for this user.</summary>
+    public async Task<ConnectorsOverviewDto?> GetConnectorsAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read connectors", async () =>
+        {
+            var response = await _http.GetAsync("/api/integrations/connectors", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<ConnectorsOverviewDto>(JsonOptions, ct)
+                : null;
+        });
+
     public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync("connect bank", async () =>

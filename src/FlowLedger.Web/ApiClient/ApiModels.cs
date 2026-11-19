@@ -470,6 +470,18 @@ public sealed record AutoAddResultDto(int Added, List<string> Names);
 
 public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? ManageUrl);
 
+// ── Financial data connectors (read-only overview) ───────────────────────────
+
+public sealed record ConnectorUsageDto(long CallsToday, long CallsThisMonth, int? DailyBudget, int? MonthlyBudget, bool Paused);
+
+public sealed record ConnectorLinkDto(string Institution, string Status, DateTimeOffset LinkedAt, DateTimeOffset UpdatedAt);
+
+public sealed record ConnectorDto(
+    string Id, string Name, string Kind, string Description, bool Active, bool EnabledInConfig, bool CredentialsConfigured,
+    List<string> ConfigKeys, List<string>? Capabilities, DateTimeOffset? LastSyncedAt, ConnectorUsageDto Usage, List<ConnectorLinkDto> Connections);
+
+public sealed record ConnectorsOverviewDto(string ActiveProvider, string SelectionMode, string SelectionNote, List<ConnectorDto> Connectors);
+
 // ── Spending insights (Mint-style breakdown) ─────────────────────────────────
 
 public sealed record BreakdownGroupDto(string Key, string Label, decimal Amount, int Count, decimal Percent, bool HasChildren);

@@ -1,0 +1,149 @@
+@page "/connectors"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<PageTitle>Connectors — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Connectors</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    The financial data feeds FlowLedger knows about, which one is in use, and what each has linked. Credentials are never shown here.
+</MudText>
+
+@if (!_household)
+{
+    <MudAlert Severity="Severity.Info">Connectors cover the whole installation and are only available to the household owner.</MudAlert>
+}
+else if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_overview is null)
+{
+    <MudAlert Severity="Severity.Info">The connectors overview is not available (it may be switched off for this deployment).</MudAlert>
+}
+else
+{
+    <MudAlert Severity="Severity.Normal" Class="mb-4" Dense="true">
+        Active connector: <strong>@_overview.ActiveProvider</strong>. @_overview.SelectionNote
+    </MudAlert>
+
+    <MudGrid>
+        @foreach (var c in _overview.Connectors)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudPaper Class="pa-4" Outlined="true" Style="height:100%">
+                    <div class="d-flex align-center mb-1" style="gap:8px; flex-wrap:wrap">
+                        <MudText Typo="Typo.subtitle1">@c.Name</MudText>
+                        @if (c.Active)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">In use</MudChip>
+                        }
+                        else if (c.EnabledInConfig)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">Enabled, not active</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small">Not in use</MudChip>
+                        }
+                        @if (c.Id != "Simulated")
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="@(c.CredentialsConfigured ? Color.Info : Color.Default)">
+                                @(c.CredentialsConfigured ? "Credentials set" : "No credentials")
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="fl-muted">@c.Kind</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2 mb-2">@c.Description</MudText>
+
+                    @if (c.Capabilities is { Count: > 0 })
+                    {
+                        <div class="mb-2" style="display:flex; gap:4px; flex-wrap:wrap">
+                            @foreach (var cap in c.Capabilities)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@cap</MudChip>
+                            }
+                        </div>
+                    }
+
+                    <MudText Typo="Typo.body2">
+                        Last sync: @(c.LastSyncedAt is { } t ? t.ToLocalTime().ToString("g") : "never")
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        API calls: @c.Usage.CallsToday today@(c.Usage.DailyBudget is { } db ? $" of {db}" : ""),
+                        @c.Usage.CallsThisMonth this month@(c.Usage.MonthlyBudget is { } mb ? $" of {mb}" : "")
+                    </MudText>
+                    @if (c.Usage.Paused)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">Calls are paused (kill switch is on).</MudAlert>
+                    }
+
+                    <MudText Typo="Typo.subtitle2" Class="mt-3">Linked institutions</MudText>
+                    @if (c.Connections.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="fl-muted">None recorded.</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true">
+                            <thead><tr><th>Institution</th><th>Status</th><th>Updated</th></tr></thead>
+                            <tbody>
+                            @foreach (var l in c.Connections)
+                            {
+                                <tr><td>@l.Institution</td><td>@l.Status</td><td>@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
+                            }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+
+                    @if (c.ConfigKeys.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="fl-muted mt-3" Style="display:block">
+                            Configured with: @string.Join(", ", c.ConfigKeys)
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudButton Class="mt-4" Variant="Variant.Outlined" OnClick="LoadAsync">Refresh</MudButton>
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.ConnectorsOverviewDto? _overview;
+    private bool _loading = true;
+    private bool _household;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // UI gate only; the API refuses non-household tenants (403) regardless.
+        _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
+        if (_household)
+        {
+            await LoadAsync();
+        }
+        else
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _overview = await ApiClient.GetConnectorsAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

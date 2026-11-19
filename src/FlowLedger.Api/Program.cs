@@ -219,6 +219,7 @@ app.MapQueryEndpoints();
 app.MapCategoryEndpoints();
 app.MapRecurringFlowEndpoints();
 app.MapSyncEndpoints();
+app.MapConnectorEndpoints();
 app.MapMxEndpoints();
 app.MapForecastEndpoints();
 app.MapImportEndpoints();
