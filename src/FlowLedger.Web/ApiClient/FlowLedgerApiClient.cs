@@ -1131,19 +1131,68 @@ public sealed class FlowLedgerApiClient
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException(
-                    $"Couldn't change the data source (server returned {(int)response.StatusCode}): {await response.Content.ReadAsStringAsync(ct)}",
+                    $"Couldn't change the data source (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
                     response.StatusCode);
             }
 
             return true;
         });
 
+    /// <summary>
+    /// Short, user-safe reason from an RFC 7807 problem response (title or the first validation message), never the raw body.
+    /// Returns an empty string when there is nothing safe to show.
+    /// </summary>
+    private static async Task<string> ProblemSummaryAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var field in errors.EnumerateObject())
+                {
+                    if (field.Value.ValueKind == JsonValueKind.Array && field.Value.GetArrayLength() > 0
+                        && field.Value[0].ValueKind == JsonValueKind.String)
+                    {
+                        return ": " + Trim(field.Value[0].GetString());
+                    }
+                }
+            }
+
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+            {
+                return ": " + Trim(detail.GetString());
+            }
+
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+            {
+                return ": " + Trim(title.GetString());
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            // Not a problem document: show only the status code.
+        }
+
+        return string.Empty;
+
+        static string Trim(string? text) => text is { Length: > 200 } ? text[..200] : text ?? string.Empty;
+    }
+
     /// <summary>Removes an account's connector link.</summary>
     public async Task ClearAccountConnectorAsync(Guid accountId, CancellationToken ct = default) =>
         await ExecuteAsync("clear account connector", async () =>
         {
             var response = await _http.DeleteAsync($"/api/accounts/{accountId}/connector", ct);
-            return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                throw new ApiClientException(
+                    $"Couldn't clear the data source (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
+                    response.StatusCode);
+            }
+
+            return true;
         });
 
     public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
