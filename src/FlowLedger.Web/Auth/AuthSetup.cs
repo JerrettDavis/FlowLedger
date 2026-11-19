@@ -85,6 +85,13 @@ public static class AuthSetup
                             return;
                         }
 
+                        if (!oidc.IsEmailAllowed(principal.FindFirstValue("email"),
+                                string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            ctx.Fail("This account is not on the FlowLedger invite list.");
+                            return;
+                        }
+
                         var apiKey = ctx.HttpContext.RequestServices.GetRequiredService<IOptions<FlowLedger.Web.ApiClient.ApiAuthOptions>>().Value.Key;
                         var http = ctx.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient(IdentityClientName);
                         using var req = new HttpRequestMessage(HttpMethod.Post, "/api/users/resolve")
@@ -180,7 +187,7 @@ public static class AuthSetup
     }
 
     private static string SafeLocal(string? url) =>
-        !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") ? url : "/";
+        !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") && !url.Any(char.IsControl) ? url : "/";
 
     private sealed record ResolveResponse(Guid UserId, Guid TenantId, bool IsHousehold = false);
 }
