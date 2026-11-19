@@ -170,6 +170,11 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.HasIndex("TenantId", nameof(Transaction.EffectiveDate))
             .HasDatabaseName("ix_transactions_tenant_date");
 
+        // Matches the list ordering (EffectiveDate DESC, CreatedAt DESC) so paged lists need no extra sort.
+        builder.HasIndex("TenantId", nameof(Transaction.EffectiveDate), nameof(Transaction.CreatedAt))
+            .IsDescending(false, true, true)
+            .HasDatabaseName("ix_transactions_tenant_date_created");
+
         // Fingerprint uniqueness index — added as raw SQL in the migration because
         // HasIndex on owned-type columns requires the exact internal shadow property name.
         // See InitialCreate migration for the actual index DDL:
