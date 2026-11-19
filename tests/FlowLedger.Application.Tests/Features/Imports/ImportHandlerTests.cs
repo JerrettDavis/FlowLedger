@@ -51,6 +51,20 @@ public sealed class ImportHandlerTests
     }
 
     [Fact]
+    public async Task Import_TooManyRows_IsRejected()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        var row = "2024-01-10,-1.00,x" + Environment.NewLine;
+        var csv = "Date,Amount,Description" + Environment.NewLine
+            + string.Concat(Enumerable.Repeat(row, ImportTransactionsHandler.MaxImportRows + 1));
+
+        var act = () => handler.HandleAsync(new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*limit per import*");
+        txRepo.All.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Import_PositiveAmount_CreatedAsCredit()
     {
         var (handler, txRepo, _, _, account) = BuildSut();
