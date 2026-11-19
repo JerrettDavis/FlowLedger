@@ -273,7 +273,7 @@ public sealed class BillSheetService(
         var to = current.AddMonths(1).AddDays(SheetMatcher.MaxDueDayDistance);
 
         var existing = await store.ListPaymentsAsync(months[^1], current, ct);
-        var all = await transactions.ListAllAsync(TransactionScanLimit, ct);
+        var all = await transactions.ListAsync(null, from, to, 0, TransactionScanLimit, ct);
         var txns = all
             .Where(t => t.Direction == TransactionDirection.Debit
                 && t.Status is TransactionStatus.Pending or TransactionStatus.Posted or TransactionStatus.Matched
