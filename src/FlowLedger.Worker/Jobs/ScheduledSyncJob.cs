@@ -60,6 +60,15 @@ public sealed class ScheduledSyncJob : IJob
                     "{TransactionsAdded} added, {TransactionsSkipped} skipped.",
                     tenantId, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
             }
+            catch (Exception ex) when (ex is FlowLedger.Application.Abstractions.SyncThrottledException
+                                          or FlowLedger.Application.Abstractions.SyncAlreadyRunningException)
+            {
+                _logger.LogInformation("ScheduledSyncJob: tenant {TenantId} skipped — {Reason}", tenantId, ex.Message);
+            }
+            catch (FlowLedger.Integrations.Abstractions.RateLimitedProviderException ex)
+            {
+                _logger.LogWarning("ScheduledSyncJob: provider rate-limited tenant {TenantId} ({Message}); retrying next interval.", tenantId, ex.Message);
+            }
             catch (Exception ex)
             {
                 // Log and continue — Quartz treats an unhandled exception as a job failure; a graceful
