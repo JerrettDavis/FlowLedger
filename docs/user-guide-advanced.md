@@ -4,8 +4,7 @@ This guide covers the pages and workflows that go beyond the basics. For the Das
 Accounts, Transactions, Money Plan, Recurring Flows and Forecasts, see the
 [User Guide](user-guide.md). New here? Start with [Onboarding](onboarding.md).
 
-Items marked **(verify)** are described from reading the source and have not been
-confirmed against a running install.
+Behavior below is taken from the application source. Where the UI offers no way to do something, the text says so.
 
 ---
 
@@ -210,7 +209,7 @@ bank description contains the text. The original description is kept.
   dismissal **append** to it (a new line).
 - Notes added by dismissing a flag also show up here.
 - **Export CSV** exports the visible rows with their single category; it does not contain
-  notes or split parts. **(verify)** if you need splits in exports.
+  notes or split parts. Use the Query/Ask page or a saved report if you need split parts.
 
 ---
 
@@ -311,8 +310,7 @@ Transfers between your own accounts, investments and card payments are never fla
   transaction.
 - If you typed a note it is also appended to the transaction's own notes, so it shows the
   note icon on Transactions and is searchable.
-- A dismissal cannot be reversed from the UI. **(verify)** if there is any way to restore a
-  flag.
+- A dismissal cannot be reversed from the UI. There is no restore endpoint; ask an administrator if a flag was dismissed by mistake.
 - Flagged lists show at most about eight items.
 
 ---
@@ -361,7 +359,7 @@ and withdrawals removed, so moving money in is not counted as a gain.
   balance history yet", and a short history is labelled (for example "history: 12d").
 - It only lists accounts of the investment type. Check account types on the Accounts page.
 - Net deposits are inferred from transactions. Brokerage-side moves the data does not show
-  can distort the return. **(verify)** accuracy for your institution.
+  can distort the return. Treat the return as an estimate.
 - This is a performance view, not a holdings or tax-lot view.
 
 ---
@@ -528,7 +526,7 @@ Step by step: [Disaster recovery](self-hosting/backups-and-recovery.md#disaster-
 - Import only works into an **empty** database.
 - The data endpoints accept requests only from the host itself unless an administrator sets
   `DataAdmin__AllowRemote=true`. If Export or Back up now fails from a remote browser, that is
-  likely why. **(verify)** for your deployment.
+  likely why.
 - If sign-in is on but no owner has been configured (`Tenancy__LegacyOwner*`), nobody is the
   owner and the page is unavailable.
 - Provider usage numbers only matter for pay-per-call providers.
@@ -560,4 +558,4 @@ than one login and not on the one you are using).
   **separate** data. Do not link their login unless you want them to see everything.
 - Linked logins have identical access: there is no read-only or admin role. (Shared
   households with roles are listed as future work in ADR 0008.)
-- The page only makes sense when sign-in is enabled. Without it, **(verify)** behavior.
+- The page only makes sense when sign-in is enabled. Without sign-in there is only one household, so there is nothing to link.
