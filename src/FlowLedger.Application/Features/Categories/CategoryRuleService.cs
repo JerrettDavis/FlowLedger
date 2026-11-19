@@ -120,7 +120,12 @@ public sealed class CategoryRuleService(
 
         if (pattern is { Length: > 0 and <= MaxLength })
         {
-            await store.SetAsync(pattern, category.Path.Value, ct);
+            // Implicit rule from a bulk recategorize: skip (never fail the recategorize) when the tenant is at its cap.
+            var existing = await store.ListAsync(ct);
+            if (existing.Count < MaxRules || existing.Any(r => string.Equals(r.Pattern, pattern, StringComparison.Ordinal)))
+            {
+                await store.SetAsync(pattern, category.Path.Value, ct);
+            }
         }
 
         return changed;
