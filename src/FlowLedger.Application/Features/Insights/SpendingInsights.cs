@@ -245,12 +245,17 @@ public sealed class GetSpendingBreakdownHandler(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories)
 {
     private const int MaxTransactions = 50_000;
+    private const int TransferPadDays = 14;
 
     public async Task<BreakdownResult> HandleAsync(BreakdownQuery q, CancellationToken ct = default)
     {
         var accountEntities = await accounts.ListAsync(ct);
         var cats = (await categories.ListAsync(ct)).Select(CategoryMapper.ToDto).ToDictionary(c => c.Id, c => c.Path);
-        var loaded = await repo.ListAllAsync(MaxTransactions, ct);
+        // Only the selected period and the equally long prior period are compared; pad both ends so transfer pairs that straddle the edge still match.
+        var span = Math.Max(1, q.To.DayNumber - q.From.DayNumber + 1);
+        var loaded = q.To < q.From
+            ? await repo.ListAllAsync(MaxTransactions, ct)
+            : await repo.ListAsync(null, q.From.AddDays(-span - TransferPadDays), q.To.AddDays(TransferPadDays), 0, MaxTransactions, ct);
         var dtos = loaded.Select(TransactionMapper.ToDto).ToList();
         return SpendingInsightsAnalyzer.Analyze(
             q, dtos, cats,
