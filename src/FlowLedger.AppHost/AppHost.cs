@@ -179,6 +179,14 @@ if (string.Equals(builder.Configuration["Tenancy:RequireTenantHeader"], "true", 
     api.WithEnvironment("Tenancy__RequireTenantHeader", "true");
 }
 
+// Optional hardening: a second secret (user-secret Api:TenantSigningKey, different from Api:Key) so the API only honours a
+// tenant that the Web app signed. A leaked API key alone then cannot act as another tenant.
+if (!string.IsNullOrEmpty(builder.Configuration["Api:TenantSigningKey"]))
+{
+    api.WithEnvironment("Api__TenantSigningKey", builder.Configuration["Api:TenantSigningKey"]!);
+    web.WithEnvironment("Api__TenantSigningKey", builder.Configuration["Api:TenantSigningKey"]!);
+}
+
 // Optional: point the worker at a dedicated tenant (e.g. an MX-sandbox tenant) so sandbox data never
 // blends with the simulated demo tenant. API callers select the same tenant via X-Tenant-Id.
 if (!string.IsNullOrEmpty(builder.Configuration["FlowLedger:WorkerTenantId"]))

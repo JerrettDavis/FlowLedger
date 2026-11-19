@@ -43,6 +43,14 @@ public sealed class HeaderTenantContext : ITenantContext
             throw new TenantResolutionException();
         }
 
+        // When a signing key is configured the Web app must vouch for this tenant (see TenantAssertion).
+        var signingKey = apiOptions.Value.TenantSigningKey;
+        if (!string.IsNullOrEmpty(signingKey)
+            && !TenantAssertion.Verify(signingKey, tenantId, http.Request.Headers["X-Tenant-Sig"].ToString(), DateTimeOffset.UtcNow))
+        {
+            throw new TenantResolutionException();
+        }
+
         TenantId = tenantId;
 
         // Self-host assumption: one user per tenant. We do NOT require a second

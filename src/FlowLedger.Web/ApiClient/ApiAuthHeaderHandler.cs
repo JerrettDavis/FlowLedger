@@ -33,6 +33,15 @@ internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options, Flo
             request.Headers.TryAddWithoutValidation("X-Tenant-Id", _options.TenantId);
         }
 
+        // Vouch for the tenant this request acts as (fresh timestamp per attempt, so resilience retries stay valid).
+        request.Headers.Remove("X-Tenant-Sig");
+        if (!string.IsNullOrEmpty(_options.TenantSigningKey)
+            && request.Headers.TryGetValues("X-Tenant-Id", out var tenantValues)
+            && Guid.TryParse(tenantValues.FirstOrDefault(), out var tenantId))
+        {
+            request.Headers.TryAddWithoutValidation("X-Tenant-Sig", TenantAssertionSigner.Sign(_options.TenantSigningKey, tenantId, DateTimeOffset.UtcNow));
+        }
+
         return base.SendAsync(request, cancellationToken);
     }
 }

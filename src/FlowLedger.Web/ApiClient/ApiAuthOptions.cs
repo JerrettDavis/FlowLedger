@@ -20,4 +20,10 @@ public sealed class ApiAuthOptions
     /// Defaults to the dev demo tenant when not configured.
     /// </summary>
     public string TenantId { get; set; } = "00000000-0000-0000-0000-000000000001";
+
+    /// <summary>
+    /// Optional (Api__TenantSigningKey): when set, every request also carries X-Tenant-Sig, an HMAC over the tenant id and a timestamp,
+    /// which the API verifies. Must match Api:TenantSigningKey on the API. Keep it different from <see cref="Key"/>.
+    /// </summary>
+    public string? TenantSigningKey { get; set; }
 }
