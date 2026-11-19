@@ -20,7 +20,7 @@ public sealed class ConnectorEndpointTests(FlowLedgerApiFactory factory, Connect
         var raw = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(raw);
         doc.RootElement.GetProperty("activeProvider").GetString().Should().Be("Simulated");
-        doc.RootElement.GetProperty("selectionMode").GetString().Should().Be("configuration");
+        doc.RootElement.GetProperty("selectionMode").GetString().Should().Be("per-account");
         var connectors = doc.RootElement.GetProperty("connectors").EnumerateArray().ToList();
         connectors.Select(c => c.GetProperty("id").GetString()).Should().Equal("Simulated", "SimpleFIN", "MX");
         connectors.Single(c => c.GetProperty("active").GetBoolean()).GetProperty("id").GetString().Should().Be("Simulated");

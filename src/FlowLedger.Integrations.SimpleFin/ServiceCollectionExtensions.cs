@@ -10,7 +10,8 @@ namespace FlowLedger.Integrations.SimpleFin;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddSimpleFinProvider(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="registerAsDefault">Also register as the un-keyed (primary) <see cref="IFinancialDataProvider"/>.</param>
+    public static IServiceCollection AddSimpleFinProvider(this IServiceCollection services, IConfiguration configuration, bool registerAsDefault = true)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -33,7 +34,12 @@ public static class ServiceCollectionExtensions
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(userInfo)));
         }).AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
 
-        services.AddScoped<IFinancialDataProvider>(sp => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
+        services.AddKeyedScoped<IFinancialDataProvider>("SimpleFIN", (sp, _) => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
+        if (registerAsDefault)
+        {
+            services.AddScoped<IFinancialDataProvider>(sp => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
+        }
+
         return services;
     }
 }

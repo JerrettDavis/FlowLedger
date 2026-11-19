@@ -37,9 +37,12 @@ internal static class ConnectorEndpoints
     {
         app.MapGet("/api/integrations/connectors", async (
                 IConfiguration cfg,
-                IFinancialDataProvider active,
+                IConnectorRegistry registry,
+                IFinancialDataProvider primary,
                 IProviderConnectionStore connections,
                 IConnectorStatusReader status,
+                IAccountConnectorLinkStore links,
+                IAccountRepository accounts,
                 CancellationToken ct) =>
             {
                 if (!cfg.GetValue("Features:ConnectorsPage", true))
@@ -48,10 +51,13 @@ internal static class ConnectorEndpoints
                 }
 
                 var linked = await connections.ListAsync(ct);
+                var accountLinks = await links.ListAsync(ct);
+                var accountsById = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a);
                 var items = new List<object>();
                 foreach (var d in Catalog)
                 {
-                    var isActive = string.Equals(d.Id, active.ProviderName, StringComparison.OrdinalIgnoreCase);
+                    var enabled = registry.IsEnabled(d.Id);
+                    var isPrimary = string.Equals(d.Id, primary.ProviderName, StringComparison.OrdinalIgnoreCase);
                     var usage = await status.GetUsageAsync(d.Id, ct);
                     var lastSync = await status.LastSyncedAtAsync(d.Id, ct);
                     var isMx = d.Id == "MX";
@@ -61,11 +67,18 @@ internal static class ConnectorEndpoints
                         name = d.DisplayName,
                         kind = d.Kind,
                         description = d.Description,
-                        active = isActive,
+                        active = enabled,
+                        primary = isPrimary,
                         enabledInConfig = d.IsEnabled(cfg),
                         credentialsConfigured = d.HasCredentials(cfg),
                         configKeys = d.ConfigKeys,
-                        capabilities = isActive ? active.Capabilities.ToString().Split(", ", StringSplitOptions.RemoveEmptyEntries) : null,
+                        capabilities = enabled
+                            ? registry.Resolve(d.Id).Capabilities.ToString().Split(", ", StringSplitOptions.RemoveEmptyEntries)
+                            : null,
+                        accounts = accountLinks
+                            .Where(l => string.Equals(l.ConnectorId, d.Id, StringComparison.OrdinalIgnoreCase) && accountsById.ContainsKey(l.AccountId))
+                            .Select(l => new { accountId = l.AccountId, name = accountsById[l.AccountId].Name, providerAccountId = l.ProviderAccountId })
+                            .ToList(),
                         lastSyncedAt = lastSync,
                         usage = new
                         {
@@ -82,13 +95,21 @@ internal static class ConnectorEndpoints
                     });
                 }
 
+                // Accounts that no connector feeds: manual, pinned manual, or not yet matched by a sync.
+                var linkedIds = accountLinks.Where(l => l.ConnectorId != AccountConnectorLinks.Manual).Select(l => l.AccountId).ToHashSet();
+                var unassigned = accountsById.Values
+                    .Where(a => !linkedIds.Contains(a.Id))
+                    .Select(a => new { accountId = a.Id, name = a.Name, pinnedManual = accountLinks.Any(l => l.AccountId == a.Id && l.ConnectorId == AccountConnectorLinks.Manual) })
+                    .ToList();
+
                 return Results.Ok(new
                 {
-                    activeProvider = active.ProviderName,
-                    // Provider choice is process-wide and read at startup. Changing it needs a config change and a restart.
-                    selectionMode = "configuration",
-                    selectionNote = "The active connector is chosen by configuration at startup (SimpleFin:Enabled / Mx:Enabled; only one real connector at a time). Runtime selection and several feeds per user are planned (ADR 0009).",
+                    activeProvider = primary.ProviderName,
+                    // Connectors are enabled per instance by configuration (restart to change); each account is linked to one connector (ADR 0010).
+                    selectionMode = "per-account",
+                    selectionNote = "Connectors are enabled for the whole instance by configuration (SimpleFin:Enabled, Mx:Enabled; restart to change). Each account is linked to one connector, or none for a manual account.",
                     connectors = items,
+                    unassignedAccounts = unassigned,
                 });
             })
             .AddEndpointFilter(DataEndpoints.HouseholdTenantOnlyAsync)

@@ -19,7 +19,8 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddSimulatedProvider(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool registerAsDefault = true)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -27,7 +28,12 @@ public static class ServiceCollectionExtensions
         services.Configure<SimulatedProviderOptions>(
             configuration.GetSection(SimulatedProviderOptions.SectionName));
 
-        services.AddSingleton<IFinancialDataProvider, SimulatedFinancialDataProvider>();
+        services.AddSingleton<SimulatedFinancialDataProvider>();
+        services.AddKeyedSingleton<IFinancialDataProvider>("Simulated", (sp, _) => sp.GetRequiredService<SimulatedFinancialDataProvider>());
+        if (registerAsDefault)
+        {
+            services.AddSingleton<IFinancialDataProvider>(sp => sp.GetRequiredService<SimulatedFinancialDataProvider>());
+        }
 
         return services;
     }

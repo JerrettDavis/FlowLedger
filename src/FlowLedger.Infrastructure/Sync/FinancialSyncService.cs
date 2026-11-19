@@ -34,6 +34,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly ISyncCursorStore _cursorStore;
     private readonly ILogger<FinancialSyncService> _logger;
     private readonly Guid? _householdTenantId;
+    private readonly IAccountConnectorLinkStore? _links;
 
     /// <param name="configuration">
     /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
@@ -46,8 +47,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         ITenantContext tenant,
         ISyncCursorStore cursorStore,
         ILogger<FinancialSyncService> logger,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
+        Microsoft.Extensions.Configuration.IConfiguration? configuration = null,
+        IAccountConnectorLinkStore? links = null)
     {
+        _links = links;
         _provider = provider;
         _db = db;
         _tenant = tenant;
@@ -155,6 +158,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         foreach (var pa in providerAccounts)
         {
             var domainAccount = await UpsertAccountAsync(pa, tenantId, ct);
+            if (domainAccount is null)
+            {
+                // Linked to a different connector (or pinned manual): not this connector's account.
+                continue;
+            }
+
             accountsUpserted++;
             providerIdToAccount[pa.ProviderId] = domainAccount;
 
@@ -188,15 +197,49 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task<Account> UpsertAccountAsync(
+    /// <summary>
+    /// Finds (or creates) the domain account for a provider account, honouring per-account connector links (ADR 0010):
+    /// a link for (this connector, provider account) wins; otherwise the legacy match on <c>Institution</c> is used and linked;
+    /// otherwise a new account is created and linked. Returns null when the matched account belongs to another connector.
+    /// </summary>
+    private async Task<Account?> UpsertAccountAsync(
         ProviderAccount pa,
         TenantId tenantId,
         CancellationToken ct)
     {
-        // Look up existing domain account by provider id stored in the Institution field.
-        // TODO(M7): replace Institution-as-external-ref with a dedicated AccountProviderLink entity.
-        var existing = await _db.Accounts
-            .FirstOrDefaultAsync(a => a.Institution == pa.ProviderId, ct);
+        Account? existing = null;
+
+        if (_links is not null)
+        {
+            var link = await _links.FindByProviderAccountAsync(_provider.ProviderName, pa.ProviderId, ct);
+            if (link is not null)
+            {
+                existing = await _db.Accounts.FirstOrDefaultAsync(a => a.Id == link.AccountId, ct);
+                if (existing is null)
+                {
+                    await _links.UnlinkAsync(link.AccountId, ct); // stale link: the account was deleted
+                }
+            }
+        }
+
+        if (existing is null)
+        {
+            // Accounts created before per-account links store the provider account id in Institution.
+            existing = await _db.Accounts.FirstOrDefaultAsync(a => a.Institution == pa.ProviderId, ct);
+            if (existing is not null && _links is not null)
+            {
+                var theirs = await _links.FindByAccountAsync(existing.Id, ct);
+                if (theirs is null)
+                {
+                    await _links.LinkAsync(existing.Id, _provider.ProviderName, pa.ProviderId, ct); // lazy backfill
+                }
+                else if (!string.Equals(theirs.ConnectorId, _provider.ProviderName, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(theirs.ProviderAccountId, pa.ProviderId, StringComparison.Ordinal))
+                {
+                    return null;
+                }
+            }
+        }
 
         if (existing is not null)
         {
@@ -259,6 +302,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             institution: pa.ProviderId); // Institution stores provider id for lookup
 
         await _db.Accounts.AddAsync(newAccount, ct);
+        if (_links is not null)
+        {
+            await _links.LinkAsync(newAccount.Id, _provider.ProviderName, pa.ProviderId, ct);
+        }
+
         return newAccount;
     }
 

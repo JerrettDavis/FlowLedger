@@ -125,26 +125,41 @@ public static class DependencyInjection
         var mxOptions = configuration.GetSection(FinancialProviderOptions.SectionName).Get<FinancialProviderOptions>()
                         ?? new FinancialProviderOptions();
 
+        // Connectors are enabled per instance by configuration; accounts choose their connector (account_connector_links, ADR 0010).
+        // Several real connectors may be on together. Simulated is on when no real connector is (or explicitly: Connectors:Simulated=true,
+        // which adds fake demo accounts next to real ones - only for trying things out).
         var simpleFinEnabled = bool.TryParse(configuration["SimpleFin:Enabled"], out var sf) && sf;
+        var simulatedExplicit = bool.TryParse(configuration["Connectors:Simulated"], out var simOn) && simOn;
+        var simulatedEnabled = (!simpleFinEnabled && !mxOptions.Enabled) || simulatedExplicit;
 
+        // The first enabled connector (SimpleFIN, MX, Simulated) is also the un-keyed "primary" IFinancialDataProvider for older call sites.
+        var connectors = new List<FlowLedger.Integrations.Abstractions.ConnectorDescriptor>();
         if (simpleFinEnabled)
         {
-            // SimpleFIN Bridge (personal real-bank aggregation). Mutually exclusive with MX.
-            if (mxOptions.Enabled)
-            {
-                throw new InvalidOperationException("Mx:Enabled and SimpleFin:Enabled cannot both be true.");
-            }
+            services.AddSimpleFinProvider(configuration, registerAsDefault: connectors.Count == 0);
+            connectors.Add(new("SimpleFIN", "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true));
+        }
 
-            services.AddSimpleFinProvider(configuration);
-        }
-        else if (mxOptions.Enabled)
+        if (mxOptions.Enabled)
         {
-            services.AddMxProvider(configuration);
+            services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
+            connectors.Add(new("MX", "MX", "Aggregator (widget)", SharedCredentials: true));
         }
-        else
+
+        if (simulatedEnabled)
         {
-            services.AddSimulatedProvider(configuration);
+            services.AddSimulatedProvider(configuration, registerAsDefault: connectors.Count == 0);
+            connectors.Add(new("Simulated", "Simulated demo data", "Demo", SharedCredentials: false));
         }
+
+        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountConnectorLinkStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+
+        services.AddScoped<FlowLedger.Integrations.Abstractions.IConnectorRegistry>(sp =>
+            new FlowLedger.Infrastructure.Sync.ConnectorRegistry(sp, connectors));
 
         // Local LLM (Ollama) for "ask a question" -> query. Loopback by default; data never leaves the machine.
         var ollama = new FlowLedger.Infrastructure.Ai.OllamaOptions();
@@ -189,29 +204,32 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Abstractions.IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
+        services.AddScoped<FlowLedger.Infrastructure.Sync.MultiConnectorSyncService>();
         services.AddScoped<IFinancialSyncService>(sp =>
         {
-            var provider = sp.GetRequiredService<FlowLedger.Integrations.Abstractions.IFinancialDataProvider>();
+            var cfg = sp.GetRequiredService<IConfiguration>();
+            var registry = sp.GetRequiredService<FlowLedger.Integrations.Abstractions.IConnectorRegistry>();
             var tenant = sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId;
-            // Configured provider credentials belong to the household (legacy) tenant only — never sync them into another user's tenant.
-            if (provider.ProviderName != "Simulated"
-                && tenant != TenancySettings.Legacy(sp.GetRequiredService<IConfiguration>()).LegacyTenantId)
+            // Operator-held connector credentials belong to the household (legacy) tenant only - never sync them into another user's tenant.
+            var usable = FlowLedger.Infrastructure.Sync.MultiConnectorSyncService.UsableFor(
+                registry, tenant, TenancySettings.Legacy(cfg).LegacyTenantId);
+            if (usable.Count == 0)
             {
                 return new FlowLedger.Infrastructure.Sync.UnlinkedTenantSyncService();
             }
-            var cfg = sp.GetRequiredService<IConfiguration>();
-            // Real providers default to 30 min between syncs; the free Simulated provider is unthrottled.
-            var defaultMinutes = provider.ProviderName == "Simulated" ? 0 : 30;
+
+            // Real connectors default to 30 min between syncs; the free Simulated provider is unthrottled.
+            var defaultMinutes = usable.Any(c => c.Id != "Simulated") ? 30 : 0;
             var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
             var db = sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>();
-            var providerName = provider.ProviderName;
+            var connectorIds = usable.Select(c => c.Id).ToArray();
 
             var guarded = new FlowLedger.Infrastructure.Sync.GuardedSyncService(
-                sp.GetRequiredService<FinancialSyncService>(),
+                sp.GetRequiredService<FlowLedger.Infrastructure.Sync.MultiConnectorSyncService>(),
                 tenant,
                 TimeSpan.FromMinutes(Math.Max(0, minutes)),
                 async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
-                    db.SyncCursors.Where(c => c.TenantId == tenant && c.ProviderName == providerName),
+                    db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
                     c => (DateTimeOffset?)c.LastSyncedAt, ct),
                 crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));

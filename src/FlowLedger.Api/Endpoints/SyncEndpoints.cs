@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Infrastructure.DataSafety;
 using Microsoft.AspNetCore.Http;
 
@@ -44,17 +45,26 @@ internal static class SyncEndpoints
 
         // Lets the browser decide whether an auto-sync is due without calling the provider.
         group.MapGet("/sync/status", async (
-                FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext db,
-                FlowLedger.SharedKernel.ITenantContext tenantContext,
-                FlowLedger.Integrations.Abstractions.IFinancialDataProvider provider,
+                IConnectorRegistry connectors,
+                IConnectorStatusReader status,
+                FlowLedger.Integrations.Abstractions.IFinancialDataProvider primary,
                 IConfiguration cfg,
                 CancellationToken ct) =>
             {
-                var providerName = provider.ProviderName;
-                var last = await FlowLedger.Infrastructure.Sync.SyncStatusReader.LastSyncedAtAsync(db, tenantContext, providerName, ct);
-                var defaultMinutes = providerName == "Simulated" ? 0 : 30;
-                var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
-                return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = providerName });
+                // Last successful sync across every enabled connector (each syncs on the same schedule).
+                DateTimeOffset? last = null;
+                foreach (var c in connectors.Enabled)
+                {
+                    var t = await status.LastSyncedAtAsync(c.Id, ct);
+                    if (t is { } v && (last is null || v > last))
+                    {
+                        last = v;
+                    }
+                }
+
+                var anyReal = connectors.Enabled.Any(c => c.Id != "Simulated");
+                var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : (anyReal ? 30 : 0);
+                return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = primary.ProviderName });
             })
             .WithName("GetSyncStatus")
             .WithSummary("When the last successful sync finished and the enforced minimum interval");
