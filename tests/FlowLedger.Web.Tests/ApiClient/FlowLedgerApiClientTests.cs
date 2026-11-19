@@ -29,6 +29,48 @@ public sealed class FlowLedgerApiClientTests
         return new FlowLedgerApiClient(http, logger);
     }
 
+    // ── Account connector calls: failures surface, bodies are not echoed ──────
+
+    [Fact]
+    public async Task ClearAccountConnectorAsync_ThrowsOnServerError_ButToleratesNotFound()
+    {
+        var failing = BuildClient(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var act = () => failing.ClearAccountConnectorAsync(Guid.NewGuid());
+        await act.Should().ThrowAsync<ApiClientException>().WithMessage("*500*");
+
+        var missing = BuildClient(new HttpResponseMessage(HttpStatusCode.NotFound));
+        await missing.Awaiting(c => c.ClearAccountConnectorAsync(Guid.NewGuid())).Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task SetAccountConnectorAsync_ShowsTheProblemTitleButNeverTheRawBody()
+    {
+        var problem = new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = new StringContent("{\"title\":\"Already linked\",\"trace\":\"SECRET-INTERNAL-DETAIL\"}", Encoding.UTF8, "application/json"),
+        };
+        var client = BuildClient(problem);
+
+        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), new SetAccountConnectorRequest("MX", "acct-1"));
+
+        var ex = (await act.Should().ThrowAsync<ApiClientException>()).Which;
+        ex.Message.Should().Contain("409").And.Contain("Already linked").And.NotContain("SECRET-INTERNAL-DETAIL");
+    }
+
+    [Fact]
+    public async Task SetAccountConnectorAsync_WithANonJsonErrorBody_ShowsOnlyTheStatusCode()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.BadGateway)
+        {
+            Content = new StringContent("<html>stack trace at Foo.Bar()</html>", Encoding.UTF8, "text/html"),
+        });
+
+        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), new SetAccountConnectorRequest("manual", null));
+
+        var ex = (await act.Should().ThrowAsync<ApiClientException>()).Which;
+        ex.Message.Should().Contain("502").And.NotContain("stack trace");
+    }
+
     // ── Malformed JSON (HTML error page) tests ────────────────────────────────
 
     [Fact]
