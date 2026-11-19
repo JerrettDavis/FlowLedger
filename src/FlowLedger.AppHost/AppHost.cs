@@ -172,6 +172,13 @@ foreach (var svc in new IResourceBuilder<IResourceWithEnvironment>[] { api, work
     }
 }
 
+// Multi-user stacks: refuse (401) any API call without a valid X-Tenant-Id instead of falling back to the household tenant.
+// Only enable together with OIDC sign-in; with sign-in off the Web app sends no tenant header.
+if (string.Equals(builder.Configuration["Tenancy:RequireTenantHeader"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    api.WithEnvironment("Tenancy__RequireTenantHeader", "true");
+}
+
 // Optional: point the worker at a dedicated tenant (e.g. an MX-sandbox tenant) so sandbox data never
 // blends with the simulated demo tenant. API callers select the same tenant via X-Tenant-Id.
 if (!string.IsNullOrEmpty(builder.Configuration["FlowLedger:WorkerTenantId"]))

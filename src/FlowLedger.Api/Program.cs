@@ -35,7 +35,8 @@ builder.Services.AddOpenApi();
 // Non-Development: HeaderTenantContext fails closed (throws TenantResolutionException
 // → 401) when no valid X-Tenant-Id header is supplied.
 builder.Services.AddHttpContextAccessor();
-if (builder.Environment.IsDevelopment())
+// Tenancy:RequireTenantHeader=true makes even Development fail closed (no demo-tenant fallback) - set it on any stack with real users.
+if (builder.Environment.IsDevelopment() && !builder.Configuration.GetValue("Tenancy:RequireTenantHeader", false))
 {
     builder.Services.AddScoped<ITenantContext, DevTenantContext>();
 }
@@ -155,7 +156,7 @@ if (app.Environment.IsDevelopment())
     {
         app.Logger.LogWarning(
             "SECURITY: running in Development with the public dev API key, and requests without X-Tenant-Id fall back to the " +
-            "household tenant. Do not expose this instance or onboard other users until ASPNETCORE_ENVIRONMENT=Production and a real Api__Key are set.");
+            "household tenant. Do not expose this instance or onboard other users until ASPNETCORE_ENVIRONMENT=Production (or at least Tenancy__RequireTenantHeader=true) and a real Api__Key are set.");
     }
 }
 
