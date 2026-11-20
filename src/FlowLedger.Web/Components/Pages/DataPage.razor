@@ -48,21 +48,28 @@ else
                                 : "Last backup FAILED: " + _status.Backup.LastRun.Error)
                     </MudAlert>
                 }
-                <MudSimpleTable Dense="true" Hover="true">
-                    <tbody>
-                        <tr><td>Off-site copy</td><td>@(_status.Backup.OffsiteConfigured ? "Configured (restic)" : "NOT configured")</td></tr>
-                        <tr><td>Last run</td><td>@(_status.Backup.LastRun is null ? "—" : Ago(_status.Backup.LastRun.FinishedUtc))</td></tr>
-                        <tr><td>Rows backed up</td><td>@(_status.Backup.LastRun?.Rows.ToString("N0") ?? "—")</td></tr>
-                        <tr><td>Restore drill</td><td>@(_status.Backup.LastRun?.DrillOk is { } d ? (d ? "Passed" : "FAILED") : "—")</td></tr>
-                        <tr><td>Off-site result</td><td>@(_status.Backup.LastRun?.OffsiteDetail ?? "—")</td></tr>
-                    </tbody>
-                </MudSimpleTable>
+                <div class="fl-periods">
+                    <div class="fl-period"><div class="fl-tile__label">Off-site copy</div><div class="fl-tile__value @(_status.Backup.OffsiteConfigured ? "fl-pos" : "fl-neg")" style="font-size:1.1rem">@(_status.Backup.OffsiteConfigured ? "Configured" : "Not configured")</div></div>
+                    <div class="fl-period"><div class="fl-tile__label">Last run</div><div class="fl-tile__value" style="font-size:1.1rem">@(_status.Backup.LastRun is null ? "—" : Ago(_status.Backup.LastRun.FinishedUtc))</div></div>
+                    <div class="fl-period"><div class="fl-tile__label">Rows backed up</div><div class="fl-tile__value fl-num" style="font-size:1.1rem">@(_status.Backup.LastRun?.Rows.ToString("N0") ?? "—")</div></div>
+                    <div class="fl-period"><div class="fl-tile__label">Restore drill</div><div class="fl-tile__value @(_status.Backup.LastRun?.DrillOk is { } dd ? (dd ? "fl-pos" : "fl-neg") : "")" style="font-size:1.1rem">@(_status.Backup.LastRun?.DrillOk is { } d ? (d ? "Passed" : "FAILED") : "—")</div></div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_status.Backup.LastRun?.OffsiteDetail))
+                {
+                    <MudText Typo="Typo.caption" Class="d-block mt-2 fl-muted">Off-site: @_status.Backup.LastRun!.OffsiteDetail</MudText>
+                }
                 <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" Disabled="_running" OnClick="BackupNow">
                     @(_running ? "Backing up…" : "Back up now")
                 </MudButton>
                 <MudButton Class="mt-3 ml-2" Variant="Variant.Outlined" Disabled="_exporting" OnClick="ExportAll">
                     @(_exporting ? "Exporting…" : "Export all data (.zip)")
                 </MudButton>
+                <div class="d-flex align-center mt-3" style="gap:8px;flex-wrap:wrap">
+                    <DateRangeSelector Label="Transactions range" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
+                    <MudButton Variant="Variant.Outlined" Disabled="_exportingCsv" OnClick="ExportTransactionsCsv">
+                        @(_exportingCsv ? "Exporting…" : "Export transactions (.csv)")
+                    </MudButton>
+                </div>
                 <MudText Typo="Typo.caption" Class="d-block mt-2 fl-muted">
                     The export holds one CSV per table plus a hashed manifest. It can be imported into an empty database (POST /api/data/import).
                 </MudText>
@@ -82,15 +89,15 @@ else
                 <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsThisMonth, _status.ProviderUsage.MonthlyBudget)" Class="mb-3" />
                 @if (_status.ProviderUsage.ByEndpoint.Count > 0)
                 {
-                    <MudSimpleTable Dense="true">
-                        <thead><tr><th>Endpoint (this month)</th><th>Calls</th></tr></thead>
-                        <tbody>
-                            @foreach (var e in _status.ProviderUsage.ByEndpoint)
-                            {
-                                <tr><td>@e.Method @e.Path</td><td>@e.Calls</td></tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
+                    <MudText Typo="Typo.overline" Class="fl-muted">Endpoints this month</MudText>
+                    var topCalls = Math.Max(1, _status.ProviderUsage.ByEndpoint.Max(x => x.Calls));
+                    @foreach (var e in _status.ProviderUsage.ByEndpoint)
+                    {
+                        <div class="mb-2">
+                            <div class="fl-acard__row"><span>@e.Method @e.Path</span><span class="fl-num">@e.Calls</span></div>
+                            <div class="fl-meter mt-1"><span style="width:@((100.0 * e.Calls / topCalls).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span></div>
+                        </div>
+                    }
                 }
                 else
                 {
@@ -102,22 +109,21 @@ else
         <MudItem xs="12">
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">Recent backup runs</MudText>
-                <MudSimpleTable Dense="true" Hover="true">
-                    <thead><tr><th>When</th><th>Result</th><th>Rows</th><th>Drill</th><th>Off-site</th><th>Detail</th></tr></thead>
-                    <tbody>
-                        @foreach (var r in _status.Backup.Runs)
-                        {
-                            <tr>
-                                <td>@r.FinishedUtc.ToLocalTime().ToString("g")</td>
-                                <td>@(r.Ok ? "OK" : "FAILED")</td>
-                                <td>@r.Rows.ToString("N0")</td>
-                                <td>@(r.DrillOk is { } d ? (d ? "pass" : "FAIL") : "—")</td>
-                                <td>@(r.OffsiteOk is { } o ? (o ? "ok" : "FAIL") : "n/a")</td>
-                                <td>@(r.Error ?? r.OffsiteDetail)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
+                <div class="fl-list">
+                    @foreach (var r in _status.Backup.Runs)
+                    {
+                        <div class="fl-li">
+                            <span class="fl-dot @(r.Ok ? "fl-tone-cash" : "fl-tone-loan")" style="@(r.Ok ? "background:var(--mud-palette-success)" : "")"></span>
+                            <div class="fl-li__main">
+                                <div class="fl-li__title">@r.FinishedUtc.ToLocalTime().ToString("g") · @(r.Ok ? "OK" : "FAILED")</div>
+                                <div class="fl-li__sub">@(r.Error ?? r.OffsiteDetail ?? "")</div>
+                            </div>
+                            <span class="fl-pill fl-hide-md">@r.Rows.ToString("N0") rows</span>
+                            <span class="fl-pill fl-hide-lg @(r.DrillOk is { } dr ? (dr ? "fl-pill--pos" : "fl-pill--neg") : "")">drill @(r.DrillOk is { } d2 ? (d2 ? "pass" : "FAIL") : "—")</span>
+                            <span class="fl-pill fl-hide-md @(r.OffsiteOk is { } of ? (of ? "fl-pill--pos" : "fl-pill--neg") : "")">off-site @(r.OffsiteOk is { } o ? (o ? "ok" : "FAIL") : "n/a")</span>
+                        </div>
+                    }
+                </div>
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -167,6 +173,62 @@ else
         {
             _running = false;
             await LoadAsync();
+        }
+    }
+
+    private string _rangePreset = "Last 12 months";
+    private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 12 months").From;
+    private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 12 months").To;
+    private bool _exportingCsv;
+
+    private void OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+    }
+
+    private static string Csv(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+
+    private async Task ExportTransactionsCsv()
+    {
+        _exportingCsv = true;
+        try
+        {
+            var sb = new System.Text.StringBuilder("date,description,merchant,amount,direction,status\n");
+            var skip = 0;
+            const int page = 500;
+            while (true)
+            {
+                var batch = await ApiClient.GetTransactionsAsync(null, _rangeFrom, _rangeTo, skip, page);
+                foreach (var t in batch)
+                {
+                    var signed = t.Direction == "Credit" ? t.Amount : -t.Amount;
+                    sb.Append(t.EffectiveDate.ToString("yyyy-MM-dd")).Append(',').Append(Csv(t.Description)).Append(',').Append(Csv(t.MerchantName))
+                      .Append(',').Append(signed.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(',').Append(t.Direction)
+                      .Append(',').Append(t.Status).Append('\n');
+                }
+
+                if (batch.Count < page)
+                {
+                    break;
+                }
+
+                skip += page;
+            }
+
+            var bytes = new System.Text.UTF8Encoding(true).GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+            using var ms = new MemoryStream(bytes);
+            using var reference = new DotNetStreamReference(ms);
+            await JS.InvokeVoidAsync("flowledgerDownload", $"transactions-{_rangeFrom:yyyyMMdd}-{_rangeTo:yyyyMMdd}.csv", reference);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _exportingCsv = false;
         }
     }
 

@@ -9,8 +9,11 @@
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter">
     <MudText Typo="Typo.h4">Assets</MudText>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+    <DateRangeSelector Label="Value change over" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" Variant="Variant.Filled"
                OnClick="OpenCreateDialog" aria-label="Add new asset">Add Asset</MudButton>
+    </div>
 </div>
 
 @if (_loading)
@@ -68,64 +71,52 @@
     </EmptyState>
 }
 
-<MudDataGrid T="FlowLedger.Web.ApiClient.AssetDto"
-             DragDropColumnReordering="true" Items="_assets" Filterable="true"
-             FilterMode="DataGridFilterMode.ColumnFilterRow" SortMode="SortMode.Multiple"
-             Hover="true" Dense="true" aria-label="Assets table">
-    <Columns>
-        <TemplateColumn Title="Name" SortBy="x => x.Name">
-            <CellTemplate>
-                <MudLink OnClick="() => OpenDetailDialog(context.Item)" Typo="Typo.body2">@context.Item.Name</MudLink>
-                @if (!string.IsNullOrWhiteSpace(context.Item.Manufacturer) || !string.IsNullOrWhiteSpace(context.Item.Model))
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@($"{context.Item.Manufacturer} {context.Item.Model}".Trim())</MudText>
-                }
-            </CellTemplate>
-        </TemplateColumn>
-        <PropertyColumn Property="x => x.Category" Title="Category" />
-        <TemplateColumn Title="Value" SortBy="x => x.EstimatedValue">
-            <CellTemplate>
-                <MudText Class="fl-num">@Format.Money(context.Item.EstimatedValue)</MudText>
-                @if (context.Item.ValuationMethod != "Manual")
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@MethodHint(context.Item)</MudText>
-                }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Gain / loss" SortBy="x => x.GainLoss">
-            <CellTemplate>
-                @if (context.Item.GainLoss is { } g)
-                {
-                    <MudText Class="fl-num" Color="@Format.Delta(g)">@Format.Signed(g)</MudText>
-                }
-                else { <MudText Color="Color.Secondary">—</MudText> }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Linked account" SortBy="x => x.LinkedAccountName">
-            <CellTemplate>
-                @if (context.Item.LinkedAccountName is not null)
-                {
-                    <MudText Typo="Typo.body2">@context.Item.LinkedAccountName</MudText>
-                    @if (context.Item.Equity is { } e)
+@if (_assets.Count > 0)
+{
+    <div class="fl-cards">
+        @foreach (var asset in _assets.OrderByDescending(x => x.EstimatedValue))
+        {
+            var pct = asset.PurchasePrice is > 0 && asset.GainLoss is { } gl ? (double)(gl / asset.PurchasePrice.Value * 100) : (double?)null;
+            <MudPaper Class="fl-acard fl-card-hover" Outlined="true">
+                <div class="fl-acard__head">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Outlined"><MudIcon Icon="@Icons.Material.Filled.Inventory2" /></MudAvatar>
+                    <div style="min-width:0;flex:1">
+                        <div class="fl-acard__title"><MudLink OnClick="() => OpenDetailDialog(asset)" Typo="Typo.body1">@asset.Name</MudLink></div>
+                        <MudText Typo="Typo.caption" Class="fl-muted">@asset.Category@(string.IsNullOrWhiteSpace(asset.Manufacturer) && string.IsNullOrWhiteSpace(asset.Model) ? "" : " · " + $"{asset.Manufacturer} {asset.Model}".Trim())</MudText>
+                    </div>
+                </div>
+                <div class="d-flex align-center justify-space-between">
+                    <span class="fl-acard__value fl-num">@Format.Money(asset.EstimatedValue)</span>
+                    @if (_changes.TryGetValue(asset.Name, out var ch) && ch.End != ch.Start)
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Equity @Format.Money(e)</MudText>
+                        <span class="fl-pill @(ch.End - ch.Start >= 0 ? "fl-pill--pos" : "fl-pill--neg")" title="Change in recorded value over @_rangePreset">@Format.Signed(ch.End - ch.Start) · @_rangePreset</span>
                     }
+                    @if (asset.GainLoss is { } g)
+                    {
+                        <span class="fl-pill @(g >= 0 ? "fl-pill--pos" : "fl-pill--neg")">@Format.Signed(g)@(pct is { } pp ? $" ({pp:+0.#;-0.#}%)" : "")</span>
+                    }
+                </div>
+                @if (asset.ValuationMethod != "Manual")
+                {
+                    <MudText Typo="Typo.caption" Class="fl-muted">@MethodHint(asset)</MudText>
                 }
-                else { <MudText Color="Color.Secondary">—</MudText> }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudIconButton Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Color="Color.Primary"
-                               OnClick="() => OpenDetailDialog(context.Item)" aria-label="@($"Valuations for {context.Item.Name}")" />
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
-                               OnClick="() => OpenEditDialog(context.Item)" aria-label="@($"Edit asset {context.Item.Name}")" />
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Default"
-                               OnClick="() => Remove(context.Item)" aria-label="@($"Remove asset {context.Item.Name}")" />
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-</MudDataGrid>
+                @if (asset.LinkedAccountName is not null && asset.Equity is { } eq && asset.EstimatedValue > 0)
+                {
+                    var eqPct = Math.Clamp((double)(eq / asset.EstimatedValue * 100), 0, 100);
+                    <div>
+                        <div class="fl-acard__row"><span class="fl-muted">Equity · @asset.LinkedAccountName</span><span class="fl-num">@Format.Money(eq)</span></div>
+                        <div class="fl-meter mt-1" role="img" aria-label="@($"{eqPct:0}% equity")"><span style="width:@(eqPct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span></div>
+                    </div>
+                }
+                <div class="d-flex justify-end" style="margin-top:auto">
+                    <MudIconButton Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenDetailDialog(asset)" aria-label="@($"Valuations for {asset.Name}")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenEditDialog(asset)" aria-label="@($"Edit asset {asset.Name}")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="() => Remove(asset)" aria-label="@($"Remove asset {asset.Name}")" />
+                </div>
+            </MudPaper>
+        }
+    </div>
+}
 
 @code {
     private bool _loading = true;
@@ -134,6 +125,24 @@
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> _templates = [];
     private FlowLedger.Web.ApiClient.AssetSummaryDto? _summary;
+    private string _rangePreset = "Last 12 months";
+    private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 12 months").From;
+    private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 12 months").To;
+    private Dictionary<string, (decimal Start, decimal End)> _changes = [];
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        await LoadChangesAsync();
+    }
+
+    private async Task LoadChangesAsync()
+    {
+        try { _changes = await ApiClient.GetSeriesChangesAsync("asset_valuations", "asset", "value", _rangeFrom, _rangeTo); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset value changes"); _changes = []; }
+    }
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -151,6 +160,7 @@
             }
 
             _summary = await ApiClient.GetAssetSummaryAsync();
+            await LoadChangesAsync();
         }
         catch (Exception ex)
         {

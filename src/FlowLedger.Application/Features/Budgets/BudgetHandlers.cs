@@ -23,10 +23,13 @@ public sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetReque
 /// <summary>Budgets with this month's actual spending (transfers excluded), rolled up from child categories.</summary>
 public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant)
 {
-    public async Task<BudgetOverview> HandleAsync(CancellationToken ct = default)
+    public async Task<BudgetOverview> HandleAsync(CancellationToken ct = default) => await HandleAsync(null, ct);
+
+    /// <summary>Budgets against the spending of <paramref name="month"/> (null = the current month).</summary>
+    public async Task<BudgetOverview> HandleAsync(DateOnly? month, CancellationToken ct = default)
     {
         var budgets = await store.ListAsync(tenant.TenantId, ct);
-        var spentByCategory = await spend.HandleAsync(ct);
+        var spentByCategory = await spend.HandleAsync(month, ct);
 
         var rows = budgets.Select(b =>
         {
@@ -35,6 +38,6 @@ public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCate
             return new BudgetStatus(b.Category, b.MonthlyLimit, spent, b.MonthlyLimit - spent, pct, spent > b.MonthlyLimit);
         }).ToList();
 
-        return new BudgetOverview(DateTime.UtcNow.ToString("yyyy-MM"), rows, spentByCategory);
+        return new BudgetOverview((month ?? DateOnly.FromDateTime(DateTime.UtcNow)).ToString("yyyy-MM"), rows, spentByCategory);
     }
 }

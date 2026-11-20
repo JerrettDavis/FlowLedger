@@ -11,7 +11,7 @@
         {
             <div class="d-flex align-center gap-2 mb-2">
                 <MudNumericField T="decimal" @bind-Value="r.Amount" Label="Amount" Min="0" Style="max-width:140px" Margin="Margin.Dense" Immediate="true" />
-                <MudSelect T="Guid?" @bind-Value="r.CategoryId" Label="Category" Margin="Margin.Dense" Style="min-width:200px" Clearable="true">
+                <MudSelect T="Guid?" @bind-Value="r.CategoryId" Label="Category" Margin="Margin.Dense" Style="min-width:min(200px,100%)" Clearable="true">
                     @foreach (var c in Categories.OrderBy(c => c.Path))
                     {
                         <MudSelectItem T="Guid?" Value="@((Guid?)c.Id)">@c.Path</MudSelectItem>

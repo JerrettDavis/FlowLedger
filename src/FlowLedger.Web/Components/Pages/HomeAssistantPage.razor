@@ -46,7 +46,7 @@ else
         }
         <div class="d-flex align-center gap-3 flex-wrap">
             <MudTextField T="string" @bind-Value="_url" Label="@(_state.Settings.HasWebhook ? "Replace webhook URL" : "Webhook URL")"
-                          InputType="InputType.Password" Style="min-width:360px" Margin="Margin.Dense" Immediate="true" />
+                          InputType="InputType.Password" Style="min-width:min(360px,100%)" Margin="Margin.Dense" Immediate="true" />
             @if (_state.Settings.HasWebhook)
             {
                 <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Disconnect">Remove webhook</MudButton>

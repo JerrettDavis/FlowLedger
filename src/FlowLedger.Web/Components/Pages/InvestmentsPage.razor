@@ -4,7 +4,11 @@
 
 <PageTitle>Investments — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Investment performance</MudText>
+<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
+    <MudText Typo="Typo.h5">Investment performance</MudText>
+    <DateRangeSelector Label="Range" Preset="@_preset" From="@(_from ?? default)" To="@_to"
+                       Presets="@RangePresets" Changed="OnRangeChanged" />
+</div>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Growth of each investment account, with deposits and withdrawals taken out so moving money in isn't counted as a gain.
     Needs balance history, which builds up with every sync.
@@ -33,21 +37,19 @@ else
             }
             else
             {
-                <MudSimpleTable Dense="true" Style="overflow-x:auto">
-                    <thead><tr><th>Period</th><th>Start balance</th><th>Net deposits</th><th>Gain / loss</th><th>Return</th></tr></thead>
-                    <tbody>
-                        @foreach (var p in a.Periods)
-                        {
-                            <tr>
-                                <td>@p.Period@(p.Days < DaysFor(p.Period) ? $" (history: {p.Days}d)" : "")</td>
-                                <td class="fl-num">@Format.Money(p.StartBalance)</td>
-                                <td class="fl-num">@Format.Money(p.NetContributions)</td>
-                                <td class="fl-num"><MudText Color="@Format.Delta(p.Gain)" Class="fl-num">@Format.Money(p.Gain)</MudText></td>
-                                <td class="fl-num">@(p.GainPercent is { } g ? $"{g:+0.00;-0.00;0.00}%" : "–")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
+                <div class="fl-periods">
+                    @foreach (var p in a.Periods)
+                    {
+                        <div class="fl-period">
+                            <div class="d-flex justify-space-between align-center">
+                                <span class="fl-tile__label">@p.Period</span>
+                                <span class="fl-pill @(p.Gain >= 0 ? "fl-pill--pos" : "fl-pill--neg")">@(p.GainPercent is { } g ? $"{g:+0.00;-0.00;0.00}%" : "–")</span>
+                            </div>
+                            <div class="fl-tile__value fl-num @(p.Gain >= 0 ? "fl-pos" : "fl-neg")">@Format.Signed(p.Gain)</div>
+                            <MudText Typo="Typo.caption" Class="fl-muted">Started @Format.Money(p.StartBalance) · deposits @Format.Money(p.NetContributions)@(p.Days < DaysFor(p.Period) ? $" · {p.Days}d of history" : "")</MudText>
+                        </div>
+                    }
+                </div>
             }
         </MudPaper>
     }
@@ -57,11 +59,33 @@ else
     private List<FlowLedger.Web.ApiClient.AccountPerformanceDto>? _accounts;
     private bool _loading = true;
 
-    private static int DaysFor(string period) => period switch { "30 days" => 30, "90 days" => 90, _ => 365 };
+    private static int DaysFor(string period) => period switch { "30 days" => 30, "90 days" => 90, "1 year" => 365, _ => 0 };
+
+    // "Standard" keeps the classic 30 days / 90 days / 1 year tiles; any other choice shows one tile for that window.
+    private static readonly string[] RangePresets =
+        ["Standard", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", "Custom"];
+    private string _preset = "Standard";
+    private DateOnly? _from;
+    private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _preset = r.Preset;
+        _from = r.Preset == "Standard" ? null : r.From;
+        _to = r.To;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _accounts = _preset == "Standard"
+            ? await ApiClient.GetInvestmentPerformanceAsync()
+            : await ApiClient.GetInvestmentPerformanceAsync(_from ?? new DateOnly(2000, 1, 1), _to);
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        _accounts = await ApiClient.GetInvestmentPerformanceAsync();
+        await LoadAsync();
         _loading = false;
     }
 }

@@ -286,9 +286,9 @@ public sealed class FlowLedgerApiClient
 
     // Bill sheet ---------------------------------------------------------------
 
-    public Task<SheetViewDto?> GetSheetAsync(string? month = null, int months = 6, CancellationToken ct = default)
+    public Task<SheetViewDto?> GetSheetAsync(string? month = null, int months = 6, int ahead = 0, CancellationToken ct = default)
         => GetJsonAsync<SheetViewDto>(
-            "/api/sheet?months=" + months + (string.IsNullOrWhiteSpace(month) ? "" : "&month=" + Uri.EscapeDataString(month)),
+            "/api/sheet?months=" + months + "&ahead=" + ahead + (string.IsNullOrWhiteSpace(month) ? "" : "&month=" + Uri.EscapeDataString(month)),
             "load the sheet", ct: ct);
 
     public Task<SheetRefreshResult?> RefreshSheetAsync(CancellationToken ct = default)
@@ -343,8 +343,11 @@ public sealed class FlowLedgerApiClient
     public Task<AssetSummaryDto?> GetAssetSummaryAsync(CancellationToken ct = default)
         => GetJsonAsync<AssetSummaryDto>("/api/assets/summary", "load asset summary", ct: ct);
 
+    // Static reference data (built-in templates): fetched once per circuit, not on every page visit.
+    private List<AssetCategoryTemplateDto>? _assetCategories;
+
     public async Task<List<AssetCategoryTemplateDto>> GetAssetCategoriesAsync(CancellationToken ct = default)
-        => await GetJsonAsync<List<AssetCategoryTemplateDto>>("/api/assets/categories", "load asset categories", ct: ct) ?? [];
+        => _assetCategories ??= await GetJsonAsync<List<AssetCategoryTemplateDto>>("/api/assets/categories", "load asset categories", ct: ct) ?? [];
 
     public Task<AssetDto?> CreateAssetAsync(CreateAssetRequest request, CancellationToken ct = default)
         => SendAssetAsync("add asset", () => _http.PostAsJsonAsync("/api/assets", request, JsonOptions, ct), ct);
@@ -458,8 +461,8 @@ public sealed class FlowLedgerApiClient
     public Task<SavedReportDto?> GetReportAsync(string id, CancellationToken ct = default)
         => GetJsonAsync<SavedReportDto>($"/api/reports/{Uri.EscapeDataString(id)}", "load report", nullOn404: true, ct: ct);
 
-    public Task<RunReportResultDto?> RunReportAsync(string id, CancellationToken ct = default)
-        => GetJsonAsync<RunReportResultDto>($"/api/reports/{Uri.EscapeDataString(id)}/run", "run report", nullOn404: true, ct: ct);
+    public Task<RunReportResultDto?> RunReportAsync(string id, DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default)
+        => GetJsonAsync<RunReportResultDto>($"/api/reports/{Uri.EscapeDataString(id)}/run{RangeQuery(from, to)}", "run report", nullOn404: true, ct: ct);
 
     public Task<SavedReportDto?> SaveReportAsync(SaveReportRequest request, Guid? existingId = null, CancellationToken ct = default)
         => ExecuteAsync("save report", async () =>
@@ -930,23 +933,86 @@ public sealed class FlowLedgerApiClient
         });
     }
 
+    /// <summary>
+    /// Per-item change of a dated series over a window (balance_history by account, asset_valuations by asset):
+    /// the earliest and latest value inside [from, to]. Items with fewer than one point are omitted.
+    /// </summary>
+    public async Task<Dictionary<string, (decimal Start, decimal End)>> GetSeriesChangesAsync(
+        string dataset, string keyColumn, string valueColumn, DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        var clauses = new List<string>();
+        if (from is { } f)
+        {
+            clauses.Add($"date >= \"{f:yyyy-MM-dd}\"");
+        }
+
+        if (to is { } t)
+        {
+            clauses.Add($"date <= \"{t:yyyy-MM-dd}\"");
+        }
+
+        var outcome = await RunQueryAsync(dataset + (clauses.Count > 0 ? " | where " + string.Join(" and ", clauses) : ""), ct);
+        var result = new Dictionary<string, (decimal, decimal)>(StringComparer.OrdinalIgnoreCase);
+        if (outcome.Result is not { } r)
+        {
+            return result;
+        }
+
+        int Col(string n) => r.Columns.FindIndex(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase));
+        int di = Col("date"), ki = Col(keyColumn), vi = Col(valueColumn);
+        if (di < 0 || ki < 0 || vi < 0)
+        {
+            return result;
+        }
+
+        foreach (var g in r.Rows.GroupBy(row => row[ki].ToString()))
+        {
+            var ordered = g.OrderBy(row => row[di].ToString(), StringComparer.Ordinal).ToList();
+            if (ordered.Count == 0 || g.Key is null)
+            {
+                continue;
+            }
+
+            decimal V(System.Text.Json.JsonElement e) => e.ValueKind == System.Text.Json.JsonValueKind.Number ? e.GetDecimal() : 0m;
+            result[g.Key] = (V(ordered[0][vi]), V(ordered[^1][vi]));
+        }
+
+        return result;
+    }
+
+    private static string RangeQuery(DateOnly? from, DateOnly? to)
+    {
+        var parts = new List<string>();
+        if (from is { } f)
+        {
+            parts.Add($"from={f:yyyy-MM-dd}");
+        }
+
+        if (to is { } t)
+        {
+            parts.Add($"to={t:yyyy-MM-dd}");
+        }
+
+        return parts.Count == 0 ? "" : "?" + string.Join("&", parts);
+    }
+
     /// <summary>Spending by category, 6-month cash flow and net-worth trend for the dashboard.</summary>
-    public async Task<DashboardInsightsDto?> GetDashboardInsightsAsync(CancellationToken ct = default)
+    public async Task<DashboardInsightsDto?> GetDashboardInsightsAsync(DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("read dashboard insights", async () =>
         {
-            var response = await _http.GetAsync("/api/dashboard/insights", ct);
+            var response = await _http.GetAsync("/api/dashboard/insights" + RangeQuery(from, to), ct);
             return response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<DashboardInsightsDto>(JsonOptions, ct)
                 : null;
         });
     }
 
-    public async Task<BudgetsDto?> GetBudgetsAsync(CancellationToken ct = default)
+    public async Task<BudgetsDto?> GetBudgetsAsync(DateOnly? month = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("read budgets", async () =>
         {
-            var response = await _http.GetAsync("/api/budgets", ct);
+            var response = await _http.GetAsync(month is { } m ? $"/api/budgets?month={m:yyyy-MM}" : "/api/budgets", ct);
             return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<BudgetsDto>(JsonOptions, ct) : null;
         });
     }
@@ -1069,11 +1135,11 @@ public sealed class FlowLedgerApiClient
         });
     }
 
-    public async Task<List<AccountPerformanceDto>?> GetInvestmentPerformanceAsync(CancellationToken ct = default)
+    public async Task<List<AccountPerformanceDto>?> GetInvestmentPerformanceAsync(DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("read investment performance", async () =>
         {
-            var response = await _http.GetAsync("/api/investments/performance", ct);
+            var response = await _http.GetAsync("/api/investments/performance" + RangeQuery(from, to), ct);
             return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<AccountPerformanceDto>>(JsonOptions, ct) : null;
         });
     }

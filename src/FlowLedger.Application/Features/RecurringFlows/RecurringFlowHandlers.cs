@@ -9,13 +9,27 @@ namespace FlowLedger.Application.Features.RecurringFlows;
 public sealed class ListRecurringFlowsHandler
 {
     private readonly IRecurringFlowRepository _repo;
+    private readonly IAccountRepository? _accounts;
 
-    public ListRecurringFlowsHandler(IRecurringFlowRepository repo)
-        => _repo = repo;
+    public ListRecurringFlowsHandler(IRecurringFlowRepository repo, IAccountRepository? accounts = null)
+    {
+        _repo = repo;
+        _accounts = accounts;
+    }
 
     public async Task<IReadOnlyList<RecurringFlowDto>> HandleAsync(CancellationToken ct = default)
     {
         var flows = await _repo.ListAsync(ct);
+        if (_accounts is not null)
+        {
+            // Investments are assets: flows that were saved against an investment/holding account are not bills or income.
+            var investmentIds = (await _accounts.ListIncludingInactiveAsync(ct))
+                .Where(Investments.InvestmentExclusion.IsInvestmentAccount)
+                .Select(a => a.Id)
+                .ToHashSet();
+            flows = flows.Where(f => !investmentIds.Contains(f.AccountId.Value)).ToList();
+        }
+
         return flows.Select(RecurringFlowMapper.ToDto).ToList().AsReadOnly();
     }
 }

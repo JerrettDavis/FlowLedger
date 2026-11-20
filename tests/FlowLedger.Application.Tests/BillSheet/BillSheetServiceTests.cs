@@ -39,6 +39,35 @@ public sealed class BillSheetServiceTests
     }
 
     [Fact]
+    public async Task Refresh_does_not_build_rows_from_investment_account_activity()
+    {
+        var store = new InMemoryStore();
+        var txns = new FakeTransactionRepository();
+        var accounts = new FakeAccountRepository();
+        var tenant = TenantId.New();
+        var brokerage = Account.Create(tenant, "Brokerage", AccountType.Investment, new Money(1000m, "USD"));
+        var checking = Account.Create(tenant, "Checking", AccountType.Checking, new Money(1000m, "USD"));
+        await accounts.AddAsync(brokerage);
+        await accounts.AddAsync(checking);
+        var svc = new BillSheetService(store, txns, accounts);
+
+        for (var i = 0; i < 4; i++)
+        {
+            var d = ThisMonth.AddMonths(-i).AddDays(9);
+            await txns.AddAsync(Transaction.RecordActual(tenant, brokerage.AccountId, new Money(500m, "USD"),
+                TransactionDirection.Debit, "ACME BROKERAGE CONTRIBUTION", d, d, TransactionSource.MxAggregation));
+            await txns.AddAsync(Transaction.RecordActual(tenant, checking.AccountId, new Money(39.99m, "USD"),
+                TransactionDirection.Debit, "Peak Fitness Club", d, d, TransactionSource.MxAggregation));
+        }
+
+        await svc.RefreshAsync();
+
+        var names = (await store.ListBillsAsync(includeInactive: true)).Select(b => b.Name).ToList();
+        names.Should().Contain(n => n.Contains("Peak Fitness", StringComparison.OrdinalIgnoreCase));
+        names.Should().NotContain(n => n.Contains("BROKERAGE", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Import_maps_headers_sections_totals_and_manual_marks()
     {
         var (svc, store, _) = Make();

@@ -12,8 +12,9 @@ internal static class BudgetEndpoints
     {
         var group = app.MapGroup("/api/budgets").WithTags("Budgets").RequireRateLimiting("api");
 
-        group.MapGet("/", async (ListBudgetsHandler handler, CancellationToken ct) =>
-            Results.Ok(await handler.HandleAsync(ct)))
+        group.MapGet("/", async (ListBudgetsHandler handler, string? month, CancellationToken ct) =>
+            Results.Ok(await handler.HandleAsync(
+                month is not null && DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var m) ? m : null, ct)))
         .WithName("ListBudgets")
         .WithSummary("Budgets with this month's spending");
 

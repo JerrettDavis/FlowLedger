@@ -32,14 +32,16 @@
         {
             <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-label="Syncing" />
         }
-        @if (_backupAlert is not null && _environment == "production")
+        @if (_backupAlert is not null && _backupAlert != _dismissedBackupAlert && _environment == "production")
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" Href="data"
+            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Error" Variant="Variant.Filled" Href="data"
                      aria-label="Backup warning">@_backupAlert</MudChip>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Inherit"
+                           OnClick="DismissBackupAlert" aria-label="Dismiss backup warning" Class="mr-1" />
         }
         @if (_environment is "demo" or "sandbox")
         {
-            <MudChip T="string" Size="Size.Small" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
+            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
                      aria-label="@($"Data environment {_environment}")">@_environment.ToUpperInvariant() DATA</MudChip>
         }
         @if (_environment == "production")
@@ -51,7 +53,7 @@
                            OnClick="ConnectBank"
                            Disabled="_syncing"
                            aria-label="Connect bank">
-                    Connect bank
+                    <span class="fl-bar-label">Connect bank</span>
                 </MudButton>
             </MudTooltip>
             <MudTooltip Text="Fetch new data from your connected institutions">
@@ -61,7 +63,7 @@
                            OnClick="SyncNow"
                            Disabled="_syncing"
                            aria-label="Sync now">
-                    Sync now
+                    <span class="fl-bar-label">Sync now</span>
                 </MudButton>
             </MudTooltip>
         }
@@ -74,7 +76,7 @@
                            OnClick="ConnectAndSync"
                            Disabled="_syncing"
                            aria-label="Connect and sync demo data">
-                    Connect &amp; Sync
+                    <span class="fl-bar-label">Connect &amp; Sync</span>
                 </MudButton>
             </MudTooltip>
         }
@@ -82,14 +84,24 @@
             <Authorized>
                 @if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst("fl_tenant") is not null)
                 {
-                    <MudText Typo="Typo.body2" Class="mx-2" aria-label="Signed in user">@(context.User.FindFirst("name")?.Value ?? context.User.FindFirst("preferred_username")?.Value ?? context.User.FindFirst("email")?.Value)</MudText>
+                    <MudText Typo="Typo.body2" Class="mx-2 fl-user-name" aria-label="Signed in user">@(context.User.FindFirst("name")?.Value ?? context.User.FindFirst("preferred_username")?.Value ?? context.User.FindFirst("email")?.Value)</MudText>
                     <form method="post" action="/auth/logout" style="display:inline">
                         <AntiforgeryToken />
-                        <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text" aria-label="Sign out">Sign out</MudButton>
+                        <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Logout" aria-label="Sign out"><span class="fl-bar-label">Sign out</span></MudButton>
                     </form>
                 }
             </Authorized>
         </AuthorizeView>
+        @if (_share)
+        {
+            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Info" Variant="Variant.Filled" aria-label="Share mode is on">SHARE MODE</MudChip>
+        }
+        <MudTooltip Text="@(_share ? "Share mode on: amounts hidden. Click to show them again" : "Share mode: hide all amounts, keep charts and categories (safe to screenshot)")">
+            <MudIconButton Icon="@(_share ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.IosShare)"
+                           Color="@(_share ? Color.Info : Color.Inherit)"
+                           OnClick="ToggleShare"
+                           aria-label="Toggle share mode" />
+        </MudTooltip>
         <MudTooltip Text="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
             <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                            Color="Color.Inherit"
@@ -106,7 +118,7 @@
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4 fl-page">
+        <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
             @Body
         </MudContainer>
     </MudMainContent>
@@ -115,8 +127,11 @@
 @code {
     private bool _drawerOpen = true;
     private bool _syncing = false;
+    private bool _share;
     private string _environment = "unknown";
     private string? _backupAlert;
+    private string? _dismissedBackupAlert;
+    private const string DismissKey = "fl-backup-alert-dismissed";
 
     // ── Auto-sync ─────────────────────────────────────────────────────────────
     // While the app is on screen: sync on load if the last sync is > 1h old, then re-check every few
@@ -177,6 +192,12 @@
                 "Could not read system color-scheme preference; defaulting to light mode");
         }
 
+        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.get"); StateHasChanged(); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not read share-mode preference"); }
+
+        try { _dismissedBackupAlert = await JS.InvokeAsync<string?>("localStorage.getItem", DismissKey); StateHasChanged(); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not read dismissed backup alert"); }
+
         _hasUserOverride = persisted.HasValue;
         ThemeService.Initialize(persisted, systemPrefersDark);
 
@@ -224,6 +245,22 @@
             Logger.LogWarning(ex,
                 "Could not persist theme preference to localStorage; preference will not survive reload");
         }
+    }
+
+    // ── Share mode ───────────────────────────────────────────────────────────
+
+    private async Task ToggleShare()
+    {
+        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.set", !_share); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not toggle share mode"); }
+    }
+
+    // Dismissal is remembered per alert text, so a different warning (e.g. stale backup) still shows.
+    private async Task DismissBackupAlert()
+    {
+        _dismissedBackupAlert = _backupAlert;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", DismissKey, _backupAlert); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not persist backup alert dismissal"); }
     }
 
     // ── Drawer ───────────────────────────────────────────────────────────────

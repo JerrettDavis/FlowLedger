@@ -107,11 +107,11 @@ else
                     else
                     {
                         <MudSimpleTable Dense="true">
-                            <thead><tr><th>Institution</th><th>Status</th><th>Updated</th></tr></thead>
+                            <thead><tr><th>Institution</th><th>Status</th><th class="fl-hide-lg">Updated</th></tr></thead>
                             <tbody>
                             @foreach (var l in c.Connections)
                             {
-                                <tr><td>@l.Institution</td><td>@l.Status</td><td>@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
+                                <tr><td>@l.Institution</td><td title="@l.UpdatedAt.ToLocalTime().ToString("g")">@l.Status</td><td class="fl-hide-lg">@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
                             }
                             </tbody>
                         </MudSimpleTable>

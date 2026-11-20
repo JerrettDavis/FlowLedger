@@ -5,7 +5,15 @@
 
 <PageTitle>Budgets — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Budgets</MudText>
+<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
+    <MudText Typo="Typo.h5">Budgets</MudText>
+    <div class="d-flex align-center" style="gap:4px" role="group" aria-label="Budget month">
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" OnClick="() => ShiftMonthAsync(-1)" aria-label="Previous month" />
+        <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite" Style="min-width:min(130px,100%);text-align:center">@_month.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" OnClick="() => ShiftMonthAsync(1)" aria-label="Next month" />
+        <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="@(_month == CurrentMonth)" OnClick="() => SetMonthAsync(CurrentMonth)">This month</MudButton>
+    </div>
+</div>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Monthly limits per category, tracked against this month's spending. Transfers between your own accounts never count.
     A budget on a parent category (for example Food) covers its sub-categories.
@@ -29,7 +37,7 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">Add or change a budget</MudText>
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudSelect T="string" @bind-Value="_category" Label="Category" Style="min-width:240px" Margin="Margin.Dense">
+            <MudSelect T="string" @bind-Value="_category" Label="Category" Style="min-width:min(240px,100%)" Margin="Margin.Dense">
                 @foreach (var c in Choices)
                 {
                     <MudSelectItem Value="@c">@c@(SpentFor(c) > 0 ? $"  ({Format.Money(SpentFor(c))} this month)" : "")</MudSelectItem>
@@ -97,12 +105,23 @@ else
             .Where(kv => kv.Key != "Uncategorized" && kv.Key != "Transfer" && _data.Budgets.All(b => b.Category != kv.Key))
             .OrderByDescending(kv => kv.Value).Take(6).ToList();
 
+    private static DateOnly CurrentMonth => new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly _month = CurrentMonth;
+
+    private async Task ShiftMonthAsync(int months) => await SetMonthAsync(_month.AddMonths(months));
+
+    private async Task SetMonthAsync(DateOnly month)
+    {
+        _month = month;
+        await LoadAsync();
+    }
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         _loading = true;
-        _data = await ApiClient.GetBudgetsAsync();
+        _data = await ApiClient.GetBudgetsAsync(_month == CurrentMonth ? null : _month);
         _loading = false;
     }
 

@@ -11,7 +11,7 @@
 <div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
     <MudText Typo="Typo.h4">Spending &amp; Trends</MudText>
     <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
-        <MudSelect T="string" Value="_period" ValueChanged="OnPeriodChanged" Label="Period" Style="width:170px" Dense="true">
+        <MudSelect T="string" Value="_period" ValueChanged="OnPeriodChanged" Label="Period" Style="width:min(170px,100%)" Dense="true">
             @foreach (var p in Periods)
             {
                 <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
@@ -19,11 +19,11 @@
         </MudSelect>
         @if (_period == "Custom")
         {
-            <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)" Style="width:150px" />
-            <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)" Style="width:150px" />
+            <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)" Style="width:min(150px,100%)" />
+            <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)" Style="width:min(150px,100%)" />
         }
         <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_accountIds" SelectedValuesChanged="OnAccountsChanged"
-                   Label="Accounts" Style="width:210px" Clearable="true"
+                   Label="Accounts" Style="width:min(210px,100%)" Clearable="true"
                    MultiSelectionTextFunc="@(v => _accountIds.Count == 0 ? "All accounts" : $"{_accountIds.Count} account(s)")">
             @foreach (var a in _accounts)
             {
@@ -147,9 +147,9 @@ else if (_result is not null)
                             @SvgText(0, 12, "middle", 15, "var(--mud-palette-text-primary)", Format.Money(CenterAmount()), "600")
                         </svg>
                     </div>
-                    <div style="flex:1 1 320px;min-width:280px">
-                        <MudSimpleTable Dense="true" Hover="true" Style="max-height:360px;overflow:auto">
-                            <thead><tr><th></th><th>@_groupBy</th><th style="text-align:right">Amount</th><th style="text-align:right">%</th><th style="text-align:right">#</th><th></th></tr></thead>
+                    <div class="fl-scroll-x" style="flex:1 1 320px;min-width:min(280px,100%)">
+                        <MudSimpleTable Dense="true" Hover="true" Class="fl-stack">
+                            <thead><tr><th></th><th>@_groupBy</th><th style="text-align:right">Amount</th><th style="text-align:right">%</th><th class="fl-hide-xs" style="text-align:right">#</th><th></th></tr></thead>
                             <tbody>
                             @for (var i = 0; i < r.Groups.Count; i++)
                             {
@@ -163,7 +163,7 @@ else if (_result is not null)
                                     </td>
                                     <td style="text-align:right" class="fl-num">@Format.Money(g.Amount)</td>
                                     <td style="text-align:right" class="fl-num">@g.Percent.ToString("0.#")%</td>
-                                    <td style="text-align:right">@g.Count</td>
+                                    <td class="fl-hide-xs" style="text-align:right">@g.Count</td>
                                     <td>
                                         <MudIconButton Icon="@(g.Key == _select ? Icons.Material.Filled.FilterAltOff : Icons.Material.Filled.FilterAlt)"
                                                        Size="Size.Small" title="Filter trend and transactions to this" aria-label="Filter to this"
@@ -238,14 +238,14 @@ else if (_result is not null)
             }
             else
             {
-                <MudSimpleTable Dense="true" Hover="true" Style="max-height:480px;overflow:auto">
-                    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Account</th><th>Tags</th><th style="text-align:right">Amount</th></tr></thead>
+                <MudSimpleTable Dense="true" Hover="true" Class="fl-stack">
+                    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="fl-hide-lg">Account</th><th class="fl-hide-md">Tags</th><th style="text-align:right">Amount</th></tr></thead>
                     <tbody>
                     @foreach (var t in r.Transactions)
                     {
                         <tr class="@(_flash.Contains(t.Id) ? "fl-row-flash" : null)">
                             <td>@Format.FullDate(t.Date)</td>
-                            <td>@(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)</td>
+                            <td title="@t.Description">@(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)</td>
                             <td>
                                 <CategoryChip Path="@t.Category" OnClick="() => Recategorize(t)"
                                               AriaLabel="@($"Change category of {(string.IsNullOrWhiteSpace(t.Merchant) ? t.Description : t.Merchant)}, currently {t.Category}")" />
@@ -261,8 +261,8 @@ else if (_result is not null)
                                     </MudChip>
                                 }
                             </td>
-                            <td>@t.Account</td>
-                            <td>@string.Join(", ", t.Tags)</td>
+                            <td class="fl-hide-lg">@t.Account</td>
+                            <td class="fl-hide-md">@string.Join(", ", t.Tags)</td>
                             <td style="text-align:right" class="fl-num">@Format.Money(t.Amount)</td>
                         </tr>
                     }

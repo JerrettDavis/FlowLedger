@@ -110,33 +110,54 @@
                 <MudText Typo="Typo.body2">@Format.DayMonth(context.Item.EffectiveDate)</MudText>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.Description" Title="Description" Sortable="true" />
-        <TemplateColumn Title="Merchant" Sortable="true" SortBy="x => x.MerchantName">
+        <TemplateColumn Title="Merchant" Sortable="true" SortBy="x => string.IsNullOrWhiteSpace(x.MerchantName) ? x.SuggestedName : x.MerchantName">
             <CellTemplate>
-                @{ var row = context.Item; }
-                <div class="d-flex align-center">
-                    <div>
-                        <MudText Typo="Typo.body2">@(string.IsNullOrWhiteSpace(row.MerchantName) ? row.SuggestedName : row.MerchantName)</MudText>
+                @{
+                    var row = context.Item;
+                    var display = string.IsNullOrWhiteSpace(row.MerchantName) ? row.SuggestedName : row.MerchantName;
+                    var showDesc = !string.IsNullOrWhiteSpace(row.Description);
+                    _accountById.TryGetValue(row.AccountId, out var rowAcct);
+                }
+                <div class="fl-merch fl-cell-truncate">
+                    <div class="fl-merch-text">
+                        <div class="fl-merch-name" title="@display">@(string.IsNullOrWhiteSpace(display) ? row.Description : display)</div>
+                        @if (showDesc)
+                        {
+                            <div class="fl-merch-desc fl-md-only" title="@row.Description">@row.Description</div>
+                        }
+                        @if (rowAcct is not null)
+                        {
+                            <div class="fl-merch-desc fl-md-only" title="@rowAcct.Name">@rowAcct.Name</div>
+                        }
                         @if (row.Tags is { Count: > 0 })
                         {
-                            @foreach (var tag in row.Tags)
-                            {
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="my-0">@tag</MudChip>
-                            }
+                            <div class="fl-merch-tags">
+                                @foreach (var tag in row.Tags)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="my-0">@tag</MudChip>
+                                }
+                            </div>
                         }
                     </div>
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Edge="Edge.End"
-                                   OnClick="@(() => EditAlias(row))"
-                                   aria-label="@($"Rename merchant for {row.Description}")" title="Rename merchant" />
-                    <MudIconButton Icon="@(string.IsNullOrWhiteSpace(row.Notes) ? Icons.Material.Outlined.NoteAdd : Icons.Material.Filled.StickyNote2)" Size="Size.Small"
-                                   Color="@(string.IsNullOrWhiteSpace(row.Notes) ? Color.Default : Color.Primary)"
-                                   OnClick="@(() => EditNote(row))"
-                                   aria-label="@($"Note for {row.Description}")" title="@(string.IsNullOrWhiteSpace(row.Notes) ? "Add a note" : row.Notes)" />
-                    <MudIconButton Icon="@Icons.Material.Filled.CallSplit" Size="Size.Small"
-                                   Color="@(row.Splits is { Count: > 0 } ? Color.Primary : Color.Default)"
-                                   OnClick="@(() => EditSplits(row))"
-                                   aria-label="@($"Split {row.Description} across categories")" title="@(row.Splits is { Count: > 0 } ? "Edit split" : "Split across categories")" />
+                    <div class="fl-merch-actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => EditAlias(row))"
+                                       aria-label="@($"Rename merchant for {row.Description}")" title="Rename merchant" />
+                        <MudIconButton Icon="@(string.IsNullOrWhiteSpace(row.Notes) ? Icons.Material.Outlined.NoteAdd : Icons.Material.Filled.StickyNote2)" Size="Size.Small"
+                                       Color="@(string.IsNullOrWhiteSpace(row.Notes) ? Color.Default : Color.Primary)"
+                                       OnClick="@(() => EditNote(row))"
+                                       aria-label="@($"Note for {row.Description}")" title="@(string.IsNullOrWhiteSpace(row.Notes) ? "Add a note" : row.Notes)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.CallSplit" Size="Size.Small"
+                                       Color="@(row.Splits is { Count: > 0 } ? Color.Primary : Color.Default)"
+                                       OnClick="@(() => EditSplits(row))"
+                                       aria-label="@($"Split {row.Description} across categories")" title="@(row.Splits is { Count: > 0 } ? "Edit split" : "Split across categories")" />
+                    </div>
                 </div>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Description" Sortable="true" SortBy="x => x.Description" HeaderClass="fl-hide-md" CellClass="fl-hide-md">
+            <CellTemplate>
+                <span class="fl-cell-truncate fl-desc-cell" title="@context.Item.Description">@context.Item.Description</span>
             </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
@@ -146,7 +167,7 @@
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Status">
+        <TemplateColumn Title="Status" HeaderClass="fl-hide-lg" CellClass="fl-hide-lg">
             <CellTemplate>
                 <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Item.Status)" Variant="Variant.Text">
                     @context.Item.Status
@@ -170,12 +191,12 @@
                 </MudMenu>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Account" Sortable="false">
+        <TemplateColumn Title="Account" Sortable="false" HeaderClass="fl-hide-md" CellClass="fl-hide-md">
             <CellTemplate>
                 @{
                     _accountById.TryGetValue(context.Item.AccountId, out var acct);
                 }
-                <MudText Typo="Typo.body2">@(acct?.Name ?? "–")</MudText>
+                <span class="fl-cell-clip" title="@(acct?.Name)">@(acct?.Name ?? "–")</span>
             </CellTemplate>
         </TemplateColumn>
     </Columns>

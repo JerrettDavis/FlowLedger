@@ -43,9 +43,9 @@ internal static class QueryEndpoints
             return r is null ? Results.NotFound() : Results.Ok(r);
         }).WithName("GetReport").WithSummary("A saved or preset view/report definition");
 
-        reports.MapGet("/{id}/run", async (string id, RunReportHandler h, CancellationToken ct) =>
+        reports.MapGet("/{id}/run", async (string id, DateOnly? from, DateOnly? to, RunReportHandler h, CancellationToken ct) =>
         {
-            var r = await h.HandleAsync(id, ct);
+            var r = await h.HandleAsync(id, ct, from, to);
             return r is null ? Results.NotFound() : Results.Ok(r);
         }).WithName("RunReport").WithSummary("Run every panel of a view/report");
 

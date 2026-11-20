@@ -10,6 +10,8 @@
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter">
     <MudText Typo="Typo.h4">Accounts</MudText>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+    <DateRangeSelector Label="Change over" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton StartIcon="@Icons.Material.Filled.Add"
                Color="Color.Primary"
                Variant="Variant.Filled"
@@ -17,6 +19,7 @@
                aria-label="Add new account">
         Add Account
     </MudButton>
+    </div>
 </div>
 
 @if (_loading)
@@ -45,84 +48,81 @@
     </EmptyState>
 }
 
-<MudDataGrid T="FlowLedger.Web.ApiClient.AccountDto"
-             DragDropColumnReordering="true"
-             Items="_accounts"
-             Filterable="true"
-             FilterMode="DataGridFilterMode.ColumnFilterRow"
-             SortMode="SortMode.Multiple"
-             Hover="true"
-             Striped="false"
-             Dense="true"
-             aria-label="Accounts table">
-    <Columns>
-        <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
-        <TemplateColumn Title="Type" Sortable="true" SortBy="x => x.AccountType">
-            <CellTemplate>
-                @context.Item.AccountType
-                @if (context.Item.TypeLockedByUser)
+@if (!_loading && _accounts.Count > 0)
+{
+    var active = _accounts.Where(x => x.IsActive).ToList();
+    var gross = active.Sum(x => Math.Abs(x.BalanceAmount));
+    var groups = Groups(active).Where(x => x.Items.Count > 0).ToList();
+    <div class="fl-alloc mb-4" role="img" aria-label="Share of balances by account group">
+        @foreach (var g in groups)
+        {
+            var pct = gross == 0 ? 0 : (double)(g.Items.Sum(x => Math.Abs(x.BalanceAmount)) / gross * 100);
+            <div class="fl-alloc__seg fl-tone-@g.Tone" style="width:@(pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%" title="@g.Title"></div>
+        }
+    </div>
+
+    @foreach (var g in groups.Append(new AccountGroup("Disabled", "off", _accounts.Where(x => !x.IsActive).ToList())).Where(x => x.Items.Count > 0))
+    {
+        <section class="mb-4" aria-label="@g.Title accounts">
+            <div class="fl-section__head">
+                <span class="fl-dot fl-tone-@g.Tone"></span>
+                <MudText Typo="Typo.subtitle1">@g.Title</MudText>
+                <MudText Typo="Typo.caption" Class="fl-muted">@g.Items.Count account@(g.Items.Count == 1 ? "" : "s")</MudText>
+                <span class="fl-spacer"></span>
+                @if (g.Tone != "off")
                 {
-                    <MudTooltip Text="Set manually - sync will not change it">
-                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="ml-1" aria-label="Type set manually" />
-                    </MudTooltip>
+                    <MudText Typo="Typo.subtitle1" Class="fl-num" Color="@(g.Items.Sum(x => x.BalanceAmount) >= 0 ? Color.Default : Color.Error)">@Format.Money(g.Items.Sum(x => x.BalanceAmount))</MudText>
                 }
-            </CellTemplate>
-        </TemplateColumn>
-        <PropertyColumn Property="x => x.Institution" Title="Institution" Sortable="true" />
-        <TemplateColumn Title="Data source" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="fl-data-source">@SourceLabel(context.Item.Id)</MudChip>
-                @if (_household)
+            </div>
+            <MudPaper Class="fl-list" Outlined="true">
+                @foreach (var acct in g.Items)
                 {
-                    <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
-                                   Size="Size.Small"
-                                   OnClick="() => OpenConnectorDialog(context.Item)"
-                                   aria-label="@($"Change data source for {context.Item.Name}")" />
+                    <div class="fl-li @(acct.IsActive ? "" : "fl-li--off")">
+                        <MudAvatar Color="@AccountColor(acct.AccountType)" Variant="Variant.Filled" Size="Size.Medium">
+                            <MudIcon Icon="@AccountIcon(acct.AccountType)" />
+                        </MudAvatar>
+                        <div class="fl-li__main">
+                            <div class="fl-li__title">
+                                <a href="@($"transactions?account={acct.Id}")" class="fl-li__link">@acct.Name</a>
+                                @if (acct.TypeLockedByUser)
+                                {
+                                    <MudTooltip Text="Set manually - sync will not change it">
+                                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="ml-1" aria-label="Type set manually" />
+                                    </MudTooltip>
+                                }
+                            </div>
+                            <div class="fl-li__sub">
+                                @acct.AccountType@(string.IsNullOrWhiteSpace(acct.Institution) || acct.Institution.Contains('.') ? "" : " · " + acct.Institution)
+                                @if (acct.IsActive && acct.Mode == "Holding")
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ml-1">Holding</MudChip>
+                                }
+                                else if (acct.IsActive && acct.HideTransactions)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="ml-1">Hidden</MudChip>
+                                }
+                            </div>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="fl-data-source fl-hide-md">@SourceLabel(acct.Id)</MudChip>
+                        @if (_household)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" Class="fl-hide-md"
+                                           OnClick="() => OpenConnectorDialog(acct)"
+                                           aria-label="@($"Change data source for {acct.Name}")" />
+                        }
+                        @if (_changes.TryGetValue(acct.Name, out var ch) && ch.End != ch.Start)
+                        {
+                            <span class="fl-num fl-hide-md @(ch.End - ch.Start >= 0 ? "fl-pos" : "fl-neg")" style="font-size:.8rem" title="Change over @_rangePreset">@Format.Signed(ch.End - ch.Start)</span>
+                        }
+                        <span class="fl-li__amt fl-num @(acct.BalanceAmount < 0 ? "fl-neg" : "")">@Format.Money(acct.BalanceAmount)</span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="() => OpenEditDialog(acct)" aria-label="@($"Edit account {acct.Name}")" />
+                    </div>
                 }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Balance" Sortable="true" SortBy="x => x.BalanceAmount">
-            <CellTemplate>
-                <MudText Class="fl-num"
-                         Color="@(context.Item.BalanceAmount >= 0 ? Color.Default : Color.Error)">
-                    @Format.Money(context.Item.BalanceAmount)
-                </MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <PropertyColumn Property="x => x.BalanceCurrency" Title="Currency" />
-        <TemplateColumn Title="Status">
-            <CellTemplate>
-                <MudChip T="string"
-                         Size="Size.Small"
-                         Variant="Variant.Text"
-                         Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
-                    @(context.Item.IsActive ? "Enabled" : "Disabled")
-                </MudChip>
-                @if (context.Item.IsActive && context.Item.Mode == "Holding")
-                {
-                    <MudTooltip Text="Holding: counts toward net worth; transactions hidden from everyday views">
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="ml-1">Holding</MudChip>
-                    </MudTooltip>
-                }
-                else if (context.Item.IsActive && context.Item.HideTransactions)
-                {
-                    <MudTooltip Text="Transactions hidden from everyday views">
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Class="ml-1">Hidden</MudChip>
-                    </MudTooltip>
-                }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                               Size="Size.Small"
-                               Color="Color.Primary"
-                               OnClick="() => OpenEditDialog(context.Item)"
-                               aria-label="@($"Edit account {context.Item.Name}")" />
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-</MudDataGrid>
+            </MudPaper>
+        </section>
+    }
+}
 
 @code {
     private bool _loading = true;
@@ -131,10 +131,62 @@
     private Dictionary<Guid, FlowLedger.Web.ApiClient.AccountConnectorLinkDto> _links = [];
     private List<FlowLedger.Web.ApiClient.ConnectorDto> _connectors = [];
     private bool _household;
+    private string _rangePreset = "Last 30 days";
+    private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 30 days").From;
+    private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 30 days").To;
+    private Dictionary<string, (decimal Start, decimal End)> _changes = [];
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        await LoadChangesAsync();
+    }
+
+    private async Task LoadChangesAsync()
+    {
+        try { _changes = await ApiClient.GetSeriesChangesAsync("balance_history", "account", "balance", _rangeFrom, _rangeTo); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load balance changes"); _changes = []; }
+    }
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    private sealed record AccountGroup(string Title, string Tone, List<FlowLedger.Web.ApiClient.AccountDto> Items);
+
+    private static IEnumerable<AccountGroup> Groups(List<FlowLedger.Web.ApiClient.AccountDto> list)
+    {
+        List<FlowLedger.Web.ApiClient.AccountDto> Of(params string[] t) => list.Where(a => t.Contains(a.AccountType)).OrderByDescending(a => Math.Abs(a.BalanceAmount)).ToList();
+        var known = new[] { "Checking", "Savings", "Cash", "CreditCard", "Loan", "Mortgage", "Investment" };
+        yield return new AccountGroup("Cash", "cash", Of("Checking", "Savings", "Cash"));
+        yield return new AccountGroup("Credit cards", "credit", Of("CreditCard"));
+        yield return new AccountGroup("Loans", "loan", Of("Loan", "Mortgage"));
+        yield return new AccountGroup("Investments", "invest", Of("Investment"));
+        yield return new AccountGroup("Other", "other", list.Where(a => !known.Contains(a.AccountType)).ToList());
+    }
+
+    private static string AccountIcon(string type) => type switch
+    {
+        "Checking" => Icons.Material.Filled.AccountBalance,
+        "Savings" => Icons.Material.Filled.Savings,
+        "CreditCard" => Icons.Material.Filled.CreditCard,
+        "Loan" or "Mortgage" => Icons.Material.Filled.Home,
+        "Investment" => Icons.Material.Filled.ShowChart,
+        "Cash" => Icons.Material.Filled.Payments,
+        _ => Icons.Material.Filled.AccountBalanceWallet
+    };
+
+    private static Color AccountColor(string type) => type switch
+    {
+        "Checking" => Color.Primary,
+        "Savings" => Color.Success,
+        "CreditCard" => Color.Warning,
+        "Loan" or "Mortgage" => Color.Error,
+        "Investment" => Color.Info,
+        _ => Color.Default
+    };
 
     private string SourceLabel(Guid accountId) =>
         !_links.TryGetValue(accountId, out var l) ? "Not linked"
@@ -170,6 +222,7 @@
         {
             _accounts = await ApiClient.GetAccountsAsync(includeInactive: true);
             _household = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
+            await LoadChangesAsync();
             _links = (await ApiClient.GetAccountConnectorsAsync()).ToDictionary(l => l.AccountId);
             _connectors = _household ? (await ApiClient.GetConnectorsAsync())?.Connectors ?? [] : [];
         }

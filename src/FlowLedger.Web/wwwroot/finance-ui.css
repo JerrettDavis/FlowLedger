@@ -1,0 +1,194 @@
+/* Finance-app building blocks: grouped lists, allocation bar, KPI tiles, meters, card grid */
+.fl-muted { opacity: .7; }
+.fl-spacer { flex: 1 1 auto; }
+.fl-neg { color: var(--mud-palette-error); }
+.fl-pos { color: var(--mud-palette-success); }
+.fl-tone-cash { background: var(--mud-palette-primary); }
+.fl-tone-credit { background: var(--mud-palette-warning); }
+.fl-tone-loan { background: var(--mud-palette-error); }
+.fl-tone-invest { background: var(--mud-palette-info); }
+.fl-tone-other { background: #9e9e9e; }
+.fl-tone-off { background: #bdbdbd; }
+.fl-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.fl-alloc { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--mud-palette-background-gray); gap: 2px; }
+.fl-alloc__seg { height: 100%; min-width: 2px; }
+.fl-section__head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 0 4px; }
+.fl-list { overflow: hidden; }
+.fl-li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--mud-palette-lines-default); min-width: 0; }
+.fl-li:first-child { border-top: 0; }
+.fl-li:hover { background: var(--mud-palette-action-default-hover); }
+.fl-li--off { opacity: .55; }
+.fl-li__main { flex: 1 1 auto; min-width: 0; }
+.fl-li__title { font-weight: 500; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+.fl-li__link { color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
+.fl-li__link:hover { text-decoration: underline; }
+.fl-li__sub { font-size: 12px; opacity: .7; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+.fl-li__amt { font-weight: 600; font-size: 1.05rem; white-space: nowrap; text-align: right; min-width: 7ch; }
+.fl-meter { height: 6px; border-radius: 4px; background: var(--mud-palette-background-gray); overflow: hidden; }
+.fl-meter > span { display: block; height: 100%; border-radius: 4px; background: var(--mud-palette-primary); }
+.fl-tile__label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+.fl-tile__value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.fl-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.fl-acard { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.fl-acard__head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fl-acard__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-acard__value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+.fl-acard__row { display: flex; justify-content: space-between; font-size: 13px; }
+.fl-pill { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--mud-palette-background-gray); white-space: nowrap; }
+.fl-pill--pos { color: var(--mud-palette-success); background: color-mix(in srgb, var(--mud-palette-success) 14%, transparent); }
+.fl-pill--neg { color: var(--mud-palette-error); background: color-mix(in srgb, var(--mud-palette-error) 14%, transparent); }
+.fl-periods { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.fl-period { padding: 12px; border-radius: 12px; border: 1px solid var(--mud-palette-lines-default); }
+
+/* Resizable columns */
+.fl-resizable { table-layout: auto; }
+
+.fl-col-handle { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; user-select: none; touch-action: none; z-index: 2; }
+.fl-col-handle::after { content: ""; position: absolute; top: 25%; bottom: 25%; right: 3px; width: 2px; border-radius: 1px; background: var(--mud-palette-lines-inputs, #bdbdbd); opacity: 0; transition: opacity .15s; }
+.fl-resizable th:hover > .fl-col-handle::after, .fl-col-handle:hover::after, body.fl-col-resizing .fl-col-handle::after { opacity: 1; }
+body.fl-col-resizing { cursor: col-resize; user-select: none; }
+.fl-resizable th, .fl-resizable td { overflow: hidden; text-overflow: ellipsis; }
+
+/* Sticky table headers: stay visible under the app bar while the page scrolls.
+   Containers must not clip (overflow) or sticky would bind to them instead of the viewport. */
+:root { --fl-sticky-top: 65px; }
+@media (max-width: 599.98px) { :root { --fl-sticky-top: 57px; } }
+.mud-main-content .mud-table-container,
+.mud-main-content .mud-simple-table,
+.mud-main-content .mud-simple-table .mud-table-container { overflow: visible !important; }
+.mud-main-content .mud-dialog .mud-table-container { overflow: auto !important; }
+.mud-main-content table thead th,
+.mud-main-content table .mud-table-head th {
+    position: sticky;
+    top: var(--fl-sticky-top);
+    z-index: 4;
+    background: var(--mud-palette-surface);
+    box-shadow: 0 1px 0 var(--mud-palette-lines-default);
+}
+.mud-dialog table thead th { position: sticky; top: 0; z-index: 4; background: var(--mud-palette-surface); }
+
+/* ── UX polish: motion, feedback, loading ─────────────────────────────── */
+html { scroll-behavior: smooth; }
+.fl-li, .fl-period, .fl-acard, .mud-table-row, .mud-button-root, .mud-icon-button { transition: background-color .15s ease, box-shadow .2s ease, transform .15s ease, opacity .2s ease; }
+.fl-li { position: relative; }
+.fl-li:hover { background: var(--mud-palette-action-default-hover); }
+.fl-period:hover { box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+.mud-icon-button:active, .mud-button-root:active { transform: scale(.97); }
+.mud-icon-button:hover { background: var(--mud-palette-action-default-hover); }
+.fl-meter > span { transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.fl-alloc__seg { transition: width .6s cubic-bezier(.2,.8,.2,1), filter .15s; }
+.fl-alloc__seg:hover { filter: brightness(1.12); }
+@keyframes fl-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fl-list > .fl-li, .fl-cards > *, .fl-periods > * { animation: fl-fade-up .35s ease-out both; }
+.fl-list > .fl-li:nth-child(2), .fl-cards > :nth-child(2), .fl-periods > :nth-child(2) { animation-delay: .04s; }
+.fl-list > .fl-li:nth-child(3), .fl-cards > :nth-child(3), .fl-periods > :nth-child(3) { animation-delay: .08s; }
+.fl-list > .fl-li:nth-child(n+4), .fl-cards > :nth-child(n+4) { animation-delay: .12s; }
+.mud-table-row:hover td { background: var(--mud-palette-action-default-hover); }
+.mud-snackbar { transition: transform .25s ease, opacity .25s ease; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .fl-list > .fl-li, .fl-cards > *, .fl-periods > * { animation: none; }
+}
+
+/* ── Overflow safety net ─────────────────────────────────────────────────────────────────────────
+   Rule of thumb: text wraps (or, for single long tokens, breaks) before it is ever clipped or pushes the page
+   sideways. Flex/grid children may shrink below their content width. Applies to every viewport and to
+   Share mode (where numbers become shorter "•••" masks but names/labels stay as long as ever).
+   :where() keeps specificity at zero so component-level rules and Bootstrap/Mud utilities still win. */
+html, body { max-width: 100%; }
+.mud-main-content, .fl-page { min-width: 0; max-width: 100%; }
+.fl-page :where(.mud-typography, .mud-link, .mud-alert-message, .mud-chip-content, .mud-card-header-content) { overflow-wrap: break-word; }
+.fl-page :where(.d-flex, .mud-grid-item, .mud-card-content, .mud-paper) { min-width: 0; }
+/* Header/toolbar rows (title left, controls right) wrap instead of colliding. */
+.fl-page :where(.d-flex.justify-space-between, .d-flex.flex-wrap) { flex-wrap: wrap; gap: 8px 12px; }
+.fl-page :where(.d-flex.justify-space-between) > :where(*) { min-width: 0; }
+.fl-page :where(h1, h2, h3, h4, h5, h6, .mud-typography-h4, .mud-typography-h5, .mud-typography-h6) { overflow-wrap: break-word; }
+
+/* Card grid: never demand more than the container offers (300px min used to overflow phones < 332px). */
+.fl-cards { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+.fl-periods { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+.fl-acard { min-width: 0; }
+.fl-acard__title { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: break-word; }
+.fl-acard__title .mud-link { overflow-wrap: break-word; }
+.fl-acard__row { gap: 8px; flex-wrap: wrap; }
+.fl-acard__row > * { min-width: 0; overflow-wrap: break-word; }
+.fl-acard__value { overflow-wrap: break-word; }
+.fl-acard .d-flex.align-center.justify-space-between { flex-wrap: wrap; gap: 6px 10px; }
+.fl-pill { max-width: 100%; }
+
+/* List rows: title and subtitle wrap instead of being cut off; the amount keeps its width. */
+.fl-li__title { flex-wrap: wrap; overflow: visible; white-space: normal; overflow-wrap: break-word; }
+.fl-li__link { overflow: visible; text-overflow: clip; overflow-wrap: break-word; min-width: 0; }
+.fl-li__sub { flex-wrap: wrap; overflow: visible; white-space: normal; overflow-wrap: break-word; }
+.fl-li__main { flex: 1 1 120px; }
+@media (max-width: 599.98px) {
+  .fl-li { flex-wrap: wrap; row-gap: 6px; padding: 12px; }
+  .fl-li__main { flex-basis: 100%; }
+  .fl-li__amt { text-align: left; }
+}
+
+/* App bar: icons-only below tablet so the bar never overflows its row, even with the Share-mode chip. */
+.fl-appbar .mud-toolbar { min-width: 0; flex-wrap: nowrap; }
+.fl-appbar .mud-toolbar > * { flex-shrink: 0; }
+.fl-appbar .mud-toolbar > .mud-typography { flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 959.98px) {
+  .fl-bar-label { display: none; }
+  .fl-appbar .fl-user-name { display: none; }
+}
+@media (max-width: 479.98px) {
+  .fl-hide-xs { display: none !important; }
+}
+
+/* Toolbars: any flex row that holds form controls / buttons wraps rather than overflowing (table-cell action rows keep their nowrap). */
+.fl-page .d-flex:has(> :is(.mud-input-control, .mud-button-root, .mud-button-group-root, .mud-chip, .fl-date-range)):not(.mud-table-cell > .d-flex, .flex-nowrap) { flex-wrap: wrap; row-gap: 8px; }
+.fl-page .mud-input-control { max-width: 100%; }
+.fl-page .mud-select, .fl-page .mud-input { min-width: 0; }
+.mud-button-root { max-width: 100%; }
+.mud-button-root .mud-button-label { min-width: 0; }
+
+/* Tablet/phone: a table that cannot fit scrolls inside its own card (never the page, never silently cut off).
+   Desktop keeps the no-scroll truncation rules and sticky headers from app.css. */
+@media (max-width: 959.98px) {
+  .mud-main-content .mud-table-container,
+  .mud-main-content .mud-simple-table,
+  .mud-main-content .mud-simple-table .mud-table-container { overflow-x: auto !important; max-width: 100%; }
+  .mud-main-content .mud-table-root { width: 100%; }
+  .mud-main-content table thead th, .mud-main-content table .mud-table-head th { position: static; box-shadow: none; }
+  .fl-sheet-wrap { overflow-x: auto; }
+}
+
+/* Chips wrap long labels instead of clipping them. */
+.fl-page .mud-chip { max-width: 100%; height: auto; min-height: 24px; }
+.fl-page .mud-chip .mud-chip-content { white-space: normal; overflow-wrap: break-word; padding-top: 3px; padding-bottom: 3px; }
+/* A block that must not widen the page (e.g. a table beside a chart) scrolls inside itself when it truly cannot fit. */
+.fl-scroll-x { min-width: 0; max-width: 100%; overflow-x: auto; }
+/* Very small phones: give the brand title room. */
+@media (max-width: 359.98px) {
+  .fl-appbar .mud-icon-button { padding: 6px; }
+  .fl-appbar .mud-toolbar > .mud-typography { margin-left: 0 !important; font-size: 1rem; }
+}
+
+/* Phones/tablets: simple data tables without a grid feel (.fl-stack) turn each row into a wrapped line/card, so nothing scrolls sideways. */
+@media (max-width: 959.98px) {
+  .mud-main-content .fl-stack .mud-table-container { overflow: visible !important; }
+  .mud-main-content .fl-stack thead { display: none; }
+  .mud-main-content .fl-stack table, .mud-main-content .fl-stack tbody { display: block; width: 100%; }
+  .mud-main-content .fl-stack tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 8px 4px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+  .mud-main-content .fl-stack tbody td { display: block; border: 0 !important; padding: 0 !important; text-align: left !important; max-width: 100%; white-space: normal; overflow-wrap: break-word; }
+  .mud-main-content .fl-stack tbody td:empty { display: none; }
+  .mud-main-content .fl-stack tbody td[data-label]::before { content: attr(data-label) ": "; opacity: .65; font-size: .75rem; }
+  .mud-main-content .fl-stack tbody td:has(> .mud-icon-button) { margin-left: auto; }
+}
+
+/* Dialogs render outside .fl-page, so they get the same wrap/shrink rules. */
+.mud-dialog { max-width: calc(100vw - 16px); }
+.mud-dialog-content { min-width: 0; overflow-x: hidden; }
+.mud-dialog :where(.mud-typography, .mud-link, .mud-alert-message, .mud-chip-content) { overflow-wrap: break-word; }
+.mud-dialog :where(.d-flex, .mud-grid-item) { min-width: 0; }
+.mud-dialog .d-flex:has(> :is(.mud-input-control, .mud-button-root, .mud-button-group-root, .mud-chip)):not(.flex-nowrap) { flex-wrap: wrap; row-gap: 8px; }
+.mud-dialog .mud-input-control { max-width: 100%; }
+.mud-dialog .mud-chip { max-width: 100%; height: auto; min-height: 24px; }
+.mud-dialog .mud-chip .mud-chip-content { white-space: normal; padding-top: 3px; padding-bottom: 3px; }
+.mud-dialog .mud-dialog-actions { flex-wrap: wrap; gap: 4px; }
+.mud-dialog .mud-button-root { max-width: 100%; }
+.mud-dialog input[type="file"], .fl-page input[type="file"] { max-width: 100%; }

@@ -11,7 +11,9 @@ namespace FlowLedger.Application.Features.BillSheet;
 /// </summary>
 public sealed class BillSheetService(
     IBillSheetStore store,
-    ITransactionRepository transactions) : ISheetAutoMarker
+    ITransactionRepository transactions,
+    IAccountRepository? accounts = null,
+    ICategoryRepository? categories = null) : ISheetAutoMarker
 {
     public const int DefaultMonthCount = 6;
     public const string DetectedSection = "Detected";
@@ -21,11 +23,13 @@ public sealed class BillSheetService(
 
     // ── View ─────────────────────────────────────────────────────────────────
 
-    public async Task<SheetViewDto> GetViewAsync(string? month, int? monthCount, CancellationToken ct = default)
+    public async Task<SheetViewDto> GetViewAsync(string? month, int? monthCount, int? monthsAhead = null, CancellationToken ct = default)
     {
         var selected = ParseMonth(month) ?? SheetMatcher.FirstOfMonth(Today);
         var count = Math.Clamp(monthCount ?? DefaultMonthCount, 1, 24);
-        var months = Enumerable.Range(0, count).Select(i => selected.AddMonths(i - (count - 1))).ToList();
+        // The window ends `ahead` months after the selected month (default 0), so the UI can show last / current / next.
+        var ahead = Math.Clamp(monthsAhead ?? 0, 0, count - 1);
+        var months = Enumerable.Range(0, count).Select(i => selected.AddMonths(i - (count - 1 - ahead))).ToList();
 
         var bills = await store.ListBillsAsync(ct: ct);
         var payments = await store.ListPaymentsAsync(months[0], months[^1], ct);
@@ -274,6 +278,20 @@ public sealed class BillSheetService(
 
         var existing = await store.ListPaymentsAsync(months[^1], current, ct);
         var all = await transactions.ListAsync(null, from, to, 0, TransactionScanLimit, ct);
+
+        // Investments are assets, not bills: leave out transactions on investment/holding accounts and anything categorised
+        // as an investment contribution, trade or dividend, so they never become (or tick) sheet rows.
+        var investmentAccounts = accounts is null ? [] : (await accounts.ListIncludingInactiveAsync(ct))
+            .Where(Investments.InvestmentExclusion.IsInvestmentAccount).Select(a => a.Id).ToHashSet();
+        var investmentCategories = categories is null ? [] : (await categories.ListAsync(ct))
+            .Where(c => Investments.InvestmentExclusion.IsInvestmentCategory(c.Path.Value)).Select(c => c.Id).ToHashSet();
+        bool IsInvestment(Transaction t) => investmentAccounts.Contains(t.AccountId.Value) || (t.CategoryId is { } c && investmentCategories.Contains(c.Value));
+
+        var investmentTxns = all.Where(IsInvestment)
+            .Select(t => new SheetTxn(t.Id, t.EffectiveDate, t.Amount.Amount, $"{t.MerchantName} {t.Description}", t.MerchantName ?? t.Description))
+            .ToList();
+        all = all.Where(t => !IsInvestment(t)).ToList();
+
         var txns = all
             .Where(t => t.Direction == TransactionDirection.Debit
                 && t.Status is TransactionStatus.Pending or TransactionStatus.Posted or TransactionStatus.Matched
@@ -353,6 +371,16 @@ public sealed class BillSheetService(
             await store.SaveBillAsync(bill, ct);
             known = [.. known, bill];
             added++;
+        }
+
+        // Rows an earlier refresh auto-detected from investment activity are retired (rows the user built are left alone).
+        foreach (var stale in known.Where(b => b.IsActive && b.Section == DetectedSection
+                     && investmentTxns.Any(t => SheetMatcher.BillMatchesText(b, t.Text))
+                     && !txns.Any(t => SheetMatcher.BillMatchesText(b, t.Text))).ToList())
+        {
+            var retired = stale with { IsActive = false };
+            await store.SaveBillAsync(retired, ct);
+            known = known.Select(b => b.Id == stale.Id ? retired : b).ToList();
         }
 
         var bills = known.Where(b => b.IsActive).ToList();

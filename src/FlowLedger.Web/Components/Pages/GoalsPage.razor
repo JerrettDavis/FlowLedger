@@ -5,7 +5,11 @@
 
 <PageTitle>Goals — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Savings goals</MudText>
+<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
+    <MudText Typo="Typo.h5">Savings goals</MudText>
+    <DateRangeSelector Label="Target date" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
+                       From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
+</div>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Set a target (emergency fund, vacation, down payment), track what you've set aside, and see the monthly amount needed to hit your date.
 </MudText>
@@ -19,7 +23,7 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editId is null ? "New goal" : "Edit goal")</MudText>
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudTextField T="string" Immediate="true" @bind-Value="_name" Label="Name" Style="min-width:220px" Margin="Margin.Dense" />
+            <MudTextField T="string" Immediate="true" @bind-Value="_name" Label="Name" Style="min-width:min(220px,100%)" Margin="Margin.Dense" />
             <MudNumericField T="decimal" Immediate="true" @bind-Value="_target" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
             <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
             <MudDatePicker @bind-Date="_date" Label="Target date (optional)" Margin="Margin.Dense" Style="max-width:200px" />
@@ -38,7 +42,7 @@ else
     else
     {
         <MudPaper Class="pa-4" Outlined="true">
-            @foreach (var g in _goals)
+            @foreach (var g in _goals.Where(InRange))
             {
                 <div class="mb-4">
                     <div class="d-flex justify-space-between align-center">
@@ -68,6 +72,21 @@ else
     private decimal _target;
     private decimal _saved;
     private DateTime? _date;
+
+    private string _rangePreset = "All time";
+    private DateOnly? _rangeFrom;
+    private DateOnly _rangeTo = DateOnly.FromDateTime(DateTime.Today);
+
+    private void OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+    }
+
+    // "All time" shows every goal (including ones with no target date); any other window keeps goals whose target date falls inside it.
+    private bool InRange(FlowLedger.Web.ApiClient.GoalDto g) =>
+        _rangePreset == "All time" || (g.TargetDate is { } d && d >= (_rangeFrom ?? DateOnly.MinValue) && d <= _rangeTo);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 

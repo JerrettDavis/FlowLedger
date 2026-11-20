@@ -10,7 +10,7 @@
     <MudText Typo="Typo.h4">Forecasts</MudText>
     <div class="d-flex align-center" style="gap:8px">
         <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_selectedIds" SelectedValuesChanged="OnAccountsChanged"
-                   Label="Accounts" Style="width:220px" Clearable="true"
+                   Label="Accounts" Style="width:min(220px,100%)" Clearable="true"
                    MultiSelectionTextFunc="@(v => _selectedIds.Count() == 0 ? "Liquid accounts" : $"{_selectedIds.Count()} account(s)")"
                    aria-label="Accounts to include in forecast">
             @foreach (var acct in _accounts)
@@ -18,7 +18,7 @@
                 <MudSelectItem T="Guid" Value="@acct.Id">@acct.Name</MudSelectItem>
             }
         </MudSelect>
-        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:140px"
+        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
                    aria-label="Forecast horizon in months">
             <MudSelectItem Value="1">1 month</MudSelectItem>
             <MudSelectItem Value="3">3 months</MudSelectItem>
@@ -201,8 +201,8 @@ else if (_forecast is not null)
                 }
                 else
                 {
-                    <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto">
-                        <thead><tr><th>Date</th><th>Account</th><th>Item</th><th style="text-align:right">Amount</th><th style="text-align:right">Total balance</th></tr></thead>
+                    <MudSimpleTable Dense="true" Hover="true" Class="fl-stack">
+                        <thead><tr><th>Date</th><th class="fl-hide-lg">Account</th><th>Item</th><th style="text-align:right">Amount</th><th style="text-align:right">Total balance</th></tr></thead>
                         <tbody>
                         @foreach (var g in aggRows)
                         {
@@ -212,10 +212,10 @@ else if (_forecast is not null)
                                 var isFirst = first;
                                 <tr>
                                     <td>@(first ? Format.FullDate(g.Date) : "")</td>
-                                    <td>@AccountName(r.AccountId)</td>
+                                    <td class="fl-hide-lg">@AccountName(r.AccountId)</td>
                                     <td>@r.Item.Label @if (r.Item.IsActual) { <MudChip T="string" Size="Size.Small" Variant="Variant.Text">posted</MudChip> }</td>
                                     <td style="text-align:right" class="fl-num"><MudText Typo="Typo.body2" Color="@(r.Item.BalanceDeltaAmount >= 0 ? Color.Success : Color.Error)">@Format.Signed(r.Item.BalanceDeltaAmount)</MudText></td>
-                                    <td style="text-align:right" class="fl-num">@(isFirst ? Format.Money(g.Balance) : "")</td>
+                                    <td data-label="Balance" style="text-align:right" class="fl-num">@(isFirst ? Format.Money(g.Balance) : "")</td>
                                 </tr>
                                 first = false;
                             }
@@ -254,7 +254,7 @@ else if (_forecast is not null)
                         Nothing is projected for this account: no recurring flows or upcoming transactions are recorded. Balance holds at @Format.Money(series.StartingBalanceAmount). Add a recurring flow to project income or bills here.
                     </MudText>
                 }
-                    <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto">
+                    <MudSimpleTable Dense="true" Hover="true">
                         <thead><tr><th>Date</th><th>Item</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead>
                         <tbody>
                         <tr><td>@Format.FullDate(_forecast.AsOf)</td><td>Starting balance</td><td></td><td style="text-align:right" class="fl-num">@Format.Money(series.StartingBalanceAmount)</td></tr>

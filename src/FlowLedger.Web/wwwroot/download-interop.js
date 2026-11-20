@@ -10,3 +10,9 @@ window.flowledgerDownload = async (fileName, streamRef) => {
     a.remove();
     URL.revokeObjectURL(url);
 };
+
+// Scrolls the bill sheet horizontally so the current-month column is in view.
+window.flowledgerFocusCurrentMonth = () => {
+    const th = document.querySelector('.fl-sheet thead th.fl-sheet-cur');
+    if (th) th.scrollIntoView({ block: 'nearest', inline: 'center' });
+};

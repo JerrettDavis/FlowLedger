@@ -21,7 +21,7 @@ else
         @foreach (var d in _rows)
         {
             <div class="d-flex align-center gap-3 flex-wrap mb-2">
-                <MudTextField T="string" Immediate="true" @bind-Value="d.Name" Label="Debt" Style="min-width:200px" Margin="Margin.Dense" />
+                <MudTextField T="string" Immediate="true" @bind-Value="d.Name" Label="Debt" Style="min-width:min(200px,100%)" Margin="Margin.Dense" />
                 <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
                 <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Rate" Label="APR %" Min="0" Max="100" Style="max-width:110px" Margin="Margin.Dense" />
                 <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
@@ -40,7 +40,7 @@ else
         <div class="d-flex gap-4 flex-wrap">
             @foreach (var (title, p) in new[] { ("Avalanche (highest APR first)", _result.Avalanche), ("Snowball (smallest balance first)", _result.Snowball) })
             {
-                <MudPaper Class="pa-4" Outlined="true" Style="min-width:320px;flex:1">
+                <MudPaper Class="pa-4" Outlined="true" Style="min-width:min(320px,100%);flex:1">
                     <MudText Typo="Typo.subtitle1">@title</MudText>
                     @if (!p.Feasible)
                     {

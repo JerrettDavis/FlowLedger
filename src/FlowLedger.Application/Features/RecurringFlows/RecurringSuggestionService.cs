@@ -74,7 +74,7 @@ public sealed class RecurringSuggestionService(
         foreach (var t in real)
         {
             var category = t.CategoryId is { } c ? categoryPaths.GetValueOrDefault(c.Value) : null;
-            if (category is not null && category.StartsWith("Investments/", StringComparison.OrdinalIgnoreCase))
+            if (Investments.InvestmentExclusion.IsInvestmentCategory(category))
             {
                 continue;
             }

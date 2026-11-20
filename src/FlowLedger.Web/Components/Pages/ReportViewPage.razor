@@ -16,7 +16,10 @@
             <MudText Typo="Typo.body2" Color="Color.Secondary">@d</MudText>
         }
     </div>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+    <DateRangeSelector Label="Date range" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton OnClick="LoadAsync" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading">Refresh</MudButton>
+    </div>
 </div>
 
 @if (_loading)
@@ -81,6 +84,19 @@
         }
     }
 
+    // "All time" runs the report exactly as saved; any other window is applied to panels over transactions / balance history.
+    private string _rangePreset = "All time";
+    private DateOnly? _rangeFrom;
+    private DateOnly _rangeTo = DateOnly.FromDateTime(DateTime.Today);
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        await LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -88,7 +104,7 @@
         try
         {
             var definition = await ApiClient.GetReportAsync(Id);
-            var run = await ApiClient.RunReportAsync(Id);
+            var run = await ApiClient.RunReportAsync(Id, _rangePreset == "All time" ? null : _rangeFrom, _rangePreset == "All time" ? null : _rangeTo);
             if (definition is null || run is null)
             {
                 _error = "That report no longer exists.";
