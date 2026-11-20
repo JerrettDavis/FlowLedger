@@ -13,7 +13,7 @@
         </MudText>
     </div>
     <div class="d-flex align-center gap-2" style="gap:8px">
-        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:140px"
+        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
                    aria-label="Forecast horizon in months">
             <MudSelectItem Value="1">1 month</MudSelectItem>
             <MudSelectItem Value="3">3 months</MudSelectItem>
@@ -101,7 +101,7 @@
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
-        <PropertyColumn Property="x => x.Category" Title="Category" Sortable="true" />
+        <PropertyColumn Property="x => x.Category" Title="Category" HeaderClass="fl-hide-md" CellClass="fl-hide-md" Sortable="true" />
         <TemplateColumn Title="Running Balance" Sortable="true" SortBy="x => x.RunningBalance">
             <CellTemplate>
                 <MudText Typo="Typo.body2"
@@ -112,7 +112,7 @@
                 </MudText>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Source" Filterable="true">
+        <TemplateColumn Title="Source" HeaderClass="fl-hide-lg" CellClass="fl-hide-lg" Filterable="true">
             <CellTemplate>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Source</MudText>
             </CellTemplate>

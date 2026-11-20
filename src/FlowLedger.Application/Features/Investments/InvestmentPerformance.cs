@@ -19,6 +19,30 @@ public static class InvestmentPerformanceCalculator
 {
     public static readonly IReadOnlyList<(string Label, int Days)> Periods = [("30 days", 30), ("90 days", 90), ("1 year", 365)];
 
+    /// <summary>Gain over one user-chosen window [<paramref name="from"/>, <paramref name="to"/>]; the end balance is the latest snapshot on/before <paramref name="to"/>.</summary>
+    public static IReadOnlyList<PeriodPerformance> ComputeRange(
+        IReadOnlyList<BalancePoint> history, IReadOnlyList<CashFlowPoint> contributions, decimal currentBalance,
+        DateOnly from, DateOnly to, DateOnly today)
+    {
+        var ordered = history.OrderBy(h => h.Date).ToList();
+        if (ordered.Count == 0 || to <= from)
+        {
+            return [];
+        }
+
+        var end = to >= today ? currentBalance : (ordered.LastOrDefault(h => h.Date <= to)?.Balance ?? currentBalance);
+        var anchor = ordered.LastOrDefault(h => h.Date <= from) ?? ordered[0];
+        if (anchor.Date >= to)
+        {
+            return [];
+        }
+
+        var net = contributions.Where(c => c.Date > anchor.Date && c.Date <= to).Sum(c => c.Amount);
+        var gain = end - anchor.Balance - net;
+        double? pct = anchor.Balance > 0 ? (double)(gain / anchor.Balance * 100m) : null;
+        return [new PeriodPerformance("Selected range", to.DayNumber - anchor.Date.DayNumber, anchor.Balance, net, gain, pct)];
+    }
+
     public static IReadOnlyList<PeriodPerformance> Compute(
         IReadOnlyList<BalancePoint> history, IReadOnlyList<CashFlowPoint> contributions, decimal currentBalance, DateOnly today)
     {
@@ -57,7 +81,7 @@ public sealed class InvestmentPerformanceService(
 {
     private const int Max = 50_000;
 
-    public async Task<IReadOnlyList<AccountPerformance>> GetAsync(DateOnly today, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AccountPerformance>> GetAsync(DateOnly today, CancellationToken ct = default, DateOnly? from = null, DateOnly? to = null)
     {
         var investment = (await accounts.ListAsync(ct)).Where(a => a.IsActive && a.AccountType.ToString() == "Investment").ToList();
         if (investment.Count == 0)
@@ -79,8 +103,10 @@ public sealed class InvestmentPerformanceService(
             var flows = dtos.Where(t => t.AccountId == a.Id && transferIds.Contains(t.Id))
                 .Select(t => new CashFlowPoint(t.PostedDate ?? t.EffectiveDate, t.Direction == "Credit" ? t.Amount : -t.Amount))
                 .ToList();
-            var periods = InvestmentPerformanceCalculator.Compute(
-                points.Where(p => p.AccountId == a.Id).ToList(), flows, a.CurrentBalance.Amount, today);
+            var accountPoints = points.Where(p => p.AccountId == a.Id).ToList();
+            var periods = from is { } f
+                ? InvestmentPerformanceCalculator.ComputeRange(accountPoints, flows, a.CurrentBalance.Amount, f, to ?? today, today)
+                : InvestmentPerformanceCalculator.Compute(accountPoints, flows, a.CurrentBalance.Amount, today);
             list.Add(new AccountPerformance(a.Id, a.Name, a.CurrentBalance.Amount, periods));
         }
 

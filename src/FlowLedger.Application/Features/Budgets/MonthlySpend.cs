@@ -13,6 +13,15 @@ public static class MonthlySpend
         "transactions | where direction == \"Debit\" and is_transfer == false and date >= startofmonth(today()) " +
         "| summarize total = sum(amount) by category";
 
+    /// <summary>Same as <see cref="ByCategoryQuery"/> but for the calendar month containing <paramref name="month"/>.</summary>
+    public static string ByCategoryQueryFor(DateOnly month)
+    {
+        var first = new DateOnly(month.Year, month.Month, 1);
+        var last = first.AddMonths(1).AddDays(-1);
+        return "transactions | where direction == \"Debit\" and is_transfer == false " +
+               $"and date >= \"{first:yyyy-MM-dd}\" and date <= \"{last:yyyy-MM-dd}\" | summarize total = sum(amount) by category";
+    }
+
     /// <summary>Parses <see cref="ByCategoryQuery"/> rows into a case-insensitive category -> total map.</summary>
     public static Dictionary<string, decimal> Parse(QueryResult result) => result.Rows.ToDictionary(
         r => r[0]?.ToString() ?? "", r => r[1] is decimal d ? d : Convert.ToDecimal(r[1] ?? 0m), StringComparer.OrdinalIgnoreCase);
@@ -27,5 +36,10 @@ public static class MonthlySpend
 public sealed class GetMonthlySpendByCategoryHandler(RunQueryHandler query)
 {
     public async Task<Dictionary<string, decimal>> HandleAsync(CancellationToken ct = default)
-        => MonthlySpend.Parse(await query.HandleAsync(MonthlySpend.ByCategoryQuery, ct));
+        => await HandleAsync(null, ct);
+
+    /// <summary>Spend for the given month (null = the current month).</summary>
+    public async Task<Dictionary<string, decimal>> HandleAsync(DateOnly? month, CancellationToken ct = default)
+        => MonthlySpend.Parse(await query.HandleAsync(
+            month is { } m ? MonthlySpend.ByCategoryQueryFor(m) : MonthlySpend.ByCategoryQuery, ct));
 }

@@ -72,6 +72,71 @@ html, body {
     transition: background-color 0.15s ease-out;
 }
 
+/* Responsive tables: the page uses the full viewport width (no max-width container), and from
+   laptop width up cells never wrap — icons, chips, account names and amounts stay on one line.
+   Free text columns (.fl-cell-truncate) grow with the viewport and ellipsize only when truly out of room.
+   Below the breakpoint (tablet/phone) cells wrap normally so nothing needs sideways scrolling. */
+.fl-cell-truncate {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 1280px) {
+    .mud-table-root th,
+    .mud-table-root td,
+    .mud-simple-table th,
+    .mud-simple-table td,
+    .mud-table-cell {
+        white-space: nowrap;
+    }
+
+    .mud-table-cell > .d-flex,
+    .mud-table-cell .mud-chip-content {
+        flex-wrap: nowrap;
+    }
+
+    .mud-table-cell .mud-chip,
+    .mud-table-cell .mud-icon-button,
+    .mud-table-cell .mud-icon-root {
+        flex: none;
+    }
+
+    /* Let the free-text column absorb the spare width instead of the page growing sideways. */
+    .mud-table-cell:has(> .fl-cell-truncate) {
+        width: 100%;
+        max-width: 0;
+    }
+
+    /* Any other cell truncates with an ellipsis rather than growing the table past its container. */
+    .mud-table-root td,
+    .mud-simple-table td {
+        max-width: 36ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* Tables never show scrollbars. When space runs out we truncate text, then drop low-priority columns. */
+.mud-table-container,
+.mud-simple-table,
+.mud-simple-table .mud-table-container {
+    overflow: hidden !important;
+    max-height: none !important;
+}
+
+@media (max-width: 1919.98px) { .fl-hide-lg { display: none !important; } }
+@media (max-width: 1599.98px) { .fl-hide-md { display: none !important; } }
+@media (max-width: 1279.98px) { .fl-hide-sm { display: none !important; } }
+
+/* Gutters scale with the display: tight on phones, generous on 1440p/4K, content still fills the width. */
+.fl-page { padding-left: 16px; padding-right: 16px; }
+@media (min-width: 1920px) { .fl-page { padding-left: 32px; padding-right: 32px; } }
+@media (min-width: 2560px) { .fl-page { padding-left: 48px; padding-right: 48px; } }
+@media (min-width: 3200px) { .fl-page { padding-left: 64px; padding-right: 64px; } }
+
 /* ───────────────────────────────────────────────────────────────────────────
    Skeleton shimmer animation
    ─────────────────────────────────────────────────────────────────────────── */
@@ -275,7 +340,7 @@ html, body {
 .fl-viz-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 8px; font-size: .8rem; color: var(--fl-muted); }
 .fl-viz-legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .fl-viz-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.fl-result-table-wrap { overflow: auto; max-height: 460px; border: 1px solid var(--mud-palette-divider); border-radius: 6px; }
+.fl-result-table-wrap { overflow: hidden; border: 1px solid var(--mud-palette-divider); border-radius: 6px; }
 .fl-result-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
 .fl-result-table th, .fl-result-table td { padding: 6px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--mud-palette-divider); }
 .fl-result-table th { position: sticky; top: 0; background: var(--mud-palette-surface); font-weight: 600; }
@@ -345,7 +410,7 @@ html, body {
 .fl-tip.k-error .fl-tip-title { color: var(--mud-palette-error); }
 
 /* ── Spreadsheet mode (/sheet) ───────────────────────────────────────────── */
-.fl-sheet-wrap { overflow-x: auto; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-surface); }
+.fl-sheet-wrap { overflow: hidden; border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; background: var(--mud-palette-surface); }
 .fl-sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .85rem; white-space: nowrap; }
 .fl-sheet th, .fl-sheet td { padding: 4px 10px; border-bottom: 1px solid var(--mud-palette-lines-default); text-align: left; font-weight: 400; }
 .fl-sheet thead th { position: sticky; top: 0; background: var(--mud-palette-surface); font-weight: 600; z-index: 2; }
@@ -469,3 +534,59 @@ html, body {
 @media (hover: none) { .fl-tree-actions { opacity: 1; } }
 .fl-tree-children { animation: fl-fade-in .16s ease-out; }
 .fl-empty { text-align: center; padding: 40px 16px; color: var(--mud-palette-text-secondary); }
+
+/* Tighter cell padding below 1920px so more columns fit before any are dropped. */
+@media (max-width: 1919.98px) {
+    .mud-table-dense * .mud-table-row .mud-table-cell,
+    .mud-table-root .mud-table-cell,
+    .mud-simple-table th, .mud-simple-table td { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Sheet: long bill names / sub-labels truncate (full text in the tooltip) instead of widening the sheet. */
+.fl-sheet .fl-sheet-name { max-width: 34ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fl-sheet-link, .fl-sheet-sub { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1919.98px) { .fl-sheet th, .fl-sheet td { padding-left: 6px; padding-right: 6px; } .fl-sheet-cell { min-width: 44px; } }
+
+/* Transactions: merchant cell = name + raw description caption, actions pinned right. */
+.fl-merch { display: flex; align-items: center; gap: 8px; }
+.fl-merch-text { flex: 1 1 auto; min-width: 0; }
+.fl-merch-name { font-weight: 600; font-size: .875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-merch-desc { font-size: .75rem; color: var(--mud-palette-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-merch-tags { display: flex; gap: 4px; margin-top: 2px; overflow: hidden; }
+.fl-merch-actions { flex: none; display: flex; align-items: center; }
+.fl-cell-clip { display: block; max-width: 44ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Below laptop width the merchant cell takes the row width and its actions drop under the text. */
+@media (max-width: 1279.98px) {
+    .fl-merch { flex-wrap: wrap; }
+    .fl-merch-text { flex-basis: 100%; }
+    .mud-table-cell { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Shown only while the dedicated Account column is hidden. */
+.fl-md-only { display: none; }
+@media (max-width: 1599.98px) { .fl-md-only { display: block; } }
+
+/* The merchant cell is the flexible column at every width: it shrinks (ellipsis) so Category/Account never get cropped. */
+@media (min-width: 960px) { .mud-table-cell:has(> .fl-merch) { width: 100%; max-width: 0; } }
+@media (max-width: 599.98px) { .mud-table-cell > .fl-merch, .mud-table-cell > .fl-cell-truncate { flex: 1 1 0; min-width: 0; text-align: right; } .fl-merch { justify-content: flex-end; } }
+@media (max-width: 1279.98px) { .fl-merch-name, .fl-merch-desc { white-space: normal; overflow-wrap: anywhere; } }
+
+.mud-table-root td:has(> .fl-cell-clip) { max-width: 48ch; }
+
+.fl-merch-desc { font-size: .8rem; color: var(--mud-palette-text-primary); opacity: .72; }
+.fl-desc-cell { font-size: .875rem; }
+
+/* Wide screens: Description absorbs spare width; Merchant gets a bounded share. */
+@media (min-width: 1600px) { .mud-table-cell:has(> .fl-merch) { width: 28%; max-width: none; } }
+
+/* ── Share mode: numbers are scrubbed by share-interop.js; these cover what text scrubbing cannot ── */
+html.fl-share input[type="number"],
+html.fl-share .mud-input-slot[inputmode="decimal"],
+html.fl-share .mud-input-slot[inputmode="numeric"] { color: transparent !important; text-shadow: 0 0 8px currentColor; }
+html.fl-share .mud-input-slot[inputmode="decimal"],
+html.fl-share .mud-input-slot[inputmode="numeric"],
+html.fl-share input[type="number"] { filter: blur(6px); }
+
+/* Share mode hides who is signed in */
+html.fl-share .fl-user-name { display: none; }

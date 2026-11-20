@@ -7,12 +7,25 @@
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
+<div class="d-flex justify-space-between align-center mb-2" style="gap:12px;flex-wrap:wrap">
+    <MudText Typo="Typo.h4">Dashboard</MudText>
+    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+        <DateRangeSelector Label="History" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo"
+                           Presets="@HistoryPresets" Changed="OnRangeChanged" />
+        <MudSelect T="int" Value="_horizonMonths" ValueChanged="OnHorizonChanged" Label="Forecast" Dense="true"
+                   Variant="Variant.Outlined" Style="width:min(130px,100%)" aria-label="Forecast horizon">
+            @foreach (var m in new[] { 1, 3, 6, 12 })
+            {
+                <MudSelectItem T="int" Value="@m">@m @(m == 1 ? "month" : "months")</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+</div>
 
 <AlertsPanel />
 
 <style>
-    .fl-account-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+    .fl-account-strip { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 4px; }
     .fl-account-chip { display: flex; flex-direction: column; align-items: center; min-width: 96px; max-width: 120px;
         padding: 8px; border-radius: 12px; text-decoration: none; color: inherit; border: 1px solid var(--mud-palette-divider); }
     .fl-account-chip:hover, .fl-account-chip:focus-visible { background: var(--mud-palette-action-default-hover); }
@@ -154,7 +167,7 @@ else
                 <MudCard>
                     <MudCardHeader>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Spending this month</MudText>
+                            <MudText Typo="Typo.h6">Spending · @RangeLabel</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">By category, excluding transfers between your accounts</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
@@ -181,7 +194,7 @@ else
                     <MudCardHeader>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Income vs spending</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last 6 months, excluding transfers</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel, excluding transfers</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
@@ -215,7 +228,7 @@ else
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Balance Projection</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">3-month household cash balance forecast</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_horizonMonths-month household cash balance forecast</MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
@@ -244,11 +257,22 @@ else
             <MudCard>
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Upcoming Flows</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Next 14 days</MudText>
+                        <div class="d-flex justify-space-between align-center" style="gap:8px">
+                            <div>
+                                <MudText Typo="Typo.h6">Upcoming Flows</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Next @_upcomingDays days</MudText>
+                            </div>
+                            <MudSelect T="int" Value="_upcomingDays" ValueChanged="OnUpcomingDaysChanged" Dense="true" Variant="Variant.Outlined"
+                                       Style="width:min(110px,100%)" aria-label="Upcoming flows window">
+                                @foreach (var d in new[] { 7, 14, 30, 60, 90 })
+                                {
+                                    <MudSelectItem T="int" Value="@d">@d days</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
                     </CardHeaderContent>
                 </MudCardHeader>
-                <MudCardContent Style="max-height:260px;overflow-y:auto">
+                <MudCardContent >
                     @if (_upcomingFlows.Count > 0)
                     {
                         <MudList T="UpcomingFlow" Dense="true" aria-label="Upcoming flows list">
@@ -272,7 +296,7 @@ else
                     {
                         <EmptyState Icon="@Icons.Material.Outlined.CalendarMonth"
                                     Title="No upcoming flows"
-                                    Description="No scheduled transactions in the next 14 days." />
+                                    Description="@($"No scheduled transactions in the next {_upcomingDays} days.")" />
                     }
                 </MudCardContent>
             </MudCard>
@@ -407,13 +431,13 @@ else
             }
 
             <div class="fl-masonry-item">
-                @ActivityList("Recent Activity", "Latest posted transactions across all accounts", _activity.RecentPosted, "No posted transactions yet.")
+                @ActivityList("Recent Activity", $"Latest posted, {RangeLabel}", InHistoryRange(_activity.RecentPosted), "No posted transactions in this range.")
             </div>
             <div class="fl-masonry-item">
                 @ActivityList("Pending", "Authorised but not yet posted", _activity.Pending, "Nothing pending.")
             </div>
             <div class="fl-masonry-item">
-                @ActivityList("Large Transactions", $"Last 30 days, at or above {Format.Money(_activity.LargeThreshold)}", _activity.Large, "No unusually large transactions.")
+                @ActivityList("Large Transactions", $"{RangeLabel}, at or above {Format.Money(_activity.LargeThreshold)}", InHistoryRange(_activity.Large), "No unusually large transactions.")
             </div>
         }
 
@@ -509,7 +533,7 @@ else
                     <MudText Typo="Typo.caption" Color="Color.Secondary">@subtitle</MudText>
                 </CardHeaderContent>
             </MudCardHeader>
-            <MudCardContent Style="max-height:360px;overflow-y:auto">
+            <MudCardContent >
                 @if (items.Count == 0)
                 {
                     <MudText Typo="Typo.body2" Color="Color.Secondary">@empty</MudText>
@@ -530,6 +554,125 @@ else
 
     private bool _loading = true;
     private string? _error;
+
+    // Configurable ranges: history window for the insight charts, and forward horizon for the projection.
+    private static readonly string[] HistoryPresets =
+        ["This month", "Last month", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", "Custom"];
+    private string _rangePreset = "Last 6 months";
+    private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 6 months").From;
+    private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 6 months").To;
+    private int _horizonMonths = 3;
+    private int _upcomingDays = 14;
+    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flowDefs = [];
+
+    // The activity feed is the recent window the API returns; the History range narrows it further (never widens it).
+    private List<FlowLedger.Web.ApiClient.TransactionDto> InHistoryRange(List<FlowLedger.Web.ApiClient.TransactionDto> items) =>
+        items.Where(t =>
+        {
+            var d = t.PostedDate ?? t.EffectiveDate;
+            return d <= _rangeTo && (_rangeFrom is not { } f || d >= f);
+        }).ToList();
+
+    private void OnUpcomingDaysChanged(int days)
+    {
+        _upcomingDays = days;
+        BuildUpcoming();
+    }
+
+    private void BuildUpcoming()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var horizon = today.AddDays(_upcomingDays);
+        var list = new List<UpcomingFlow>();
+        foreach (var flow in _flowDefs.Where(f => f.IsActive))
+        {
+            for (var d = today; d <= horizon; d = d.AddDays(1))
+            {
+                if (IsFlowOnDate(flow, d))
+                {
+                    list.Add(new UpcomingFlow(flow.Name, d, flow.Amount, flow.Direction == "Credit"));
+                }
+            }
+        }
+
+        _upcomingFlows = list.OrderBy(f => f.Date).Take(40).ToList();
+    }
+
+    private string RangeLabel => _rangePreset switch
+    {
+        "All time" => "All time",
+        "Custom" => $"{Format.FullDate(_rangeFrom ?? _rangeTo)} – {Format.FullDate(_rangeTo)}",
+        _ => _rangePreset,
+    };
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        await ReloadInsightsAsync();
+    }
+
+    private async Task OnHorizonChanged(int months)
+    {
+        _horizonMonths = months;
+        try
+        {
+            var forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);
+            if (forecast is not null)
+            {
+                _forecastPoints = forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList();
+                if (forecast.AggregateLowWaterMark is not null)
+                {
+                    _lowWaterMark = forecast.AggregateLowWaterMark.MinBalanceAmount;
+                    _lowWaterMarkDate = forecast.AggregateLowWaterMark.Date;
+                }
+                _lwmTuple = _lowWaterMarkDate.HasValue ? (_lowWaterMarkDate.Value, _lowWaterMark) : null;
+                _overdraftWarnings = forecast.OverdraftWarnings;
+                _overdraftCount = _overdraftWarnings.Count;
+                _breachDates = _overdraftWarnings.Count > 0 ? _overdraftWarnings.Select(w => w.FirstBreachDate).Distinct().ToList() : null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to reload forecast");
+            Snackbar.Add("Couldn't load the forecast", Severity.Error);
+        }
+    }
+
+    private async Task ReloadInsightsAsync()
+    {
+        try
+        {
+            _insights = await ApiClient.GetDashboardInsightsAsync(_rangeFrom, _rangeTo);
+            ApplyInsights();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to reload dashboard insights");
+            Snackbar.Add("Couldn't load that date range", Severity.Error);
+        }
+    }
+
+    private void ApplyInsights()
+    {
+        if (_insights is null)
+        {
+            return;
+        }
+
+        _spendSeries = [new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.SpendingByCategory.Select(c => (double)c.Amount).ToArray() }];
+        _spendLabels = _insights.SpendingByCategory.Select(c => c.Category).ToArray();
+        _flowSeries =
+        [
+            new MudBlazor.ChartSeries<double> { Name = "Income", Data = _insights.CashFlow.Select(m => (double)m.Income).ToArray() },
+            new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.CashFlow.Select(m => (double)m.Spending).ToArray() },
+        ];
+        _flowLabels = _insights.CashFlow.Select(m => m.Month.Length >= 7 ? m.Month[..7] : m.Month).ToArray();
+        var nw = _insights.NetWorth.TakeLast(60).ToList();
+        _netWorthSeries = [new MudBlazor.ChartSeries<double> { Name = "Net worth", Data = nw.Select(p => (double)p.Value).ToArray() }];
+        _netWorthLabels = nw.Select(p => p.Date).ToArray();
+    }
 
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
@@ -568,8 +711,8 @@ else
             var accountsTask = ApiClient.GetAccountsAsync();
             var assetSummaryTask = ApiClient.GetAssetSummaryAsync();
             var activityTask = ApiClient.GetDashboardActivityAsync();
-            var insightsTask = ApiClient.GetDashboardInsightsAsync();
-            var forecastTask = ApiClient.GetForecastAsync(months: 3);
+            var insightsTask = ApiClient.GetDashboardInsightsAsync(_rangeFrom, _rangeTo);
+            var forecastTask = ApiClient.GetForecastAsync(months: _horizonMonths);
 
             _accounts = await accountsTask;
 
@@ -605,20 +748,7 @@ else
             try
             {
                 _insights = await insightsTask;
-                if (_insights is not null)
-                {
-                    _spendSeries = [new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.SpendingByCategory.Select(c => (double)c.Amount).ToArray() }];
-                    _spendLabels = _insights.SpendingByCategory.Select(c => c.Category).ToArray();
-                    _flowSeries =
-                    [
-                        new MudBlazor.ChartSeries<double> { Name = "Income", Data = _insights.CashFlow.Select(m => (double)m.Income).ToArray() },
-                        new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.CashFlow.Select(m => (double)m.Spending).ToArray() },
-                    ];
-                    _flowLabels = _insights.CashFlow.Select(m => m.Month.Length >= 7 ? m.Month[..7] : m.Month).ToArray();
-                    var nw = _insights.NetWorth.TakeLast(60).ToList();
-                    _netWorthSeries = [new MudBlazor.ChartSeries<double> { Name = "Net worth", Data = nw.Select(p => (double)p.Value).ToArray() }];
-                    _netWorthLabels = nw.Select(p => p.Date).ToArray();
-                }
+                ApplyInsights();
             }
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
 
@@ -653,24 +783,9 @@ else
                 ? (_lowWaterMarkDate.Value, _lowWaterMark)
                 : null;
 
-            // Recurring flows for upcoming 14 days
-            var flows = await ApiClient.GetRecurringFlowsAsync();
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var horizon = today.AddDays(14);
-
-            foreach (var flow in flows.Where(f => f.IsActive))
-            {
-                for (var d = today; d <= horizon; d = d.AddDays(1))
-                {
-                    if (IsFlowOnDate(flow, d))
-                    {
-                        _upcomingFlows.Add(new UpcomingFlow(
-                            flow.Name, d, flow.Amount, flow.Direction == "Credit"));
-                    }
-                }
-            }
-
-            _upcomingFlows = _upcomingFlows.OrderBy(f => f.Date).Take(20).ToList();
+            // Recurring flows for the selectable upcoming window
+            _flowDefs = await ApiClient.GetRecurringFlowsAsync();
+            BuildUpcoming();
         }
         catch (Exception ex)
         {

@@ -80,7 +80,41 @@ public sealed class SaveReportHandler(ISavedReportStore store)
 /// <summary>Runs every panel of a saved or preset report; a failing panel reports its error instead of failing the report.</summary>
 public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets)
 {
-    public async Task<RunReportResultDto?> HandleAsync(string id, CancellationToken ct = default)
+    /// <summary>
+    /// Narrows a panel query to a date window by inserting a date filter right after the dataset name; only datasets that
+    /// have a <c>date</c> column (transactions, balance_history) are narrowed, others run unchanged.
+    /// </summary>
+    internal static string ApplyRange(string query, DateOnly? from, DateOnly? to)
+    {
+        if (from is null && to is null)
+        {
+            return query;
+        }
+
+        var trimmed = query.TrimStart();
+        var end = trimmed.IndexOf('|');
+        var dataset = (end < 0 ? trimmed : trimmed[..end]).Trim();
+        if (dataset is not ("transactions" or "balance_history"))
+        {
+            return query;
+        }
+
+        var clauses = new List<string>();
+        if (from is { } f)
+        {
+            clauses.Add($"date >= \"{f:yyyy-MM-dd}\"");
+        }
+
+        if (to is { } t)
+        {
+            clauses.Add($"date <= \"{t:yyyy-MM-dd}\"");
+        }
+
+        var filter = $"| where {string.Join(" and ", clauses)} ";
+        return end < 0 ? $"{dataset} {filter}" : $"{dataset} {filter}{trimmed[end..]}";
+    }
+
+    public async Task<RunReportResultDto?> HandleAsync(string id, CancellationToken ct = default, DateOnly? from = null, DateOnly? to = null)
     {
         var report = await reports.HandleAsync(id, ct);
         if (report is null)
@@ -94,7 +128,7 @@ public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvi
         {
             try
             {
-                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(p.Query, tables, today), null);
+                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(ApplyRange(p.Query, from, to), tables, today), null);
             }
             catch (QueryException ex)
             {

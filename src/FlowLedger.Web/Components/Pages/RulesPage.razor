@@ -19,8 +19,8 @@ else
 {
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudTextField T="string" Immediate="true" @bind-Value="_pattern" Label="If description contains" Style="min-width:260px" Margin="Margin.Dense" />
-            <MudTextField T="string" Immediate="true" @bind-Value="_category" Label="Category (e.g. Food/Coffee)" Style="min-width:260px" Margin="Margin.Dense" />
+            <MudTextField T="string" Immediate="true" @bind-Value="_pattern" Label="If description contains" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
+            <MudTextField T="string" Immediate="true" @bind-Value="_category" Label="Category (e.g. Food/Coffee)" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save"
                        Disabled="@(string.IsNullOrWhiteSpace(_pattern) || string.IsNullOrWhiteSpace(_category))">Save rule</MudButton>
         </div>

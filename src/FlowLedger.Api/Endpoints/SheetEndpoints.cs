@@ -11,8 +11,8 @@ internal static class SheetEndpoints
     {
         var group = app.MapGroup("/api/sheet").WithTags("Sheet").RequireRateLimiting("api");
 
-        group.MapGet("/", async (string? month, int? months, BillSheetService s, CancellationToken ct)
-            => Results.Ok(await s.GetViewAsync(month, months, ct)))
+        group.MapGet("/", async (string? month, int? months, int? ahead, BillSheetService s, CancellationToken ct)
+            => Results.Ok(await s.GetViewAsync(month, months, ahead, ct)))
             .WithName("GetBillSheet").WithSummary("The spreadsheet-mode grid: rows, month cells, per-section totals");
 
         group.MapPost("/refresh", (ISheetAutoMarker marker, CancellationToken ct) => Guarded(async () =>

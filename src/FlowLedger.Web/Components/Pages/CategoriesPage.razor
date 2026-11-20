@@ -13,7 +13,7 @@
         <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
             <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Immediate="true" DebounceInterval="120"
                           Placeholder="Search categories" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="width:260px" aria-label="Search categories" />
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="width:min(260px,100%)" aria-label="Search categories" />
             <MudTooltip Text="Expand all">
                 <MudIconButton Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" OnClick="ExpandAll" aria-label="Expand all" />
             </MudTooltip>

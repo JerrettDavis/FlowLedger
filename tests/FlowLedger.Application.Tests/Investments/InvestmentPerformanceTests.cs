@@ -72,4 +72,18 @@ public sealed class InvestmentPerformanceTests
 
         p.StartBalance.Should().Be(2_000m);
     }
+
+    [Fact]
+    public void Custom_range_measures_between_the_chosen_dates_and_removes_deposits()
+    {
+        var history = new[] { P(new DateOnly(2026, 9, 1), 1000m), P(new DateOnly(2026, 10, 1), 1600m), P(new DateOnly(2026, 11, 14), 2000m) };
+        var deposits = new[] { new CashFlowPoint(new DateOnly(2026, 9, 15), 400m) };
+
+        // Sept 1 -> Oct 1: 1000 -> 1600 with 400 deposited => 200 gain, ending balance taken from the Oct 1 snapshot.
+        var r = InvestmentPerformanceCalculator.ComputeRange(history, deposits, 2000m, new DateOnly(2026, 9, 1), new DateOnly(2026, 10, 1), Today);
+
+        r.Should().ContainSingle();
+        r[0].Gain.Should().Be(200m);
+        r[0].NetContributions.Should().Be(400m);
+    }
 }

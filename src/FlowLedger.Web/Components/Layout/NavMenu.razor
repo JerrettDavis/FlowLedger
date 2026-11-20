@@ -1,74 +1,41 @@
 <MudNavMenu aria-label="Main navigation menu">
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
-        Dashboard
-    </MudNavLink>
-    <MudNavLink Href="money-plan" Icon="@Icons.Material.Filled.TableChart">
-        Money Plan
-    </MudNavLink>
-    <MudNavLink Href="accounts" Icon="@Icons.Material.Filled.AccountBalance">
-        Accounts
-    </MudNavLink>
-    <MudNavLink Href="assets" Icon="@Icons.Material.Filled.Inventory2">
-        Assets
-    </MudNavLink>
-    <MudNavLink Href="sheet" Icon="@Icons.Material.Filled.GridOn">
-        Sheet
-    </MudNavLink>
-    <MudNavLink Href="transactions" Icon="@Icons.Material.Filled.Receipt">
-        Transactions
-    </MudNavLink>
-    <MudNavLink Href="recurring-flows" Icon="@Icons.Material.Filled.Repeat">
-        Recurring Flows
-    </MudNavLink>
-    <MudNavLink Href="spending" Icon="@Icons.Material.Filled.DonutLarge">
-        Spending
-    </MudNavLink>
-
-    <MudNavLink Href="forecasts" Icon="@Icons.Material.Filled.TrendingUp">
-        Forecasts
-    </MudNavLink>
-    <MudNavLink Href="query" Icon="@Icons.Material.Filled.QueryStats">
-        Query
-    </MudNavLink>
-    <MudNavLink Href="reports" Icon="@Icons.Material.Filled.Assessment">
-        Reports
-    </MudNavLink>
-<MudNavLink Href="budgets" Icon="@Icons.Material.Filled.Savings">
-    Budgets
-</MudNavLink>
-<MudNavLink Href="investments" Icon="@Icons.Material.Filled.ShowChart">
-    Investments
-</MudNavLink>
-<MudNavLink Href="goals" Icon="@Icons.Material.Filled.Flag">
-    Goals
-</MudNavLink>
-<MudNavLink Href="debt" Icon="@Icons.Material.Filled.CreditScore">
-    Debt Payoff
-</MudNavLink>
-<MudNavLink Href="home-assistant" Icon="@Icons.Material.Filled.Home">
-    Home Assistant
-</MudNavLink>
-<MudNavLink Href="rules" Icon="@Icons.Material.Filled.Rule">
-    Rules
-</MudNavLink>
-<MudNavLink Href="categories" Icon="@Icons.Material.Filled.Category">
-    Categories
-</MudNavLink>
-@if (_household)
-{
-    <MudNavLink Href="data" Icon="@Icons.Material.Filled.Shield">
-        Data &amp; Backups
-    </MudNavLink>
-    @if (Config.GetValue("Features:ConnectorsPage", true))
-    {
-        <MudNavLink Href="connectors" Icon="@Icons.Material.Filled.Hub">
-            Connectors
-        </MudNavLink>
-    }
-}
-<MudNavLink Href="account/logins" Icon="@Icons.Material.Filled.ManageAccounts">
-    Linked logins
-</MudNavLink>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    <MudNavGroup Title="Money" Icon="@Icons.Material.Filled.AccountBalanceWallet" Expanded="true">
+        <MudNavLink Href="accounts" Icon="@Icons.Material.Filled.AccountBalance">Accounts</MudNavLink>
+        <MudNavLink Href="transactions" Icon="@Icons.Material.Filled.Receipt">Transactions</MudNavLink>
+        <MudNavLink Href="recurring-flows" Icon="@Icons.Material.Filled.Repeat">Recurring Flows</MudNavLink>
+        <MudNavLink Href="assets" Icon="@Icons.Material.Filled.Inventory2">Assets</MudNavLink>
+        <MudNavLink Href="investments" Icon="@Icons.Material.Filled.ShowChart">Investments</MudNavLink>
+    </MudNavGroup>
+    <MudNavGroup Title="Plan" Icon="@Icons.Material.Filled.EventNote" Expanded="true">
+        <MudNavLink Href="money-plan" Icon="@Icons.Material.Filled.TableChart">Money Plan</MudNavLink>
+        <MudNavLink Href="sheet" Icon="@Icons.Material.Filled.GridOn">Sheet</MudNavLink>
+        <MudNavLink Href="budgets" Icon="@Icons.Material.Filled.Savings">Budgets</MudNavLink>
+        <MudNavLink Href="goals" Icon="@Icons.Material.Filled.Flag">Goals</MudNavLink>
+        <MudNavLink Href="debt" Icon="@Icons.Material.Filled.CreditScore">Debt Payoff</MudNavLink>
+        <MudNavLink Href="forecasts" Icon="@Icons.Material.Filled.TrendingUp">Forecasts</MudNavLink>
+    </MudNavGroup>
+    <MudNavGroup Title="Analyze" Icon="@Icons.Material.Filled.Insights" Expanded="true">
+        <MudNavLink Href="spending" Icon="@Icons.Material.Filled.DonutLarge">Spending</MudNavLink>
+        <MudNavLink Href="reports" Icon="@Icons.Material.Filled.Assessment">Reports</MudNavLink>
+        <MudNavLink Href="query" Icon="@Icons.Material.Filled.QueryStats">Query</MudNavLink>
+    </MudNavGroup>
+    <MudNavGroup Title="Organize" Icon="@Icons.Material.Filled.Tune" Expanded="true">
+        <MudNavLink Href="categories" Icon="@Icons.Material.Filled.Category">Categories</MudNavLink>
+        <MudNavLink Href="rules" Icon="@Icons.Material.Filled.Rule">Rules</MudNavLink>
+    </MudNavGroup>
+    <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="true">
+        <MudNavLink Href="home-assistant" Icon="@Icons.Material.Filled.Home">Home Assistant</MudNavLink>
+        @if (_household)
+        {
+            <MudNavLink Href="data" Icon="@Icons.Material.Filled.Shield">Data &amp; Backups</MudNavLink>
+            @if (Config.GetValue("Features:ConnectorsPage", true))
+            {
+                <MudNavLink Href="connectors" Icon="@Icons.Material.Filled.Hub">Connectors</MudNavLink>
+            }
+        }
+        <MudNavLink Href="account/logins" Icon="@Icons.Material.Filled.ManageAccounts">Linked logins</MudNavLink>
+    </MudNavGroup>
 </MudNavMenu>
 
 @code {

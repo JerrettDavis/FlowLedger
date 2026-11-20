@@ -9,7 +9,9 @@
 
 <div class="d-flex align-center justify-space-between mb-4">
     <MudText Typo="Typo.h4">Recurring Flows</MudText>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-center" style="flex-wrap:wrap">
+    <DateRangeSelector Label="Active during" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
+                       From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton StartIcon="@Icons.Material.Filled.AutoFixHigh"
                Color="Color.Default"
                Variant="Variant.Outlined"
@@ -45,34 +47,27 @@
                 Add all (@_suggestions.Count)
             </MudButton>
         </div>
-        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto;">
-            <thead>
-                <tr><th>Name</th><th>Account</th><th>Amount</th><th>Repeats</th><th>Next</th><th>Confidence</th><th></th></tr>
-            </thead>
-            <tbody>
+        <div class="fl-cards">
             @foreach (var s in _suggestions)
             {
-                <tr>
-                    <td>@s.Name</td>
-                    <td><MudText Typo="Typo.caption">@s.AccountName</MudText></td>
-                    <td>
-                        <MudText Class="fl-num" Color="@(s.Direction == "Credit" ? Color.Success : Color.Error)">
-                            @Format.Signed(s.Amount, s.Direction == "Credit")@(s.AmountModel == "Estimated" ? " ≈" : "")
-                        </MudText>
-                    </td>
-                    <td>@DescribeSuggestion(s)</td>
-                    <td>@Format.DayMonth(s.NextExpected)</td>
-                    <td><MudChip T="string" Size="Size.Small" Color="@(s.Confidence >= 0.85 ? Color.Success : Color.Warning)">@($"{s.Confidence:P0}") · @s.Occurrences×</MudChip></td>
-                    <td style="white-space:nowrap;">
+                <div class="fl-period">
+                    <div class="d-flex justify-space-between align-center">
+                        <span class="fl-li__title">@s.Name</span>
+                        <span class="fl-pill @(s.Confidence >= 0.85 ? "fl-pill--pos" : "")">@($"{s.Confidence:P0}") · @s.Occurrences×</span>
+                    </div>
+                    <div class="fl-tile__value fl-num @(s.Direction == "Credit" ? "fl-pos" : "")">
+                        @Format.Signed(s.Amount, s.Direction == "Credit")@(s.AmountModel == "Estimated" ? " ≈" : "")
+                    </div>
+                    <MudText Typo="Typo.caption" Class="fl-muted">@DescribeSuggestion(s) · next @Format.DayMonth(s.NextExpected) · @s.AccountName</MudText>
+                    <div class="d-flex justify-end mt-1">
                         <MudButton Size="Size.Small" Color="Color.Primary" Disabled="_busy"
                                    OnClick="() => AcceptSuggestion(s)" aria-label="@($"Add {s.Name} as a recurring flow")">Add</MudButton>
                         <MudButton Size="Size.Small" Color="Color.Default" Disabled="_busy"
                                    OnClick="() => DismissSuggestion(s)" aria-label="@($"Dismiss suggestion {s.Name}")">Dismiss</MudButton>
-                    </td>
-                </tr>
+                    </div>
+                </div>
             }
-            </tbody>
-        </MudSimpleTable>
+        </div>
     </MudPaper>
 }
 
@@ -102,98 +97,81 @@
     </EmptyState>
 }
 
-@if (_flows.Any(f => f.IsActive))
+@if (_flows.Count > 0)
 {
-    <MudText Typo="Typo.body2" Class="mb-2" aria-live="polite">
-        Per month, active flows: <span class="fl-num" style="color:var(--mud-palette-success)">+@Format.Money(MonthlyTotal("Credit"))</span> in ·
-        <span class="fl-num" style="color:var(--mud-palette-error)">−@Format.Money(MonthlyTotal("Debit"))</span> out.
-        Weekly and every-other-week items count every time they fall in the month (a $55 fortnightly bill is about $119/month).
-    </MudText>
-}
+    var inflow = MonthlyTotal("Credit");
+    var outflow = MonthlyTotal("Debit");
+    var net = inflow - outflow;
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="4"><MudPaper Class="pa-4 fl-card-hover" Outlined="true"><div class="fl-tile__label">Income / month</div><div class="fl-tile__value fl-num fl-pos">+@Format.Money(inflow)</div></MudPaper></MudItem>
+        <MudItem xs="12" sm="4"><MudPaper Class="pa-4 fl-card-hover" Outlined="true"><div class="fl-tile__label">Bills / month</div><div class="fl-tile__value fl-num fl-neg">−@Format.Money(outflow)</div></MudPaper></MudItem>
+        <MudItem xs="12" sm="4"><MudPaper Class="pa-4 fl-card-hover" Outlined="true"><div class="fl-tile__label">Left over</div><div class="fl-tile__value fl-num @(net >= 0 ? "fl-pos" : "fl-neg")">@Format.Signed(net)</div></MudPaper></MudItem>
+    </MudGrid>
 
-<MudDataGrid T="FlowLedger.Web.ApiClient.RecurringFlowDto"
-             DragDropColumnReordering="true"
-             Items="_flows"
-             Filterable="true"
-             FilterMode="DataGridFilterMode.ColumnFilterRow"
-             SortMode="SortMode.Multiple"
-             Hover="true"
-             Striped="false"
-             Dense="true"
-             aria-label="Recurring flows table">
-    <Columns>
-        <PropertyColumn Property="x => x.Name" Title="Name" Sortable="true" />
-        <TemplateColumn Title="Account">
-            <CellTemplate>
-                @{
-                    var acct = _accounts.FirstOrDefault(a => a.Id == context.Item.AccountId);
+    @foreach (var (title, dir) in new[] { ("Bills & expenses", "Debit"), ("Income", "Credit") })
+    {
+        var items = _flows.Where(f => f.Direction == dir).OrderByDescending(f => f.IsActive).ThenByDescending(f => f.MonthlyAmount).ToList();
+        if (items.Count == 0) { continue; }
+        var max = items.Max(f => f.MonthlyAmount);
+        <section class="mb-4" aria-label="@title">
+            <div class="fl-section__head">
+                <span class="fl-dot @(dir == "Credit" ? "fl-tone-cash" : "fl-tone-loan")"></span>
+                <MudText Typo="Typo.subtitle1">@title</MudText>
+                <MudText Typo="Typo.caption" Class="fl-muted">@items.Count</MudText>
+            </div>
+            <MudPaper Class="fl-list" Outlined="true">
+                @foreach (var f in items)
+                {
+                    var acct = _accounts.FirstOrDefault(a => a.Id == f.AccountId);
+                    var w = max == 0 ? 0 : (double)(f.MonthlyAmount / max * 100);
+                    <div class="fl-li @(f.IsActive ? "" : "fl-li--off")">
+                        <MudAvatar Color="@(dir == "Credit" ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Medium">
+                            <MudIcon Icon="@(dir == "Credit" ? Icons.Material.Filled.SouthWest : Icons.Material.Filled.NorthEast)" />
+                        </MudAvatar>
+                        <div class="fl-li__main">
+                            <div class="fl-li__title">@f.Name</div>
+                            <div class="fl-li__sub">@DescribeSchedule(f) · @(acct?.Name ?? "–")@(f.IsActive ? "" : " · inactive")@(f.EndDate.HasValue ? $" · ends {Format.FullDate(f.EndDate.Value)}" : "")</div>
+                            <div class="fl-meter mt-1" style="max-width:260px"><span style="width:@(w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%;background:@(dir == "Credit" ? "var(--mud-palette-success)" : "var(--mud-palette-error)")"></span></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="fl-li__amt fl-num @(dir == "Credit" ? "fl-pos" : "")">@Format.Signed(f.Amount, dir == "Credit")</div>
+                            <div class="fl-li__sub fl-hide-md" style="justify-content:flex-end" title="@($"{PerMonthCount(f):0.##} occurrence(s) a month on average")">≈ @Format.Money(f.MonthlyAmount)/mo</div>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="() => OpenEditDialog(f)" aria-label="@($"Edit flow {f.Name}")" />
+                        <MudTooltip Text="Not recurring: remove and never detect again">
+                            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Warning"
+                                           OnClick="() => FlagNotRecurring(f)" aria-label="@($"Flag {f.Name} as not recurring")" />
+                        </MudTooltip>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="() => DeleteFlow(f)" aria-label="@($"Delete flow {f.Name}")" />
+                    </div>
                 }
-                <MudText Typo="Typo.body2">@(acct?.Name ?? "–")</MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
-            <CellTemplate>
-                <MudText Class="fl-num" Color="@(context.Item.Direction == "Credit" ? Color.Success : Color.Error)">
-                    @Format.Signed(context.Item.Amount, context.Item.Direction == "Credit") @context.Item.Currency
-                </MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Per month" Sortable="true" SortBy="x => x.MonthlyAmount">
-            <CellTemplate>
-                <MudText Class="fl-num" Typo="Typo.body2" title="@($"{PerMonthCount(context.Item):0.##} occurrence(s) a month on average")">
-                    @Format.Money(context.Item.MonthlyAmount)
-                </MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <PropertyColumn Property="x => x.RecurrenceFrequency" Title="Frequency" Sortable="true" />
-        <TemplateColumn Title="Schedule">
-            <CellTemplate>
-                <MudText Typo="Typo.body2">@DescribeSchedule(context.Item)</MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Window">
-            <CellTemplate>
-                <MudText Typo="Typo.caption">
-                    @Format.DayMonth(context.Item.StartDate)
-                    @(context.Item.EndDate.HasValue ? $" → {Format.FullDate(context.Item.EndDate.Value)}" : " (ongoing)")
-                </MudText>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Status">
-            <CellTemplate>
-                <MudChip T="string" Size="Size.Small"
-                         Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
-                    @(context.Item.IsActive ? "Active" : "Inactive")
-                </MudChip>
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Actions" Sortable="false" Filterable="false">
-            <CellTemplate>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                               Size="Size.Small"
-                               Color="Color.Primary"
-                               OnClick="() => OpenEditDialog(context.Item)"
-                               aria-label="@($"Edit flow {context.Item.Name}")" />
-                <MudTooltip Text="Not recurring: remove and never detect again">
-                    <MudIconButton Icon="@Icons.Material.Filled.Block"
-                                   Size="Size.Small"
-                                   Color="Color.Warning"
-                                   OnClick="() => FlagNotRecurring(context.Item)"
-                                   aria-label="@($"Flag {context.Item.Name} as not recurring")" />
-                </MudTooltip>
-                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                               Size="Size.Small"
-                               Color="Color.Error"
-                               OnClick="() => DeleteFlow(context.Item)"
-                               aria-label="@($"Delete flow {context.Item.Name}")" />
-            </CellTemplate>
-        </TemplateColumn>
-    </Columns>
-</MudDataGrid>
+            </MudPaper>
+        </section>
+    }
+}
 
 @code {
     private bool _loading = true;
     private string? _error;
+    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _allFlows = [];
+    private string _rangePreset = "All time";
+    private DateOnly? _rangeFrom;
+    private DateOnly _rangeTo = DateOnly.FromDateTime(DateTime.Today);
+
+    // A flow counts when its start/end window overlaps the chosen range ("All time" keeps everything).
+    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> FilterFlows() => _rangePreset == "All time"
+        ? _allFlows
+        : _allFlows.Where(f => f.StartDate <= _rangeTo && (f.EndDate is null || f.EndDate >= (_rangeFrom ?? DateOnly.MinValue))).ToList();
+
+    private void OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        _flows = FilterFlows();
+    }
     private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flows = [];
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private List<FlowLedger.Web.ApiClient.RecurringSuggestionDto> _suggestions = [];
@@ -352,7 +330,8 @@
         _error = null;
         try
         {
-            _flows = await ApiClient.GetRecurringFlowsAsync();
+            _allFlows = await ApiClient.GetRecurringFlowsAsync();
+            _flows = FilterFlows();
             await LoadSuggestionsAsync();
         }
         catch (Exception ex)
@@ -449,6 +428,19 @@
 
     private static decimal PerMonthCount(FlowLedger.Web.ApiClient.RecurringFlowDto f) =>
         f.Amount > 0 ? f.MonthlyAmount / f.Amount : 0;
+
+    // Sort key for the Schedule column: monthly flows order by their due day (like the bill sheet's Due column);
+    // twice-monthly use their first day; flows without a fixed day of the month (weekly, every-N-weeks, daily)
+    // follow, grouped by how often they repeat.
+    internal static int ScheduleSortKey(FlowLedger.Web.ApiClient.RecurringFlowDto f) => f.RecurrenceFrequency switch
+    {
+        "Monthly" or "TwiceMonthly" when f.DayOfMonth.HasValue => f.DayOfMonth.Value,
+        "Monthly" or "TwiceMonthly" => 50,
+        "EveryNWeeks" => 100 + (f.IntervalWeeks ?? 2),
+        "Weekly" => 100,
+        "Daily" => 99,
+        _ => 200,
+    };
 
     private static string DescribeSchedule(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
     {

@@ -1,0 +1,97 @@
+@namespace FlowLedger.Web.Components.Shared
+
+<div class="d-flex align-center fl-range" style="gap:8px;flex-wrap:wrap">
+    <MudSelect T="string" Value="_preset" ValueChanged="OnPresetChanged" Label="@Label" Dense="true"
+               Variant="Variant.Outlined" Style="width:min(170px,100%)" aria-label="@Label">
+        @foreach (var p in Presets)
+        {
+            <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+        }
+    </MudSelect>
+    @if (_preset == Custom)
+    {
+        <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:min(150px,100%)" />
+        <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:min(150px,100%)" />
+    }
+</div>
+
+@code {
+    public const string Custom = "Custom";
+
+    public static readonly string[] DefaultPresets =
+        ["This month", "Last month", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", Custom];
+
+    /// <summary>Presets for pages that look forward (due dates, target dates).</summary>
+    public static readonly string[] ForwardPresets =
+        ["All time", "Next 30 days", "Next 3 months", "Next 6 months", "Next 12 months", "This year", Custom];
+
+    [Parameter] public string Label { get; set; } = "Date range";
+    [Parameter] public string[] Presets { get; set; } = DefaultPresets;
+    [Parameter] public string Preset { get; set; } = "This month";
+    [Parameter] public DateOnly From { get; set; }
+    [Parameter] public DateOnly To { get; set; }
+    [Parameter] public EventCallback<DateRange> Changed { get; set; }
+
+    private string _preset = "This month";
+    private DateOnly _from;
+    private DateOnly _to;
+
+    /// <summary>A resolved window. <c>From</c> is null for "All time".</summary>
+    public sealed record DateRange(string Preset, DateOnly? From, DateOnly To);
+
+    protected override void OnParametersSet()
+    {
+        _preset = Preset;
+        var (f, t) = Resolve(_preset, From == default ? null : From, To == default ? null : To);
+        _from = f ?? DateOnly.FromDateTime(DateTime.Today).AddDays(-89);
+        _to = t;
+    }
+
+    /// <summary>Turns a preset name into concrete dates (custom uses the supplied values).</summary>
+    public static (DateOnly? From, DateOnly To) Resolve(string preset, DateOnly? customFrom = null, DateOnly? customTo = null)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
+        return preset switch
+        {
+            "This month" => (firstOfMonth, today),
+            "Last month" => (firstOfMonth.AddMonths(-1), firstOfMonth.AddDays(-1)),
+            "Last 30 days" => (today.AddDays(-29), today),
+            "Last 90 days" => (today.AddDays(-89), today),
+            "Last 6 months" => (firstOfMonth.AddMonths(-5), today),
+            "Year to date" => (new DateOnly(today.Year, 1, 1), today),
+            "Last 12 months" => (firstOfMonth.AddMonths(-11), today),
+            "All time" => (null, today),
+            "Next 30 days" => (today, today.AddDays(30)),
+            "Next 3 months" => (today, today.AddMonths(3)),
+            "Next 6 months" => (today, today.AddMonths(6)),
+            "Next 12 months" => (today, today.AddMonths(12)),
+            "This year" => (new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31)),
+            _ => (customFrom ?? today.AddDays(-89), customTo ?? today),
+        };
+    }
+
+    private async Task OnPresetChanged(string preset)
+    {
+        _preset = preset;
+        var (f, t) = Resolve(preset, _from, _to);
+        if (f is { } nf) _from = nf;
+        _to = t;
+        // Opening Custom just reveals the pickers; the window only changes once a date is picked.
+        if (preset != Custom)
+        {
+            await Changed.InvokeAsync(new DateRange(preset, f, t));
+        }
+    }
+
+    private async Task OnCustomDate(DateTime? d, bool isFrom)
+    {
+        if (d is null) return;
+        var v = DateOnly.FromDateTime(d.Value);
+        if (isFrom) _from = v; else _to = v;
+        if (_to < _from) (_from, _to) = (_to, _from);
+        await Changed.InvokeAsync(new DateRange(Custom, _from, _to));
+    }
+}
