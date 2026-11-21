@@ -616,3 +616,19 @@ a forecast overdraft in the next 7 days, a budget nearly used or over. Bill, pay
 * Disabled accounts and accounts with hidden transactions are not used.
 
 Design and event format: [ADR 0012](adr/0012-home-assistant-alerts.md).
+
+## Local AI (in-process models)
+
+FlowLedger can run small AI models **inside the app itself** (no Ollama, no cloud, no extra service) from **Settings → Local AI**.
+
+- **Embedder** (default all-MiniLM-L6-v2, ~23 MB): suggests categories for merchants you have not labelled (it compares them with merchants you *have*
+  categorized), finds merchant names that are really the same business ("STARBUCKS #1042" / "SQ *STARBUCKS") so you can merge them into one alias with a click,
+  and powers "similar transactions". Until a model is installed a built-in spelling-based fallback is used, so everything still works.
+- **Held-out test:** "Run held-out test" hides each merchant you categorized from the model in turn and scores its guesses, so you can see real precision
+  and coverage on your own data and pick `Categorization:MlThreshold` (auto-apply; default off = suggestions only).
+- **Language-model tie-breaker (optional):** a small GGUF model (default Qwen2.5-1.5B-Instruct, ~1.1 GB) via llama.cpp. Off by default
+  (`LocalAi:Llm:Enabled=true`). It only chooses among the embedder's candidates or "none", only when you press *Categorize with the model*, never during sync.
+- **Installing models:** the household owner can press *Download* (pinned Hugging Face revision, SHA-256 verified), or copy the files into the model folder
+  (`LocalAi:ModelDirectory`, default `%LOCALAPPDATA%/FlowLedger/models`; mount a volume in Docker). Set `LocalAi:AllowModelDownload=false` to forbid downloads.
+- **Tuning (`LocalAi:*`):** `Enabled`, `Embedder` (Auto|Hashing|Onnx), `EmbeddingModel` (e.g. `bge-small-en-v1.5-q8`), `SemanticFloor`, `Neighbours`,
+  `SameMerchantThreshold`, `Llm:MaxCallsPerRun`. Design and model research: [ADR 0013](adr/0013-local-in-process-ai.md).

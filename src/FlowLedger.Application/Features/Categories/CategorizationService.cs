@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
@@ -33,7 +34,7 @@ public interface ICategorizationStore
 }
 
 public sealed record CategorizationResult(
-    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0);
+    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
 /// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
 public sealed class CategorizationOptions
@@ -61,13 +62,23 @@ public sealed class CategorizationService(
     ICategoryRepository categories,
     IAccountRepository accounts,
     ITenantContext tenant,
-    CategorizationOptions? options = null)
+    CategorizationOptions? options = null,
+    ITextEmbedder? embedder = null,
+    LocalAiOptions? localAi = null,
+    ILocalLlm? llm = null)
 {
     private readonly CategorizationOptions _options = options ?? new CategorizationOptions();
+    private readonly LocalAiOptions _localAi = localAi ?? new LocalAiOptions();
 
     private const int Max = 50_000;
 
-    public async Task<CategorizationResult> RunAsync(CancellationToken ct = default)
+    public Task<CategorizationResult> RunAsync(CancellationToken ct = default) => RunAsync(false, ct);
+
+    /// <summary>
+    /// <paramref name="allowLlm"/> lets the optional in-process language model adjudicate rows the embedder is unsure about
+    /// (suggestions only, capped per run). The sync pipeline never passes true: CPU inference would stall every sync.
+    /// </summary>
+    public async Task<CategorizationResult> RunAsync(bool allowLlm, CancellationToken ct = default)
     {
         if (!await store.AnyUncategorizedAsync(ct))
         {
@@ -114,7 +125,18 @@ public sealed class CategorizationService(
             .Where(x => x.path is not null && !string.Equals(x.path, AutoCategorizer.TransferCategory, StringComparison.OrdinalIgnoreCase))
             .Select(x => new TrainingExample(x.t.MerchantName, x.t.Description, x.t.Direction.ToString(), x.t.Amount.Amount, x.path!)));
 
-        int byLearned = 0, byKeyword = 0, byModel = 0, suggested = 0, transfers = 0, left = 0;
+        // Semantic step (in-process embeddings): ranks unseen merchants by similarity to ones the user already categorized.
+        var ranked = await RankSemanticAsync(real, uncategorized, existing.Values, ct);
+        var llmReady = allowLlm && llm is { State: { Enabled: true, ModelInstalled: true } };
+        var llmCalls = 0;
+        // Fallback offering for the model when the embedder has nothing: the categories the user relies on most.
+        var popular = real.Where(t => t.CategorySource == CategorySource.Manual && t.CategoryId is not null)
+            .GroupBy(t => t.CategoryId!.Value.Value).OrderByDescending(g => g.Count()).Take(6)
+            .Select(g => existing.Values.FirstOrDefault(c => c.Id == g.Key)?.Path.Value)
+            .Where(x => x is not null && !string.Equals(x, AutoCategorizer.TransferCategory, StringComparison.OrdinalIgnoreCase))
+            .Select(x => x!).ToList();
+
+        int byLearned = 0, byKeyword = 0, byModel = 0, byLlm = 0, suggested = 0, transfers = 0, left = 0;
         foreach (var t in uncategorized)
         {
             var key = AutoCategorizer.MerchantKey(t.MerchantName, t.Description);
@@ -135,7 +157,12 @@ public sealed class CategorizationService(
             }
             else
             {
-                var p = model?.Predict(t.MerchantName, t.Description, t.Direction.ToString(), t.Amount.Amount);
+                var bayes = model?.Predict(t.MerchantName, t.Description, t.Direction.ToString(), t.Amount.Amount);
+                var text = SemanticTraining.TextOf(t);
+                var candidates = ranked.GetValueOrDefault(text);
+                var top = candidates?.FirstOrDefault();
+                var sem = top is not null && top.Probability >= _localAi.SemanticFloor ? top : null;
+                var p = PredictionEnsemble.Combine(bayes, sem, embedder?.IsSemantic == true);
                 if (p is not null && p.Probability >= _options.MlThreshold)
                 {
                     t.Categorize(await EnsureAsync(p.Label), null, CategorySource.Auto, p.Probability);
@@ -147,8 +174,22 @@ public sealed class CategorizationService(
                     suggested++;
                     left++;
                 }
+                else if (llmReady && llmCalls < _localAi.Llm.MaxCallsPerRun && text.Length > 0
+                    && await AskLlmAsync(t, candidates, popular, p, ct) is { } llmPath)
+                {
+                    llmCalls++;
+                    t.SetSuggestion(await EnsureAsync(llmPath), LlmConfidence);
+                    byLlm++;
+                    suggested++;
+                    left++;
+                }
                 else
                 {
+                    if (llmReady && llmCalls < _localAi.Llm.MaxCallsPerRun && text.Length > 0)
+                    {
+                        llmCalls++;
+                    }
+
                     t.SetSuggestion(null, null);
                     left++;
                 }
@@ -157,7 +198,78 @@ public sealed class CategorizationService(
 
         await categories.SaveChangesAsync(ct);
         await store.SaveAsync(ct);
-        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested);
+        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm);
+    }
+
+    /// <summary>Fixed confidence shown for a language-model pick (it has no calibrated probability).</summary>
+    private const double LlmConfidence = 0.5;
+
+    /// <summary>Embedding-kNN top candidates keyed by normalised text; empty when disabled, under-trained, or the embedder fails.</summary>
+    private async Task<IReadOnlyDictionary<string, IReadOnlyList<Prediction>>> RankSemanticAsync(
+        List<Transaction> real, List<Transaction> uncategorized, IEnumerable<Category> allCategories, CancellationToken ct)
+    {
+        var none = new Dictionary<string, IReadOnlyList<Prediction>>();
+        if (embedder is null || !_localAi.Enabled)
+        {
+            return none;
+        }
+
+        try
+        {
+            var pathById = allCategories.ToDictionary(c => c.Id, c => c.Path.Value);
+            var examples = SemanticTraining.Examples(
+                real.Where(t => t.CategorySource == CategorySource.Manual), pathById, embedder.IsSemantic);
+            var classifier = await SemanticCategoryClassifier.TrainAsync(embedder, examples, _localAi.Neighbours, ct);
+            if (classifier is null)
+            {
+                return none;
+            }
+
+            var texts = uncategorized.Select(SemanticTraining.TextOf).Take(_localAi.MaxTextsPerRequest).ToList();
+            return await SemanticTraining.RankAsync(embedder, classifier, texts, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // A broken/missing model must never break categorization: fall back to the keyword + naive-Bayes steps.
+            return none;
+        }
+    }
+
+    /// <summary>Asks the language model to pick among the embedder's candidates (or the user's popular categories). Null = none/unavailable.</summary>
+    private async Task<string?> AskLlmAsync(
+        Transaction t, IReadOnlyList<Prediction>? candidates, List<string> popular, Prediction? current, CancellationToken ct)
+    {
+        var choices = (candidates?.Select(c => c.Label) ?? [])
+            .Concat(current is null ? [] : [current.Label])
+            .Concat(popular)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
+        if (choices.Count == 0)
+        {
+            return null;
+        }
+
+        var user = $"Transaction: {(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName + " / " + t.Description)}\n"
+            + $"Direction: {t.Direction}\nAmount: {t.Amount.Amount:0.00}\nCategories:\n"
+            + string.Join("\n", choices.Select((c, i) => $"{i + 1}. {c}")) + "\n0. none of these\nAnswer:";
+        try
+        {
+            var pick = await llm!.ChooseAsync(
+                "You classify bank transactions into one of the user's categories. Reply with only the number of the best category; 0 means none of them fits.",
+                user, choices, ct);
+            return pick is { } i ? choices[i] : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     /// <summary>

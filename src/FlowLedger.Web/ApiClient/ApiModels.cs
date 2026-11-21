@@ -242,7 +242,7 @@ public sealed record DataStatusDto(string Environment, BackupStatusDto Backup, P
 
 public sealed record AskQueryAnswer(string Question, string? Query, string? Error, int Attempts, string? Note = null);
 
-public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0);
+public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
 public sealed record CategorySpendDto(string Category, decimal Amount);
 
@@ -522,3 +522,24 @@ public sealed record HomeAssistantStateDto(HomeAssistantSettingsDto Settings, Li
 
 public sealed record HomeAssistantSaveRequest(
     bool Enabled, string? WebhookUrl, bool ClearWebhook, bool ShareAmounts, bool IncludeNames, int LeadDays, List<string> Kinds);
+
+// ── Local AI (in-process embeddings) ─────────────────────────────────────────
+
+public sealed record LocalAiModelDto(string Id, string Kind, string Title, string Description, long SizeBytes, bool Installed, bool Selected, string License);
+
+public sealed record LocalAiDownloadDto(string ModelId, string State, long ReceivedBytes, long TotalBytes, string? Error);
+
+public sealed record LocalAiStatusDto(
+    string Mode, string ActiveEmbedder, int Dimensions, bool Semantic, bool EmbeddingModelInstalled, string? EmbedderNote,
+    string EmbeddingModelId, bool LlmEnabled, bool LlmModelInstalled, bool LlmLoaded, string? LlmNote,
+    string ModelDirectory, bool DownloadsAllowed, List<LocalAiModelDto> Models, LocalAiDownloadDto? Download);
+
+public sealed record MerchantOccurrenceDto(string Raw, int Count);
+public sealed record MerchantGroupDto(string Canonical, List<MerchantOccurrenceDto> Members, int TotalCount, double MinSimilarity, string SuggestedName = "");
+public sealed record MerchantGroupsDto(string Embedder, bool Semantic, double Threshold, List<MerchantGroupDto> Groups);
+
+public sealed record EvalPointDto(double Threshold, int Predicted, int Correct, double Coverage, double Precision);
+public sealed record EvalMethodDto(string Name, double Accuracy, List<EvalPointDto> Curve);
+public sealed record EvaluationDto(string Embedder, bool Semantic, int Merchants, int Labels, int Folds, long Milliseconds, string Note, List<EvalMethodDto> Methods);
+
+public sealed record SimilarTransactionDto(Guid Id, DateOnly Date, string? Merchant, string Description, decimal Amount, string Direction, string? CategoryPath, double Similarity);

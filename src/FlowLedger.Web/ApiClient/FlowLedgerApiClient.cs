@@ -869,11 +869,11 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Fills in missing categories (never overwrites existing ones).</summary>
-    public async Task<CategorizationResultDto?> RunCategorizationAsync(CancellationToken ct = default)
+    public async Task<CategorizationResultDto?> RunCategorizationAsync(CancellationToken ct = default, bool useLlm = false)
     {
         return await ExecuteAsync("categorize transactions", async () =>
         {
-            var response = await _http.PostAsync("/api/categorization/run", null, ct);
+            var response = await _http.PostAsync("/api/categorization/run" + (useLlm ? "?llm=true" : string.Empty), null, ct);
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't categorize (server returned {(int)response.StatusCode}).", response.StatusCode);
@@ -1239,6 +1239,56 @@ public sealed class FlowLedgerApiClient
             return response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<ConnectorsOverviewDto>(JsonOptions, ct)
                 : null;
+        });
+
+    // ── Local AI ────────────────────────────────────────────────────────────
+
+    public async Task<LocalAiStatusDto?> GetLocalAiStatusAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read local AI status", async () =>
+        {
+            var response = await _http.GetAsync("/api/local-ai/status", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<LocalAiStatusDto>(JsonOptions, ct) : null;
+        });
+
+    /// <summary>Starts a catalog model download. Returns null on success, else a short safe reason.</summary>
+    public async Task<string?> StartLocalAiDownloadAsync(string modelId, CancellationToken ct = default) =>
+        await ExecuteAsync("start the model download", async () =>
+        {
+            var response = await _http.PostAsync($"/api/local-ai/models/{Uri.EscapeDataString(modelId)}/download", null, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                return (string?)null;
+            }
+
+            return response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                ? "Only the household owner can install models."
+                : await ReadProblemDetailAsync(response, ct) ?? $"The server returned {(int)response.StatusCode}.";
+        });
+
+    public async Task<bool> RemoveLocalAiModelAsync(string modelId, CancellationToken ct = default) =>
+        await ExecuteAsync("remove the model", async () =>
+            (await _http.DeleteAsync($"/api/local-ai/models/{Uri.EscapeDataString(modelId)}", ct)).IsSuccessStatusCode);
+
+    public async Task<MerchantGroupsDto?> GetMerchantGroupsAsync(double? threshold = null, CancellationToken ct = default) =>
+        await ExecuteAsync("find similar merchants", async () =>
+        {
+            var url = "/api/local-ai/merchant-groups" + (threshold is { } t ? $"?threshold={t.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : "");
+            var response = await _http.GetAsync(url, ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<MerchantGroupsDto>(JsonOptions, ct) : null;
+        });
+
+    public async Task<EvaluationDto?> EvaluateLocalAiAsync(int folds = 5, CancellationToken ct = default) =>
+        await ExecuteAsync("evaluate the categorizers", async () =>
+        {
+            var response = await _http.PostAsync($"/api/local-ai/evaluate?folds={folds}", null, ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<EvaluationDto>(JsonOptions, ct) : null;
+        });
+
+    public async Task<List<SimilarTransactionDto>> GetSimilarTransactionsAsync(Guid transactionId, int top = 10, CancellationToken ct = default) =>
+        await ExecuteAsync("find similar transactions", async () =>
+        {
+            var response = await _http.GetAsync($"/api/local-ai/similar/{transactionId}?top={top}", ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<SimilarTransactionDto>>(JsonOptions, ct) ?? [] : [];
         });
 
     /// <summary>Which connector feeds each of this user's accounts.</summary>

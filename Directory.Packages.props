@@ -136,6 +136,16 @@
   </ItemGroup>
 
   <!-- ============================================================
+       Local AI (in-process, no external server)
+  ============================================================ -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.24.4" />
+    <!-- llama.cpp in-process (optional generative tie-breaker). Backend/CPU version must match LLamaSharp exactly. -->
+    <PackageVersion Include="LLamaSharp" Version="0.30.0" />
+    <PackageVersion Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
+  </ItemGroup>
+
+  <!-- ============================================================
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>

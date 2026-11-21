@@ -201,6 +201,7 @@ app.MapUserEndpoints();
 app.MapEnvironmentEndpoints();
 app.MapDataEndpoints();
 app.MapCategorizationEndpoints();
+app.MapLocalAiEndpoints();
 app.MapMerchantAliasEndpoints();
 app.MapBudgetEndpoints();
 app.MapGoalEndpoints();

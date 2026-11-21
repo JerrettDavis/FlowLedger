@@ -45,6 +45,20 @@ public static class DependencyInjection
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.Categories.CategorizationOptions>(services);
         services.AddSingleton(categorization);
 
+        // ── Local AI (in-process embeddings; no external server) ─────────────────
+        var localAi = new FlowLedger.Application.Features.LocalAi.LocalAiOptions();
+        configuration.GetSection(FlowLedger.Application.Features.LocalAi.LocalAiOptions.SectionName).Bind(localAi);
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.LocalAi.LocalAiOptions>(services);
+        services.AddSingleton(localAi);
+        services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30));
+        services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>();
+        services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiModels>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>());
+        services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LlamaSharpLocalLlm>();
+        services.AddSingleton<FlowLedger.Application.Abstractions.ILocalLlm>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.LlamaSharpLocalLlm>());
+        services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>();
+        services.AddSingleton<FlowLedger.Application.Abstractions.ITextEmbedder>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
+        services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiRuntime>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
+
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".

@@ -35,6 +35,8 @@ public static class DependencyInjection
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
         services.AddScoped<FlowLedger.Application.Features.Query.AskQueryHandler>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
+        services.TryAddSingleton<FlowLedger.Application.Features.LocalAi.LocalAiOptions>();
+        services.AddScoped<FlowLedger.Application.Features.LocalAi.LocalAiService>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRuleService>();
