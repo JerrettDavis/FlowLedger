@@ -32,10 +32,10 @@ internal static class CategorizationEndpoints
             .WithSummary("Set a transaction's category by hand; optionally re-label every matching merchant and remember a rule for future syncs")
             .RequireRateLimiting("write");
 
-        app.MapPost("/api/categorization/run", async (CategorizationService service, CancellationToken ct) =>
-                Results.Ok(await service.RunAsync(ct)))
+        app.MapPost("/api/categorization/run", async (bool? llm, CategorizationService service, CancellationToken ct) =>
+                Results.Ok(await service.RunAsync(llm == true, ct)))
             .WithTags("Categories").WithName("RunCategorization")
-            .WithSummary("Fill in missing categories (transfers, learned merchants, keyword rules). Never overwrites existing categories.")
+            .WithSummary("Fill in missing categories (transfers, learned merchants, keyword rules, models). Never overwrites existing categories. ?llm=true lets the optional in-process language model suggest for rows the embedder is unsure about (slow; capped per run).")
             .RequireRateLimiting("write");
 
         app.MapPost("/api/transactions/enrich", async (TransactionEnrichmentService service, CancellationToken ct) =>

@@ -1,0 +1,415 @@
+@page "/local-ai"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Local AI — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Local AI</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Small language models that run inside FlowLedger itself — no Ollama, no cloud, no extra service. They suggest categories for merchants
+    you haven't labelled and spot merchant names that are really the same business. They only ever <em>suggest</em>; nothing you chose by hand is changed.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_status is null)
+{
+    <MudAlert Severity="Severity.Warning">Local AI status is unavailable right now.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Outlined="true" Style="height:100%" data-testid="local-ai-status">
+                <div class="d-flex align-center mb-2" style="gap:8px; flex-wrap:wrap">
+                    <MudText Typo="Typo.subtitle1">Active embedder</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@(_status.Semantic ? Color.Success : Color.Warning)" data-testid="local-ai-active">
+                        @(_status.Semantic ? "Semantic model" : "Lexical fallback")
+                    </MudChip>
+                </div>
+                <MudText Typo="Typo.body2"><strong data-testid="local-ai-model-id">@_status.ActiveEmbedder</strong> · @_status.Dimensions dimensions · mode <em>@_status.Mode</em></MudText>
+                @if (!string.IsNullOrWhiteSpace(_status.EmbedderNote))
+                {
+                    <MudText Typo="Typo.caption" Class="fl-muted d-block mt-1">@_status.EmbedderNote</MudText>
+                }
+                <MudText Typo="Typo.caption" Class="fl-muted d-block mt-2">Model folder: @_status.ModelDirectory</MudText>
+                <MudText Typo="Typo.caption" Class="fl-muted d-block">
+                    Adjust with configuration: <code>LocalAi:Embedder</code> (Auto | Hashing | Onnx), <code>LocalAi:EmbeddingModel</code>,
+                    <code>LocalAi:SemanticFloor</code>, <code>LocalAi:ModelDirectory</code>.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Outlined="true" Style="height:100%">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Models</MudText>
+                @foreach (var m in _status.Models)
+                {
+                    <div class="mb-3" data-testid="local-ai-model-@m.Id">
+                        <div class="d-flex align-center" style="gap:8px; flex-wrap:wrap">
+                            <MudText Typo="Typo.body1">@m.Title</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@(m.Installed ? Color.Success : Color.Default)">@(m.Installed ? "Installed" : "Not installed")</MudChip>
+                            @if (m.Selected)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">In use</MudChip>
+                            }
+                            <MudSpacer />
+                            @if (m.Installed)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => RemoveAsync(m.Id)">Remove</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(!_status.DownloadsAllowed || Downloading)"
+                                           OnClick="() => DownloadAsync(m.Id)" data-testid="@("local-ai-download-" + m.Id)">Download @FormatSize(m.SizeBytes)</MudButton>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Class="fl-muted">@m.Description · @m.License</MudText>
+                        @if (_status.Download is { } d && d.ModelId == m.Id && d.State == "Downloading")
+                        {
+                            <MudProgressLinear Value="@(d.TotalBytes == 0 ? 0 : 100.0 * d.ReceivedBytes / d.TotalBytes)" Class="mt-1" />
+                        }
+                        else if (_status.Download is { } f && f.ModelId == m.Id && f.State == "Failed")
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">Download failed: @f.Error</MudText>
+                        }
+                    </div>
+                }
+                @if (!_status.DownloadsAllowed)
+                {
+                    <MudText Typo="Typo.caption" Class="fl-muted">Downloads are disabled here; copy the model files into the model folder to install them offline.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Outlined="true" data-testid="local-ai-llm">
+                <div class="d-flex align-center mb-1" style="gap:8px; flex-wrap:wrap">
+                    <MudText Typo="Typo.subtitle1">Language-model tie-breaker (optional)</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@(_status.LlmLoaded ? Color.Success : _status.LlmEnabled ? Color.Info : Color.Default)" data-testid="local-ai-llm-state">
+                        @(_status.LlmLoaded ? "Loaded" : _status.LlmEnabled ? (_status.LlmModelInstalled ? "Enabled" : "Enabled, model missing") : "Off")
+                    </MudChip>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_categorizing || !_status.LlmEnabled || !_status.LlmModelInstalled)" OnClick="CategorizeWithModelAsync" data-testid="local-ai-categorize-llm">
+                        @(_categorizing ? "Thinking… (CPU)" : "Categorize with the model")
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Class="fl-muted d-block">
+                    A small model (llama.cpp, running inside FlowLedger) looks at the transactions the embedder is unsure about and may only choose among the embedder's
+                    candidates or “none”. It suggests; you accept. It never runs during sync. Enable with <code>LocalAi:Llm:Enabled=true</code> and install the model above;
+                    <code>LocalAi:Llm:MaxCallsPerRun</code> caps how many it examines.
+                </MudText>
+                @if (!string.IsNullOrWhiteSpace(_status.LlmNote))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block mt-1">@_status.LlmNote</MudText>
+                }
+                @if (_llmResult is not null)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2" data-testid="local-ai-llm-result">
+                        Model run: @_llmResult.ByLlm suggestion(s) by the model, @_llmResult.Suggested suggestion(s) in total, @_llmResult.StillUncategorized still uncategorized.
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Outlined="true">
+                <div class="d-flex align-center mb-2" style="gap:8px; flex-wrap:wrap">
+                    <MudText Typo="Typo.subtitle1">How accurate is it on your data?</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Disabled="_evaluating" OnClick="EvaluateAsync" data-testid="local-ai-evaluate">
+                        @(_evaluating ? "Measuring…" : "Run held-out test")
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Class="fl-muted d-block mb-2">
+                    Hides each merchant you categorized from the model in turn and asks it to guess — so the score reflects merchants it has never seen.
+                </MudText>
+                @if (_evaluating)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                @if (_eval is not null)
+                {
+                    <MudText Typo="Typo.body2" Class="mb-2" data-testid="local-ai-eval-note">@_eval.Note (@_eval.Merchants merchants · @_eval.Labels categories · @_eval.Milliseconds ms)</MudText>
+                    @if (_eval.Methods.Count > 0)
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto" data-testid="local-ai-eval-table">
+                            <thead>
+                                <tr>
+                                    <th>Method</th>
+                                    <th style="text-align:right">Overall hit rate</th>
+                                    @foreach (var p in _eval.Methods[0].Curve)
+                                    {
+                                        <th style="text-align:right">≥ @p.Threshold.ToString("0.0")<br /><span class="fl-muted">precision / coverage</span></th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in _eval.Methods)
+                                {
+                                    <tr>
+                                        <td>@m.Name</td>
+                                        <td style="text-align:right">@m.Accuracy.ToString("P0")</td>
+                                        @foreach (var p in m.Curve)
+                                        {
+                                            <td style="text-align:right">@(p.Predicted == 0 ? "—" : $"{p.Precision:P0} / {p.Coverage:P0}")</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                        <MudText Typo="Typo.caption" Class="fl-muted d-block mt-2">
+                            Pick the confidence level where precision is high enough for you and set <code>Categorization:MlThreshold</code> to it to let the model fill categories automatically
+                            (default: off — suggestions only).
+                        </MudText>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Outlined="true">
+                <div class="d-flex align-center mb-2" style="gap:8px; flex-wrap:wrap">
+                    <MudText Typo="Typo.subtitle1">Same merchant, different spelling</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_grouping" OnClick="FindGroupsAsync" data-testid="local-ai-find-groups">
+                        @(_grouping ? "Looking…" : "Find look-alike merchants")
+                    </MudButton>
+                </div>
+                @if (_groups is not null)
+                {
+                    <MudText Typo="Typo.caption" Class="fl-muted d-block mb-2" data-testid="local-ai-groups-note">
+                        @_groups.Groups.Count group(s) · similarity ≥ @_groups.Threshold.ToString("0.00") · @(_groups.Semantic ? "semantic model" : "spelling-based fallback")
+                    </MudText>
+                    @foreach (var g in _groups.Groups.Take(30))
+                    {
+                        var key = g.Canonical;
+                        <MudPaper Class="pa-3 mb-2" Outlined="true">
+                            <div class="d-flex align-center" style="gap:8px; flex-wrap:wrap">
+                                <MudTextField T="string" Margin="Margin.Dense" Variant="Variant.Outlined" Label="Show all of these as" Style="max-width:320px"
+                                              @bind-Value="_aliasNames[key]" />
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy.Contains(key)" OnClick="() => AcceptAsync(g)">Merge under this name</MudButton>
+                                <MudText Typo="Typo.caption" Class="fl-muted">@g.TotalCount transactions · min similarity @g.MinSimilarity.ToString("0.00")</MudText>
+                            </div>
+                            <MudText Typo="Typo.body2" Class="mt-1">@string.Join("  ·  ", g.Members.Select(m => $"{m.Raw} ({m.Count})"))</MudText>
+                        </MudPaper>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.LocalAiStatusDto? _status;
+    private FlowLedger.Web.ApiClient.EvaluationDto? _eval;
+    private FlowLedger.Web.ApiClient.MerchantGroupsDto? _groups;
+    private readonly Dictionary<string, string> _aliasNames = [];
+    private readonly HashSet<string> _busy = [];
+    private FlowLedger.Web.ApiClient.CategorizationResultDto? _llmResult;
+    private bool _loading = true, _evaluating, _grouping, _categorizing;
+    private CancellationTokenSource? _poll;
+
+    private bool Downloading => _status?.Download is { State: "Downloading" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+        _loading = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            _status = await ApiClient.GetLocalAiStatusAsync();
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+
+        if (Downloading)
+        {
+            StartPolling();
+        }
+    }
+
+    private void StartPolling()
+    {
+        if (_poll is not null)
+        {
+            return;
+        }
+
+        _poll = new CancellationTokenSource();
+        var token = _poll.Token;
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        await RefreshAsyncNoPoll();
+                        StateHasChanged();
+                    });
+                    if (!Downloading)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                _poll = null;
+            }
+        });
+    }
+
+    private async Task RefreshAsyncNoPoll()
+    {
+        try
+        {
+            _status = await ApiClient.GetLocalAiStatusAsync();
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException)
+        {
+        }
+    }
+
+    private async Task DownloadAsync(string id)
+    {
+        var error = await ApiClient.StartLocalAiDownloadAsync(id);
+        if (error is not null)
+        {
+            Snackbar.Add(error, Severity.Warning);
+            return;
+        }
+
+        Snackbar.Add("Download started.", Severity.Info);
+        await RefreshAsync();
+        StartPolling();
+    }
+
+    private async Task RemoveAsync(string id)
+    {
+        if (await ApiClient.RemoveLocalAiModelAsync(id))
+        {
+            Snackbar.Add("Model removed.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Couldn't remove it (it may be in use; restart FlowLedger and try again).", Severity.Warning);
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task CategorizeWithModelAsync()
+    {
+        _categorizing = true;
+        try
+        {
+            _llmResult = await ApiClient.RunCategorizationAsync(default, useLlm: true);
+            await RefreshAsync();
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _categorizing = false;
+        }
+    }
+
+    private async Task EvaluateAsync()
+    {
+        _evaluating = true;
+        try
+        {
+            _eval = await ApiClient.EvaluateLocalAiAsync();
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _evaluating = false;
+        }
+    }
+
+    private async Task FindGroupsAsync()
+    {
+        _grouping = true;
+        try
+        {
+            _groups = await ApiClient.GetMerchantGroupsAsync();
+            foreach (var g in _groups?.Groups ?? [])
+            {
+                _aliasNames.TryAdd(g.Canonical, string.IsNullOrWhiteSpace(g.SuggestedName) ? Title(g.Canonical) : g.SuggestedName);
+            }
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _grouping = false;
+        }
+    }
+
+    private async Task AcceptAsync(FlowLedger.Web.ApiClient.MerchantGroupDto g)
+    {
+        var name = _aliasNames.GetValueOrDefault(g.Canonical)?.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            Snackbar.Add("Give the merchant a name first.", Severity.Warning);
+            return;
+        }
+
+        _busy.Add(g.Canonical);
+        try
+        {
+            var changed = 0;
+            foreach (var m in g.Members)
+            {
+                changed += await ApiClient.SetMerchantAliasAsync(m.Raw, name);
+            }
+
+            Snackbar.Add($"Merged {g.Members.Count} spellings as “{name}” ({changed} transactions updated).", Severity.Success);
+            _groups = _groups! with { Groups = _groups.Groups.Where(x => x.Canonical != g.Canonical).ToList() };
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _busy.Remove(g.Canonical);
+        }
+    }
+
+    private static string Title(string raw)
+    {
+        var cleaned = string.Join(' ', System.Text.RegularExpressions.Regex.Replace(raw, @"[#\*\d]+", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned.ToLowerInvariant());
+    }
+
+    private static string FormatSize(long bytes) => bytes >= 1_000_000_000 ? $"{bytes / 1e9:0.0} GB" : $"{bytes / 1e6:0} MB";
+
+    public void Dispose() => _poll?.Cancel();
+}

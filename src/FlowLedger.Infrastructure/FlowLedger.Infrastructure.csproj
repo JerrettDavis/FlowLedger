@@ -11,6 +11,10 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Identity EF stores: not referenced by code yet; keep only if user accounts land here -->
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <!-- In-process sentence embeddings (ONNX) for local categorization / similarity: no external model server -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="LLamaSharp" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" />
     <!-- Quartz scheduler (Api on-demand sync job; Worker scheduled sync/backup jobs) -->
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.AspNetCore" />
