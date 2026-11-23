@@ -65,3 +65,12 @@ decision adjustable, and never silently overwrite what the user chose.
 
 Snowflake arctic-embed model card (MTEB retrieval comparison); 2026 embedding rankings (MiniLM / bge-small / arctic); small-language-model classification
 benchmarks (Qwen3, Llama 3.2, Gemma 3); LLamaSharp 0.30 release notes (llama.cpp c0c7e14).
+
+## Validation log (2026-11-22, seeded 66-merchant / 7-category set; re-run on real data before trusting)
+
+- Held-out merchants, embedding kNN: **MiniLM 65% vs bge-small 61%**; ensemble 64% vs 61%. bge's cosine values sit higher, so the confidence mapping
+  (tuned on MiniLM) over-covers at low thresholds; MiniLM stays the default and bge would need its own calibration constants before being preferred.
+- LLM few-shot (user's labelled merchants in the prompt) made Qwen2.5-1.5B **worse** (Speedway to Utilities, Wawa to Medical): shipped as `LocalAi:Llm:FewShot`, default off.
+  The 1.5B model is a weak adjudicator (roughly 2 of 7 right on unseen merchants); it stays suggest-only. Try Qwen3-4B before enabling few-shot.
+- Hardening added: downloader tests (bad checksum, oversize body, redirect to a foreign host, HTTP errors, retry after failure), prompt-injection neutralisation
+  (control characters stripped, 80-char cap), LLM load failure retries after 2 minutes instead of staying disabled until restart.

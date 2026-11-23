@@ -49,6 +49,9 @@ public sealed class LocalAiOptions
         /// <summary>Most low-confidence transactions the model may adjudicate per categorization run.</summary>
         public int MaxCallsPerRun { get; set; } = 25;
 
+        /// <summary>Add the user's own labelled merchants to the prompt. Off: measured WORSE with the default 1.5B model (it over-copies the examples); try with a 4B+ model.</summary>
+        public bool FewShot { get; set; }
+
         public int ContextSize { get; set; } = 1024;
 
         public int Threads { get; set; } = Math.Max(2, Environment.ProcessorCount / 2);
