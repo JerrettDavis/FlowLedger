@@ -129,6 +129,14 @@ public sealed class CategorizationService(
         var ranked = await RankSemanticAsync(real, uncategorized, existing.Values, ct);
         var llmReady = allowLlm && llm is { State: { Enabled: true, ModelInstalled: true } };
         var llmCalls = 0;
+        // Few-shot examples for the model: merchants the user labelled by hand, per category (a handful each).
+        var shots = llmReady && _localAi.Llm.FewShot
+            ? real.Where(t => t.CategorySource == CategorySource.Manual && t.CategoryId is not null)
+                .Select(t => (Path: existing.Values.FirstOrDefault(c => c.Id == t.CategoryId!.Value.Value)?.Path.Value, Text: SemanticTraining.TextOf(t)))
+                .Where(x => x.Path is not null && x.Text.Length > 0)
+                .GroupBy(x => x.Path!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Text).Distinct().Take(2).ToList(), StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, List<string>>();
         // Fallback offering for the model when the embedder has nothing: the categories the user relies on most.
         var popular = real.Where(t => t.CategorySource == CategorySource.Manual && t.CategoryId is not null)
             .GroupBy(t => t.CategoryId!.Value.Value).OrderByDescending(g => g.Count()).Take(6)
@@ -175,7 +183,7 @@ public sealed class CategorizationService(
                     left++;
                 }
                 else if (llmReady && llmCalls < _localAi.Llm.MaxCallsPerRun && text.Length > 0
-                    && await AskLlmAsync(t, candidates, popular, p, ct) is { } llmPath)
+                    && await AskLlmAsync(t, candidates, popular, shots, p, ct) is { } llmPath)
                 {
                     llmCalls++;
                     t.SetSuggestion(await EnsureAsync(llmPath), LlmConfidence);
@@ -239,9 +247,24 @@ public sealed class CategorizationService(
         }
     }
 
+    public static string PromptText(string? s)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in s ?? string.Empty)
+        {
+            sb.Append(char.IsControl(ch) ? ' ' : ch);
+            if (sb.Length >= 80)
+            {
+                break;
+            }
+        }
+
+        return sb.ToString().Trim();
+    }
+
     /// <summary>Asks the language model to pick among the embedder's candidates (or the user's popular categories). Null = none/unavailable.</summary>
     private async Task<string?> AskLlmAsync(
-        Transaction t, IReadOnlyList<Prediction>? candidates, List<string> popular, Prediction? current, CancellationToken ct)
+        Transaction t, IReadOnlyList<Prediction>? candidates, List<string> popular, IReadOnlyDictionary<string, List<string>> shots, Prediction? current, CancellationToken ct)
     {
         var choices = (candidates?.Select(c => c.Label) ?? [])
             .Concat(current is null ? [] : [current.Label])
@@ -252,9 +275,13 @@ public sealed class CategorizationService(
             return null;
         }
 
-        var user = $"Transaction: {(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName + " / " + t.Description)}\n"
-            + $"Direction: {t.Direction}\nAmount: {t.Amount.Amount:0.00}\nCategories:\n"
-            + string.Join("\n", choices.Select((c, i) => $"{i + 1}. {c}")) + "\n0. none of these\nAnswer:";
+        // Bank text is untrusted: strip control characters/newlines and cap length so a crafted descriptor cannot add prompt lines.
+        var subject = PromptText(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName + " / " + t.Description);
+        var examples = string.Concat(choices
+            .SelectMany(c => shots.GetValueOrDefault(c) ?? [], (c, text) => $"- {PromptText(text)} => {PromptText(c)}\n"));
+        var user = (examples.Length == 0 ? string.Empty : "Labelled examples from this user:\n" + examples)
+            + $"Transaction: {subject}\nDirection: {t.Direction}\nAmount: {t.Amount.Amount:0.00}\nCategories:\n"
+            + string.Join("\n", choices.Select((c, i) => $"{i + 1}. {PromptText(c)}")) + "\n0. none of these\nAnswer:";
         try
         {
             var pick = await llm!.ChooseAsync(

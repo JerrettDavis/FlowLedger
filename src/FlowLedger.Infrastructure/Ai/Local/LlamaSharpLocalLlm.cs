@@ -24,6 +24,8 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
     private ModelParams? _params;
     private string? _loadedId;
     private string? _failure;
+    private DateTime _failedAtUtc;
+    private static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(2);
 
     public LlamaSharpLocalLlm(LocalAiOptions options, LocalModelManager models, ILogger<LlamaSharpLocalLlm> logger)
     {
@@ -49,7 +51,7 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
     public async Task<int?> ChooseAsync(string system, string user, IReadOnlyList<string> choices, CancellationToken ct = default)
     {
         var state = State;
-        if (!state.Enabled || !state.ModelInstalled || choices.Count == 0 || _failure is not null && _weights is null)
+        if (!state.Enabled || !state.ModelInstalled || choices.Count == 0 || (_failure is not null && _weights is null && DateTime.UtcNow - _failedAtUtc < RetryAfter))
         {
             return null;
         }
@@ -87,6 +89,7 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
         }
         catch (Exception ex)
         {
+            _failedAtUtc = DateTime.UtcNow;
             _failure = "Inference failed (" + ex.GetType().Name + "): " + ex.Message;
             _logger.LogWarning(ex, "Local LLM inference failed");
             return null;
@@ -123,6 +126,7 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
         }
         catch (Exception ex)
         {
+            _failedAtUtc = DateTime.UtcNow;
             _failure = "Could not load the model (" + ex.GetType().Name + "): " + ex.Message;
             _logger.LogWarning(ex, "Local LLM {Model} failed to load", model.Id);
             return false;
