@@ -189,6 +189,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      api-probe:
+        condition: service_completed_successfully
     # Worker is a Generic Host — no HTTP server, no healthcheck port.
     # Liveness is inferred from process health (restart: unless-stopped).
     healthcheck:

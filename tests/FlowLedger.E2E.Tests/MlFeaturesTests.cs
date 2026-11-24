@@ -47,8 +47,16 @@ public class MlFeaturesTests : E2ETestBase
     {
         var r = await http.PostAsJsonAsync($"{ApiUrl}/api/transactions", new
         {
-            accountId = account, amount, currency = "USD", direction = "Debit", description = merchant,
-            effectiveDate = Today(daysAgo), postedDate = Today(daysAgo), categoryId = category, merchantName = category.HasValue ? merchant : null, notes = (string?)null,
+            accountId = account,
+            amount,
+            currency = "USD",
+            direction = "Debit",
+            description = merchant,
+            effectiveDate = Today(daysAgo),
+            postedDate = Today(daysAgo),
+            categoryId = category,
+            merchantName = category.HasValue ? merchant : null,
+            notes = (string?)null,
         });
         r.IsSuccessStatusCode.Should().BeTrue(await r.Content.ReadAsStringAsync());
     }
@@ -124,6 +132,7 @@ public class MlFeaturesTests : E2ETestBase
         await Page.GetByRole(AriaRole.Option, new() { Name = "CreditCard", Exact = true }).ClickAsync();
         await Page.Locator(".mud-dialog").GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Page.Locator(".mud-dialog").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 20000 });
+        await Assertions.Expect(Page.GetByText("Account updated - type pinned")).ToBeVisibleAsync();
 
         var accounts = await http.GetFromJsonAsync<JsonElement>($"{ApiUrl}/api/accounts");
         var mine = accounts.EnumerateArray().Single(a => a.GetProperty("id").GetGuid() == id);
@@ -138,7 +147,7 @@ public class MlFeaturesTests : E2ETestBase
 
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
-        (await Page.Locator("tr", new() { HasText = name }).First.InnerTextAsync()).Should().Contain("CreditCard");
+        (await Page.Locator(".fl-li", new() { HasText = name }).First.InnerTextAsync()).Should().Contain("CreditCard");
         AssertNoPageErrors();
     }
 
