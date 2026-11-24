@@ -146,7 +146,7 @@ var objectsDir = Path.Combine(dataDir, "objects");
 Directory.CreateDirectory(objectsDir);
 
 // ── Application services ────────────────────────────────────────────────────
-var api = builder.AddProject<Projects.FlowLedger_Api>("api")
+var api = builder.AddDotnetProject("api", "../FlowLedger.Api/FlowLedger.Api.csproj")
     .WithReference(postgres)
     .WithReference(redis)
     .WaitFor(postgres)
@@ -155,11 +155,11 @@ var api = builder.AddProject<Projects.FlowLedger_Api>("api")
 WithMxConfig(api, builder.Configuration);
 api.WithEnvironment("ObjectStorage__RootPath", objectsDir);
 
-var web = builder.AddProject<Projects.FlowLedger_Web>("web")
+var web = builder.AddDotnetProject("web", "../FlowLedger.Web/FlowLedger.Web.csproj")
     .WithReference(api)
     .WaitFor(api);
 
-var worker = builder.AddProject<Projects.FlowLedger_Worker>("worker")
+var worker = builder.AddDotnetProject("worker", "../FlowLedger.Worker/FlowLedger.Worker.csproj")
     .WithReference(postgres)
     .WithReference(redis)
     .WaitFor(postgres)
