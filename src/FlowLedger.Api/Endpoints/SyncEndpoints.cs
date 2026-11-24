@@ -1,6 +1,6 @@
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Integrations.Abstractions;
 using Microsoft.AspNetCore.Http;
 
 namespace FlowLedger.Api.Endpoints;

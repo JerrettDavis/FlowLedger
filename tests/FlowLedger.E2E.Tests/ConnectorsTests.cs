@@ -56,6 +56,7 @@ public class ConnectorsTests : E2ETestBase
             await http.PostAsync("api/sync", null);
         }
 
+        await Page!.SetViewportSizeAsync(1800, 900);
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
