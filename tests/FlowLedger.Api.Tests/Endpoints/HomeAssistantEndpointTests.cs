@@ -24,7 +24,13 @@ public sealed class HomeAssistantEndpointTests(FlowLedgerApiFactory factory) : I
 
     private static object Body(bool enabled, string? url = null, bool amounts = false) => new
     {
-        enabled, webhookUrl = url, clearWebhook = false, shareAmounts = amounts, includeNames = true, leadDays = 3, kinds = (string[]?)null,
+        enabled,
+        webhookUrl = url,
+        clearWebhook = false,
+        shareAmounts = amounts,
+        includeNames = true,
+        leadDays = 3,
+        kinds = (string[]?)null,
     };
 
     [Fact]

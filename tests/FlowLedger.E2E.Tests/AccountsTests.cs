@@ -62,7 +62,7 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: data grid is rendered")]
+    [Fact(DisplayName = "Accounts: account list is rendered")]
     public async Task Accounts_DataGridIsRendered()
     {
         if (ShouldSkip)
@@ -73,10 +73,8 @@ public class AccountsTests : E2ETestBase
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
-        // MudDataGrid renders as <div aria-label="Accounts table"> (not a <table> element)
-        var table = Page!.Locator("[aria-label='Accounts table']");
-        (await table.CountAsync()).Should().BeGreaterThan(0);
-        (await table.IsVisibleAsync()).Should().BeTrue();
+        var accounts = Page!.Locator("section[aria-label$=' accounts'] .fl-li");
+        await Assertions.Expect(accounts.First).ToBeVisibleAsync();
         AssertNoPageErrors();
     }
 
