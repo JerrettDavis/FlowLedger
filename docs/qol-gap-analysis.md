@@ -42,3 +42,7 @@ Status after the gap-closing pass. "Have" = already existed; "Added" = built in 
 | Credit score | Credit Karma, Mint | Blocked — bureau partnership |
 | Native mobile app | all | Open — web is responsive; no PWA manifest/offline yet |
 | Partner/household shared views | Monarch, YNAB | Open — multi-user tenancy exists (ADR 0008), no shared household view |
+
+## Import coverage
+
+`POST /api/imports/auto` (and Transactions → Import) detects and normalises exports from Mint, Monarch, YNAB, Simplifi/Quicken, Chase, Bank of America, Wells Fargo (headerless), Citi, Capital One, American Express, Discover, Apple Card, PayPal, any CSV with recognisable headers (including Debit/Credit or Outflow/Inflow columns and `;`/tab delimiters), OFX/QFX and QIF. Everything is converted to one canonical CSV and goes through the existing fingerprint de-duplication and plan matching. `GET /api/imports/formats` lists the sources. Cards that list purchases as positive numbers (Amex, Discover, Apple Card) are sign-corrected; pass `formatId` to override detection.
