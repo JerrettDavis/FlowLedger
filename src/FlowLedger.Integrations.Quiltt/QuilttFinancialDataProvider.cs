@@ -80,7 +80,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         }
 
         var statuses = accounts.Select(a => a.Connection?.Status?.ToUpperInvariant()).ToList();
-        if (statuses.Any(s => s is "ERROR_REPAIRABLE" or "ERROR_REAUTH" or "REAUTH_REQUIRED" or "ERROR_INSTITUTION" or "NEEDS_ATTENTION"))
+        if (statuses.Any(s => s is "ERROR_REPAIRABLE" or "DISCONNECTED" or "DISCONNECTING"))
         {
             return ConnectionStatus.NeedsUserAction;
         }
@@ -90,7 +90,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             return ConnectionStatus.Syncing;
         }
 
-        return statuses.Any(s => s is "ERROR" or "ERROR_PROVIDER") ? ConnectionStatus.Degraded : ConnectionStatus.Healthy;
+        return statuses.Any(s => s is "ERROR_INSTITUTION" or "ERROR_PROVIDER" or "ERROR_SERVICE") ? ConnectionStatus.Degraded : ConnectionStatus.Healthy;
     }
 
     // ── Accounts ─────────────────────────────────────────────────────────────

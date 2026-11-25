@@ -36,10 +36,10 @@ public sealed class QuilttProviderTests
     }
 
     private const string AccountsJson = """
-        {"data":{"accounts":{"nodes":[
-          {"id":"acc_1","name":"Everyday","type":"CHECKING","mask":"1234","currencyCode":"USD","balance":{"current":100.5,"available":90},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}},
-          {"id":"acc_2","name":"Visa","type":"CREDIT","currencyCode":"USD","balance":{"current":-250.25},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}}
-        ],"pageInfo":{"hasNextPage":false}}}}
+        {"data":{"accounts":[
+          {"id":"acc_1","name":"Everyday","kind":"DEPOSITORY","state":"OPEN","mask":"1234","currencyCode":"USD","balance":{"current":100.5,"available":90},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}},
+          {"id":"acc_2","name":"Visa","kind":"CREDIT","state":"OPEN","currencyCode":"USD","balance":{"current":-250.25},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}}
+        ]}}
         """;
 
     private const string TransactionsJson = """
@@ -127,33 +127,62 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
-    public async Task Pagination_FollowsEndCursor()
+    public void AccountKinds_MapToFlowLedgerTypes()
     {
-        var pages = 0;
+        QuilttMapper.MapType("DEPOSITORY", "Everyday Checking").Should().Be("CHECKING");
+        QuilttMapper.MapType("DEPOSITORY", "High Yield Savings").Should().Be("SAVINGS");
+        QuilttMapper.MapType("CREDIT", "Visa").Should().Be("CREDIT_CARD");
+        QuilttMapper.MapType("LOAN", "Auto").Should().Be("LOAN");
+        QuilttMapper.MapType("LOAN", "Home Mortgage").Should().Be("MORTGAGE");
+        QuilttMapper.MapType("INVESTMENT", "IRA").Should().Be("INVESTMENT");
+    }
+
+    [Fact]
+    public async Task Transactions_FollowEndCursor()
+    {
+        var calls = 0;
         var stub = new Stub((req, body) =>
         {
             if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
-            pages++;
+            if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
+            calls++;
             return Json(body.Contains("\"after\":null")
-                ? """{"data":{"accounts":{"nodes":[{"id":"a1","name":"A","type":"CHECKING"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}"""
-                : """{"data":{"accounts":{"nodes":[{"id":"a2","name":"B","type":"SAVINGS"}],"pageInfo":{"hasNextPage":false}}}}""");
+                ? """{"data":{"transactions":{"nodes":[{"id":"t1","date":"2026-11-01","description":"A","amount":-1,"entryType":"DEBIT","status":"POSTED","account":{"id":"acc_1"}}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}"""
+                : """{"data":{"transactions":{"nodes":[{"id":"t2","date":"2026-11-02","description":"B","amount":-2,"entryType":"DEBIT","status":"POSTED","account":{"id":"acc_1"}}],"pageInfo":{"hasNextPage":false}}}}""");
         });
+        var p = Make(stub);
+        await p.GetAccountsAsync("p_1");
 
-        var accounts = await Make(stub).GetAccountsAsync("p_1");
+        var page = await p.GetTransactionsAsync("acc_1", SyncCursor.Initial);
 
-        accounts.Select(a => a.ProviderId).Should().Equal("a1", "a2");
-        pages.Should().Be(2);
+        page.Items.Select(i => i.ProviderId).Should().Equal("t1", "t2");
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ConnectionStatus_UsesQuilttStatusEnum()
+    {
+        Task<ConnectionStatus> Status(string s) => Make(new Stub((req, _) =>
+            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            : Json("""{"data":{"accounts":[{"id":"a","name":"A","kind":"DEPOSITORY","connection":{"id":"c","status":"%S%"}}]}}""".Replace("%S%", s))))
+            .GetConnectionStatusAsync("p_1");
+
+        (await Status("SYNCED")).Should().Be(ConnectionStatus.Healthy);
+        (await Status("SYNCING")).Should().Be(ConnectionStatus.Syncing);
+        (await Status("ERROR_REPAIRABLE")).Should().Be(ConnectionStatus.NeedsUserAction);
+        (await Status("ERROR_INSTITUTION")).Should().Be(ConnectionStatus.Degraded);
     }
 
     // ── Webhooks ──
 
     private static string Header(string secret, string body, long ts)
     {
-        var mac = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes($"{ts}.{body}"));
-        return $"t={ts},v1={Convert.ToHexString(mac).ToLowerInvariant()}";
+        // Quiltt: Base64(HMAC-SHA256(secret, "1" + Quiltt-Timestamp + body)); the endpoint joins both headers as t=,v1=.
+        var mac = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes($"1{ts}{body}"));
+        return $"t={ts},v1={Convert.ToBase64String(mac)}";
     }
 
-    private const string Hook = """{"eventTypes":["connection.synced"],"profile":{"id":"p_1"},"events":[{"type":"connection.synced","record":{"id":"conn_1"}}]}""";
+    private const string Hook = """{"environment":{"id":"env_1","mode":"SANDBOX"},"eventTypes":["connection.synced.successful"],"events":[{"id":"evt_1","at":"2026-11-25T18:33:03Z","type":"connection.synced.successful","profile":{"id":"p_1","uuid":"u"},"record":{"id":"conn_1","status":"SYNCED"}}]}""";
 
     [Fact]
     public async Task Webhook_ValidSignature_VerifiesAndParses()
@@ -165,7 +194,7 @@ public sealed class QuilttProviderTests
         await p.VerifyWebhookAsync(raw, header);
         var evt = await p.ParseWebhookAsync(raw);
 
-        evt.EventType.Should().Be("connection.synced");
+        evt.EventType.Should().Be("connection.synced.successful");
         evt.MemberId.Should().Be("p_1");
         evt.Metadata["recordId"].Should().Be("conn_1");
     }

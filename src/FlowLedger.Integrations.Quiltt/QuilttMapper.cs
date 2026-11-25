@@ -10,7 +10,7 @@ internal static class QuilttMapper
     {
         var id = a.Id ?? throw new FatalProviderException("Quiltt account is missing its id.");
         var currency = Currency(a.CurrencyCode);
-        var type = MapType(a.Type, a.Name);
+        var type = MapType(a.Kind, a.Name);
         var balance = a.Balance?.Current ?? 0m;
         var available = a.Balance?.Available;
 
@@ -57,7 +57,7 @@ internal static class QuilttMapper
         return new ProviderTransaction(t.Id, accountId, date, pending, new Money(amount, new Currency(currency)), desc, null, null);
     }
 
-    /// <summary>Quiltt account types are coarse (CHECKING, SAVINGS, CREDIT, INVESTMENT, LOAN, ...); the name refines them.</summary>
+    /// <summary>Quiltt AccountKind is coarse (DEPOSITORY, INVESTMENT, CREDIT, LOAN, INSURANCE; extensible); the name refines it.</summary>
     internal static string MapType(string? type, string? name)
     {
         var t = (type ?? string.Empty).ToUpperInvariant();
@@ -65,7 +65,7 @@ internal static class QuilttMapper
         if (t.Contains("MORTGAGE") || n.Contains("MORTGAGE")) { return "MORTGAGE"; }
         if (t.Contains("LOAN") || t.Contains("LINE_OF_CREDIT")) { return "LOAN"; }
         if (t.Contains("CREDIT") || t.Contains("CARD")) { return "CREDIT_CARD"; }
-        if (t.Contains("SAVING") || t.Contains("MONEY_MARKET")) { return "SAVINGS"; }
+        if (t.Contains("SAVING") || t.Contains("MONEY_MARKET") || (t == "DEPOSITORY" && (n.Contains("SAVING") || n.Contains("MONEY MARKET")))) { return "SAVINGS"; }
         if (t.Contains("INVEST") || t.Contains("BROKERAGE") || t.Contains("RETIREMENT") || t.Contains("401")) { return "INVESTMENT"; }
         return "CHECKING";
     }

@@ -15,15 +15,12 @@ namespace FlowLedger.Integrations.Quiltt;
 internal sealed class QuilttApiClient
 {
     internal const string AccountsQuery = """
-        query FlowLedgerAccounts($first: Int!, $after: String) {
-          accounts(first: $first, after: $after) {
-            nodes {
-              id name type mask currencyCode
-              balance { current available }
-              institution { name }
-              connection { id status }
-            }
-            pageInfo { hasNextPage endCursor }
+        query FlowLedgerAccounts {
+          accounts {
+            id name kind state mask currencyCode
+            balance { current available }
+            institution { name }
+            connection { id status }
           }
         }
         """;
@@ -83,25 +80,11 @@ internal sealed class QuilttApiClient
         return new QuilttSession(token, id, body.ExpiresAt ?? QuilttJwt.Expiry(token));
     }
 
+    /// <summary>Quiltt's <c>accounts</c> root is a plain (unpaginated) list.</summary>
     public async Task<IReadOnlyList<QAccount>> ListAccountsAsync(string sessionToken, CancellationToken ct)
     {
-        var all = new List<QAccount>();
-        string? after = null;
-        for (var page = 0; page < _options.MaxPages; page++)
-        {
-            var data = await QueryAsync<QAccountsData>(sessionToken, AccountsQuery,
-                new { first = _options.PageSize, after }, ct).ConfigureAwait(false);
-            var conn = data?.Accounts;
-            all.AddRange(conn?.Nodes ?? []);
-            if (conn?.PageInfo is not { HasNextPage: true, EndCursor: { Length: > 0 } next })
-            {
-                return all;
-            }
-
-            after = next;
-        }
-
-        throw new FatalProviderException($"Quiltt accounts exceeded {_options.MaxPages} pages; refusing to loop.");
+        var data = await QueryAsync<QAccountsData>(sessionToken, AccountsQuery, new { }, ct).ConfigureAwait(false);
+        return data?.Accounts ?? [];
     }
 
     public async Task<IReadOnlyList<QTransaction>> ListTransactionsAsync(string sessionToken, DateOnly from, CancellationToken ct)

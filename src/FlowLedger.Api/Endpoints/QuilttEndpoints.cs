@@ -95,7 +95,11 @@ internal static class QuilttEndpoints
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
-                var signature = request.Headers.TryGetValue("Quiltt-Signature", out var sig) ? sig.ToString() : string.Empty;
+                // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
+                var signature = request.Headers.TryGetValue("Quiltt-Signature", out var sig)
+                                && request.Headers.TryGetValue("Quiltt-Timestamp", out var ts)
+                    ? $"t={ts},v1={sig}"
+                    : string.Empty;
                 try
                 {
                     await provider.VerifyWebhookAsync(rawBody, signature, ct);
