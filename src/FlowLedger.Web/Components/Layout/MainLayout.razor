@@ -44,7 +44,7 @@
             <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
                      aria-label="@($"Data environment {_environment}")">@_environment.ToUpperInvariant() DATA</MudChip>
         }
-        @if (_environment == "production")
+        @if (_environment is "production" or "sandbox") // sandbox = a real provider (Quiltt/MX sandbox) is configured
         {
             <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
                 <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
