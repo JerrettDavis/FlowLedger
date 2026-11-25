@@ -18,7 +18,14 @@ inside FlowLedger. Quiltt provides an embeddable Connector (browser) plus a per-
 ## Config
 `Quiltt:Enabled, ApiKeySecret, ConnectorId, WebhookSecret, Environment` (AppHost user-secrets, forwarded to api + worker).
 
-## Unverified until keys arrive
-GraphQL field names/filters (`QuilttApiClient` constants), webhook header/payload shape (`QuilttWebhookVerifier`, `ParseWebhookAsync`), Connector JS API
-(`quiltt-interop.js`), account-type and status strings. All are isolated in those files and covered by stubbed tests.
-Webhook-triggered syncs currently run for the household tenant (no profile-to-tenant lookup yet); scheduled sync is the per-tenant backstop.
+## Verified against Quiltt docs (2026-11-25), not yet against a live sandbox
+- Session API: `POST auth.quiltt.io/v1/users/sessions`, Bearer API secret, `{userId}` for an existing profile; response `token/userId/expiresAt`.
+- GraphQL: `accounts` is an **unpaginated list** with `kind` (DEPOSITORY/INVESTMENT/CREDIT/LOAN/INSURANCE), not `type`; `transactions` is Relay-paginated
+  (`first<=100`, `filter.date_gte`, `sort: DATE_ASC`). Connection status enum: SYNCED, SYNCING, INITIALIZING, ERROR_REPAIRABLE/INSTITUTION/PROVIDER/SERVICE, DISCONNECTED.
+- Webhooks: `Quiltt-Timestamp` + `Quiltt-Signature` = Base64(HMAC-SHA256(secret, `"1" + timestamp + body`)); body batches `events[]` each with `profile.id`.
+- Connector JS: `cdn.quiltt.io/v1/connector.js`, `Quiltt.authenticate(token)`, `Quiltt.connect(id, {onExitSuccess,...}).open()`.
+
+## Still unverified until keys arrive
+`institution { name }` field list, webhook processing of multi-event/multi-profile batches (only the first event drives the sync),
+and an end-to-end Connector link in the sandbox. Webhook-triggered syncs currently run for the household tenant (no profile-to-tenant lookup yet);
+scheduled sync is the per-tenant backstop.
