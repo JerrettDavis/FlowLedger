@@ -6,6 +6,7 @@ on:
     tags:     ["v*.*.*"]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 # Least privilege: only the tag-only `push` job below is granted packages: write.
 permissions:
@@ -171,7 +172,7 @@ jobs:
       AUTH__ALLOWANONYMOUS: "true"
     needs: build
     # Run on push to default branch or on tagged release; skip on PRs to save minutes
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout

@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Configuration;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.SharedKernel;
 using FlowLedger.Worker;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
