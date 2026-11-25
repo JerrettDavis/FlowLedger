@@ -234,7 +234,7 @@ else
                                 <div class="d-flex justify-space-between">
                                     <MudText Typo="Typo.body2">@m.Category</MudText>
                                     <MudText Typo="Typo.body2" Class="fl-num" Color="@(m.Change > 0 ? Color.Error : Color.Success)">
-                                        @(m.Change > 0 ? "▲" : "▼") @Format.Money(Math.Abs(m.Change))
+                                        @(m.Change > 0 ? "▲" : "▼") @Format.Money(Math.Abs(m.Change))@(m.Previous != 0 ? $" ({Format.Percent(m.Change, m.Previous)})" : "")
                                     </MudText>
                                 </div>
                                 <MudProgressLinear Value="@(maxChange == 0 ? 0 : Math.Abs((double)m.Change) / maxChange * 100)" Size="Size.Small"
@@ -395,7 +395,7 @@ else
                             @if (_assetSummary.TotalCost > 0)
                             {
                                 <div class="text-right">
-                                    <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(_assetSummary.UnrealizedGainLoss)">@Format.Signed(_assetSummary.UnrealizedGainLoss)</MudText>
+                                    <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(_assetSummary.UnrealizedGainLoss)">@Format.SignedWithPercent(_assetSummary.UnrealizedGainLoss, _assetSummary.TotalCost)</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">vs. @Format.Money(_assetSummary.TotalCost) cost</MudText>
                                 </div>
                             }
