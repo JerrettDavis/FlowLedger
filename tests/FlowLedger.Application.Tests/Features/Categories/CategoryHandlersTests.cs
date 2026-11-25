@@ -40,10 +40,19 @@ public sealed class CategoryHandlersTests
         await createHandler.HandleAsync(new CreateCategoryRequest("Food", "Food", null));
         await createHandler.HandleAsync(new CreateCategoryRequest("Transport", "Transport", null));
 
-        var listHandler = new ListCategoriesHandler(_repo);
+        var listHandler = new ListCategoriesHandler(_repo, _tenant);
         var categories = await listHandler.HandleAsync();
 
-        categories.Should().HaveCount(2);
+        categories.Should().HaveCount(2); // non-empty tenant: defaults are not re-seeded
+    }
+
+    [Fact]
+    public async Task ListCategories_EmptyTenant_SeedsDefaults_AndRestoreIsIdempotent()
+    {
+        var categories = await new ListCategoriesHandler(_repo, _tenant).HandleAsync();
+        categories.Select(c => c.Path).Should().BeEquivalentTo(DefaultCategories.Paths);
+
+        (await new RestoreDefaultCategoriesHandler(_repo, _tenant).HandleAsync()).Should().Be(0);
     }
 
     [Fact]

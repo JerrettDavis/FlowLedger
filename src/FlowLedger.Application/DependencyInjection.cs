@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.LocalAi.LocalAiService>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();
+        services.AddScoped<FlowLedger.Application.Features.Strategies.StrategyService>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRuleService>();
         services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRestructureService>();
         services.AddScoped<TransactionAnnotationService>();
@@ -69,6 +70,7 @@ public static class DependencyInjection
 
         // ── Handlers — Categories ────────────────────────────────────────────────
         services.AddScoped<ListCategoriesHandler>();
+        services.AddScoped<RestoreDefaultCategoriesHandler>();
         services.AddScoped<GetCategoryHandler>();
         services.AddScoped<CreateCategoryHandler>();
         services.AddScoped<UpdateCategoryHandler>();
@@ -79,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<GetRecurringFlowHandler>();
         services.AddScoped<CreateRecurringFlowHandler>();
         services.AddScoped<RecurringSuggestionService>();
+        services.AddScoped<FlowLedger.Application.Features.Duplicates.DuplicateService>();
         services.AddScoped<UpdateRecurringFlowHandler>();
         services.AddScoped<DeactivateRecurringFlowHandler>();
 

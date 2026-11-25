@@ -12,10 +12,18 @@ internal static class DashboardEndpoints
 
     internal sealed record NetWorthPoint(string Date, decimal Value);
 
+    internal sealed record MerchantSpend(string Merchant, decimal Amount, int Visits);
+
+    /// <summary>A category whose spending changed most against the previous period of the same length.</summary>
+    internal sealed record CategoryMover(string Category, decimal Current, decimal Previous, decimal Change);
+
     internal sealed record DashboardInsights(
         IReadOnlyList<CategorySpend> SpendingByCategory,
         IReadOnlyList<MonthCashFlow> CashFlow,
-        IReadOnlyList<NetWorthPoint> NetWorth);
+        IReadOnlyList<NetWorthPoint> NetWorth,
+        IReadOnlyList<MerchantSpend>? TopMerchants = null,
+        IReadOnlyList<CategoryMover>? Movers = null,
+        string? PreviousLabel = null);
 
     internal sealed record DismissSuspiciousRequest(string? Note);
 
@@ -64,10 +72,43 @@ internal static class DashboardEndpoints
                         ? "balance_history | summarize total = sum(balance) by date"
                         : $"balance_history | where date >= \"{fromS ?? "0001-01-01"}\"{toClause} | summarize total = sum(balance) by date", ct);
 
+                var today = DateOnly.FromDateTime(DateTime.Now);
+                // Merchants follow the selected window (this month when none).
+                var curFrom = from ?? new DateOnly(today.Year, today.Month, 1);
+                var curTo = to ?? today;
+
+                // "What changed" is always the last 30 days against the 30 before, whatever the chart window is: a fixed,
+                // recent comparison that stays meaningful even when history is shorter than the selected range.
+                var moveTo = today;
+                var moveFrom = moveTo.AddDays(-29);
+                var prevTo = moveFrom.AddDays(-1);
+                var prevFrom = prevTo.AddDays(-29);
+
+                async Task<Dictionary<string, decimal>> SpendBetween(DateOnly a, DateOnly b)
+                {
+                    var r = await query.HandleAsync(
+                        $"transactions | where direction == \"Debit\" and is_transfer == false and date >= \"{a:yyyy-MM-dd}\" and date <= \"{b:yyyy-MM-dd}\" | summarize total = sum(amount) by category", ct);
+                    return r.Rows.GroupBy(x => Str(x[0]), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(x => Dec(x[1])), StringComparer.OrdinalIgnoreCase);
+                }
+
+                var cur = await SpendBetween(moveFrom, moveTo);
+                var prev = await SpendBetween(prevFrom, prevTo);
+                var movers = cur.Keys.Union(prev.Keys, StringComparer.OrdinalIgnoreCase)
+                    .Select(k => new CategoryMover(k, cur.GetValueOrDefault(k), prev.GetValueOrDefault(k), cur.GetValueOrDefault(k) - prev.GetValueOrDefault(k)))
+                    .Where(m => Math.Max(m.Current, m.Previous) >= 25m)
+                    .OrderByDescending(m => Math.Abs(m.Change))
+                    .Take(6).ToList();
+
+                var merchants = await query.HandleAsync(
+                    $"transactions | where direction == \"Debit\" and is_transfer == false and date >= \"{curFrom:yyyy-MM-dd}\" and date <= \"{curTo:yyyy-MM-dd}\" | summarize total = sum(amount), visits = count() by merchant | top 8 by total", ct);
+
                 return Results.Ok(new DashboardInsights(
                     spending.Rows.Select(r => new CategorySpend(Str(r[0]), Dec(r[1]))).ToList(),
                     cashFlow.Rows.Select(r => new MonthCashFlow(Str(r[0]), Dec(r[1]), Dec(r[2]))).OrderBy(m => m.Month, StringComparer.Ordinal).ToList(),
-                    netWorth.Rows.Select(r => new NetWorthPoint(Str(r[0]), Dec(r[1]))).OrderBy(p => p.Date, StringComparer.Ordinal).ToList()));
+                    netWorth.Rows.Select(r => new NetWorthPoint(Str(r[0]), Dec(r[1]))).OrderBy(p => p.Date, StringComparer.Ordinal).ToList(),
+                    merchants.Rows.Select(r => new MerchantSpend(string.IsNullOrWhiteSpace(Str(r[0])) ? "Unknown" : Str(r[0]), Dec(r[1]), (int)Dec(r[2]))).ToList(),
+                    movers,
+                    $"{prevFrom:MMM d} – {prevTo:MMM d}"));
             })
             .WithName("GetDashboardInsights")
             .WithSummary("Spending by category (this month), 6-month income vs spending, and net-worth trend from balance snapshots");

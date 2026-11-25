@@ -74,3 +74,20 @@ benchmarks (Qwen3, Llama 3.2, Gemma 3); LLamaSharp 0.30 release notes (llama.cpp
   The 1.5B model is a weak adjudicator (roughly 2 of 7 right on unseen merchants); it stays suggest-only. Try Qwen3-4B before enabling few-shot.
 - Hardening added: downloader tests (bad checksum, oversize body, redirect to a foreign host, HTTP errors, retry after failure), prompt-injection neutralisation
   (control characters stripped, 80-char cap), LLM load failure retries after 2 minutes instead of staying disabled until restart.
+
+## Validation log (2026-11-23, real household data: verified 2026-11-23 snapshot, primary tenant, 176 hand-categorized merchants / 42 categories)
+
+Run with `RealDataEvaluationTests` (opt-in via `FLOWLEDGER_REAL_SNAPSHOT`/`FLOWLEDGER_REAL_PG`/`FLOWLEDGER_REAL_OUT`; restores the snapshot to a scratch DB and calls the
+app's own `EvaluateAsync`; emits aggregates only). Held-out merchants, overall hit rate, 5-fold / 10-fold:
+
+| Method | hashing | MiniLM | bge-small |
+|---|---|---|---|
+| Naive Bayes (current) | 35% / 33% | 35% / 33% | 35% / 33% |
+| Embedding kNN | 32% / 33% | 32% / 30% | 34% / 33% |
+| Ensemble | 36% / 35% | 34% / 35% | 35% / 34% |
+
+- **The seeded-set numbers did not transfer.** Naive Bayes is about 34% (not ~60%) and kNN about 30-34% (not 65%) on real unseen merchants. The seeded set was easier (clean, well-separated categories).
+- bge-small does not lose to MiniLM here: higher kNN precision at the same threshold (about 82% at 0.5 with 21% coverage, versus about 55% for MiniLM at 0.5 with 33% coverage; MiniLM reaches 74% only at 0.7 with 15% coverage).
+  Both are far from auto-apply quality, so `Categorization:MlThreshold` stays off and everything remains suggest-only. If suggestions are filtered, bge-small kNN at >= 0.5 is the best precision/coverage point measured.
+- Ensemble is at or slightly above the best single method overall, and its precision at 0.9 is about 86% on bge (14% coverage) but only about 47% on MiniLM, so MiniLM's confidence mapping is the poorer-calibrated one on real data.
+- Likely ceiling: fuzzy label boundaries (Dining / Snacks / Fast Food / Convenience) and overlapping categories (Food vs Food & Dining, Transport vs Auto & Transport, Fees vs Business/Fees). Consolidating those should raise measured accuracy more than a larger model.

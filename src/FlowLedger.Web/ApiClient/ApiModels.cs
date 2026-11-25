@@ -251,7 +251,10 @@ public sealed record MonthCashFlowDto(string Month, decimal Income, decimal Spen
 public sealed record NetWorthPointDto(string Date, decimal Value);
 
 public sealed record DashboardInsightsDto(
-    List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth);
+    List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth,
+List<MerchantSpendDto>? TopMerchants = null, List<CategoryMoverDto>? Movers = null, string? PreviousLabel = null);
+public sealed record MerchantSpendDto(string Merchant, decimal Amount, int Visits);
+public sealed record CategoryMoverDto(string Category, decimal Current, decimal Previous, decimal Change);
 
 public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
 
@@ -270,6 +273,17 @@ public sealed record DebtPlanDto(PayoffPlanDto Avalanche, PayoffPlanDto Snowball
 public sealed record AlertDto(string Severity, string Title, string Detail);
 
 public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
+
+public sealed record DuplicateSideDto(
+    Guid Id, Guid AccountId, string Description, string? MerchantName, decimal Amount, string Direction, string Status,
+    DateOnly EffectiveDate, Guid? CategoryId, string CategorySource, string? Notes, bool BankSynced);
+
+public sealed record DuplicateSuggestionDto(
+    string Key, string Confidence, double Score, int DaysApart, string Reason, DuplicateSideDto Keep, DuplicateSideDto Remove);
+
+public sealed record DuplicateScanDto(int Total, int AutoMergeable, List<DuplicateSuggestionDto> Suggestions);
+
+public sealed record AutoMergeDto(int Merged, int Suggested);
 public sealed record CategoryMergeDto(Guid SourceId, string OldPath, Guid TargetId, string TargetPath);
 public sealed record CategoryMoveDto(Guid Id, string OldPath, string NewPath, string DisplayName, Guid? ParentId);
 public sealed record CategoryMoveResultDto(int Moved, int Merged, int TransactionsAffected, List<CategoryMergeDto> Merges, List<CategoryMoveDto> Moves);

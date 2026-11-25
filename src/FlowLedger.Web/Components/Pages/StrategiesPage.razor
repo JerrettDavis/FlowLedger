@@ -1,0 +1,548 @@
+@page "/strategies"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@inject FlowLedgerApiClient ApiClient
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+<PageTitle>Strategies — FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Strategies &amp; simulators</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Suggestions built from your balances and cash flow plus current market rates (savings, CDs, mortgage, car, credit card, personal loan).
+    Every suggestion shows its evidence and assumptions. Use the simulators to test what-ifs in the past and the future.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_report is null)
+{
+    <MudAlert Severity="Severity.Warning">Couldn't load strategies. Try again shortly.</MudAlert>
+}
+else
+{
+    var r = _report.Rates;
+    <MudPaper Class="pa-3 mb-4" Outlined="true">
+        <div class="d-flex flex-wrap gap-4 align-center">
+            <MudText Typo="Typo.subtitle2">Market rates</MudText>
+            <MudText Class="fl-num">High-yield savings ~@Pct(r.Hysa)</MudText>
+            <MudText Class="fl-num">Money market ~@Pct(r.MoneyMarket)</MudText>
+            <MudText Class="fl-num">CD 6mo/1y/2y/5y ~@Pct(r.Cd6Month) / @Pct(r.Cd1Year) / @Pct(r.Cd2Year) / @Pct(r.Cd5Year)</MudText>
+            <MudText Class="fl-num">Mortgage 30y/15y @Pct(r.Mortgage30) / @Pct(r.Mortgage15)</MudText>
+            <MudText Class="fl-num">Auto @Pct(r.Auto48Month)</MudText>
+            <MudText Class="fl-num">Personal loan @Pct(r.PersonalLoan)</MudText>
+            <MudText Class="fl-num">Credit card @Pct(r.CreditCard)</MudText>
+        </div>
+        <MudText Typo="Typo.caption" Class="fl-muted">As of @r.AsOf.ToString("yyyy-MM-dd") · @r.Source</MudText>
+    </MudPaper>
+
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Liquid cash</MudText><MudText Class="fl-num">@Format.Money(_report.LiquidCash)</MudText></MudPaper>
+        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Avg monthly spend</MudText><MudText Class="fl-num">@Format.Money(_report.AvgMonthlySpend)</MudText></MudPaper>
+        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Savings rate</MudText><MudText Class="fl-num">@(_report.SavingsRate is { } sr ? sr.ToString("P0") : "—")</MudText></MudPaper>
+        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Emergency cover</MudText><MudText Class="fl-num">@(_report.EmergencyMonths is { } em ? $"{em:0.0} months" : "—")</MudText></MudPaper>
+    </div>
+
+    @if (_report.Coach is { } coach)
+    {
+        <MudPaper Class="pa-4 mb-4" Outlined="true" Style="border-left:4px solid var(--mud-palette-primary)">
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle1">Your next move</MudText>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@(coach.PickedBy == "LocalModel" ? "Prioritised by local AI" : "Prioritised by rules")</MudChip>
+            </div>
+            @foreach (var line in coach.Narrative) { <MudText Class="mt-1">@line</MudText> }
+        </MudPaper>
+    }
+
+    @if (_report.Trajectory is { Points.Count: > 0 } tr)
+    {
+        <MudPaper Class="pa-4 mb-4" Outlined="true">
+            <MudText Typo="Typo.subtitle1">Cash trajectory (next 12 months)</MudText>
+            <MudText Class="mb-2">@tr.Summary</MudText>
+            <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_trajSeries" ChartLabels="@_trajLabels" Width="100%" Height="220px" />
+            <MudText Typo="Typo.caption" Class="fl-muted">Trend of your recent monthly net cash flow, damped toward the average. The low/high lines are an approximate 80% range.</MudText>
+        </MudPaper>
+    }
+
+    <MudText Typo="Typo.h6" Class="mb-2">Suggestions</MudText>
+    @if (_report.Suggestions.Count == 0)
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4">Nothing stands out right now. Your cash, savings rate and debt look healthy against current rates.</MudAlert>
+    }
+
+    @foreach (var s in _report.Suggestions)
+    {
+        <MudPaper Class="pa-3 mb-3" Outlined="true">
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <MudChip T="string" Size="Size.Small" Color="@SeverityColor(s.Severity)">@s.Severity</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@s.Kind</MudChip>
+                <MudText Typo="Typo.subtitle1" Style="flex:1;min-width:min(240px,100%)">@s.Title</MudText>
+                @if (s.AnnualImpact is { } imp)
+                {
+                    <MudText Class="fl-num" Color="Color.Success">≈ @Format.Money(imp) / yr</MudText>
+                }
+            </div>
+            <MudText Class="mt-1">@s.Summary</MudText>
+            <MudExpansionPanels Class="mt-2" Elevation="0" Dense="true">
+                <MudExpansionPanel Text="Why, what to do, and assumptions">
+                    <MudText Typo="Typo.subtitle2">Evidence</MudText>
+                    <ul>@foreach (var e in s.Evidence) { <li>@e</li> }</ul>
+                    <MudText Typo="Typo.subtitle2">Steps</MudText>
+                    <ol>@foreach (var e in s.Steps) { <li>@e</li> }</ol>
+                    <MudText Typo="Typo.subtitle2">Assumptions</MudText>
+                    <ul>@foreach (var e in s.Assumptions) { <li class="fl-muted">@e</li> }</ul>
+                    <MudText Typo="Typo.caption" Class="fl-muted">Confidence @(s.Confidence.ToString("P0"))</MudText>
+                    @if (s.Simulator is { } sim)
+                    {
+                        <div class="mt-2"><MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => _tab = TabFor(sim))">Open simulator</MudButton></div>
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudPaper>
+    }
+
+    <MudText Typo="Typo.caption" Class="fl-muted d-block mb-4">@_report.Disclaimer</MudText>
+
+    <MudExpansionPanels Class="mb-4" Elevation="0">
+        <MudExpansionPanel Text="@($"Your account rates ({_rateRows.Count(x => x.Saved)} of {_rateRows.Count} entered): makes suggestions exact")">
+            <MudText Typo="Typo.body2" Class="fl-muted mb-2">Enter the APY on savings/checking and the APR on cards and loans (months remaining helps loan refinance maths). Blank rows use typical or market assumptions.</MudText>
+            @foreach (var row in _rateRows)
+            {
+                <div class="d-flex align-center gap-3 flex-wrap mb-1">
+                    <MudText Style="min-width:min(220px,100%);flex:1">@row.Name <span class="fl-muted">(@row.Type)</span></MudText>
+                    <MudNumericField T="decimal?" Immediate="true" @bind-Value="row.Rate" Label="@(row.IsLiability ? "APR %" : "APY %")" Min="0" Max="100" Margin="Margin.Dense" Style="max-width:120px" />
+                    @if (row.IsLiability)
+                    {
+                        <MudNumericField T="int?" Immediate="true" @bind-Value="row.Months" Label="Months left" Min="1" Max="600" Margin="Margin.Dense" Style="max-width:130px" />
+                    }
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SaveRate(row))" Disabled="@(!row.Rate.HasValue)">Save</MudButton>
+                    <MudButton Size="Size.Small" OnClick="@(() => ClearRate(row))" Disabled="@(!row.Saved)">Clear</MudButton>
+                </div>
+            }
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+    <MudText Typo="Typo.h6" Class="mb-2">Simulators</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2 fl-muted">Drag a slider and the result updates live.</MudText>
+    <MudTabs @bind-ActivePanelIndex="_tab" Elevation="0" Rounded="true" TabPanelsClass="pa-3">
+        <MudTabPanel Text="Goal planner">
+            <MudText Typo="Typo.body2" Class="fl-muted mb-2">Pick what you are saving for. See how long it takes now, then drag the levers to find faster paths.</MudText>
+            <div class="fl-sliders">
+                @Slider("Goal amount", _goTarget, 1000, Math.Max(500000m, _goTarget * 2), 1000, v => { _goTarget = v; return Queue(RunGoal); }, Format.Money)
+                @Slider("Already saved", _goSaved, 0, Math.Max(100000m, _goSaved * 2), 500, v => { _goSaved = v; return Queue(RunGoal); }, Format.Money)
+                @Slider("Saving per month now", _goMonthly, 0, 5000, 25, v => { _goMonthly = v; return Queue(RunGoal); }, Format.Money)
+                @Slider("Earning on it now (APY)", _goApy, 0, 12, 0.05m, v => { _goApy = v; return Queue(RunGoal); }, Pct)
+                @Slider("Deadline (0 = none)", _goYears, 0, 30, 0.5m, v => { _goYears = v; return Queue(RunGoal); }, v => v == 0 ? "none" : $"{v:0.#} yrs")
+            </div>
+            <MudText Typo="Typo.subtitle2" Class="mt-3">What if I…</MudText>
+            <div class="fl-sliders">
+                @Slider("Save extra per month", _goExtra, 0, 3000, 25, v => { _goExtra = v; return Queue(RunGoal); }, Format.Money)
+                @Slider("Earn more income", _goRaise, 0, 50, 1, v => { _goRaise = v; return Queue(RunGoal); }, v => $"+{v:0}%")
+                @Slider("Cut spending", _goCut, 0, 50, 1, v => { _goCut = v; return Queue(RunGoal); }, v => $"-{v:0}%")
+                @Slider("One-time lump sum", _goLump, 0, Math.Max(50000m, _goLump * 2), 250, v => { _goLump = v; return Queue(RunGoal); }, Format.Money)
+                @Slider("Move to a better rate (APY)", _goScApy, 0, 12, 0.05m, v => { _goScApy = v; return Queue(RunGoal); }, Pct)
+            </div>
+            @if (_goal is not null)
+            {
+                <MudPaper Class="pa-3 mt-3" Outlined="true">
+                    <MudText Class="fl-num">Current path: @GoalWhen(_goal.BaselineMonths) · With your changes: <b>@GoalWhen(_goal.ScenarioMonths)</b>
+                        @if (_goal.MonthsSaved is { } ms && ms != 0) { <span> (@(ms > 0 ? $"{ms} months sooner" : $"{-ms} months later"))</span> }
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="fl-muted">Scenario saves @Format.Money(_goal.ScenarioMonthly)/mo. Your recent surplus is @Format.Money(_goal.Surplus)/mo.@(_goal.RequiredMonthly is { } rq ? $" To hit the deadline you need {Format.Money(rq)}/mo." : "")</MudText>
+                </MudPaper>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_goalSeries" ChartLabels="@_goalLabels" Width="100%" Height="260px" />
+                @if (_goal.Callouts.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-2" Dense="true">
+                        <ul class="ma-0 pl-4">@foreach (var c in _goal.Callouts) { <li>@c</li> }</ul>
+                    </MudAlert>
+                }
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Ways to get there faster (each on its own, from your current path)</MudText>
+                @foreach (var l in _goal.Levers)
+                {
+                    <MudPaper Class="pa-2 mb-1 d-flex align-center gap-2 flex-wrap" Outlined="true">
+                        <div style="flex:1;min-width:min(260px,100%)">
+                            <MudText Typo="Typo.body2">@l.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="fl-muted">@l.Detail</MudText>
+                        </div>
+                        <MudText Class="fl-num">@GoalWhen(l.MonthsToGoal)@(l.MonthsSaved is > 0 ? $" ({l.MonthsSaved} mo sooner)" : "")</MudText>
+                        @if (CanApply(l.Id))
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => ApplyLever(l))">Try it</MudButton>
+                        }
+                    </MudPaper>
+                }
+            }
+        </MudTabPanel>
+        <MudTabPanel Text="Growth (future)">
+            <div class="fl-sliders">
+                @Slider("Starting balance", _gStart, 0, Math.Max(100000m, _gStart * 2), 500, v => { _gStart = v; return Queue(RunGrowth); }, Format.Money)
+                @Slider("Now: monthly add", _gBaseMonthly, 0, 5000, 25, v => { _gBaseMonthly = v; return Queue(RunGrowth); }, Format.Money)
+                @Slider("Now: APY", _gBaseApy, 0, 12, 0.05m, v => { _gBaseApy = v; return Queue(RunGrowth); }, Pct)
+                @Slider("Change: monthly add", _gScMonthly, 0, 5000, 25, v => { _gScMonthly = v; return Queue(RunGrowth); }, Format.Money)
+                @Slider("Change: APY", _gScApy, 0, 12, 0.05m, v => { _gScApy = v; return Queue(RunGrowth); }, Pct)
+                @Slider("Years", _gYears, 1, 40, 1, v => { _gYears = (int)v; return Queue(RunGrowth); }, v => $"{v:0} yrs")
+            </div>
+            @if (_growth is not null)
+            {
+                <MudText Class="fl-num mt-3">After @_gYears years: @Format.Money(_growth.Baseline[^1].Balance) → @Format.Money(_growth.Scenario[^1].Balance) (<b>@(_growth.Difference >= 0 ? "+" : "")@Format.Money(_growth.Difference)</b>)</MudText>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_growthSeries" ChartLabels="@_growthLabels" Width="100%" Height="260px" />
+            }
+        </MudTabPanel>
+        <MudTabPanel Text="What if (past)">
+            <MudText Typo="Typo.body2" Class="fl-muted mb-2">Replays your actual history with a different choice. Leave a slider at 0 to skip it.</MudText>
+            <div class="fl-sliders">
+                @Slider("Months back", _pMonths, 1, 60, 1, v => { _pMonths = (int)v; return Queue(RunPast); }, v => $"{v:0} mo")
+                @Slider("Saved extra / month", _pExtra, 0, 3000, 25, v => { _pExtra = v; return Queue(RunPast); }, Format.Money)
+                @Slider("Cut spending in category", _pCut, 0, 100, 5, v => { _pCut = v; return Queue(RunPast); }, v => $"{v:0}%")
+                @Slider("Idle cash moved", _pIdle, 0, Math.Max(100000m, _pIdle * 2), 500, v => { _pIdle = v; return Queue(RunPast); }, Format.Money)
+                @Slider("From APY", _pFrom, 0, 8, 0.05m, v => { _pFrom = v; return Queue(RunPast); }, Pct)
+                @Slider("To APY", _pTo, 0, 8, 0.05m, v => { _pTo = v; return Queue(RunPast); }, Pct)
+                @Slider("Saved money earns", _pGrowth, 0, 12, 0.25m, v => { _pGrowth = v; return Queue(RunPast); }, Pct)
+            </div>
+            <MudTextField T="string" Immediate="true" Value="_pCategory" ValueChanged="@(async (string? v) => { _pCategory = v; await Queue(RunPast); })" Label="Cut category (e.g. Dining)" Margin="Margin.Dense" Style="max-width:260px" />
+            @if (_past is not null)
+            {
+                <MudText Class="fl-num mt-3">You would have <b>@Format.Money(_past.TotalExtra)</b> more: @Format.Money(_past.FromSaving) saved plus @Format.Money(_past.FromYield) of growth and yield.</MudText>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_pastSeries" ChartLabels="@_pastLabels" Width="100%" Height="240px" />
+            }
+        </MudTabPanel>
+        <MudTabPanel Text="Refinance">
+            <div class="fl-sliders">
+                @Slider("Balance", _rBalance, 10000, 1500000, 5000, v => { _rBalance = v; return Queue(RunRefi); }, Format.Money)
+                @Slider("Current rate", _rCur, 0.5m, 15, 0.125m, v => { _rCur = v; return Queue(RunRefi); }, Pct)
+                @Slider("Months left", _rRemaining, 6, 480, 6, v => { _rRemaining = (int)v; return Queue(RunRefi); }, v => $"{v:0} mo ({v / 12:0.#} yrs)")
+                @Slider("New rate", _rNew, 0.5m, 15, 0.125m, v => { _rNew = v; return Queue(RunRefi); }, Pct)
+                @Slider("New term", _rTerm, 60, 480, 12, v => { _rTerm = (int)v; return Queue(RunRefi); }, v => $"{v:0} mo ({v / 12:0.#} yrs)")
+                @Slider("Closing costs", _rCosts, 0, 30000, 250, v => { _rCosts = v; return Queue(RunRefi); }, Format.Money)
+            </div>
+            @if (_refi is not null)
+            {
+                <MudAlert Severity="@(_refi.Worthwhile ? Severity.Success : Severity.Warning)" Class="mt-3">
+                    @(_refi.Worthwhile ? "This refinance pays off." : "This refinance does not clearly pay off.")
+                    Payment @Format.Money(_refi.CurrentPayment) → @Format.Money(_refi.NewPayment) (@Format.Money(_refi.MonthlySavings) / month).
+                    @(_refi.BreakEvenMonths is { } be ? $"Break-even after {be} months." : "No break-even: payment doesn't fall.")
+                    Remaining interest @Format.Money(_refi.CurrentRemainingInterest) → @Format.Money(_refi.NewTotalInterest) (net @Format.Money(_refi.LifetimeSavings)).
+                </MudAlert>
+                var maxPay = (double)Math.Max(1m, Math.Max(_refi.CurrentPayment, _refi.NewPayment));
+                    var maxInt = (double)Math.Max(1m, Math.Max(_refi.CurrentRemainingInterest, _refi.NewTotalInterest));
+                <div class="mt-2">
+                    <MudText Typo="Typo.caption">Monthly payment</MudText>
+                    <MudProgressLinear Value="@((double)_refi.CurrentPayment / maxPay * 100)" Color="Color.Default" Size="Size.Large"><span class="fl-num">Now @Format.Money(_refi.CurrentPayment)</span></MudProgressLinear>
+                    <MudProgressLinear Value="@((double)_refi.NewPayment / maxPay * 100)" Color="Color.Primary" Size="Size.Large" Class="mt-1"><span class="fl-num">New @Format.Money(_refi.NewPayment)</span></MudProgressLinear>
+                    <MudText Typo="Typo.caption" Class="mt-2 d-block">Remaining interest</MudText>
+                    <MudProgressLinear Value="@((double)_refi.CurrentRemainingInterest / maxInt * 100)" Color="Color.Default" Size="Size.Large"><span class="fl-num">Now @Format.Money(_refi.CurrentRemainingInterest)</span></MudProgressLinear>
+                    <MudProgressLinear Value="@((double)_refi.NewTotalInterest / maxInt * 100)" Color="@(_refi.LifetimeSavings >= 0 ? Color.Success : Color.Warning)" Size="Size.Large" Class="mt-1"><span class="fl-num">New @Format.Money(_refi.NewTotalInterest)</span></MudProgressLinear>
+                </div>
+                <MudText Typo="Typo.caption" Class="fl-muted">Closing costs are rolled into the new loan. A longer new term lowers the payment but can raise lifetime interest; compare the lifetime figure.</MudText>
+            }
+        </MudTabPanel>
+        <MudTabPanel Text="CD ladder">
+            <div class="fl-sliders">
+                @Slider("Amount to ladder", _lAmount, 400, Math.Max(100000m, _lAmount * 2), 500, v => { _lAmount = v; return Queue(RunLadder); }, Format.Money)
+            </div>
+            @if (_ladder is not null)
+            {
+                @foreach (var x in _ladder.Rungs)
+                {
+                    <MudText Class="fl-num">@x.Label CD: @Format.Money(x.Amount) at ~@Pct(x.Apy) (@Format.Money(x.InterestAtMaturity) at maturity)</MudText>
+                }
+                <MudText Class="fl-num mt-2"><b>Blended ~@Pct(_ladder.BlendedApy)</b>: @Format.Money(_ladder.AnnualInterest) / yr vs @Format.Money(_ladder.SavingsAnnualInterest) in high-yield savings (@(_ladder.Advantage >= 0 ? "+" : "")@Format.Money(_ladder.Advantage)).</MudText>
+                <MudText Typo="Typo.caption" Class="fl-muted">CD rates are estimated from Treasury yields; real offers vary. Early withdrawal usually costs interest.</MudText>
+            }
+        </MudTabPanel>
+        <MudTabPanel Text="FIRE">
+            <MudText Typo="Typo.body2" Class="fl-muted mb-2">When can your investments fund your spending? Returns are inflation-adjusted, so all figures are in today's dollars.</MudText>
+            <div class="fl-sliders">
+                @Slider("Invested today", _fInvested, 0, Math.Max(1000000m, _fInvested * 2), 1000, v => { _fInvested = v; return Queue(RunFire); }, Format.Money)
+                @Slider("Monthly contribution", _fMonthly, 0, 10000, 50, v => { _fMonthly = v; return Queue(RunFire); }, Format.Money)
+                @Slider("Annual spending", _fSpend, 10000, 200000, 1000, v => { _fSpend = v; return Queue(RunFire); }, Format.Money)
+                @Slider("Withdrawal rate", _fWithdrawal, 2, 6, 0.25m, v => { _fWithdrawal = v; return Queue(RunFire); }, Pct)
+                @Slider("Real return", _fReturn, 0, 10, 0.25m, v => { _fReturn = v; return Queue(RunFire); }, Pct)
+                @Slider("Your age", _fAge, 18, 80, 1, v => { _fAge = v; return Queue(RunFire); }, v => $"{v:0}")
+            </div>
+            @if (_fire is not null)
+            {
+                <MudText Class="fl-num mt-3">
+                    Target nest egg <b>@Format.Money(_fire.FireNumber)</b>.
+                    @if (_fire.Reachable && _fire.MonthsToFire is { } fm)
+                    {
+                        <span>Reached in <b>@($"{fm / 12.0:0.#}")</b> years (age <b>@($"{_fire.FireAge:0.#}")</b>).</span>
+                    }
+                    else
+                    {
+                        <span>Not reached within 50 years at this pace. Try saving more or spending less.</span>
+                    }
+                </MudText>
+            }
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private bool _loading = true;
+    private StrategyReportDto? _report;
+    private int _tab;
+
+    private sealed class RateRow
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = "";
+        public string Type { get; init; } = "";
+        public bool IsLiability { get; init; }
+        public decimal? Rate { get; set; }
+        public int? Months { get; set; }
+        public bool Saved { get; set; }
+    }
+
+    private List<RateRow> _rateRows = [];
+    private List<ChartSeries<double>> _trajSeries = [];
+    private string[] _trajLabels = [];
+    private static readonly HashSet<string> RateTypes = new(StringComparer.OrdinalIgnoreCase) { "Checking", "Savings", "CreditCard", "Loan", "Mortgage" };
+
+    private decimal _goTarget = 20000m, _goSaved, _goMonthly, _goApy = 0.5m, _goYears, _goExtra, _goRaise, _goCut, _goLump, _goScApy = 4m;
+    private GoalPlanDto? _goal;
+    private List<ChartSeries<double>> _goalSeries = [];
+    private string[] _goalLabels = [];
+
+    private static string GoalWhen(int? months) => months switch
+    {
+        null => "not within 50 years",
+        0 => "already there",
+        var m when m < 24 => $"{m} months",
+        var m => $"{m / 12.0:0.#} years",
+    };
+
+    private static bool CanApply(string id) => id.StartsWith("save-") || id.StartsWith("income-") || id == "cut-10" || id == "yield-hysa";
+
+    private async Task ApplyLever(GoalLeverDto l)
+    {
+        if (l.Id.StartsWith("save-")) { _goExtra = l.MonthlyImpact ?? 0; }
+        else if (l.Id.StartsWith("income-")) { _goRaise = decimal.Parse(l.Id["income-".Length..]); }
+        else if (l.Id == "cut-10") { _goCut = 10; }
+        else if (l.Id == "yield-hysa") { _goScApy = _report?.Rates.Hysa ?? _goScApy; }
+        await RunGoal();
+    }
+
+    private Task RunGoal() => Safe(async () =>
+    {
+        _goal = await ApiClient.SimulateGoalAsync(_goTarget, _goSaved, _goMonthly, _goApy, (int)Math.Round(_goYears * 12), _goExtra, _goRaise, _goCut, _goLump, _goScApy);
+        if (_goal is null) { return; }
+        var n = Math.Max(_goal.Baseline.Count, _goal.Scenario.Count);
+        var step = Math.Max(1, n / 24);
+        var idx = Enumerable.Range(0, n).Where(i => i % step == 0 || i == n - 1).ToList();
+        double At(List<decimal> p, int i) => (double)p[Math.Min(i, p.Count - 1)];
+        _goalLabels = idx.Select(i => i % 12 == 0 ? $"Y{i / 12}" : $"{i}m").ToArray();
+        _goalSeries =
+        [
+            new ChartSeries<double> { Name = "Current path", Data = idx.Select(i => At(_goal.Baseline, i)).ToArray() },
+            new ChartSeries<double> { Name = "With your changes", Data = idx.Select(i => At(_goal.Scenario, i)).ToArray() },
+            new ChartSeries<double> { Name = "Goal", Data = idx.Select(_ => (double)_goal.Target).ToArray() },
+        ];
+    });
+
+    private decimal _gStart, _gBaseMonthly, _gBaseApy = 0.5m, _gScMonthly, _gScApy = 4m;
+    private int _gYears = 10;
+    private GrowthComparisonDto? _growth;
+    private FireDto? _fire;
+    private decimal _fInvested = 50000m, _fMonthly = 1500m, _fSpend = 50000m, _fWithdrawal = 4m, _fReturn = 5m, _fAge = 35m;
+    private List<ChartSeries<double>> _growthSeries = [];
+    private string[] _growthLabels = [];
+
+    private int _pMonths = 12;
+    private decimal _pExtra, _pCut, _pIdle, _pFrom = 0.5m, _pTo = 4m, _pGrowth = 4m;
+    private string? _pCategory;
+    private PastWhatIfDto? _past;
+    private List<ChartSeries<double>> _pastSeries = [];
+    private string[] _pastLabels = [];
+
+    private decimal _rBalance = 300000m, _rCur = 7m, _rNew = 6m, _rCosts = 5000m;
+    private int _rRemaining = 336, _rTerm = 360;
+    private RefinanceDto? _refi;
+
+    private decimal _lAmount = 20000m;
+    private LadderPlanDto? _ladder;
+
+    private RenderFragment Slider(string label, decimal value, decimal min, decimal max, decimal step, Func<decimal, Task> set, Func<decimal, string> fmt) => __b =>
+    {
+        var v = Math.Clamp(value, min, max);
+        __b.OpenElement(0, "div");
+        __b.AddAttribute(1, "class", "fl-slider");
+        __b.OpenComponent<MudText>(2);
+        __b.AddAttribute(3, "Typo", Typo.caption);
+        __b.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, $"{label}: {fmt(value)}")));
+        __b.CloseComponent();
+        __b.OpenComponent<MudSlider<decimal>>(5);
+        __b.AddAttribute(6, "Value", v);
+        __b.AddAttribute(7, "ValueChanged", EventCallback.Factory.Create<decimal>(this, set));
+        __b.AddAttribute(8, "Min", min);
+        __b.AddAttribute(9, "Max", max);
+        __b.AddAttribute(10, "Step", step);
+        __b.AddAttribute(11, "Immediate", true);
+        __b.AddAttribute(12, "Color", Color.Primary);
+        __b.CloseComponent();
+        __b.CloseElement();
+    };
+
+    private CancellationTokenSource? _debounce;
+
+    /// <summary>Debounced re-run so dragging a slider doesn't flood the API.</summary>
+    private async Task Queue(Func<Task> run)
+    {
+        _debounce?.Cancel();
+        var cts = _debounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(120, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await run();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+
+    private static string Pct(decimal v) => v.ToString("0.##") + "%";
+
+    private static int TabFor(string sim) => sim switch { "goal" => 0, "growth" => 1, "past" => 2, "refinance" => 3, "ladder" => 4, "fire" => 5, _ => 0 };
+
+    private static Color SeverityColor(string s) => s switch
+    {
+        "Urgent" => Color.Error, "Attention" => Color.Warning, "Opportunity" => Color.Success, _ => Color.Default,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _report = await ApiClient.GetStrategiesAsync();
+            await LoadRatesAsync();
+            if (_report is not null)
+            {
+                BuildTrajectory();
+                _gStart = Math.Round(_report.LiquidCash, 0);
+                _gBaseApy = _report.Rates.TypicalSavingsApy;
+                _gScApy = _report.Rates.Hysa;
+                _lAmount = Math.Max(1000m, Math.Floor(_report.LiquidCash / 4 / 100) * 100);
+                _pIdle = Math.Round(_report.LiquidCash, 0);
+                _pFrom = _report.Rates.TypicalSavingsApy;
+                _pTo = _report.Rates.Hysa;
+                _pGrowth = _report.Rates.Hysa;
+                _goSaved = Math.Round(_report.LiquidCash, 0);
+                _goMonthly = Math.Max(0, Math.Round(_report.AvgMonthlyIncome - _report.AvgMonthlySpend, 0));
+                _goApy = _report.Rates.TypicalSavingsApy;
+                _goScApy = Math.Max(_report.Rates.Hysa, _goApy);
+                _goTarget = Math.Max(5000m, Math.Ceiling(_goSaved * 2 / 1000m) * 1000m);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+
+        _loading = false;
+        await Safe(async () => { await RunGoal(); await RunGrowth(); await RunPast(); await RunRefi(); await RunLadder(); await RunFire(); });
+    }
+
+    private async Task LoadRatesAsync()
+    {
+        var accounts = await ApiClient.GetAccountsAsync();
+        var saved = (await ApiClient.GetAccountRatesAsync() ?? []).ToDictionary(r => r.AccountId);
+        _rateRows = accounts.Where(a => a.IsActive && RateTypes.Contains(a.AccountType)).Select(a => new RateRow
+        {
+            Id = a.Id, Name = a.Name, Type = a.AccountType, IsLiability = a.AccountType is "CreditCard" or "Loan" or "Mortgage",
+            Rate = saved.TryGetValue(a.Id, out var s) ? s.RatePercent : null,
+            Months = saved.TryGetValue(a.Id, out var s2) ? s2.RemainingMonths : null,
+            Saved = saved.ContainsKey(a.Id),
+        }).ToList();
+    }
+
+    private void BuildTrajectory()
+    {
+        if (_report?.Trajectory is not { Points.Count: > 0 } t) { return; }
+        _trajLabels = t.Points.Select(p => p.MonthsAhead == 0 ? "Now" : $"+{p.MonthsAhead}m").ToArray();
+        _trajSeries =
+        [
+            new ChartSeries<double> { Name = "Expected", Data = t.Points.Select(p => (double)p.Expected).ToArray() },
+            new ChartSeries<double> { Name = "Low", Data = t.Points.Select(p => (double)p.Low).ToArray() },
+            new ChartSeries<double> { Name = "High", Data = t.Points.Select(p => (double)p.High).ToArray() },
+        ];
+    }
+
+    private async Task SaveRate(RateRow row)
+    {
+        await Safe(async () =>
+        {
+            await ApiClient.SaveAccountRateAsync(row.Id, row.Rate ?? 0, row.IsLiability ? row.Months : null);
+            row.Saved = true;
+            _report = await ApiClient.GetStrategiesAsync();
+            BuildTrajectory();
+            Snackbar.Add("Rate saved. Suggestions updated.", Severity.Success);
+        });
+    }
+
+    private async Task ClearRate(RateRow row)
+    {
+        await Safe(async () =>
+        {
+            await ApiClient.RemoveAccountRateAsync(row.Id);
+            row.Rate = null; row.Months = null; row.Saved = false;
+            _report = await ApiClient.GetStrategiesAsync();
+            BuildTrajectory();
+        });
+    }
+
+    private Task RunFire() => Safe(async () =>
+        _fire = await ApiClient.SimulateFireAsync(_fInvested, _fMonthly, _fSpend, _fWithdrawal, _fReturn, _fAge, 50));
+
+    private async Task RunGrowth()
+    {
+        await Safe(async () =>
+        {
+            _growth = await ApiClient.SimulateGrowthAsync(_gStart, _gBaseMonthly, _gBaseApy, _gScMonthly, _gScApy, _gYears);
+            if (_growth is null) { return; }
+            var step = Math.Max(1, _gYears / 10) * 12;
+            var idx = Enumerable.Range(0, _growth.Baseline.Count).Where(i => i % step == 0 || i == _growth.Baseline.Count - 1).ToList();
+            _growthLabels = idx.Select(i => $"Y{i / 12.0:0.#}").ToArray();
+            _growthSeries =
+            [
+                new ChartSeries<double> { Name = "Current path", Data = idx.Select(i => (double)_growth.Baseline[i].Balance).ToArray() },
+                new ChartSeries<double> { Name = "With change", Data = idx.Select(i => (double)_growth.Scenario[i].Balance).ToArray() },
+            ];
+        });
+    }
+
+    private async Task RunPast()
+    {
+        await Safe(async () =>
+        {
+            _past = await ApiClient.SimulatePastAsync(_pMonths, _pExtra, _pCategory, _pCut, _pIdle, _pFrom, _pTo, _pGrowth);
+            if (_past is null) { return; }
+            _pastLabels = _past.Points.Select(p => p.Month).ToArray();
+            _pastSeries = [new ChartSeries<double> { Name = "Extra wealth", Data = _past.Points.Select(p => (double)p.ExtraWealth).ToArray() }];
+        });
+    }
+
+    private Task RunRefi() => Safe(async () => _refi = await ApiClient.SimulateRefinanceAsync(_rBalance, _rCur, _rRemaining, _rNew, _rTerm, _rCosts));
+
+    private Task RunLadder() => Safe(async () => _ladder = await ApiClient.SimulateLadderAsync(_lAmount));
+
+    private async Task Safe(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,135 @@
+namespace FlowLedger.Application.Features.Strategies;
+
+public sealed record GrowthPoint(int Month, decimal Balance, decimal Contributed, decimal Interest);
+
+public sealed record GrowthComparison(
+    IReadOnlyList<GrowthPoint> Baseline, IReadOnlyList<GrowthPoint> Scenario, decimal Difference);
+
+public sealed record PastPoint(string Month, decimal ExtraWealth);
+
+public sealed record PastWhatIfResult(IReadOnlyList<PastPoint> Points, decimal TotalExtra, decimal FromSaving, decimal FromYield);
+
+public sealed record RefinanceResult(
+    decimal CurrentPayment, decimal NewPayment, decimal MonthlySavings, decimal ClosingCosts,
+    int? BreakEvenMonths, decimal CurrentRemainingInterest, decimal NewTotalInterest, decimal LifetimeSavings, bool Worthwhile);
+
+public sealed record LadderRung(string Label, int Months, decimal Amount, decimal Apy, decimal InterestAtMaturity);
+
+public sealed record LadderPlan(
+    IReadOnlyList<LadderRung> Rungs, decimal BlendedApy, decimal AnnualInterest, decimal SavingsAnnualInterest, decimal Advantage);
+
+/// <summary>Standard amortised-loan payment. Zero-rate loans amortise linearly.</summary>
+public static class LoanMath
+{
+    public static decimal Payment(decimal balance, decimal annualRatePercent, int months)
+    {
+        if (months <= 0 || balance <= 0)
+        {
+            return 0m;
+        }
+
+        var r = (double)annualRatePercent / 1200.0;
+        if (r == 0)
+        {
+            return Math.Round(balance / months, 2);
+        }
+
+        var pow = Math.Pow(1 + r, months);
+        return Math.Round((decimal)((double)balance * r * pow / (pow - 1)), 2);
+    }
+}
+
+public static class Simulators
+{
+    public const int MaxMonths = 600;
+
+    /// <summary>Monthly-compounded growth of a starting balance plus recurring contributions.</summary>
+    public static IReadOnlyList<GrowthPoint> Grow(decimal start, decimal monthlyContribution, decimal annualRatePercent, int months)
+    {
+        months = Math.Clamp(months, 0, MaxMonths);
+        var points = new List<GrowthPoint>(months + 1) { new(0, Math.Round(start, 2), Math.Round(start, 2), 0m) };
+        var balance = start;
+        var contributed = start;
+        var rate = annualRatePercent / 1200m;
+        for (var m = 1; m <= months; m++)
+        {
+            balance += balance * rate;
+            balance += monthlyContribution;
+            contributed += monthlyContribution;
+            points.Add(new GrowthPoint(m, Math.Round(balance, 2), Math.Round(contributed, 2), Math.Round(balance - contributed, 2)));
+        }
+
+        return points;
+    }
+
+    public static GrowthComparison CompareGrowth(
+        decimal start, decimal baseContribution, decimal baseRate, decimal scenarioContribution, decimal scenarioRate, int months)
+    {
+        var a = Grow(start, baseContribution, baseRate, months);
+        var b = Grow(start, scenarioContribution, scenarioRate, months);
+        return new GrowthComparison(a, b, b[^1].Balance - a[^1].Balance);
+    }
+
+    /// <summary>
+    /// "What if I'd done this in the past?" Replays history month by month: <paramref name="extraByMonth"/> is money you
+    /// would have saved each month, which compounds at <paramref name="growthRatePercent"/>; <paramref name="idleCash"/> would have
+    /// earned the spread between <paramref name="toRate"/> and <paramref name="fromRate"/> the whole time.
+    /// </summary>
+    public static PastWhatIfResult PastWhatIf(
+        IReadOnlyList<(string Month, decimal Extra)> extraByMonth, decimal growthRatePercent,
+        decimal idleCash, decimal fromRate, decimal toRate)
+    {
+        var points = new List<PastPoint>();
+        decimal wealth = 0, saved = 0;
+        var growth = growthRatePercent / 1200m;
+        var spread = idleCash * (toRate - fromRate) / 1200m;
+        foreach (var (month, extra) in extraByMonth)
+        {
+            wealth += wealth * growth;
+            wealth += extra + spread;
+            saved += extra;
+            points.Add(new PastPoint(month, Math.Round(wealth, 2)));
+        }
+
+        var total = Math.Round(wealth, 2);
+        return new PastWhatIfResult(points, total, Math.Round(saved, 2), Math.Round(total - saved, 2));
+    }
+
+    /// <summary>Refinance break-even: new payment vs current payment over the remaining term, including closing costs.</summary>
+    public static RefinanceResult Refinance(
+        decimal balance, decimal currentRate, int remainingMonths, decimal newRate, int newTermMonths, decimal closingCosts)
+    {
+        var curPay = LoanMath.Payment(balance, currentRate, remainingMonths);
+        var newBalance = balance + closingCosts; // roll costs in; the conservative case
+        var newPay = LoanMath.Payment(newBalance, newRate, newTermMonths);
+        var monthlySavings = curPay - newPay;
+        var curInterest = Math.Max(0, curPay * remainingMonths - balance);
+        var newInterest = Math.Max(0, newPay * newTermMonths - newBalance);
+        // Lifetime view charges the new loan's interest; closing costs are in the new principal, so they are already counted.
+        var lifetime = curInterest - newInterest;
+        int? breakEven = monthlySavings > 0 && closingCosts > 0 ? (int)Math.Ceiling(closingCosts / monthlySavings) : closingCosts <= 0 && monthlySavings > 0 ? 0 : null;
+        var worthwhile = lifetime > 0 && monthlySavings > 0 && (breakEven is null || breakEven <= Math.Min(remainingMonths, newTermMonths));
+        return new RefinanceResult(curPay, newPay, Math.Round(monthlySavings, 2), closingCosts, breakEven,
+            Math.Round(curInterest, 2), Math.Round(newInterest, 2), Math.Round(lifetime, 2), worthwhile);
+    }
+}
+
+public static class LadderPlanner
+{
+    /// <summary>Equal rungs at 6 months, 1, 2 and 5 years (a classic ladder). Compares against the same money in high-yield savings.</summary>
+    public static LadderPlan Build(decimal amount, MarketRates r)
+    {
+        (string Label, int Months, decimal Apy)[] spec =
+        [
+            ("6-month", 6, r.Cd6Month), ("1-year", 12, r.Cd1Year), ("2-year", 24, r.Cd2Year), ("5-year", 60, r.Cd5Year),
+        ];
+        var each = Math.Floor(amount / spec.Length / 100m) * 100m;
+        var rungs = spec.Select(s => new LadderRung(
+            s.Label, s.Months, each, s.Apy, Math.Round(each * s.Apy / 100m * s.Months / 12m, 2))).ToList();
+        var invested = each * spec.Length;
+        var annual = spec.Sum(s => each * s.Apy / 100m);
+        var blended = invested > 0 ? Math.Round(annual / invested * 100m, 2) : 0m;
+        var savingsAnnual = invested * r.Hysa / 100m;
+        return new LadderPlan(rungs, blended, Math.Round(annual, 2), Math.Round(savingsAnnual, 2), Math.Round(annual - savingsAnnual, 2));
+    }
+}

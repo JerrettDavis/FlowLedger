@@ -19,6 +19,11 @@ internal static class CategoryEndpoints
             .WithName("ListCategories")
             .WithSummary("List all categories for the current tenant");
 
+        group.MapPost("/defaults", async (RestoreDefaultCategoriesHandler handler, CancellationToken ct) =>
+            Results.Ok(new { added = await handler.HandleAsync(ct) }))
+            .WithName("RestoreDefaultCategories")
+            .WithSummary("Add any missing default (Mint-equivalent) categories; existing categories are untouched");
+
         group.MapGet("/{id:guid}", async (Guid id, GetCategoryHandler handler, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);

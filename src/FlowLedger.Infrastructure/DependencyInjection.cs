@@ -102,6 +102,7 @@ public static class DependencyInjection
 
         // ── Repositories ────────────────────────────────────────────────────────
         services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddHttpClient<FlowLedger.Application.Features.Strategies.IMarketRateProvider, FlowLedger.Infrastructure.Strategies.FredMarketRateProvider>(c => c.DefaultRequestHeaders.UserAgent.ParseAdd("FlowLedger-RateFetcher/1.0"));
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
@@ -222,6 +223,11 @@ public static class DependencyInjection
         // ── Sync service ────────────────────────────────────────────────────────
         services.AddScoped<FinancialSyncService>();
         services.AddScoped<FlowLedger.Application.Abstractions.IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();
+        services.AddScoped<FlowLedger.Application.Features.Duplicates.IDuplicateStore, FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore>();
+        services.AddSingleton(new FlowLedger.Application.Features.Duplicates.DuplicateOptions
+        {
+            AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto,
+        });
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
         services.AddScoped<FlowLedger.Infrastructure.Sync.MultiConnectorSyncService>();
@@ -255,8 +261,13 @@ public static class DependencyInjection
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
             // After every successful sync, fill in missing categories (never overwrites existing ones).
-            var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
+            var deduped = new FlowLedger.Infrastructure.Sync.DedupingSyncService(
                 guarded,
+                sp.GetRequiredService<FlowLedger.Application.Features.Duplicates.DuplicateService>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.DedupingSyncService>>());
+
+            var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
+                deduped,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
@@ -328,6 +339,11 @@ public static class DependencyInjection
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore>());
         services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
+        // -- Account rates (per-tenant, ad-hoc table; part of every snapshot/export) --
+        services.AddSingleton<FlowLedger.Application.Features.Strategies.IAccountRateStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountRateStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Home Assistant sharing (per-tenant settings + sent ledger; alerts only by default) --
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(_ =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlHomeAssistantStore(
