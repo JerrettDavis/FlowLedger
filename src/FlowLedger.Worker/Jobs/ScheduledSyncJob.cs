@@ -59,6 +59,10 @@ public sealed class ScheduledSyncJob : IJob
                     "ScheduledSyncJob: tenant {TenantId} sync complete — {AccountsUpserted} accounts, " +
                     "{TransactionsAdded} added, {TransactionsSkipped} skipped.",
                     tenantId, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+                await sp.GetRequiredService<FlowLedger.Application.Features.Integrations.IntegrationService>().DispatchAsync(
+                    FlowLedger.Application.Features.Integrations.IntegrationEvents.SyncCompleted,
+                    new { accounts = result.AccountsUpserted, transactionsAdded = result.TransactionsAdded },
+                    cancellationToken);
             }
             catch (Exception ex) when (ex is FlowLedger.Application.Abstractions.SyncThrottledException
                                           or FlowLedger.Application.Abstractions.SyncAlreadyRunningException)

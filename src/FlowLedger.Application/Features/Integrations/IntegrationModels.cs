@@ -30,7 +30,8 @@ public static class IntegrationEvents
     public const string SyncCompleted = "sync.completed";
     public const string AlertRaised = "alert.raised";
 
-    public static IReadOnlyList<string> All { get; } = [ImportCompleted, SyncCompleted, AlertRaised];
+    /// <summary>Events a webhook can subscribe to. <see cref="AlertRaised"/> is reserved until alerts are dispatched.</summary>
+    public static IReadOnlyList<string> All { get; } = [ImportCompleted, SyncCompleted];
 }
 
 /// <summary>The non-secret part of an integration. Secrets (credential, signing secret) never live here.</summary>

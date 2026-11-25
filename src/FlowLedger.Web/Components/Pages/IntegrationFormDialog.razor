@@ -54,7 +54,7 @@
             {
                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
                     This server has no encryption key, so it will refuse to store credentials. Ask whoever runs FlowLedger to set
-                    <code>Integrations__EncryptionKey</code> (base64, 32 bytes).
+                    <code>Integrations__EncryptionKey</code> or <code>HomeAssistant__EncryptionKey</code> (base64, 32 bytes).
                 </MudAlert>
             }
         }
@@ -156,7 +156,7 @@
     internal static string DescribeEvent(string ev) => ev switch
     {
         "import.completed" => "A transaction import finished",
-        "sync.completed" => "A bank sync finished",
+        "sync.completed" => "A bank sync finished (scheduled or manual)",
         "alert.raised" => "An alert was raised",
         _ => ev,
     };

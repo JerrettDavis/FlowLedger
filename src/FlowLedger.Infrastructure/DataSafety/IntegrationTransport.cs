@@ -13,13 +13,18 @@ namespace FlowLedger.Infrastructure.DataSafety;
 public sealed class IntegrationTransport(IHttpClientFactory http) : IIntegrationTransport
 {
     public const string HttpClientName = "integrations";
+
+    /// <summary>A separate client (and so a separate connection pool) for the household owner, who may reach local addresses.
+    /// A pooled connection opened under that policy must never be reused for another tenant, because the connect-time check
+    /// only runs for new connections.</summary>
+    public const string LocalHttpClientName = "integrations-local";
     public const int MaxResponseBytes = 256 * 1024;
 
     public async Task<TransportResponse> SendAsync(TransportRequest request, bool allowLocalNetwork, CancellationToken ct = default)
     {
         try
         {
-            using var client = http.CreateClient(HttpClientName);
+            using var client = http.CreateClient(allowLocalNetwork ? LocalHttpClientName : HttpClientName);
             using var message = new HttpRequestMessage(new HttpMethod(request.Method), request.Url);
             message.Options.Set(HomeAssistantWebhookSender.AllowLocalKey, allowLocalNetwork);
             if (request.Body is not null)

@@ -24,6 +24,7 @@ public sealed partial class IntegrationService(
     public const int MaxIntegrationsPerTenant = 25;
     public const int MaxHeaders = 10;
     public const int MaxRequestBytes = 256 * 1024;
+    public static readonly TimeSpan DispatchTimeout = TimeSpan.FromSeconds(8);
 
     public const string SignatureHeader = "X-FlowLedger-Signature";
     public const string TimestampHeader = "X-FlowLedger-Timestamp";
@@ -345,23 +346,58 @@ public sealed partial class IntegrationService(
     public async Task<int> DispatchAsync(string eventKind, object? data, CancellationToken ct = default)
     {
         var sent = 0;
+        IReadOnlyList<Integration> all;
         try
         {
-            foreach (var integration in await store.ListAsync(TenantId, ct))
-            {
-                if (integration.Kind == IntegrationKind.Webhook && integration.Enabled && integration.Config.Events.Contains(eventKind))
-                {
-                    await DeliverAsync(integration, eventKind, data, ct);
-                    sent++;
-                }
-            }
+            all = await store.ListAsync(TenantId, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Swallowed on purpose; see summary.
+            return 0;
+        }
+
+        foreach (var integration in all)
+        {
+            if (integration.Kind != IntegrationKind.Webhook || !integration.Enabled || !integration.Config.Events.Contains(eventKind))
+            {
+                continue;
+            }
+
+            // A receiver that accepts the connection and never answers must not hold up the import or sync that raised the event.
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(DispatchTimeout);
+            try
+            {
+                await DeliverAsync(integration, eventKind, data, limit.Token);
+                sent++;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                await RecordFailureAsync(integration, "event:" + eventKind, "The receiver did not answer in time.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Swallowed on purpose; see summary.
+            }
         }
 
         return sent;
+    }
+
+    private async Task RecordFailureAsync(Integration integration, string trigger, string error)
+    {
+        try
+        {
+            await store.RecordDeliveryAsync(
+                TenantId,
+                new IntegrationDelivery(Guid.NewGuid(), integration.Id, DateTimeOffset.UtcNow, trigger, "POST",
+                    IntegrationUrl.SafeTarget(integration.Config.Url), null, (int)DispatchTimeout.TotalMilliseconds, error),
+                CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The log is best effort.
+        }
     }
 
     private async Task<IntegrationCallResult> DeliverAsync(Integration integration, string eventKind, object? data, CancellationToken ct)
