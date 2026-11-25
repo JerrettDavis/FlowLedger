@@ -39,7 +39,7 @@ public static class DataEnvironmentGuard
 {
     public const string SettingKey = "data_environment";
 
-    public static DataEnvironment Expected(bool mxEnabled, string? mxEnvironment, bool simpleFinEnabled = false)
+    public static DataEnvironment Expected(bool mxEnabled, string? mxEnvironment, bool simpleFinEnabled = false, bool quilttEnabled = false, string? quilttEnvironment = null)
     {
         // SimpleFIN only ever returns real bank data, so it is always PRODUCTION.
         if (simpleFinEnabled)
@@ -47,9 +47,15 @@ public static class DataEnvironmentGuard
             return DataEnvironment.Production;
         }
 
+        // Quiltt production is real bank data; Quiltt sandbox is sandbox data.
+        if (quilttEnabled && string.Equals(quilttEnvironment, "production", StringComparison.OrdinalIgnoreCase))
+        {
+            return DataEnvironment.Production;
+        }
+
         if (!mxEnabled)
         {
-            return DataEnvironment.Demo;
+            return quilttEnabled ? DataEnvironment.Sandbox : DataEnvironment.Demo;
         }
 
         return string.Equals(mxEnvironment, "production", StringComparison.OrdinalIgnoreCase)
@@ -153,7 +159,8 @@ public sealed class DataEnvironmentGuardService : IHostedService
 
         var mxEnabled = bool.TryParse(_config["Mx:Enabled"], out var e) && e;
         var simpleFin = bool.TryParse(_config["SimpleFin:Enabled"], out var s) && s;
-        var expected = DataEnvironmentGuard.Expected(mxEnabled, _config["Mx:Environment"], simpleFin);
+        var quiltt = bool.TryParse(_config["Quiltt:Enabled"], out var q) && q;
+        var expected = DataEnvironmentGuard.Expected(mxEnabled, _config["Mx:Environment"], simpleFin, quiltt, _config["Quiltt:Environment"]);
         var adopt = bool.TryParse(_config["DataEnvironment:AdoptExistingAsProduction"], out var a) && a;
 
         _state.Current = await DataEnvironmentGuard.EnsureAsync(conn, expected, adopt, cancellationToken);

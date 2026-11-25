@@ -22,7 +22,7 @@ public sealed class ConnectorEndpointTests(FlowLedgerApiFactory factory, Connect
         doc.RootElement.GetProperty("activeProvider").GetString().Should().Be("Simulated");
         doc.RootElement.GetProperty("selectionMode").GetString().Should().Be("per-account");
         var connectors = doc.RootElement.GetProperty("connectors").EnumerateArray().ToList();
-        connectors.Select(c => c.GetProperty("id").GetString()).Should().Equal("Simulated", "SimpleFIN", "MX");
+        connectors.Select(c => c.GetProperty("id").GetString()).Should().Equal("Simulated", "SimpleFIN", "MX", "Quiltt");
         connectors.Single(c => c.GetProperty("active").GetBoolean()).GetProperty("id").GetString().Should().Be("Simulated");
         connectors.Single(c => c.GetProperty("id").GetString() == "MX").GetProperty("usage").GetProperty("dailyBudget").GetInt32().Should().BeGreaterThan(0);
         raw.Should().NotContainEquivalentOf("accessurl\":\"").And.NotContain("@");

@@ -227,6 +227,7 @@ app.MapSyncEndpoints();
 app.MapConnectorEndpoints();
 app.MapAccountConnectorEndpoints();
 app.MapMxEndpoints();
+app.MapQuilttEndpoints();
 app.MapForecastEndpoints();
 app.MapImportEndpoints();
 

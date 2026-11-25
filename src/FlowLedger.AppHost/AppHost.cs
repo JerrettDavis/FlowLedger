@@ -49,6 +49,18 @@ static IResourceBuilder<T> WithMxConfig<T>(
         }
     }
 
+    // Quiltt (in-app bank linking): same safe-by-default rule. Demo mode = Quiltt off, Simulated data.
+    //   dotnet user-secrets set "Quiltt:Enabled" "true"  (+ ApiKeySecret, ConnectorId, WebhookSecret, Environment=sandbox|production)
+    resource = resource.WithEnvironment("Quiltt__Enabled", configuration["Quiltt:Enabled"] ?? "false");
+    foreach (var key in new[] { "ApiKeySecret", "ConnectorId", "WebhookSecret", "Environment", "AuthBaseUrl", "ApiBaseUrl", "ConnectorScriptUrl" })
+    {
+        var value = configuration[$"Quiltt:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"Quiltt__{key}", value);
+        }
+    }
+
     // SimpleFIN Bridge: same safe-by-default rule. Real bank data only when the AppHost config says so.
     resource = resource.WithEnvironment("SimpleFin__Enabled", configuration["SimpleFin:Enabled"] ?? "false");
     foreach (var key in new[] { "AccessUrl", "HistoryDays", "OverlapDays" })

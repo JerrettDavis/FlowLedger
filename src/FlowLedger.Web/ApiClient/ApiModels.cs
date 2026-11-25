@@ -488,6 +488,15 @@ public sealed record AutoAddResultDto(int Added, List<string> Names);
 
 public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? ManageUrl);
 
+/// <summary>Whether the in-app Quiltt Connector is available on this instance.</summary>
+public sealed record QuilttConfigDto(bool Enabled, string? ConnectorId = null, string? ScriptUrl = null);
+
+/// <summary>Short-lived, profile-scoped Quiltt session for the browser Connector.</summary>
+public sealed record QuilttSessionDto(string ConnectorId, string ScriptUrl, string Token, string ProfileId, DateTimeOffset? ExpiresAt);
+
+/// <summary>Outcome of one Connector run (status: success, cancelled or error).</summary>
+public sealed record QuilttConnectResult(string Status, string? ConnectionId);
+
 // ── Financial data connectors (read-only overview) ───────────────────────────
 
 public sealed record ConnectorUsageDto(long CallsToday, long CallsThisMonth, int? DailyBudget, int? MonthlyBudget, bool Paused);

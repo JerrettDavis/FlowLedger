@@ -6,6 +6,7 @@ using FlowLedger.Infrastructure.Storage;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
+using FlowLedger.Integrations.Quiltt;
 using FlowLedger.Integrations.SimpleFin;
 using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
@@ -145,7 +146,8 @@ public static class DependencyInjection
         // which adds fake demo accounts next to real ones - only for trying things out).
         var simpleFinEnabled = bool.TryParse(configuration["SimpleFin:Enabled"], out var sf) && sf;
         var simulatedExplicit = bool.TryParse(configuration["Connectors:Simulated"], out var simOn) && simOn;
-        var simulatedEnabled = (!simpleFinEnabled && !mxOptions.Enabled) || simulatedExplicit;
+        var quilttEnabled = bool.TryParse(configuration["Quiltt:Enabled"], out var qt) && qt;
+        var simulatedEnabled = (!simpleFinEnabled && !mxOptions.Enabled && !quilttEnabled) || simulatedExplicit;
 
         // The first enabled connector (SimpleFIN, MX, Simulated) is also the un-keyed "primary" IFinancialDataProvider for older call sites.
         var connectors = new List<FlowLedger.Integrations.Abstractions.ConnectorDescriptor>();
@@ -159,6 +161,13 @@ public static class DependencyInjection
         {
             services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
             connectors.Add(new("MX", "MX", "Aggregator (widget)", SharedCredentials: true));
+        }
+
+        if (quilttEnabled)
+        {
+            services.AddQuilttProvider(configuration, registerAsDefault: connectors.Count == 0);
+            // Per-user profiles: Quiltt isolates each tenant itself, so unlike SimpleFIN/MX it is not tied to the household tenant.
+            connectors.Add(new("Quiltt", "Quiltt", "Aggregator (embedded)", SharedCredentials: false));
         }
 
         if (simulatedEnabled)
