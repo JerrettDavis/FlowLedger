@@ -25,7 +25,7 @@
                 </MudItem>
                 <MudItem xs="6" sm="3">
                     <MudText Typo="Typo.overline" Color="Color.Secondary">Gain / loss</MudText>
-                    @if (_asset.GainLoss is { } g) { <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(g)">@Format.Signed(g)</MudText> }
+                    @if (_asset.GainLoss is { } g) { <MudText Typo="Typo.body1" Class="fl-num" Color="@Format.Delta(g)">@Format.SignedWithPercent(g, _asset.PurchasePrice ?? 0m)</MudText> }
                     else { <MudText Color="Color.Secondary">—</MudText> }
                 </MudItem>
                 <MudItem xs="6" sm="3">

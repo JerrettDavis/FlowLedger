@@ -192,3 +192,34 @@ html, body { max-width: 100%; }
 .mud-dialog .mud-dialog-actions { flex-wrap: wrap; gap: 4px; }
 .mud-dialog .mud-button-root { max-width: 100%; }
 .mud-dialog input[type="file"], .fl-page input[type="file"] { max-width: 100%; }
+
+/* ---- Dropdowns (MudSelect / MudAutocomplete): field, chevron, and popover list ---- */
+.mud-select .mud-input-outlined .mud-input-outlined-border { border-radius: 10px; transition: border-color .15s, box-shadow .15s; }
+.mud-select:hover .mud-input-outlined .mud-input-outlined-border { border-color: var(--mud-palette-primary); }
+.mud-select .mud-input.mud-input-outlined:focus-within .mud-input-outlined-border,
+.mud-select .mud-input-control.mud-input-focused .mud-input-outlined-border { border-width: 2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--mud-palette-primary) 18%, transparent); }
+.mud-select .mud-select-input { cursor: pointer; text-overflow: ellipsis; }
+.mud-select .mud-input-adornment-end .mud-icon-root { opacity: .6; transition: transform .2s, opacity .15s; }
+.mud-select:hover .mud-input-adornment-end .mud-icon-root,
+.mud-select .mud-input-control.mud-input-focused .mud-input-adornment-end .mud-icon-root { opacity: 1; }
+.mud-select .mud-select-input.mud-input-slot { padding-right: 4px; }
+
+.mud-popover.mud-select-popover-open,
+.mud-popover-open.mud-popover:has(> .mud-list) {
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .18), 0 2px 6px rgba(0, 0, 0, .08);
+  overflow: hidden;
+  margin-top: 4px;
+  min-width: 160px;
+}
+.mud-popover .mud-list { padding: 6px; max-height: min(320px, 60vh); overflow-y: auto; }
+.mud-popover .mud-list-item { border-radius: 8px; margin: 1px 0; padding-top: 7px; padding-bottom: 7px; transition: background-color .12s; }
+.mud-popover .mud-list-item:hover { background: var(--mud-palette-action-default-hover); }
+.mud-popover .mud-list-item.mud-selected-item,
+.mud-popover .mud-list-item.mud-selected-item:hover { background: color-mix(in srgb, var(--mud-palette-primary) 14%, transparent); color: var(--mud-palette-primary); font-weight: 600; }
+.mud-popover .mud-list-item.mud-list-item-disabled { opacity: .45; }
+.mud-popover .mud-list-item-gutters { padding-left: 12px; padding-right: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .mud-select .mud-input-outlined-border, .mud-popover .mud-list-item, .mud-select .mud-input-adornment-end .mud-icon-root { transition: none; }
+}

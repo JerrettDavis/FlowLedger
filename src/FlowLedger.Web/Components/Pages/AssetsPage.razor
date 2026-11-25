@@ -38,7 +38,7 @@
         <MudItem xs="12" sm="6" md="3">
             <MudCard Class="fl-card-hover"><MudCardContent>
                 <MudText Typo="Typo.overline" Color="Color.Secondary">Gain / loss vs cost</MudText>
-                <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_summary.UnrealizedGainLoss)">@Format.Signed(_summary.UnrealizedGainLoss)</MudText>
+                <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_summary.UnrealizedGainLoss)">@Format.SignedWithPercent(_summary.UnrealizedGainLoss, _summary.TotalCost)</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Cost basis @Format.Money(_summary.TotalCost)</MudText>
             </MudCardContent></MudCard>
         </MudItem>
@@ -89,7 +89,7 @@
                     <span class="fl-acard__value fl-num">@Format.Money(asset.EstimatedValue)</span>
                     @if (_changes.TryGetValue(asset.Name, out var ch) && ch.End != ch.Start)
                     {
-                        <span class="fl-pill @(ch.End - ch.Start >= 0 ? "fl-pill--pos" : "fl-pill--neg")" title="Change in recorded value over @_rangePreset">@Format.Signed(ch.End - ch.Start) · @_rangePreset</span>
+                        <span class="fl-pill @(ch.End - ch.Start >= 0 ? "fl-pill--pos" : "fl-pill--neg")" title="Change in recorded value over @_rangePreset">@Format.SignedWithPercent(ch.End - ch.Start, ch.Start) · @_rangePreset</span>
                     }
                     @if (asset.GainLoss is { } g)
                     {

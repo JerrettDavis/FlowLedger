@@ -31,6 +31,30 @@ public static class Format
         Signed(isCredit ? amount : -amount);
 
     /// <summary>
+    /// Signed percentage change of <paramref name="change"/> relative to <paramref name="baseline"/>
+    /// (e.g., "+4.2%"). Returns an empty string when the baseline is zero (change is undefined).
+    /// The percentage is relative to the magnitude of the baseline so a debt shrinking reads as positive.
+    /// </summary>
+    public static string Percent(decimal change, decimal baseline)
+    {
+        if (baseline == 0)
+        {
+            return "";
+        }
+
+        var pct = change / Math.Abs(baseline) * 100m;
+        var rounded = Math.Round(pct, pct is > -10 and < 10 ? 2 : 1);
+        return (rounded >= 0 ? "+" : "−") + Math.Abs(rounded).ToString("0.##", UsCulture) + "%";
+    }
+
+    /// <summary>"+$12.00 (+1.2%)" - signed amount with its percentage change when computable.</summary>
+    public static string SignedWithPercent(decimal change, decimal baseline)
+    {
+        var p = Percent(change, baseline);
+        return p.Length == 0 ? Signed(change) : $"{Signed(change)} ({p})";
+    }
+
+    /// <summary>
     /// Format a DateOnly as "MMM d" (e.g., "Jan 15").
     /// </summary>
     public static string DayMonth(DateOnly d) =>
