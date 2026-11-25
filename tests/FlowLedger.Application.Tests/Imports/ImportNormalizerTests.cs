@@ -144,3 +144,26 @@ public sealed class ImportNormalizerTests
         NormalizedImport.Mapping.DateColumnIndex.Should().Be(0);
     }
 }
+
+public sealed class ImportNormalizerLimitTests
+{
+    [Fact]
+    public void Rejects_oversized_content_before_parsing()
+    {
+        var act = () => ImportNormalizer.Normalize(new string('x', ImportNormalizer.MaxContentChars + 1));
+        act.Should().Throw<InvalidOperationException>().WithMessage("*too large*");
+    }
+
+    [Fact]
+    public void Rejects_more_rows_than_the_import_limit()
+    {
+        var sb = new System.Text.StringBuilder("Date,Description,Amount\n");
+        for (var i = 0; i < ImportTransactionsHandler.MaxImportRows + 1; i++)
+        {
+            sb.Append("2024-01-05,Coffee,-3.00\n");
+        }
+
+        var act = () => ImportNormalizer.Normalize(sb.ToString());
+        act.Should().Throw<InvalidOperationException>().WithMessage("*limit per import*");
+    }
+}

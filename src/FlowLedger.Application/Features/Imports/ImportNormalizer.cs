@@ -24,6 +24,9 @@ public static partial class ImportNormalizer
 {
     public const string Generic = "generic-csv";
 
+    /// <summary>Upper bound on raw input, checked before anything is parsed or materialised.</summary>
+    public const int MaxContentChars = 5 * 1024 * 1024;
+
     public static IReadOnlyList<ImportFormatInfo> Formats { get; } =
     [
         new("mint", "Mint"), new("monarch", "Monarch Money"), new("ynab", "YNAB"), new("simplifi", "Quicken Simplifi / Quicken"),
@@ -59,6 +62,11 @@ public static partial class ImportNormalizer
         if (string.IsNullOrWhiteSpace(content))
         {
             throw new InvalidOperationException("The file is empty.");
+        }
+
+        if (content.Length > MaxContentChars)
+        {
+            throw new InvalidOperationException("The file is too large to import in one go (limit 5 MB). Split it and import it in parts.");
         }
 
         content = content.TrimStart('﻿');
@@ -421,6 +429,12 @@ public static partial class ImportNormalizer
         if (rows.Count == 0)
         {
             throw new InvalidOperationException("No transactions could be read from this file.");
+        }
+
+        if (rows.Count > ImportTransactionsHandler.MaxImportRows)
+        {
+            throw new InvalidOperationException(
+                $"The file has {rows.Count} transactions; the limit per import is {ImportTransactionsHandler.MaxImportRows}. Split the file and import it in parts.");
         }
 
         if (skipped > 0)
