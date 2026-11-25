@@ -22,6 +22,7 @@
     <ProjectReference Include="..\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
+    <ProjectReference Include="..\FlowLedger.Integrations.Quiltt\FlowLedger.Integrations.Quiltt.csproj" />
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
   </ItemGroup>
 

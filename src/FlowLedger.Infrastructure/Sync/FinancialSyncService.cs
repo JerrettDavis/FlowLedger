@@ -73,7 +73,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private void EnsureTenantMayUseProvider()
     {
         if (_householdTenantId is { } household
-            && _provider.ProviderName != "Simulated"
+            && _provider.ProviderName is not ("Simulated" or "Quiltt") // Quiltt keeps one profile per tenant
             && _tenant.TenantId != household)
         {
             throw new NeedsUserActionProviderException(
@@ -137,6 +137,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
+        if (_provider.ProviderName == "Quiltt"
+            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == "Quiltt", ct))
+        {
+            return new SyncResult(0, 0, 0, 0); // this tenant has not linked a bank through the Quiltt Connector yet
+        }
+
         var memberRef = await GetOrProvisionConnectionAsync(
             tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
 

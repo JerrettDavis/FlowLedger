@@ -282,6 +282,14 @@
 
     private async Task ConnectBank()
     {
+        // In-app flow first: when Quiltt is enabled the user links a bank in the Connector without leaving FlowLedger.
+        var quiltt = await ApiClient.GetQuilttConfigAsync();
+        if (quiltt.Enabled)
+        {
+            await ConnectViaQuiltt();
+            return;
+        }
+
         var info = await ApiClient.GetProviderInfoAsync();
         if (info is { UsesWidget: false, ManageUrl: { Length: > 0 } manage })
         {
@@ -315,6 +323,36 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect bank failed");
+            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConnectViaQuiltt()
+    {
+        try
+        {
+            var session = await ApiClient.StartQuilttSessionAsync();
+            if (session is null)
+            {
+                Snackbar.Add("Could not start the bank connection.", Severity.Warning);
+                return;
+            }
+
+            var result = await JS.InvokeAsync<QuilttConnectResult>(
+                "flowledgerQuiltt.open", session.ScriptUrl, session.ConnectorId, session.Token);
+            if (result.Status == "success")
+            {
+                Snackbar.Add("Bank linked. Syncing your accounts…", Severity.Success);
+                await SyncNow();
+            }
+            else if (result.Status == "error")
+            {
+                Snackbar.Add("The bank connection did not complete. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Quiltt connect failed");
             Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
         }
     }

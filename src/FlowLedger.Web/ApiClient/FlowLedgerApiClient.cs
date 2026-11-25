@@ -1610,6 +1610,31 @@ public sealed class FlowLedgerApiClient
             return true;
         });
 
+    /// <summary>Whether the in-app Quiltt Connector is enabled (false on any failure, so callers fall back to the old flow).</summary>
+    public async Task<QuilttConfigDto> GetQuilttConfigAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read Quiltt config", async () =>
+        {
+            var response = await _http.GetAsync("/api/integrations/quiltt/config", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<QuilttConfigDto>(JsonOptions, ct) ?? new QuilttConfigDto(false)
+                : new QuilttConfigDto(false);
+        }) ?? new QuilttConfigDto(false);
+
+    /// <summary>Mints a session so the browser can open the Quiltt Connector for the signed-in user.</summary>
+    public async Task<QuilttSessionDto?> StartQuilttSessionAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("start Quiltt session", async () =>
+        {
+            var response = await _http.PostAsync("/api/integrations/quiltt/session", null, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ApiClientException(
+                    $"Couldn't start the bank connection (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
+                    response.StatusCode);
+            }
+
+            return await response.Content.ReadFromJsonAsync<QuilttSessionDto>(JsonOptions, ct);
+        });
+
     public async Task<string?> BeginBankConnectionAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync("connect bank", async () =>
