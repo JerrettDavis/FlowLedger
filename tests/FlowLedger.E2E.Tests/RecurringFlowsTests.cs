@@ -62,7 +62,7 @@ public class RecurringFlowsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "RecurringFlows: data grid is rendered")]
+    [Fact(DisplayName = "RecurringFlows: flow list is rendered")]
     public async Task RecurringFlows_DataGridIsRendered()
     {
         if (ShouldSkip)
@@ -73,10 +73,8 @@ public class RecurringFlowsTests : E2ETestBase
         await NavigateAsync("/recurring-flows");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
-        // MudDataGrid renders as <div aria-label="Recurring flows table"> (not a <table> element)
-        var table = Page!.Locator("[aria-label='Recurring flows table']");
-        (await table.CountAsync()).Should().BeGreaterThan(0);
-        (await table.IsVisibleAsync()).Should().BeTrue();
+        var flows = Page!.Locator("section[aria-label='Bills & expenses'] .fl-li, section[aria-label='Income'] .fl-li");
+        await Assertions.Expect(flows.First).ToBeVisibleAsync();
         AssertNoPageErrors();
     }
 
@@ -92,30 +90,8 @@ public class RecurringFlowsTests : E2ETestBase
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
 
-        var table = Page!.Locator("[aria-label='Recurring flows table']");
-        await table.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 20_000,
-        });
-
-        // MudBlazor 9 renders MudDataGrid rows as standard HTML table elements (tbody/tr/td).
-        // Poll tbody td elements — header th cells are in thead and are not counted here.
-        var rows = table.Locator("tbody td");
-        var rowCount = 0;
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (DateTime.UtcNow < deadline && rowCount == 0)
-        {
-            rowCount = await rows.CountAsync();
-            if (rowCount == 0)
-            {
-                await Page!.WaitForTimeoutAsync(500);
-            }
-        }
-
-        rowCount.Should().BeGreaterThan(0,
-            "expected seeded recurring flow rows to appear in the Recurring Flows table. " +
-            "If 0 rows: the Web→API call may have failed or Blazor did not load data in time.");
+        var flows = Page!.Locator("section[aria-label='Bills & expenses'] .fl-li, section[aria-label='Income'] .fl-li");
+        await Assertions.Expect(flows.First).ToBeVisibleAsync(new() { Timeout = 30_000 });
 
         AssertNoPageErrors();
     }

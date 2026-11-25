@@ -133,10 +133,9 @@ public class AccountsDataTests : E2ETestBase
             "If null: the Web→API call likely returned 401 (no auth header) or the " +
             "Blazor SignalR circuit did not load data in time.");
 
-        // ── Step 5: Confirm the accounts table grid itself is rendered ────────
-        var grid = Page!.Locator("[aria-label='Accounts table']");
-        (await grid.CountAsync()).Should().BeGreaterThan(0, "accounts table must be rendered");
-        (await grid.IsVisibleAsync()).Should().BeTrue("accounts table must be visible");
+        // ── Step 5: Confirm the seeded account is in the account list ─────────
+        var account = Page!.Locator("section[aria-label$=' accounts'] .fl-li", new() { HasText = foundName });
+        await Assertions.Expect(account.First).ToBeVisibleAsync();
 
         AssertNoPageErrors();
     }
