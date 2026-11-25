@@ -29,3 +29,10 @@ inside FlowLedger. Quiltt provides an embeddable Connector (browser) plus a per-
 `institution { name }` field list, webhook processing of multi-event/multi-profile batches (only the first event drives the sync),
 and an end-to-end Connector link in the sandbox. Webhook-triggered syncs currently run for the household tenant (no profile-to-tenant lookup yet);
 scheduled sync is the per-tenant backstop.
+
+## Live-run checklist (first sandbox session)
+1. Open Connect bank, link Quiltt's mock institution; confirm `ProviderConnections` row for `Quiltt` and accounts appear after a sync.
+2. Watch for **session rate limits**: Quiltt allows 10 sessions/hour and 20/day per profile and every sync mints one. If hit (HTTP 429), cache the token
+   until `expiresAt` or switch server-to-server GraphQL to Basic auth (`profileId:apiKeySecret`, documented as unlimited).
+3. Send a test webhook from the Quiltt dashboard; only `connection.synced.successful*`, `connection.created` and `account.verified` trigger a sync (`IsSyncTrigger`).
+4. Confirm `institution { name }` is accepted by the GraphQL schema (not listed in the docs we read).

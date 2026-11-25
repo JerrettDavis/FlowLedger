@@ -173,6 +173,18 @@ public sealed class QuilttProviderTests
         (await Status("ERROR_INSTITUTION")).Should().Be(ConnectionStatus.Degraded);
     }
 
+    [Theory]
+    [InlineData("connection.synced.successful", true)]
+    [InlineData("connection.synced.successful.initial", true)]
+    [InlineData("connection.synced.successful.historical", true)]
+    [InlineData("connection.created", true)]
+    [InlineData("account.verified", true)]
+    [InlineData("connection.synced.errored.repairable", false)]
+    [InlineData("profile.created", false)]
+    [InlineData(null, false)]
+    public void IsSyncTrigger_OnlyForEventsCarryingData(string? type, bool expected) =>
+        QuilttFinancialDataProvider.IsSyncTrigger(type).Should().Be(expected);
+
     // ── Webhooks ──
 
     private static string Header(string secret, string body, long ts)

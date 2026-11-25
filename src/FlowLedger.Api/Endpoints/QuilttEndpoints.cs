@@ -126,6 +126,11 @@ internal static class QuilttEndpoints
                     return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "Malformed webhook payload");
                 }
 
+                if (!QuilttFinancialDataProvider.IsSyncTrigger(evt.EventType))
+                {
+                    return Results.Accepted(value: new { ignored = evt.EventType });
+                }
+
                 var jobData = new JobDataMap
                 {
                     [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
