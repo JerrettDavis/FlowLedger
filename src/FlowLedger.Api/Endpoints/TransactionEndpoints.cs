@@ -29,6 +29,29 @@ internal static class TransactionEndpoints
         .WithName("ListTransactions")
         .WithSummary("List transactions with optional filtering");
 
+        group.MapGet("/export.csv", async (
+            [AsParameters] ListTransactionsQuery query,
+            ListTransactionsHandler handler,
+            CancellationToken ct) =>
+        {
+            const int Page = 500, Cap = 50_000;
+            var all = new List<TransactionDto>();
+            for (var skip = 0; all.Count < Cap; skip += Page)
+            {
+                var batch = await handler.HandleAsync(query with { Skip = skip, Take = Page }, ct);
+                all.AddRange(batch);
+                if (batch.Count < Page)
+                {
+                    break;
+                }
+            }
+
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(TransactionCsv.Build(all)), "text/csv; charset=utf-8",
+                $"flowledger-transactions-{DateTime.UtcNow:yyyyMMdd}.csv");
+        })
+        .WithName("ExportTransactionsCsv")
+        .WithSummary("Download transactions (filtered like the list) as CSV");
+
         group.MapGet("/{id:guid}", async (Guid id, GetTransactionHandler handler, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);

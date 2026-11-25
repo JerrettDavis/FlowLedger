@@ -22,6 +22,9 @@ namespace FlowLedger.Infrastructure.Persistence;
 public sealed class FlowLedgerDbContext : DbContext
 {
     private readonly ITenantContext? _tenantContext;
+
+    /// <summary>The tenant this context is scoped to (null at design time / in tenant-free contexts).</summary>
+    internal Guid? CurrentTenantId => _tenantContext?.TenantId;
     private readonly IDomainEventDispatcher _eventDispatcher;
 
     // ── DbSets ────────────────────────────────────────────────────────────────

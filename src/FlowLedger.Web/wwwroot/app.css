@@ -590,3 +590,7 @@ html.fl-share input[type="number"] { filter: blur(6px); }
 
 /* Share mode hides who is signed in */
 html.fl-share .fl-user-name { display: none; }
+
+/* Strategy simulators: live sliders */
+.fl-sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 4px 24px; }
+.fl-slider { min-width: 0; }

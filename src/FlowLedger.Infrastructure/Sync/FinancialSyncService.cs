@@ -401,11 +401,18 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     .Where(t => t.Fingerprint != null && candidateFingerprints.Contains(t.Fingerprint.Value))
                     .ToListAsync(ct);
                 var existingByFp = existingRows.ToDictionary(t => t.Fingerprint!.Value);
+                // Rows merged away as duplicates are never re-created from the provider.
+                var mergedAway = await FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore.TombstonedAsync(_db, candidateFingerprints, ct);
 
                 var toInsert = new List<Transaction>();
                 var settled = 0;
                 foreach (var x in fingerprintMap)
                 {
+                    if (mergedAway.Contains(x.Fingerprint.Value))
+                    {
+                        continue;
+                    }
+
                     if (existingByFp.TryGetValue(x.Fingerprint.Value, out var row))
                     {
                         // Same provider id seen before: pending -> posted transition in place.

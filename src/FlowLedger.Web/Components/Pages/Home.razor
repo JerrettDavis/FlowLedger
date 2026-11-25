@@ -199,6 +199,77 @@ else
                     </MudCardHeader>
                     <MudCardContent>
                         <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                        @if (_savingsRate is { } rate)
+                        {
+                            <div class="d-flex align-center gap-2 mt-2 flex-wrap">
+                                <MudChip T="string" Size="Size.Small" Color="@(rate >= 0.2 ? Color.Success : rate >= 0 ? Color.Warning : Color.Error)">
+                                    Savings rate @rate.ToString("P0")
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Kept @Format.Money(_netSaved) of @Format.Money(_totalIncome) earned over @RangeLabel
+                                </MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        }
+
+        <!-- Insights: what changed vs the previous period -->
+        @if (_insights is { Movers.Count: > 0 })
+        {
+            <div class="fl-masonry-item">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Biggest changes</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last 30 days vs the 30 before (@_insights.PreviousLabel)</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @{ var maxChange = (double)_insights.Movers.Max(m => Math.Abs(m.Change)); }
+                        @foreach (var m in _insights.Movers)
+                        {
+                            <div class="mb-2">
+                                <div class="d-flex justify-space-between">
+                                    <MudText Typo="Typo.body2">@m.Category</MudText>
+                                    <MudText Typo="Typo.body2" Class="fl-num" Color="@(m.Change > 0 ? Color.Error : Color.Success)">
+                                        @(m.Change > 0 ? "▲" : "▼") @Format.Money(Math.Abs(m.Change))
+                                    </MudText>
+                                </div>
+                                <MudProgressLinear Value="@(maxChange == 0 ? 0 : Math.Abs((double)m.Change) / maxChange * 100)" Size="Size.Small"
+                                                   Color="@(m.Change > 0 ? Color.Error : Color.Success)" aria-label="@($"{m.Category} change")" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.Money(m.Previous) → @Format.Money(m.Current)</MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        }
+
+        <!-- Insights: top merchants -->
+        @if (_insights is { TopMerchants.Count: > 0 })
+        {
+            <div class="fl-masonry-item">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Top merchants</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel, excluding transfers</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @{ var topMerchant = (double)_insights.TopMerchants.Max(m => m.Amount); }
+                        @foreach (var m in _insights.TopMerchants)
+                        {
+                            <div class="mb-2">
+                                <div class="d-flex justify-space-between">
+                                    <MudText Typo="Typo.body2">@m.Merchant <span class="fl-muted">· @m.Visits×</span></MudText>
+                                    <MudText Typo="Typo.body2" Class="fl-num">@Format.Money(m.Amount)</MudText>
+                                </div>
+                                <MudProgressLinear Value="@(topMerchant == 0 ? 0 : (double)m.Amount / topMerchant * 100)" Size="Size.Small" Color="Color.Primary" aria-label="@($"{m.Merchant} spend")" />
+                            </div>
+                        }
                     </MudCardContent>
                 </MudCard>
             </div>
@@ -667,7 +738,11 @@ else
         [
             new MudBlazor.ChartSeries<double> { Name = "Income", Data = _insights.CashFlow.Select(m => (double)m.Income).ToArray() },
             new MudBlazor.ChartSeries<double> { Name = "Spending", Data = _insights.CashFlow.Select(m => (double)m.Spending).ToArray() },
+            new MudBlazor.ChartSeries<double> { Name = "Net", Data = _insights.CashFlow.Select(m => (double)(m.Income - m.Spending)).ToArray() },
         ];
+        _totalIncome = _insights.CashFlow.Sum(m => m.Income);
+        _netSaved = _totalIncome - _insights.CashFlow.Sum(m => m.Spending);
+        _savingsRate = _totalIncome > 0 ? (double)(_netSaved / _totalIncome) : null;
         _flowLabels = _insights.CashFlow.Select(m => m.Month.Length >= 7 ? m.Month[..7] : m.Month).ToArray();
         var nw = _insights.NetWorth.TakeLast(60).ToList();
         _netWorthSeries = [new MudBlazor.ChartSeries<double> { Name = "Net worth", Data = nw.Select(p => (double)p.Value).ToArray() }];
@@ -679,6 +754,9 @@ else
     private List<MudBlazor.ChartSeries<double>> _spendSeries = [];
     private string[] _spendLabels = [];
     private List<MudBlazor.ChartSeries<double>> _flowSeries = [];
+    private decimal _totalIncome;
+    private decimal _netSaved;
+    private double? _savingsRate;
     private string[] _flowLabels = [];
     private List<MudBlazor.ChartSeries<double>> _netWorthSeries = [];
     private string[] _netWorthLabels = [];

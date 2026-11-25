@@ -113,7 +113,10 @@ internal sealed class TransactionRepository : ITransactionRepository
             .Select(t => t.Fingerprint!.Value)
             .ToListAsync(ct);
 
-        return [.. existing];
+        // Rows that were merged away as duplicates stay "existing", so re-importing the same file cannot bring them back.
+        var merged = await DuplicateStore.TombstonedAsync(_db, list, ct);
+        merged.UnionWith(existing);
+        return merged;
     }
 
     public async Task AddAsync(Transaction transaction, CancellationToken ct = default)

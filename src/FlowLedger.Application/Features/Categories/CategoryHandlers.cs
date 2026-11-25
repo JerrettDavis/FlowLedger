@@ -9,14 +9,59 @@ namespace FlowLedger.Application.Features.Categories;
 public sealed class ListCategoriesHandler
 {
     private readonly ICategoryRepository _repo;
+    private readonly ITenantContext _tenant;
 
-    public ListCategoriesHandler(ICategoryRepository repo)
-        => _repo = repo;
+    public ListCategoriesHandler(ICategoryRepository repo, ITenantContext tenant)
+    {
+        _repo = repo;
+        _tenant = tenant;
+    }
 
     public async Task<IReadOnlyList<CategoryDto>> HandleAsync(CancellationToken ct = default)
     {
         var cats = await _repo.ListAsync(ct);
+
+        // First use: a brand-new tenant gets the default (Mint-equivalent) set. Later restructuring is never undone here;
+        // use RestoreDefaultCategoriesHandler to add any that are missing.
+        if (cats.Count == 0)
+        {
+            await new RestoreDefaultCategoriesHandler(_repo, _tenant).HandleAsync(ct);
+            cats = await _repo.ListAsync(ct);
+        }
+
         return cats.Select(CategoryMapper.ToDto).ToList().AsReadOnly();
+    }
+}
+
+/// <summary>Additively creates any default categories the tenant is missing; existing ones are never touched.</summary>
+public sealed class RestoreDefaultCategoriesHandler
+{
+    private readonly ICategoryRepository _repo;
+    private readonly ITenantContext _tenant;
+
+    public RestoreDefaultCategoriesHandler(ICategoryRepository repo, ITenantContext tenant)
+    {
+        _repo = repo;
+        _tenant = tenant;
+    }
+
+    /// <returns>The number of categories added.</returns>
+    public async Task<int> HandleAsync(CancellationToken ct = default)
+    {
+        var have = (await _repo.ListAsync(ct)).Select(c => c.Path.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = DefaultCategories.Paths.Where(p => !have.Contains(p)).ToList();
+        var tenantId = TenantId.From(_tenant.TenantId);
+        foreach (var path in missing)
+        {
+            await _repo.AddAsync(Category.Create(tenantId, new CategoryPath(path), path.Split('/').Last()), ct);
+        }
+
+        if (missing.Count > 0)
+        {
+            await _repo.SaveChangesAsync(ct);
+        }
+
+        return missing.Count;
     }
 }
 

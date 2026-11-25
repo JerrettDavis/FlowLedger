@@ -25,3 +25,20 @@ Status after the gap-closing pass. "Have" = already existed; "Added" = built in 
 - Investment performance is a balance-snapshot calculation (no holdings or benchmark data), so its history starts when syncing started.
 - The debt planner is stateless: APR and minimum payment are entered per run because providers do not supply them.
 - Low-balance and bill-due alerts are not included yet.
+
+## 2026-11 pass: gaps vs Monarch, YNAB, Rocket Money, Empower, Copilot
+
+| Gap | Competitors | Status |
+|---|---|---|
+| Rate-aware savings/debt/refi suggestions, what-if simulators | Monarch, Empower (partial) | Have — `/strategies` (ADR 0015) |
+| Duplicate detection and merge | Monarch | Have — `/duplicates` (ADR 0014) |
+| Local, private AI categorization and coaching | Copilot (cloud) | Have — ADR 0013 |
+| Retirement / financial-independence planner | Empower, Monarch | **Added** — FIRE tab on `/strategies`, `POST /api/strategies/simulate/fire` |
+| Transactions CSV export (server side, filter-aware, formula-injection safe) | all | **Added** — `GET /api/transactions/export.csv` |
+| Budget rollover (unspent carries forward) | YNAB, Monarch | Open — needs per-budget flag and schema change |
+| Low-balance and bill-due alerts | Simplifi, Rocket Money | Open — needs forecast inputs in `GetAlertsHandler` |
+| Email/push delivery of alerts | all | Open — only Home Assistant (ADR 0012) today |
+| Subscription cancellation / bill negotiation | Rocket Money | Out of scope — needs a paid concierge service |
+| Credit score | Credit Karma, Mint | Blocked — bureau partnership |
+| Native mobile app | all | Open — web is responsive; no PWA manifest/offline yet |
+| Partner/household shared views | Monarch, YNAB | Open — multi-user tenancy exists (ADR 0008), no shared household view |

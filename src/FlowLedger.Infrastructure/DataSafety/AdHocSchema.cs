@@ -20,6 +20,7 @@ public static class AdHocSchema
         BackupRunStore.CreateSqlText,
         NpgsqlBudgetStore.CreateSqlText,
         NpgsqlGoalStore.CreateSqlText,
+        NpgsqlAccountRateStore.CreateSqlText,
         NpgsqlCategoryRuleStore.CreateSqlText,
         NpgsqlMerchantAliasStore.CreateSqlText,
         NpgsqlRecurringDismissalStore.CreateSqlText,
@@ -28,6 +29,7 @@ public static class AdHocSchema
         NpgsqlAccountConnectorLinkStore.CreateSqlText,
         NpgsqlProviderAccountCatalog.CreateSqlText,
         NpgsqlHomeAssistantStore.CreateSqlText,
+        FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore.CreateSqlText,
     ];
 
     public static string AllSql => string.Join("\n", Scripts);

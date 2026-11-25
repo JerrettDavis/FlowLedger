@@ -31,7 +31,7 @@ public static class QueryCatalog
                 new("source", "string", "Manual, Import, ProviderSync, …"),
                 new("currency", "string", "ISO currency code"),
                 new("notes", "string", "Free-text notes"),
-                new("is_transfer", "bool", "True when this is one leg of a move between your own accounts (excluded from income/spending)"),
+                new("is_transfer", "bool", "True when this is one leg of a move between your own accounts, or is categorized Transfer/Investments (excluded from income/spending)"),
             ]),
         new("accounts",
             "Your accounts with current balances.",
@@ -210,7 +210,9 @@ public sealed class QueryDatasetProvider(
             t.Source,
             t.Currency,
             amountOverride is null ? t.Notes : notesOverride,
-            isTransfer,
+            // A leg the pairing detector missed (a card payment, a one-sided transfer) still carries the Transfer category;
+            // Investments are likewise not spending. Both count as "not income/spending" everywhere is_transfer is used.
+            isTransfer || FlowLedger.Application.Features.Insights.SpendingInsightsAnalyzer.IsNonSpending(category),
         ];
     }
 }

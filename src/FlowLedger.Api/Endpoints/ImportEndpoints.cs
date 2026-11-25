@@ -23,6 +23,7 @@ internal static class ImportEndpoints
             [FromBody] ImportRequest request,
             ImportTransactionsHandler handler,
             FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
+            FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
             ILogger<ImportTransactionsHandler> logger,
             CancellationToken ct) =>
         {
@@ -58,6 +59,16 @@ internal static class ImportEndpoints
                 var summary = await handler.HandleAsync(command, ct);
                 if (summary.ImportedCount > 0)
                 {
+                    // A file often overlaps what the bank already synced: fold the unambiguous overlaps now.
+                    try
+                    {
+                        await duplicates.AutoMergeAsync(ct);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Duplicate merge after import failed.");
+                    }
+
                     try
                     {
                         await sheetMarker.RefreshAsync(ct);
