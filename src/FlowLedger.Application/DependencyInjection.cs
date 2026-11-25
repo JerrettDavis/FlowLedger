@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.Budgets.ListBudgetsHandler>();
         services.AddScoped<FlowLedger.Application.Features.Alerts.GetAlertsHandler>();
         services.AddScoped<FlowLedger.Application.Features.HomeAssistant.HomeAssistantService>();
+        services.AddScoped<FlowLedger.Application.Features.Integrations.IntegrationService>();
 
         // ── FluentValidation ─────────────────────────────────────────────────────
         services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);

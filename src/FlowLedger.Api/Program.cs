@@ -209,6 +209,7 @@ app.MapGoalEndpoints();
 app.MapDebtEndpoints();
 app.MapAlertEndpoints();
 app.MapHomeAssistantEndpoints();
+app.MapIntegrationEndpoints();
 app.MapCategoryRuleEndpoints();
 app.MapTransactionAnnotationEndpoints();
 app.MapInvestmentEndpoints();

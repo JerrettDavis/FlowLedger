@@ -357,6 +357,17 @@ public static class DependencyInjection
             FlowLedger.Infrastructure.DataSafety.HouseholdHomeAssistantNetworkPolicy>();
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
             FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
+        // -- Integrations (REST / SOAP / signed webhooks; per-tenant definitions, encrypted secrets, delivery log) --
+        services.AddSingleton<FlowLedger.Application.Features.Integrations.IIntegrationStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlIntegrationStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+                configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
+        services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.IntegrationTransport.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
+            .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(20));
+        services.AddSingleton<FlowLedger.Application.Features.Integrations.IIntegrationTransport,
+            FlowLedger.Infrastructure.DataSafety.IntegrationTransport>();
         // -- Scheduled backups (verified snapshot + restore drill + restic off-site) --
         services.AddSingleton(_ => FlowLedger.Infrastructure.DataSafety.BackupSettings.From(configuration));
         services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.BackupRunStore(

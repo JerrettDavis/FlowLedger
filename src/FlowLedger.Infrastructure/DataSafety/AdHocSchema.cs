@@ -29,6 +29,7 @@ public static class AdHocSchema
         NpgsqlAccountConnectorLinkStore.CreateSqlText,
         NpgsqlProviderAccountCatalog.CreateSqlText,
         NpgsqlHomeAssistantStore.CreateSqlText,
+        NpgsqlIntegrationStore.CreateSqlText,
         FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore.CreateSqlText,
     ];
 

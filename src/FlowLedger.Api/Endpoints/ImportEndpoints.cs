@@ -19,6 +19,7 @@ internal static class ImportEndpoints
         ImportSummaryDto summary,
         FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
         FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
+        FlowLedger.Application.Features.Integrations.IntegrationService integrations,
         ILogger logger,
         CancellationToken ct)
     {
@@ -26,6 +27,11 @@ internal static class ImportEndpoints
         {
             return;
         }
+
+        await integrations.DispatchAsync(
+            FlowLedger.Application.Features.Integrations.IntegrationEvents.ImportCompleted,
+            new { imported = summary.ImportedCount },
+            ct);
 
         // A file often overlaps what the bank already synced: fold the unambiguous overlaps now.
         try
@@ -56,6 +62,7 @@ internal static class ImportEndpoints
             ImportTransactionsHandler handler,
             FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
             FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
+            FlowLedger.Application.Features.Integrations.IntegrationService integrations,
             ILogger<ImportTransactionsHandler> logger,
             CancellationToken ct) =>
         {
@@ -89,7 +96,7 @@ internal static class ImportEndpoints
 
                 var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
                 var summary = await handler.HandleAsync(command, ct);
-                await AfterImportAsync(summary, sheetMarker, duplicates, logger, ct);
+                await AfterImportAsync(summary, sheetMarker, duplicates, integrations, logger, ct);
 
                 return Results.Ok(summary);
             }
@@ -118,6 +125,7 @@ internal static class ImportEndpoints
             ImportTransactionsHandler handler,
             FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
             FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
+            FlowLedger.Application.Features.Integrations.IntegrationService integrations,
             ILogger<ImportTransactionsHandler> logger,
             CancellationToken ct) =>
         {
@@ -131,7 +139,7 @@ internal static class ImportEndpoints
                 var normalized = ImportNormalizer.Normalize(request.Content, request.FormatId);
                 var summary = await handler.HandleAsync(
                     new ImportTransactionsCommand(request.AccountId, normalized.Csv, NormalizedImport.Mapping), ct);
-                await AfterImportAsync(summary, sheetMarker, duplicates, logger, ct);
+                await AfterImportAsync(summary, sheetMarker, duplicates, integrations, logger, ct);
                 return Results.Ok(new AutoImportResult(normalized.FormatId, normalized.FormatName, normalized.Warnings, summary));
             }
             catch (InvalidOperationException ex)

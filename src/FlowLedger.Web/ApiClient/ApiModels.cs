@@ -537,6 +537,37 @@ public sealed record HomeAssistantStateDto(HomeAssistantSettingsDto Settings, Li
 public sealed record HomeAssistantSaveRequest(
     bool Enabled, string? WebhookUrl, bool ClearWebhook, bool ShareAmounts, bool IncludeNames, int LeadDays, List<string> Kinds);
 
+// ── Integrations (REST / SOAP / webhooks) ───────────────────────────────────
+
+public sealed record IntegrationConfigDto(
+    string Url, string Auth, string? AuthUser, Dictionary<string, string> Headers, List<string> Events, string? SoapEndpoint);
+
+public sealed record IntegrationDto(
+    Guid Id, string Name, string Kind, bool Enabled, IntegrationConfigDto Config, bool HasCredential, bool HasSigningSecret,
+    DateTimeOffset CreatedUtc, DateTimeOffset? LastUsedUtc, string? LastError);
+
+public sealed record IntegrationsStateDto(List<IntegrationDto> Integrations, bool CanStoreSecrets, List<string> Events, int Limit);
+
+public sealed record IntegrationSaveDto(
+    string Name, string Kind, bool Enabled, string Url, string Auth, string? AuthUser, string? Credential, bool ClearCredential,
+    Dictionary<string, string>? Headers, List<string>? Events, string? SoapEndpoint);
+
+/// <summary><c>SigningSecret</c> is set only when it was just issued (webhook created or rotated); it is never retrievable again.</summary>
+public sealed record IntegrationSavedDto(IntegrationDto Integration, string? SigningSecret);
+
+public sealed record IntegrationDeliveryDto(
+    Guid Id, Guid IntegrationId, DateTimeOffset AtUtc, string Trigger, string Method, string Target, int? StatusCode, int DurationMs, string? Error);
+
+public sealed record IntegrationCallResultDto(int? StatusCode, string? ContentType, string Body, bool Truncated, int DurationMs, string? Error);
+
+public sealed record RestCallDto(string Method, string? Path, string? Query, Dictionary<string, string>? Headers, string? Body, string? ContentType);
+
+public sealed record SoapInvokeDto(string Operation, string BodyXml, string? Version);
+
+public sealed record WsdlOperationDto(string Name, string SoapAction, string SoapVersion, string Endpoint, string Namespace, string BodySkeleton);
+
+public sealed record SoapOperationsDto(List<WsdlOperationDto> Operations, string? Error);
+
 // ── Local AI (in-process embeddings) ─────────────────────────────────────────
 
 public sealed record LocalAiModelDto(string Id, string Kind, string Title, string Description, long SizeBytes, bool Installed, bool Selected, string License);
