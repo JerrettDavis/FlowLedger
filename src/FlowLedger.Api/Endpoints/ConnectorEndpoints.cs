@@ -35,7 +35,7 @@ internal static class ConnectorEndpoints
             "In-app bank linking: each user links institutions inside FlowLedger through the Quiltt Connector (one Quiltt profile per tenant).",
             ["Quiltt:Enabled", "Quiltt:ApiKeySecret", "Quiltt:ConnectorId", "Quiltt:WebhookSecret"],
             c => bool.TryParse(c["Quiltt:Enabled"], out var on) && on,
-            c => Has(c, "Quiltt:ApiKeySecret") && Has(c, "Quiltt:ConnectorId") && Has(c, "Quiltt:WebhookSecret")),
+            c => Has(c, "Quiltt:ApiKeySecret") && Has(c, "Quiltt:ConnectorId")), // WebhookSecret is optional: without it only webhooks are refused
     ];
 
     internal static IEndpointRouteBuilder MapConnectorEndpoints(this IEndpointRouteBuilder app)
