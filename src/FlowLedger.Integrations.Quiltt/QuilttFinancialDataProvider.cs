@@ -217,6 +217,17 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         }
     }
 
+    /// <summary>
+    /// Whether a webhook event type means new bank data is available. Quiltt recommends prefix matching
+    /// (subscribing to <c>connection.synced.successful</c> also delivers its <c>.initial</c>/<c>.historical</c> children).
+    /// Events such as <c>profile.created</c> carry no data, so they must not trigger a sync.
+    /// </summary>
+    public static bool IsSyncTrigger(string? eventType) =>
+        eventType is not null
+        && (eventType.StartsWith("connection.synced.successful", StringComparison.OrdinalIgnoreCase)
+            || eventType.Equals("connection.created", StringComparison.OrdinalIgnoreCase)
+            || eventType.Equals("account.verified", StringComparison.OrdinalIgnoreCase));
+
     private static JsonElement? Obj(JsonElement? e, string name) =>
         e is { ValueKind: JsonValueKind.Object } o && o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;
 
