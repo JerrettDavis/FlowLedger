@@ -1,0 +1,477 @@
+@page "/integrations"
+@rendermode InteractiveServer
+@using FlowLedger.Web.ApiClient
+@inject FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Integrations — FlowLedger</PageTitle>
+
+<div class="d-flex align-center flex-wrap gap-3 mb-1">
+    <MudText Typo="Typo.h5">Integrations</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenFormAsync(null))"
+               Disabled="@(_state is null || _state.Integrations.Count >= _state.Limit)">Add integration</MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Connect FlowLedger to other services: call a <strong>REST</strong> API, call a <strong>SOAP</strong> service from its WSDL, or push
+    signed <strong>webhook</strong> events when an import or sync finishes. Credentials are stored encrypted and never shown again.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_state is null)
+{
+    <MudAlert Severity="Severity.Warning">Couldn't load integrations.</MudAlert>
+}
+else
+{
+    @if (!_state.CanStoreSecrets)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+            This server has no <code>Integrations__EncryptionKey</code>, so it will not store credentials or webhook signing secrets
+            (integrations with no authentication still work). Set a base64 32-byte value, e.g. <code>openssl rand -base64 32</code>.
+        </MudAlert>
+    }
+
+    @if (_state.Integrations.Count == 0)
+    {
+        <MudPaper Class="pa-6 text-center" Outlined="true">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Large" Class="fl-muted mb-2" />
+            <MudText Typo="Typo.h6">No integrations yet</MudText>
+            <MudText Typo="Typo.body2" Class="fl-muted mb-3">Start with whichever service you want to talk to.</MudText>
+            <div class="d-flex justify-center flex-wrap gap-2">
+                <MudButton Variant="Variant.Outlined" OnClick="@(() => OpenFormAsync(null, "Rest"))">REST API</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="@(() => OpenFormAsync(null, "Soap"))">SOAP / WSDL</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="@(() => OpenFormAsync(null, "Webhook"))">Webhook</MudButton>
+            </div>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="2" Class="mb-4">
+            @foreach (var item in _state.Integrations)
+            {
+                var i = item;
+                var selected = _selected?.Id == i.Id;
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Outlined="true" Class="@($"pa-3 fl-integration-card{(selected ? " fl-integration-selected" : "")}")" Style="height:100%;cursor:pointer"
+                              @onclick="@(() => SelectAsync(i))">
+                        <div class="d-flex align-center gap-2 mb-1">
+                            <MudIcon Icon="@KindIcon(i.Kind)" Color="@(i.Enabled ? Color.Primary : Color.Default)" />
+                            <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@i.Name</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@(i.Enabled ? Color.Success : Color.Default)" Variant="Variant.Outlined">@(i.Enabled ? "On" : "Off")</MudChip>
+                        </div>
+                        <MudText Typo="Typo.caption" Class="fl-muted d-block" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                            @KindLabel(i.Kind) · @HostOf(i.Config.Url)
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="d-block mt-1">
+                            @if (i.LastError is not null)
+                            {
+                                <span style="color:var(--mud-palette-error)">Last call failed: @i.LastError</span>
+                            }
+                            else if (i.LastUsedUtc is { } used)
+                            {
+                                <span class="fl-muted">Last used @used.ToLocalTime().ToString("g")</span>
+                            }
+                            else
+                            {
+                                <span class="fl-muted">Never used</span>
+                            }
+                        </MudText>
+                        <div class="d-flex gap-1 mt-2" @onclick:stopPropagation="true">
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenFormAsync(i))">Edit</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(i))">Delete</MudButton>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    @if (_selected is { } s)
+    {
+        <MudPaper Outlined="true" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-1">@s.Name</MudText>
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-3" @bind-ActivePanelIndex="_tab">
+                <MudTabPanel Text="@(s.Kind switch { "Rest" => "Request", "Soap" => "Operations", _ => "Events" })">
+                    @if (s.Kind == "Rest") { @RestPanel(s) }
+                    else if (s.Kind == "Soap") { @SoapPanel(s) }
+                    else { @WebhookPanel(s) }
+                </MudTabPanel>
+                <MudTabPanel Text="Activity" OnClick="@(() => LoadDeliveriesAsync(s))">
+                    @if (_deliveries is null)
+                    {
+                        <MudProgressLinear Indeterminate="true" />
+                    }
+                    else if (_deliveries.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="fl-muted">Nothing yet. Calls and deliveries show up here (status and timing only, never the contents).</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto">
+                            <thead><tr><th>When</th><th>What</th><th>Target</th><th>Status</th><th>Time</th></tr></thead>
+                            <tbody>
+                                @foreach (var d in _deliveries)
+                                {
+                                    <tr>
+                                        <td>@d.AtUtc.ToLocalTime().ToString("g")</td>
+                                        <td>@d.Method · @d.Trigger</td>
+                                        <td class="fl-mono" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@d.Target</td>
+                                        <td>
+                                            @if (d.Error is null)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@(d.StatusCode?.ToString() ?? "OK")</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudTooltip Text="@d.Error"><MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">@(d.StatusCode?.ToString() ?? "Failed")</MudChip></MudTooltip>
+                                            }
+                                        </td>
+                                        <td>@d.DurationMs ms</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </MudPaper>
+    }
+}
+
+@code {
+    private IntegrationsStateDto? _state;
+    private IntegrationDto? _selected;
+    private List<IntegrationDeliveryDto>? _deliveries;
+    private bool _loading = true;
+    private bool _busy;
+    private int _tab;
+
+    // REST console
+    private string _method = "GET";
+    private string _path = "";
+    private string _query = "";
+    private string _body = "";
+    private string _headers = "";
+
+    // SOAP console
+    private List<WsdlOperationDto>? _operations;
+    private string? _operation;
+    private string _soapBody = "";
+    private string? _soapError;
+
+    private IntegrationCallResultDto? _result;
+    private string? _callError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync(Guid? keepSelected = null)
+    {
+        _loading = true;
+        _state = await ApiClient.GetIntegrationsAsync();
+        var id = keepSelected ?? _selected?.Id;
+        _selected = _state?.Integrations.FirstOrDefault(i => i.Id == id);
+        _loading = false;
+    }
+
+    private async Task SelectAsync(IntegrationDto i)
+    {
+        _selected = i;
+        _result = null;
+        _callError = null;
+        _operations = null;
+        _operation = null;
+        _soapBody = "";
+        _soapError = null;
+        _deliveries = null;
+        _tab = 0;
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadDeliveriesAsync(IntegrationDto i)
+        => _deliveries = await ApiClient.GetIntegrationDeliveriesAsync(i.Id) ?? [];
+
+    private async Task OpenFormAsync(IntegrationDto? existing, string kind = "Rest")
+    {
+        var dialog = await DialogService.ShowAsync<IntegrationFormDialog>(existing is null ? "Add integration" : "Edit integration",
+            new DialogParameters<IntegrationFormDialog>
+            {
+                { x => x.Existing, existing },
+                { x => x.CanStoreSecrets, _state?.CanStoreSecrets ?? false },
+                { x => x.Events, _state?.Events ?? [] },
+                { x => x.InitialKind, kind },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: IntegrationSavedDto saved })
+        {
+            Snackbar.Add(existing is null ? "Integration added." : "Saved.", Severity.Success);
+            await LoadAsync(saved.Integration.Id);
+            if (existing is null)
+            {
+                await SelectAsync(_selected ?? saved.Integration);
+            }
+
+            if (saved.SigningSecret is { } secret)
+            {
+                await RevealAsync(secret);
+            }
+        }
+    }
+
+    private async Task RevealAsync(string secret)
+        => await (await DialogService.ShowAsync<SecretRevealDialog>("Signing secret",
+            new DialogParameters<SecretRevealDialog> { { x => x.Secret, secret } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false })).Result;
+
+    private async Task DeleteAsync(IntegrationDto i)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete integration", $"Delete '{i.Name}' and its activity log? This can't be undone.", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApiClient.DeleteIntegrationAsync(i.Id);
+            if (_selected?.Id == i.Id)
+            {
+                _selected = null;
+            }
+
+            await LoadAsync();
+            Snackbar.Add("Deleted.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task RunAsync(Func<Task<IntegrationCallResultDto?>> call)
+    {
+        _busy = true;
+        _callError = null;
+        _result = null;
+        try
+        {
+            _result = await call();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _callError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task SendRestAsync(IntegrationDto s)
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in _headers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var idx = line.IndexOf(':');
+            if (idx > 0)
+            {
+                headers[line[..idx].Trim()] = line[(idx + 1)..].Trim();
+            }
+        }
+
+        return RunAsync(() => ApiClient.CallRestIntegrationAsync(s.Id, new RestCallDto(
+            _method, _path, _query, headers, string.IsNullOrWhiteSpace(_body) ? null : _body, "application/json")));
+    }
+
+    private async Task LoadOperationsAsync(IntegrationDto s)
+    {
+        _busy = true;
+        _soapError = null;
+        try
+        {
+            var r = await ApiClient.GetSoapOperationsAsync(s.Id);
+            _operations = r?.Operations ?? [];
+            _soapError = r?.Error;
+            if (_operations.Count > 0)
+            {
+                PickOperation(_operations[0].Name);
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _soapError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void PickOperation(string? name)
+    {
+        _operation = name;
+        _soapBody = _operations?.FirstOrDefault(o => o.Name == name)?.BodySkeleton ?? "";
+    }
+
+    private Task InvokeSoapAsync(IntegrationDto s)
+    {
+        var version = _operations?.FirstOrDefault(o => o.Name == _operation)?.SoapVersion;
+        return RunAsync(() => ApiClient.InvokeSoapAsync(s.Id, new SoapInvokeDto(_operation ?? "", _soapBody, version)));
+    }
+
+    private async Task RotateAsync(IntegrationDto s)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Rotate signing secret", "The current secret stops working immediately; update your receiver with the new one.", yesText: "Rotate", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var r = await ApiClient.RotateIntegrationSecretAsync(s.Id);
+            if (r?.SigningSecret is { } secret)
+            {
+                await RevealAsync(secret);
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static string KindIcon(string kind) => kind switch
+    {
+        "Soap" => Icons.Material.Filled.Code,
+        "Webhook" => Icons.Material.Filled.Webhook,
+        _ => Icons.Material.Filled.Api,
+    };
+
+    private static string KindLabel(string kind) => kind switch { "Soap" => "SOAP", "Webhook" => "Webhook", _ => "REST" };
+
+    private static string HostOf(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Authority : url;
+
+    private static string PrettyBody(IntegrationCallResultDto r)
+    {
+        if (r.ContentType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true && !string.IsNullOrWhiteSpace(r.Body))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(r.Body);
+                return System.Text.Json.JsonSerializer.Serialize(doc.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+            }
+        }
+
+        return r.Body;
+    }
+
+    private RenderFragment ResultView() => @<div class="mt-3">
+        @if (_callError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@_callError</MudAlert>
+        }
+        @if (_result is { } r)
+        {
+            <div class="d-flex align-center gap-2 mb-1">
+                <MudChip T="string" Size="Size.Small" Color="@(r.Error is null ? Color.Success : Color.Error)" Variant="Variant.Filled">@(r.StatusCode?.ToString() ?? "No response")</MudChip>
+                <MudText Typo="Typo.caption" Class="fl-muted">@r.DurationMs ms@(r.ContentType is null ? "" : " · " + r.ContentType)@(r.Truncated ? " · truncated at 256 KB" : "")</MudText>
+            </div>
+            @if (r.Error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@r.Error</MudAlert>
+            }
+            @if (!string.IsNullOrEmpty(r.Body))
+            {
+                <pre class="fl-mono fl-response">@PrettyBody(r)</pre>
+            }
+        }
+    </div>;
+
+    private RenderFragment RestPanel(IntegrationDto s) => @<div>
+        <div class="d-flex gap-2 flex-wrap align-start">
+            <MudSelect T="string" @bind-Value="_method" Label="Method" Margin="Margin.Dense" Style="max-width:130px">
+                @foreach (var m in new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD" })
+                {
+                    <MudSelectItem Value="@m">@m</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" @bind-Value="_path" Label="Path" Placeholder="/items" Margin="Margin.Dense" Immediate="true" Style="flex:1;min-width:200px"
+                          HelperText="@("Added to " + s.Config.Url)" />
+            <MudTextField T="string" @bind-Value="_query" Label="Query" Placeholder="page=2" Margin="Margin.Dense" Immediate="true" Style="max-width:220px" />
+        </div>
+        <MudTextField T="string" @bind-Value="_headers" Label="Extra headers (Name: value per line)" Lines="2" Margin="Margin.Dense" Immediate="true" Class="mb-2" />
+        @if (_method is not ("GET" or "HEAD"))
+        {
+            <MudTextField T="string" @bind-Value="_body" Label="Body" Lines="6" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono" />
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || !s.Enabled)" OnClick="@(() => SendRestAsync(s))"
+                   StartIcon="@Icons.Material.Filled.Send">Send</MudButton>
+        @if (!s.Enabled) { <MudText Typo="Typo.caption" Class="fl-muted ml-2">This integration is off.</MudText> }
+        @ResultView()
+    </div>;
+
+    private RenderFragment SoapPanel(IntegrationDto s) => @<div>
+        <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !s.Enabled)" OnClick="@(() => LoadOperationsAsync(s))"
+                   StartIcon="@Icons.Material.Filled.CloudDownload">@(_operations is null ? "Load operations from WSDL" : "Reload WSDL")</MudButton>
+        @if (_soapError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_soapError</MudAlert>
+        }
+        @if (_operations is { Count: > 0 })
+        {
+            <MudSelect T="string" Value="_operation" ValueChanged="PickOperation" Label="Operation" Margin="Margin.Dense" Class="mt-3">
+                @foreach (var o in _operations)
+                {
+                    <MudSelectItem Value="@o.Name">@o.Name <span class="fl-muted">· SOAP @o.SoapVersion</span></MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" @bind-Value="_soapBody" Label="Request body (XML, goes inside soap:Body)" Lines="8" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || _operation is null)" OnClick="@(() => InvokeSoapAsync(s))"
+                       StartIcon="@Icons.Material.Filled.Send">Call operation</MudButton>
+        }
+        @ResultView()
+    </div>;
+
+    private RenderFragment WebhookPanel(IntegrationDto s) => @<div>
+        <MudText Typo="Typo.subtitle2">Sends</MudText>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+            @foreach (var e in s.Config.Events)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@IntegrationFormDialog.DescribeEvent(e)</MudChip>
+            }
+        </div>
+        <div class="d-flex gap-2 flex-wrap mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy)" OnClick="@(() => RunAsync(() => ApiClient.TestIntegrationAsync(s.Id)))"
+                       StartIcon="@Icons.Material.Filled.Send">Send test event</MudButton>
+            <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !s.HasSigningSecret)" OnClick="@(() => RotateAsync(s))"
+                       StartIcon="@Icons.Material.Filled.Key">Rotate signing secret</MudButton>
+        </div>
+        @ResultView()
+        <MudText Typo="Typo.subtitle2" Class="mt-4">What your receiver gets</MudText>
+        <pre class="fl-mono fl-response">POST @s.Config.Url
+Content-Type: application/json
+X-FlowLedger-Event: import.completed
+X-FlowLedger-Delivery: &lt;unique id&gt;
+X-FlowLedger-Timestamp: &lt;unix seconds&gt;
+X-FlowLedger-Signature: sha256=HMAC_SHA256(secret, timestamp + "." + body)
+
+{ "source": "flowledger", "version": 1, "event": "import.completed",
+  "event_id": "…", "occurred_at": "…", "data": { "imported": 12 } }</pre>
+    </div>;
+}

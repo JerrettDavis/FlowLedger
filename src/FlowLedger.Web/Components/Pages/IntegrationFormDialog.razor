@@ -1,0 +1,200 @@
+@using FlowLedger.Web.ApiClient
+@inject FlowLedgerApiClient ApiClient
+
+<MudDialog aria-labelledby="integration-dialog-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="integration-dialog-title">@(Existing is null ? "Add integration" : "Edit integration")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (Existing is null)
+        {
+            <MudText Typo="Typo.caption" Class="fl-muted">What kind of service?</MudText>
+            <MudToggleGroup T="string" @bind-Value="_kind" Color="Color.Primary" CheckMark="true" FixedContent="true" Class="mb-3">
+                <MudToggleItem Value="@("Rest")" Text="REST API" />
+                <MudToggleItem Value="@("Soap")" Text="SOAP / WSDL" />
+                <MudToggleItem Value="@("Webhook")" Text="Webhook" />
+            </MudToggleGroup>
+        }
+
+        <MudText Typo="Typo.body2" Class="fl-muted mb-3">@KindHelp</MudText>
+
+        <MudTextField T="string" @bind-Value="_name" Label="Name" Immediate="true" MaxLength="80" Margin="Margin.Dense" Class="mb-2" AutoFocus="true" />
+        <MudTextField T="string" @bind-Value="_url" Label="@UrlLabel" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                      Placeholder="@UrlPlaceholder" HelperText="@UrlHelp" />
+        @if (_kind == "Soap")
+        {
+            <MudTextField T="string" @bind-Value="_soapEndpoint" Label="Service endpoint override (optional)" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          HelperText="Leave empty to use the address inside the WSDL." />
+        }
+
+        <MudSelect T="string" @bind-Value="_auth" Label="Authentication" Margin="Margin.Dense" Class="mb-2">
+            <MudSelectItem Value="@("None")">None</MudSelectItem>
+            <MudSelectItem Value="@("Bearer")">Bearer token</MudSelectItem>
+            <MudSelectItem Value="@("Basic")">Basic (user + password)</MudSelectItem>
+            <MudSelectItem Value="@("ApiKey")">API key in a header</MudSelectItem>
+        </MudSelect>
+        @if (_auth == "Basic")
+        {
+            <MudTextField T="string" @bind-Value="_authUser" Label="User name" Immediate="true" Margin="Margin.Dense" Class="mb-2" />
+        }
+        else if (_auth == "ApiKey")
+        {
+            <MudTextField T="string" @bind-Value="_authUser" Label="Header name" Placeholder="X-API-Key" Immediate="true" Margin="Margin.Dense" Class="mb-2" />
+        }
+        @if (_auth != "None")
+        {
+            <MudTextField T="string" @bind-Value="_credential" InputType="InputType.Password" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          Label="@(_auth == "Basic" ? "Password" : _auth == "Bearer" ? "Token" : "Key")"
+                          HelperText="@(Existing?.HasCredential == true ? "A credential is saved. Leave empty to keep it; it is never shown again." : "Stored encrypted and never shown again.")" />
+            @if (Existing?.HasCredential == true)
+            {
+                <MudCheckBox T="bool" @bind-Value="_clearCredential" Label="Remove the saved credential" Dense="true" />
+            }
+            @if (!CanStoreSecrets)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                    This server has no encryption key, so it will refuse to store credentials. Ask whoever runs FlowLedger to set
+                    <code>Integrations__EncryptionKey</code> (base64, 32 bytes).
+                </MudAlert>
+            }
+        }
+
+        <MudTextField T="string" @bind-Value="_headers" Label="Extra headers (one per line, Name: value)" Lines="3" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                      HelperText="Not secret. Put keys and tokens in the authentication fields above." />
+
+        @if (_kind == "Webhook")
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Send these events</MudText>
+            @foreach (var e in Events)
+            {
+                var ev = e;
+                <div><MudCheckBox T="bool" Value="@_events.Contains(ev)" ValueChanged="@(v => ToggleEvent(ev, v))" Label="@DescribeEvent(ev)" Dense="true" /></div>
+            }
+        }
+
+        <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="Enabled" Class="mt-2" />
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_url))">
+            @(Existing is null ? "Add" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public IntegrationDto? Existing { get; set; }
+    [Parameter] public bool CanStoreSecrets { get; set; }
+    [Parameter] public List<string> Events { get; set; } = [];
+    [Parameter] public string InitialKind { get; set; } = "Rest";
+
+    private string _kind = "Rest";
+    private string _name = "";
+    private string _url = "";
+    private string? _soapEndpoint;
+    private string _auth = "None";
+    private string? _authUser;
+    private string? _credential;
+    private bool _clearCredential;
+    private string _headers = "";
+    private bool _enabled = true;
+    private HashSet<string> _events = [];
+    private bool _busy;
+    private string? _error;
+
+    private string KindHelp => _kind switch
+    {
+        "Soap" => "Point FlowLedger at a WSDL. It lists the operations and lets you call them with a generated SOAP envelope (SOAP 1.1 and 1.2).",
+        "Webhook" => "FlowLedger will POST signed JSON events to this URL when things happen (an import finishes, a sync completes).",
+        _ => "Call a JSON/HTTP API on demand. Requests go to this base URL plus the path you choose, with your authentication added.",
+    };
+
+    private string UrlLabel => _kind switch { "Soap" => "WSDL URL", "Webhook" => "Receiver URL", _ => "Base URL" };
+
+    private string UrlPlaceholder => _kind switch
+    {
+        "Soap" => "https://service.example.com/Calc.svc?wsdl",
+        "Webhook" => "https://example.com/hooks/flowledger",
+        _ => "https://api.example.com/v1",
+    };
+
+    private string UrlHelp => "Use https. Addresses on your local network are reserved for the household owner.";
+
+    protected override void OnInitialized()
+    {
+        if (Existing is { } e)
+        {
+            _kind = e.Kind;
+            _name = e.Name;
+            _url = e.Config.Url;
+            _soapEndpoint = e.Config.SoapEndpoint;
+            _auth = e.Config.Auth;
+            _authUser = e.Config.AuthUser;
+            _headers = string.Join('\n', e.Config.Headers.Select(h => $"{h.Key}: {h.Value}"));
+            _enabled = e.Enabled;
+            _events = [.. e.Config.Events];
+        }
+        else
+        {
+            _kind = InitialKind;
+            _events = [.. Events];
+        }
+    }
+
+    private void ToggleEvent(string ev, bool on)
+    {
+        if (on) { _events.Add(ev); } else { _events.Remove(ev); }
+    }
+
+    internal static string DescribeEvent(string ev) => ev switch
+    {
+        "import.completed" => "A transaction import finished",
+        "sync.completed" => "A bank sync finished",
+        "alert.raised" => "An alert was raised",
+        _ => ev,
+    };
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var line in _headers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var i = line.IndexOf(':');
+            if (i <= 0)
+            {
+                _error = $"'{line}' isn't a header. Use Name: value.";
+                return;
+            }
+
+            headers[line[..i].Trim()] = line[(i + 1)..].Trim();
+        }
+
+        _busy = true;
+        try
+        {
+            var saved = await ApiClient.SaveIntegrationAsync(Existing?.Id, new IntegrationSaveDto(
+                _name.Trim(), _kind, _enabled, _url.Trim(), _auth, string.IsNullOrWhiteSpace(_authUser) ? null : _authUser.Trim(),
+                string.IsNullOrEmpty(_credential) ? null : _credential, _clearCredential, headers,
+                _kind == "Webhook" ? [.. _events] : null, string.IsNullOrWhiteSpace(_soapEndpoint) ? null : _soapEndpoint.Trim()));
+            MudDialog.Close(DialogResult.Ok(saved));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

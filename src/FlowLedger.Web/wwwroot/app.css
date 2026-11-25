@@ -594,3 +594,11 @@ html.fl-share .fl-user-name { display: none; }
 /* Strategy simulators: live sliders */
 .fl-sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 4px 24px; }
 .fl-slider { min-width: 0; }
+
+/* Integrations */
+.fl-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.fl-response { margin: 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  background: var(--mud-palette-background-gray, rgba(127,127,127,.08)); border-radius: 6px; font-size: .8125rem; }
+.fl-integration-card { transition: border-color .15s, box-shadow .15s; }
+.fl-integration-card:hover { border-color: var(--mud-palette-primary); }
+.fl-integration-selected { border-color: var(--mud-palette-primary); box-shadow: 0 0 0 1px var(--mud-palette-primary); }
