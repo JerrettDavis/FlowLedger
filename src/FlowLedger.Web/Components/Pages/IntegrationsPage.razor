@@ -31,7 +31,7 @@ else
     @if (!_state.CanStoreSecrets)
     {
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
-            This server has no <code>Integrations__EncryptionKey</code>, so it will not store credentials or webhook signing secrets
+            This server has no <code>Integrations__EncryptionKey</code> (or <code>HomeAssistant__EncryptionKey</code>), so it will not store credentials or webhook signing secrets
             (integrations with no authentication still work). Set a base64 32-byte value, e.g. <code>openssl rand -base64 32</code>.
         </MudAlert>
     }
