@@ -49,6 +49,25 @@ public interface IFinancialDataProvider
         string memberProviderId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Like <see cref="GetConnectionStatusAsync"/> but also classifies WHY a connection is unhealthy
+    /// (<see cref="ProviderIssue"/>), so persistence, retry policy and UI are connector-agnostic. The default derives a coarse
+    /// result from the status alone; connectors that can see richer state (per-connection error codes) override it.
+    /// </summary>
+    async Task<ConnectionHealth> GetConnectionHealthAsync(
+        string memberProviderId,
+        CancellationToken cancellationToken = default)
+    {
+        var status = await GetConnectionStatusAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
+        return status switch
+        {
+            ConnectionStatus.NeedsUserAction => ConnectionHealth.FromIssue(ProviderIssue.Of(ProviderIssueKind.ReauthRequired, "The institution needs the user to re-authenticate.")),
+            ConnectionStatus.Degraded => ConnectionHealth.FromIssue(ProviderIssue.Of(ProviderIssueKind.InstitutionUnavailable, "The connection is degraded.")),
+            ConnectionStatus.Error => ConnectionHealth.FromIssue(ProviderIssue.Of(ProviderIssueKind.Unknown, "The connection is in an error state.")),
+            _ => new ConnectionHealth(status),
+        };
+    }
+
     // ── Accounts ──────────────────────────────────────────────────────────────
 
     /// <summary>
