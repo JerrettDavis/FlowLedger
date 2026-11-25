@@ -1,0 +1,119 @@
+<MudDialog aria-labelledby="import-tx-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="import-tx-title">Import transactions</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Upload an export from Mint, Monarch, YNAB, Simplifi/Quicken, Chase, Bank of America, Wells Fargo, Citi, Capital One,
+            American Express, Discover, Apple Card, PayPal, or any bank's CSV, OFX/QFX or QIF file. The format is detected
+            automatically. Transactions already in FlowLedger are skipped.
+        </MudText>
+        <MudSelect T="Guid" @bind-Value="_accountId" Label="Import into account" Variant="Variant.Outlined" Class="mb-2">
+            @foreach (var a in Accounts)
+            {
+                <MudSelectItem T="Guid" Value="@a.Id">@a.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" @bind-Value="_format" Label="Format" Variant="Variant.Outlined" Class="mb-2" HelperText="Leave on Auto-detect unless the result looks wrong.">
+            <MudSelectItem T="string" Value="@("")">Auto-detect</MudSelectItem>
+            @foreach (var f in _formats)
+            {
+                <MudSelectItem T="string" Value="@f.Id">@f.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <InputFile OnChange="OnFile" accept=".csv,.ofx,.qfx,.qif,.txt,text/csv" class="mb-2" aria-label="Pick a file to import" />
+        @if (_fileName is not null)
+        {
+            <MudText Typo="Typo.caption" Class="fl-muted">@_fileName (@(_content.Length / 1024) KB)</MudText>
+        }
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert>
+        }
+        @if (_result is not null)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-2">
+                Read as <b>@_result.FormatName</b>: imported @_result.Summary.ImportedCount,
+                skipped @_result.Summary.DuplicateCount already present@(_result.Summary.FailedRowCount > 0 ? $", {_result.Summary.FailedRowCount} could not be read" : "").
+                @foreach (var w in _result.Warnings)
+                {
+                    <div>@w</div>
+                }
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">@(_result is null ? "Cancel" : "Done")</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit"
+                   Disabled="@(_busy || _accountId == Guid.Empty || string.IsNullOrEmpty(_content))">Import</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Inject] private FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient { get; set; } = default!;
+    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+
+    private Guid _accountId;
+    private string _format = "";
+    private string _content = "";
+    private string? _fileName;
+    private string? _error;
+    private bool _busy;
+    private FlowLedger.Web.ApiClient.AutoImportResultDto? _result;
+    private List<FlowLedger.Web.ApiClient.ImportFormatDto> _formats = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Accounts.Count == 1)
+        {
+            _accountId = Accounts[0].Id;
+        }
+
+        try
+        {
+            _formats = await ApiClient.GetImportFormatsAsync() ?? [];
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException)
+        {
+            // The list is optional: auto-detect still works.
+        }
+    }
+
+    private async Task OnFile(InputFileChangeEventArgs e)
+    {
+        _result = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(8 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            _content = await reader.ReadToEndAsync();
+            _fileName = e.File.Name;
+            _error = null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            _error = "Could not read that file (limit 8 MB).";
+        }
+    }
+
+    private void Close() => MudDialog.Close(_result is null ? DialogResult.Cancel() : DialogResult.Ok(true));
+
+    private async Task Submit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _result = await ApiClient.ImportTransactionsAutoAsync(_accountId, _content, string.IsNullOrEmpty(_format) ? null : _format);
+        }
+        catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

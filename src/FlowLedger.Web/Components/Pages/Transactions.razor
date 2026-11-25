@@ -15,6 +15,10 @@
                    aria-label="Auto-categorize transactions">
             @(_categorizing ? "Categorizing…" : "Auto-categorize")
         </MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" OnClick="OpenImport"
+                   aria-label="Import transactions from another app or bank">
+            Import
+        </MudButton>
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCsv"
                    aria-label="Export visible transactions as CSV">
             Export CSV
@@ -333,6 +337,19 @@
         catch (Exception ex)
         {
             Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task OpenImport()
+    {
+        var dialog = await Dialogs.ShowAsync<ImportTransactionsDialog>("Import transactions", new DialogParameters<ImportTransactionsDialog>
+        {
+            { x => x.Accounts, _accounts },
+        }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
         }
     }
 

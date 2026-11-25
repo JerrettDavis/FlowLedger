@@ -324,6 +324,22 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<SheetImportResult>(JsonOptions, ct);
         });
 
+    public Task<List<ImportFormatDto>?> GetImportFormatsAsync(CancellationToken ct = default)
+        => ExecuteAsync("load import formats", async () =>
+        {
+            var response = await _http.GetAsync("/api/imports/formats", ct);
+            await ThrowIfFailedAsync(response, "load import formats", ct);
+            return await response.Content.ReadFromJsonAsync<List<ImportFormatDto>>(JsonOptions, ct);
+        });
+
+    public Task<AutoImportResultDto?> ImportTransactionsAutoAsync(Guid accountId, string content, string? formatId, CancellationToken ct = default)
+        => ExecuteAsync("import transactions", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/imports/auto", new { accountId, content, formatId }, JsonOptions, ct);
+            await ThrowIfFailedAsync(response, "import transactions", ct);
+            return await response.Content.ReadFromJsonAsync<AutoImportResultDto>(JsonOptions, ct);
+        });
+
     private Task<bool> SendNoContentAsync(string description, Func<Task<HttpResponseMessage>> send, CancellationToken ct)
         => ExecuteAsync(description, async () =>
         {

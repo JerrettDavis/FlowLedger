@@ -15,6 +15,38 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class ImportEndpoints
 {
+    private static async Task AfterImportAsync(
+        ImportSummaryDto summary,
+        FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
+        FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        if (summary.ImportedCount <= 0)
+        {
+            return;
+        }
+
+        // A file often overlaps what the bank already synced: fold the unambiguous overlaps now.
+        try
+        {
+            await duplicates.AutoMergeAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Duplicate merge after import failed.");
+        }
+
+        try
+        {
+            await sheetMarker.RefreshAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Bill sheet refresh after import failed.");
+        }
+    }
+
     internal static IEndpointRouteBuilder MapImportEndpoints(this IEndpointRouteBuilder app)
     {
         // ── Import ────────────────────────────────────────────────────────────
@@ -57,27 +89,7 @@ internal static class ImportEndpoints
 
                 var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
                 var summary = await handler.HandleAsync(command, ct);
-                if (summary.ImportedCount > 0)
-                {
-                    // A file often overlaps what the bank already synced: fold the unambiguous overlaps now.
-                    try
-                    {
-                        await duplicates.AutoMergeAsync(ct);
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        logger.LogWarning(ex, "Duplicate merge after import failed.");
-                    }
-
-                    try
-                    {
-                        await sheetMarker.RefreshAsync(ct);
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        logger.LogWarning(ex, "Bill sheet refresh after import failed.");
-                    }
-                }
+                await AfterImportAsync(summary, sheetMarker, duplicates, logger, ct);
 
                 return Results.Ok(summary);
             }
@@ -93,6 +105,44 @@ internal static class ImportEndpoints
         .WithName("ImportTransactions")
         .WithTags("Imports")
         .WithSummary("Import transactions from CSV")
+        .RequireRateLimiting("write");
+
+        app.MapGet("/api/imports/formats", () => Results.Ok(ImportNormalizer.Formats))
+            .WithName("ListImportFormats")
+            .WithTags("Imports")
+            .WithSummary("Supported import sources (apps, banks and file types)")
+            .RequireRateLimiting("api");
+
+        app.MapPost("/api/imports/auto", async (
+            [FromBody] AutoImportRequest request,
+            ImportTransactionsHandler handler,
+            FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
+            FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
+            ILogger<ImportTransactionsHandler> logger,
+            CancellationToken ct) =>
+        {
+            if (request.AccountId == Guid.Empty || string.IsNullOrWhiteSpace(request.Content))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["import"] = ["An account and file content are required."] });
+            }
+
+            try
+            {
+                var normalized = ImportNormalizer.Normalize(request.Content, request.FormatId);
+                var summary = await handler.HandleAsync(
+                    new ImportTransactionsCommand(request.AccountId, normalized.Csv, NormalizedImport.Mapping), ct);
+                await AfterImportAsync(summary, sheetMarker, duplicates, logger, ct);
+                return Results.Ok(new AutoImportResult(normalized.FormatId, normalized.FormatName, normalized.Warnings, summary));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(title: "Import failed", detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+        })
+        .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(10 * 1024 * 1024))
+        .WithName("ImportTransactionsAuto")
+        .WithTags("Imports")
+        .WithSummary("Import a Mint, Monarch, YNAB, bank CSV, OFX/QFX or QIF file with automatic format detection")
         .RequireRateLimiting("write");
 
         // ── Match suggestions ────────────────────────────────────────────────
@@ -190,3 +240,9 @@ public sealed record ImportRequest(
 
 /// <summary>Request body for POST /api/transactions/{id}/match.</summary>
 public sealed record ManualMatchRequest(Guid PlannedOccurrenceId);
+
+/// <summary>Request body for POST /api/imports/auto. <paramref name="FormatId"/> overrides detection.</summary>
+public sealed record AutoImportRequest(Guid AccountId, string Content, string? FormatId = null);
+
+/// <summary>What was detected plus the import summary.</summary>
+public sealed record AutoImportResult(string FormatId, string FormatName, IReadOnlyList<string> Warnings, ImportSummaryDto Summary);

@@ -557,3 +557,9 @@ public sealed record EvalMethodDto(string Name, double Accuracy, List<EvalPointD
 public sealed record EvaluationDto(string Embedder, bool Semantic, int Merchants, int Labels, int Folds, long Milliseconds, string Note, List<EvalMethodDto> Methods);
 
 public sealed record SimilarTransactionDto(Guid Id, DateOnly Date, string? Merchant, string Description, decimal Amount, string Direction, string? CategoryPath, double Similarity);
+
+public sealed record ImportFormatDto(string Id, string Name);
+
+public sealed record ImportSummaryDto(Guid ImportBatchId, int ImportedCount, int DuplicateCount, int FailedRowCount, int MatchedToPlanCount);
+
+public sealed record AutoImportResultDto(string FormatId, string FormatName, List<string> Warnings, ImportSummaryDto Summary);
