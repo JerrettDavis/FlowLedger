@@ -42,3 +42,12 @@ Against the real Quiltt sandbox (Mock Sandbox Bank profile): session API returns
 `accounts { id name kind state mask currencyCode balance{current available} institution{name} connection{id status} }` and the paginated `transactions`
 query both succeed; `balance.available` can be null. `QuilttProviderTests.Live_Sandbox_ReadsAccountsAndTransactions` (opt-in via `QUILTT_LIVE_KEY`/`QUILTT_LIVE_PROFILE`) runs
 the real provider end to end. Not yet exercised: the in-app Connector UI (needs signed-in user) and webhook delivery (needs a public URL).
+
+## In-app end-to-end verification (2026-11-25, isolated sandbox stack)
+Signed-in user -> Connect bank -> real Quiltt Connector (email auth, Mock Sandbox Bank, OAuth consent) -> Sync now: 2 accounts, 168 transactions and 2 balance snapshots
+landed in the tenant's rows and render on /accounts tagged Quiltt. Run on a throwaway DB (`FlowLedger__PostgresVolume`/`DatabaseName` + `SimpleFin__Enabled=false` env overrides);
+never link a sandbox bank into the production database.
+Findings: (1) Connect bank was hidden unless environment=production (fixed: also sandbox). (2) The Connectors page demanded the webhook secret for "credentials set" (fixed).
+(3) The Web ApiClient binds the tenant header once per circuit; a first click right after the OIDC redirect can carry no tenant and, in Development without
+`Tenancy:RequireTenantHeader=true`, falls back to the demo tenant, so the Quiltt connection was saved under the wrong tenant and sync found nothing. Set
+`Tenancy:RequireTenantHeader=true` on any stack with real users so this fails closed. Webhook delivery is still untested (needs a public URL).
