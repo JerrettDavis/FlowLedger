@@ -85,7 +85,7 @@
         _result = null;
         try
         {
-            await using var stream = e.File.OpenReadStream(8 * 1024 * 1024);
+            await using var stream = e.File.OpenReadStream(5 * 1024 * 1024);
             using var reader = new StreamReader(stream);
             _content = await reader.ReadToEndAsync();
             _fileName = e.File.Name;
@@ -93,7 +93,7 @@
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            _error = "Could not read that file (limit 8 MB).";
+            _error = "Could not read that file (limit 5 MB).";
         }
     }
 

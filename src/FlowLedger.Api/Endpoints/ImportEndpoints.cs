@@ -139,7 +139,7 @@ internal static class ImportEndpoints
                 return Results.Problem(title: "Import failed", detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
         })
-        .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(10 * 1024 * 1024))
+        .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024))
         .WithName("ImportTransactionsAuto")
         .WithTags("Imports")
         .WithSummary("Import a Mint, Monarch, YNAB, bank CSV, OFX/QFX or QIF file with automatic format detection")
