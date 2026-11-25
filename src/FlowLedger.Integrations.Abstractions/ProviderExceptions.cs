@@ -12,6 +12,21 @@ public abstract class ProviderException : Exception
     /// <summary>Provider-specific error code or category, if available.</summary>
     public string? ProviderCode { get; }
 
+    private ProviderIssueKind? _kind;
+
+    /// <summary>
+    /// Connector-neutral classification. Defaults from the exception type (see <see cref="DefaultKind"/>); a connector that
+    /// knows better (e.g. an institution outage vs. a vendor outage, both "transient") sets it with an object initializer.
+    /// </summary>
+    public ProviderIssueKind Kind
+    {
+        get => _kind ?? DefaultKind;
+        init => _kind = value;
+    }
+
+    /// <summary>The kind implied by the exception type alone.</summary>
+    protected virtual ProviderIssueKind DefaultKind => ProviderIssueKind.Unknown;
+
     protected ProviderException(string message, string? providerCode = null, Exception? inner = null)
         : base(message, inner)
     {
@@ -39,6 +54,8 @@ public sealed class TransientProviderException : ProviderException
     {
         RetryAfter = retryAfter;
     }
+
+    protected override ProviderIssueKind DefaultKind => ProviderIssueKind.ServiceUnavailable;
 }
 
 /// <summary>
@@ -59,6 +76,8 @@ public sealed class RateLimitedProviderException : ProviderException
     {
         RetryAfter = retryAfter;
     }
+
+    protected override ProviderIssueKind DefaultKind => ProviderIssueKind.RateLimited;
 }
 
 /// <summary>
@@ -80,6 +99,8 @@ public sealed class NeedsUserActionProviderException : ProviderException
     {
         UserHint = userHint;
     }
+
+    protected override ProviderIssueKind DefaultKind => ProviderIssueKind.ReauthRequired;
 }
 
 /// <summary>
@@ -94,6 +115,8 @@ public sealed class FatalProviderException : ProviderException
         string? providerCode = null,
         Exception? inner = null)
         : base(message, providerCode, inner) { }
+
+    protected override ProviderIssueKind DefaultKind => ProviderIssueKind.Internal;
 }
 
 /// <summary>
