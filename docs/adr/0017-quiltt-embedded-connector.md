@@ -36,3 +36,9 @@ scheduled sync is the per-tenant backstop.
    until `expiresAt` or switch server-to-server GraphQL to Basic auth (`profileId:apiKeySecret`, documented as unlimited).
 3. Send a test webhook from the Quiltt dashboard; only `connection.synced.successful*`, `connection.created` and `account.verified` trigger a sync (`IsSyncTrigger`).
 4. Confirm `institution { name }` is accepted by the GraphQL schema (not listed in the docs we read).
+
+## Live sandbox verification (2026-11-25)
+Against the real Quiltt sandbox (Mock Sandbox Bank profile): session API returns 201 (`token,userId,userUuid,environmentId,expiration,expiresAt`);
+`accounts { id name kind state mask currencyCode balance{current available} institution{name} connection{id status} }` and the paginated `transactions`
+query both succeed; `balance.available` can be null. `QuilttProviderTests.Live_Sandbox_ReadsAccountsAndTransactions` (opt-in via `QUILTT_LIVE_KEY`/`QUILTT_LIVE_PROFILE`) runs
+the real provider end to end. Not yet exercised: the in-app Connector UI (needs signed-in user) and webhook delivery (needs a public URL).

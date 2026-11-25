@@ -185,6 +185,33 @@ public sealed class QuilttProviderTests
     public void IsSyncTrigger_OnlyForEventsCarryingData(string? type, bool expected) =>
         QuilttFinancialDataProvider.IsSyncTrigger(type).Should().Be(expected);
 
+    /// <summary>Opt-in: runs the real provider against Quiltt's sandbox. Set QUILTT_LIVE_KEY and QUILTT_LIVE_PROFILE.</summary>
+    [Fact]
+    public async Task Live_Sandbox_ReadsAccountsAndTransactions()
+    {
+        var key = Environment.GetEnvironmentVariable("QUILTT_LIVE_KEY");
+        var profile = Environment.GetEnvironmentVariable("QUILTT_LIVE_PROFILE");
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile)) { return; }
+
+        var opts = new QuilttOptions { ApiKeySecret = key, ConnectorId = "live", InitialHistoryDays = 5000 };
+        var o = Options.Create(opts);
+        var p = new QuilttFinancialDataProvider(new QuilttApiClient(new HttpClient(), o), o, null, NullLogger<QuilttFinancialDataProvider>.Instance);
+
+        (await p.GetConnectionStatusAsync(profile)).Should().Be(ConnectionStatus.Healthy);
+        var accounts = await p.GetAccountsAsync(profile);
+        accounts.Should().NotBeEmpty();
+        accounts.Should().OnlyContain(a => a.Name.StartsWith("Mock Sandbox Bank"));
+
+        var total = 0;
+        foreach (var a in accounts)
+        {
+            var page = await p.GetTransactionsAsync(a.ProviderId, SyncCursor.Initial);
+            total += page.Items.Count;
+        }
+
+        total.Should().BeGreaterThan(0);
+    }
+
     // ── Webhooks ──
 
     private static string Header(string secret, string body, long ts)
