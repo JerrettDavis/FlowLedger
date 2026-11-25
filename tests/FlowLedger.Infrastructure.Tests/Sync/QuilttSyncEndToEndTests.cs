@@ -147,6 +147,62 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
         }
     }
 
+    /// <summary>Opt-in: syncs the real Quiltt sandbox profile into Postgres. Set QUILTT_LIVE_KEY and QUILTT_LIVE_PROFILE.</summary>
+    [DockerFact]
+    public async Task Live_Sandbox_Sync_PopulatesDatabase_AndIsIdempotent()
+    {
+        var key = Environment.GetEnvironmentVariable("QUILTT_LIVE_KEY");
+        var profile = Environment.GetEnvironmentVariable("QUILTT_LIVE_PROFILE");
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile)) { return; }
+
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Quiltt:Enabled"] = "true",
+            ["Quiltt:ApiKeySecret"] = key,
+            ["Quiltt:ConnectorId"] = "live",
+            ["Quiltt:InitialHistoryDays"] = "5000",
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddQuilttProvider(config);
+        await using var sp = services.BuildServiceProvider();
+
+        var tenant = TestTenantContext.New();
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            await seed.ProviderConnections.AddAsync(ProviderConnectionRecord.Create(
+                tenant.TenantId, "Quiltt", profile, "Quiltt", "ConnectionPending", DateTimeOffset.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+
+        async Task<FlowLedger.Application.Abstractions.SyncResult> RunSync()
+        {
+            await using var scope = sp.CreateAsyncScope();
+            await using var db = _fixture.CreateDbContext(tenant);
+            var provider = scope.ServiceProvider.GetRequiredService<QuilttFinancialDataProvider>();
+            return await new FinancialSyncService(provider, db, tenant, new EfSyncCursorStore(db, tenant), NullLogger<FinancialSyncService>.Instance).SyncAsync();
+        }
+
+        var first = await RunSync();
+        first.AccountsUpserted.Should().BeGreaterThan(0);
+        first.TransactionsAdded.Should().BeGreaterThan(0);
+
+        int accounts, txns;
+        await using (var v = _fixture.CreateDbContext(tenant))
+        {
+            accounts = await v.Accounts.CountAsync();
+            txns = await v.Transactions.CountAsync();
+        }
+
+        accounts.Should().Be(first.AccountsUpserted);
+        txns.Should().Be(first.TransactionsAdded);
+
+        var second = await RunSync();
+        second.TransactionsAdded.Should().Be(0);
+        await using var v2 = _fixture.CreateDbContext(tenant);
+        (await v2.Transactions.CountAsync()).Should().Be(txns);
+    }
+
     private static int FreePort()
     {
         var l = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
