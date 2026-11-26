@@ -659,7 +659,7 @@ Primary database:
 
 Optional local simple mode later:
 
-- SQLite for single-user lightweight deployments, but not required for v1.
+- SQLite is NOT supported: the code is PostgreSQL-only (jsonb, Npgsql raw SQL, advisory locks, ON CONFLICT, unnest). Supported database: PostgreSQL 15+.
 
 Supporting infrastructure:
 

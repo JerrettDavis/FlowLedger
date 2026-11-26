@@ -41,6 +41,8 @@ FlowLedger combines four traditionally separate tools into one system:
 
 [AGPL-3.0-only](./LICENSE) — free and open source. The self-hosted version is first-class, not a crippled community edition.
 
+AGPL section 13 note for operators: if you modify FlowLedger and let users interact with it over a network, you must offer those users the corresponding source of your modified version. Running unmodified releases carries no extra obligation. Third-party licences are listed in [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
+
 ## Tech stack
 
 | Layer | Technology |
@@ -49,7 +51,7 @@ FlowLedger combines four traditionally separate tools into one system:
 | Orchestration | .NET Aspire 13.4 |
 | Frontend | Blazor Web App (interactive auto), MudBlazor 9 |
 | API | ASP.NET Core Minimal APIs, vertical slices |
-| Database | PostgreSQL (EF Core 10 + Npgsql) |
+| Database | PostgreSQL 15+ only (EF Core 10 + Npgsql); no SQLite or other engines |
 | Cache / locks | Redis |
 | Scheduler | Quartz.NET |
 | Identity / Auth | ASP.NET Core Identity + OpenIddict |
