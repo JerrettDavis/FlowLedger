@@ -101,9 +101,9 @@
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
-    [Parameter] public FlowLedger.Web.ApiClient.AssetDto? Asset { get; set; }
+    [Parameter] public FlowLedger.Contracts.AssetDto? Asset { get; set; }
     [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
-    [Parameter] public List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> Templates { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.AssetCategoryTemplateDto> Templates { get; set; } = [];
 
     private sealed class Row { public string Key { get; set; } = ""; public string Value { get; set; } = ""; }
 
@@ -175,11 +175,11 @@
         DateOnly? purchase = _purchaseDate is { } p ? DateOnly.FromDateTime(p) : null;
 
         object result = Asset is null
-            ? new FlowLedger.Web.ApiClient.CreateAssetRequest(
+            ? new FlowLedger.Contracts.CreateAssetRequest(
                 _name, _category, _value ?? 0m, _currency,
                 _valuedOn is { } v ? DateOnly.FromDateTime(v) : null, purchase, _purchasePrice,
                 _manufacturer, _model, _serial, _notes, _method, rate, salvage, life, _linkedAccountId, attrs)
-            : new FlowLedger.Web.ApiClient.UpdateAssetRequest(
+            : new FlowLedger.Contracts.UpdateAssetRequest(
                 _name, _category, purchase, _purchasePrice, _manufacturer, _model, _serial, _notes,
                 _method, rate, salvage, life, _linkedAccountId, attrs);
 

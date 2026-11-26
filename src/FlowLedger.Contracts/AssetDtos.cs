@@ -1,7 +1,4 @@
-namespace FlowLedger.Application.Features.Assets;
-
-/// <summary>One point in an asset's valuation history.</summary>
-public sealed record AssetValuationDto(Guid Id, decimal Amount, DateOnly AsOf, string Source, string? Note, DateTimeOffset RecordedAt);
+namespace FlowLedger.Contracts;
 
 /// <summary>Response DTO for an asset. <see cref="Valuations"/> is only populated on single-asset reads.</summary>
 public sealed record AssetDto(
@@ -33,7 +30,32 @@ public sealed record AssetDto(
     IReadOnlyList<AssetValuationDto>? Valuations,
     ValuationSpreadDto? Spread = null);
 
-public sealed record ValuationSpreadDto(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
+public sealed record AssetCategoryTemplateDto(
+    string Category,
+    string Label,
+    string DefaultMethod,
+    decimal DefaultAnnualRate,
+    int? DefaultUsefulLifeYears,
+    IReadOnlyList<string> SuggestedFields);
+
+public sealed record AssetSummaryDto(
+    int AssetCount,
+    decimal TotalValue,
+    decimal TotalCost,
+    decimal UnrealizedGainLoss,
+    decimal LinkedLiabilities,
+    decimal TotalEquity,
+    IReadOnlyList<AssetCategoryBreakdownDto> ByCategory,
+    IReadOnlyList<AssetDto> TopAssets,
+    NetWorthDto NetWorth);
+
+public sealed record AssetCategoryBreakdownDto(string Category, int Count, decimal Value);
+
+/// <summary>Outcome of asking a valuation feed to refresh an asset.</summary>
+public sealed record AssetRefreshResultDto(bool Updated, string Message, AssetDto? Asset);
+
+/// <summary>One point in an asset's valuation history.</summary>
+public sealed record AssetValuationDto(Guid Id, decimal Amount, DateOnly AsOf, string Source, string? Note, DateTimeOffset RecordedAt);
 
 public sealed record CreateAssetRequest(
     string Name,
@@ -73,15 +95,7 @@ public sealed record UpdateAssetRequest(
 
 public sealed record RecordValuationRequest(decimal Amount, DateOnly? AsOf, string? Source, string? Note);
 
-public sealed record AssetCategoryTemplateDto(
-    string Category,
-    string Label,
-    string DefaultMethod,
-    decimal DefaultAnnualRate,
-    int? DefaultUsefulLifeYears,
-    IReadOnlyList<string> SuggestedFields);
-
-public sealed record AssetCategoryBreakdownDto(string Category, int Count, decimal Value);
+public sealed record ValuationSpreadDto(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
 
 /// <summary>Net worth. Currencies are never summed together: see <see cref="MixedCurrencies"/> and <see cref="ByCurrency"/>.</summary>
 public sealed record NetWorthDto(
@@ -93,26 +107,3 @@ public sealed record NetWorthDto(
     string Currency = "USD",
     bool MixedCurrencies = false,
     IReadOnlyList<CurrencyTotalDto>? ByCurrency = null);
-
-/// <summary>Net worth components for one currency.</summary>
-public sealed record CurrencyTotalDto(
-    string Currency,
-    decimal AccountAssets,
-    decimal AccountLiabilities,
-    decimal PhysicalAssets,
-    decimal NetWorth,
-    decimal CarriedByAccounts);
-
-public sealed record AssetSummaryDto(
-    int AssetCount,
-    decimal TotalValue,
-    decimal TotalCost,
-    decimal UnrealizedGainLoss,
-    decimal LinkedLiabilities,
-    decimal TotalEquity,
-    IReadOnlyList<AssetCategoryBreakdownDto> ByCategory,
-    IReadOnlyList<AssetDto> TopAssets,
-    NetWorthDto NetWorth);
-
-/// <summary>Outcome of asking a valuation feed to refresh an asset.</summary>
-public sealed record AssetRefreshResultDto(bool Updated, string Message, AssetDto? Asset);
