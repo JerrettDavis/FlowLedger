@@ -58,4 +58,37 @@ public sealed class ReadinessChecksTests
         }).Build(), TimeProvider.System);
         (await down.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Degraded);
     }
+    [Fact]
+    public async Task ObjectStorage_check_is_healthy_when_writable_and_unhealthy_when_root_is_a_file()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "fl-os-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var ok = new ObjectStorageWritableCheck(Microsoft.Extensions.Options.Options.Create(new FlowLedger.Infrastructure.Storage.ObjectStorageOptions { RootPath = dir }));
+            (await ok.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy);
+            Directory.GetFiles(dir).Should().BeEmpty("the probe file is removed");
+
+            var file = Path.Combine(dir, "not-a-dir");
+            await File.WriteAllTextAsync(file, "x");
+            var bad = new ObjectStorageWritableCheck(Microsoft.Extensions.Options.Options.Create(new FlowLedger.Infrastructure.Storage.ObjectStorageOptions { RootPath = file }));
+            (await bad.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Unhealthy);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LastSync_check_is_degraded_never_unhealthy_when_database_unavailable()
+    {
+        var down = new LastSyncAgeCheck(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:flowledger"] = "Host=127.0.0.1;Port=1;Database=x;Username=u;Password=p;Timeout=1",
+        }).Build(), TimeProvider.System);
+        (await down.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Degraded);
+    }
 }
