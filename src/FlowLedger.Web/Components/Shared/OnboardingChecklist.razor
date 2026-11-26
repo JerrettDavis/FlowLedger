@@ -1,0 +1,28 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@* First-run setup guide. Copy is deliberately environment-neutral: it never points at a toolbar button that only
+   exists in some environments (the app bar offers "Connect bank" in production and "Connect & Sync" in demo/sandbox). *@
+<MudPaper Class="pa-4 mb-4" Outlined="true" role="region" aria-label="Get started">
+    <MudText Typo="Typo.h6" Class="mb-1">Get started with FlowLedger</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Your dashboard fills in once there is data. Pick whichever of these suits you; you can come back to the rest later.
+    </MudText>
+    <ol class="fl-checklist" aria-label="Setup steps">
+        <li>
+            <MudLink Href="accounts">Add or connect an account</MudLink>
+            <span class="fl-checklist-hint">Use the app bar to link a bank, or add an account by hand.</span>
+        </li>
+        <li>
+            <MudLink Href="transactions">Import transactions</MudLink>
+            <span class="fl-checklist-hint">Upload a CSV export from your bank or another app.</span>
+        </li>
+        <li>
+            <MudLink Href="recurring-flows">Review recurring bills and income</MudLink>
+            <span class="fl-checklist-hint">These drive the cash-flow forecast.</span>
+        </li>
+        <li>
+            <MudLink Href="budgets">Set a budget</MudLink>
+            <span class="fl-checklist-hint">Optional: get alerts when a category runs over.</span>
+        </li>
+    </ol>
+</MudPaper>

@@ -639,3 +639,7 @@ html.fl-share .fl-user-name { display: none; }
 .fl-integration-card { transition: border-color .15s, box-shadow .15s; }
 .fl-integration-card:hover { border-color: var(--mud-palette-primary); }
 .fl-integration-selected { border-color: var(--mud-palette-primary); box-shadow: 0 0 0 1px var(--mud-palette-primary); }
+
+/* First-run onboarding checklist */
+.fl-checklist { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 8px; }
+.fl-checklist-hint { display: block; font-size: 0.8125rem; color: var(--mud-palette-text-secondary); }
