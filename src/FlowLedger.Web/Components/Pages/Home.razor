@@ -334,7 +334,7 @@ else
                     {
                         <EmptyState Icon="@Icons.Material.Outlined.ShowChart"
                                     Title="No forecast yet"
-                                    Description="Click &quot;Connect &amp; Sync&quot; to load demo data." />
+                                    Description="@OnboardingCopy.LoadData(Status?.Environment)" />
                     }
                 </MudCardContent>
             </MudCard>
@@ -550,6 +550,9 @@ else
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private static string FlagName(FlowLedger.Web.ApiClient.FlaggedTransactionDto f) =>
         string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName;
 

@@ -132,7 +132,9 @@
     <MudMainContent>
         <main id="main-content" tabindex="-1">
             <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
-                @Body
+                <CascadingValue Value="_status">
+                    @Body
+                </CascadingValue>
             </MudContainer>
         </main>
     </MudMainContent>

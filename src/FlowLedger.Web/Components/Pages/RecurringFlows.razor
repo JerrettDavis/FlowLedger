@@ -84,7 +84,7 @@
 {
     <EmptyState Icon="@Icons.Material.Outlined.Repeat"
                 Title="No recurring flows"
-                Description="Add a recurring flow or use Connect & Sync to load demo data.">
+                Description="@($"Add a recurring flow. {OnboardingCopy.LoadData(Status?.Environment)}")">
         <Action>
             <MudButton StartIcon="@Icons.Material.Filled.Add"
                        Color="Color.Primary"
@@ -153,6 +153,9 @@
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _allFlows = [];

@@ -35,7 +35,7 @@
 {
     <EmptyState Icon="@Icons.Material.Outlined.AccountBalance"
                 Title="No accounts yet"
-                Description="Add an account or use Connect &amp; Sync to load demo data.">
+                Description="@($"Add an account manually. {OnboardingCopy.LoadData(Status?.Environment)}")">
         <Action>
             <MudButton StartIcon="@Icons.Material.Filled.Add"
                        Color="Color.Primary"
@@ -131,6 +131,9 @@
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
