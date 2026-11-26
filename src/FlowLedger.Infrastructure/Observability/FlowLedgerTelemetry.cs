@@ -27,6 +27,39 @@ public static class FlowLedgerTelemetry
             new KeyValuePair<string, object?>("provider", provider),
             new KeyValuePair<string, object?>("status", failed || statusCode is null ? "error" : $"{statusCode / 100}xx"));
 
+    /// <summary>Sync runs, tagged <c>outcome</c> (success | failure | throttled | already_running).</summary>
+    public static readonly Counter<long> SyncRuns = Meter.CreateCounter<long>("flowledger.sync.runs", "{run}", "Financial syncs by outcome.");
+
+    /// <summary>Wall-clock duration of a sync that actually ran (success or failure), in seconds.</summary>
+    public static readonly Histogram<double> SyncDuration = Meter.CreateHistogram<double>("flowledger.sync.duration", "s", "Financial sync duration.");
+
+    /// <summary>Outbox deliveries, tagged <c>outcome</c> (delivered | retried | dead_lettered).</summary>
+    public static readonly Counter<long> OutboxMessages = Meter.CreateCounter<long>("flowledger.outbox.messages", "{message}", "Outbox messages by delivery outcome.");
+
+    /// <summary>Inbound provider webhooks, tagged <c>provider</c> and <c>outcome</c> (accepted | duplicate | invalid_signature | too_large | malformed | ignored).</summary>
+    public static readonly Counter<long> WebhooksReceived = Meter.CreateCounter<long>("flowledger.webhook.received", "{webhook}", "Inbound webhooks by outcome.");
+
+    /// <summary>Audit events written, tagged <c>action</c>.</summary>
+    public static readonly Counter<long> AuditEvents = Meter.CreateCounter<long>("flowledger.audit.events", "{event}", "Audit events recorded by action.");
+
+    public static void RecordSync(string outcome, TimeSpan? duration = null)
+    {
+        SyncRuns.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+        if (duration is { } d)
+        {
+            SyncDuration.Record(d.TotalSeconds, new KeyValuePair<string, object?>("outcome", outcome));
+        }
+    }
+
+    public static void RecordOutbox(string outcome)
+        => OutboxMessages.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+
+    public static void RecordWebhook(string provider, string outcome)
+        => WebhooksReceived.Add(1, new KeyValuePair<string, object?>("provider", provider), new KeyValuePair<string, object?>("outcome", outcome));
+
+    public static void RecordAudit(string action)
+        => AuditEvents.Add(1, new KeyValuePair<string, object?>("action", action));
+
     private static readonly ConcurrentDictionary<string, DateTimeOffset> LastSuccess = new();
 
     static FlowLedgerTelemetry()
@@ -49,6 +82,12 @@ public static class FlowLedgerTelemetry
             LastSuccess[job] = finishedUtc;
         }
     }
+
+    /// <summary>Automatic retries scheduled after a failed job run, tagged <c>job</c>.</summary>
+    public static readonly Counter<long> JobRetries = Meter.CreateCounter<long>("flowledger.job.retries", "{retry}", "Retries scheduled for failed background jobs.");
+
+    public static void RecordJobRetry(string job)
+        => JobRetries.Add(1, new KeyValuePair<string, object?>("job", job));
 
     public static void RecordJobVetoed(string job)
         => JobRuns.Add(1, new KeyValuePair<string, object?>("job", job), new KeyValuePair<string, object?>("outcome", "vetoed"));

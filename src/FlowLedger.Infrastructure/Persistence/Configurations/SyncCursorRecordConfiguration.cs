@@ -38,6 +38,9 @@ internal sealed class SyncCursorRecordConfiguration : IEntityTypeConfiguration<S
             .HasColumnName("last_synced_at")
             .IsRequired();
 
+        builder.Property(r => r.LastSuccessfulSyncAt)
+            .HasColumnName("last_successful_sync_at");
+
         builder.Property(r => r.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();

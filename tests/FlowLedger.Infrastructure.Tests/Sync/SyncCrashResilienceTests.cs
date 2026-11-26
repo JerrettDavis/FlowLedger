@@ -81,6 +81,27 @@ public sealed class SyncCrashResilienceTests : IAsyncLifetime
         (await db.BalanceSnapshots.CountAsync()).Should().Be(accounts * 2, "snapshots are append-only, one per account per sync");
     }
 
+    [DockerFact]
+    public async Task Throttle_clock_is_the_last_successful_sync_not_the_cursor_write_time()
+    {
+        var tenant = TestTenantContext.New();
+
+        // A sync that dies after cursors were written must not stamp the success clock (#120).
+        var act = () => RunSync(tenant, new FaultingProvider(NewSim(), failOnTransactionPageCall: 3));
+        await act.Should().ThrowAsync<IOException>();
+        await using (var failedDb = _fixture.CreateDbContext(tenant))
+        {
+            (await failedDb.SyncCursors.CountAsync()).Should().BeGreaterThan(0, "cursors advanced before the failure");
+            (await SyncStatusReader.LastSyncedAtAsync(failedDb, tenant, "Simulated", default))
+                .Should().BeNull("a failed sync is not a successful sync, so it does not start a throttle window");
+        }
+
+        await RunSync(tenant, NewSim());
+        await using var doneDb = _fixture.CreateDbContext(tenant);
+        var last = await SyncStatusReader.LastSyncedAtAsync(doneDb, tenant, "Simulated", default);
+        last.Should().NotBeNull();
+    }
+
     private sealed class FaultingProvider(IFinancialDataProvider inner, int failOnTransactionPageCall) : IFinancialDataProvider
     {
         private int _calls;

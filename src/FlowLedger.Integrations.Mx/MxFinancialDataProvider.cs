@@ -24,6 +24,8 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
     private readonly MxWebhookVerifier _webhookVerifier;
     private readonly MxProviderOptions _options;
     private readonly ILogger<MxFinancialDataProvider> _logger;
+    // Account currency by packed account id, so a transaction without its own currency inherits it instead of defaulting to USD (#124).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
     internal MxFinancialDataProvider(
         MxApiClient client,
@@ -448,9 +450,22 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
 
             foreach (var a in response.Accounts ?? [])
             {
-                var dto = MxMapper.ToProviderAccount(a);
+                ProviderAccount dto;
+                try
+                {
+                    dto = MxMapper.ToProviderAccount(a);
+                }
+                catch (UnknownCurrencyException ex)
+                {
+                    // Never guess USD for an account whose currency the provider did not report (#124).
+                    _logger.LogWarning("Skipping MX account: {Message}", ex.Message);
+                    continue;
+                }
+
                 // Re-pack the account id with the owning user so GetTransactions can address it.
-                results.Add(dto with { ProviderId = MxCompositeId.Pack(userGuid, dto.ProviderId) });
+                var packedId = MxCompositeId.Pack(userGuid, dto.ProviderId);
+                _currencyByAccount[packedId] = dto.CurrencyCode;
+                results.Add(dto with { ProviderId = packedId });
             }
 
             if (!HasMorePages(response.Pagination, page))
@@ -491,14 +506,25 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken, position.FromDate)
             .ConfigureAwait(false);
 
-        var mapped = (response.Transactions ?? [])
-            .Select(t => MxMapper.ToProviderTransaction(t, _logger))
-            .Select(t => t with { ProviderAccountId = providerAccountId })
-            .ToList();
+        var accountCurrency = _currencyByAccount.GetValueOrDefault(providerAccountId);
+        var mapped = new List<ProviderTransaction>();
+        var unknownCurrency = 0;
+        foreach (var raw in response.Transactions ?? [])
+        {
+            try
+            {
+                mapped.Add(MxMapper.ToProviderTransaction(raw, _logger, accountCurrency) with { ProviderAccountId = providerAccountId });
+            }
+            catch (UnknownCurrencyException ex)
+            {
+                unknownCurrency++;
+                _logger.LogWarning("Skipping MX transaction: {Message}", ex.Message);
+            }
+        }
 
         // A row with no parseable date maps to DateOnly.MinValue (year 0001); never persist that sentinel.
         var items = mapped.Where(t => t.PostedDate != DateOnly.MinValue).ToList();
-        var skipped = mapped.Count - items.Count;
+        var skipped = mapped.Count - items.Count + unknownCurrency;
         foreach (var bad in mapped.Where(t => t.PostedDate == DateOnly.MinValue))
         {
             _logger.LogWarning("Skipping MX transaction {ProviderTransactionId}: no usable date.", bad.ProviderId);

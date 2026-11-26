@@ -124,6 +124,16 @@ else if (_forecast is not null)
         </MudItem>
     </MudGrid>
 
+    @if (_forecast.Warnings.Count > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" aria-live="polite" data-testid="forecast-warnings">
+            @foreach (var warning in _forecast.Warnings)
+            {
+                <MudText Typo="Typo.body2">@warning</MudText>
+            }
+        </MudAlert>
+    }
+
     <!-- Overdraft warnings -->
     @if (_forecast.OverdraftWarnings.Count > 0)
     {

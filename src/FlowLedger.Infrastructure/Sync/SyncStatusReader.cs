@@ -12,6 +12,6 @@ public static class SyncStatusReader
         var tenant = tenantContext.TenantId;
         return await db.SyncCursors
             .Where(c => c.TenantId == tenant && c.ProviderName == providerName)
-            .MaxAsync(c => (DateTimeOffset?)c.LastSyncedAt, ct);
+            .MaxAsync(c => c.LastSuccessfulSyncAt, ct);
     }
 }

@@ -125,6 +125,7 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
             await ins.ExecuteNonQueryAsync(ct);
         }
 
+        await RegisterTenantAsync(conn, tx, tenantId.Value, ct);
         await tx.CommitAsync(ct);
         return new ResolvedUser(userId, tenantId.Value, identity.Email, identity.DisplayName, true);
     }
@@ -229,6 +230,18 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
             await m.ExecuteNonQueryAsync(ct);
         }
 
+        // #169: the target is certainly in use; the old tenant is now orphaned when this was its last login (kept visible in the
+        // registry so it can be reviewed and offboarded instead of lingering unseen).
+        await RegisterTenantAsync(conn, tx, target, ct);
+        await using (var o = new NpgsqlCommand(
+            "UPDATE tenants SET status = 'orphaned', orphaned_utc = now() WHERE id = @old AND status = 'active' AND id <> @legacy " +
+            "AND NOT EXISTS (SELECT 1 FROM app_users WHERE tenant_id = @old)", conn, tx))
+        {
+            o.Parameters.AddWithValue("old", current.Value);
+            o.Parameters.AddWithValue("legacy", legacy.LegacyTenantId);
+            await o.ExecuteNonQueryAsync(ct);
+        }
+
         await tx.CommitAsync(ct);
         return LinkOutcome.Linked;
     }
@@ -245,12 +258,27 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
         // Detached login gets its own fresh tenant; refused when it is the tenant's only login.
         await using var cmd = new NpgsqlCommand(
             "UPDATE app_users SET tenant_id = gen_random_uuid() WHERE id = @u AND tenant_id = @t " +
-            "AND (SELECT count(*) FROM app_users WHERE tenant_id = @t) > 1", conn, tx);
+            "AND (SELECT count(*) FROM app_users WHERE tenant_id = @t) > 1 RETURNING tenant_id", conn, tx);
         cmd.Parameters.AddWithValue("u", userId);
         cmd.Parameters.AddWithValue("t", tenantId);
-        var n = await cmd.ExecuteNonQueryAsync(ct);
+        var fresh = await cmd.ExecuteScalarAsync(ct) as Guid?;
+        if (fresh is { } id)
+        {
+            await RegisterTenantAsync(conn, tx, id, ct);
+        }
+
         await tx.CommitAsync(ct);
-        return n == 1;
+        return fresh is not null;
+    }
+
+    /// <summary>Records the tenant in the registry (or reactivates it when a login lands on a tenant that had been orphaned).</summary>
+    private static async Task RegisterTenantAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid tenantId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "INSERT INTO tenants (id) VALUES (@t) ON CONFLICT (id) DO UPDATE SET status = 'active', orphaned_utc = NULL " +
+            "WHERE tenants.status = 'orphaned'", conn, tx);
+        cmd.Parameters.AddWithValue("t", tenantId);
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     private async Task<NpgsqlConnection> OpenAsync(CancellationToken ct)
@@ -260,8 +288,11 @@ public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantCla
         if (!_schemaReady)
         {
             // ALTER ... IF NOT EXISTS still takes a table lock, so run the idempotent DDL once per process.
-            await using var create = new NpgsqlCommand(CreateSqlText, conn);
+            await using var create = new NpgsqlCommand(string.Join(" ", CreateSqlText, NpgsqlTenantRegistry.CreateSqlText, NpgsqlTenantRegistry.BackfillSqlText), conn);
             await create.ExecuteNonQueryAsync(ct);
+            await using var household = new NpgsqlCommand("INSERT INTO tenants (id) VALUES (@t) ON CONFLICT (id) DO NOTHING", conn);
+            household.Parameters.AddWithValue("t", legacy.LegacyTenantId);
+            await household.ExecuteNonQueryAsync(ct);
             _schemaReady = true;
         }
 

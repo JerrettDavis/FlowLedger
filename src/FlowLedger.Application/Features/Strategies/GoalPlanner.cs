@@ -67,16 +67,23 @@ public static class GoalPlanner
             return Math.Max(0, target - start);
         }
 
-        var r = (double)Simulators.MonthlyRate(apy);
-        var growth = Math.Pow(1 + r, months);
-        var need = (double)target - (double)start * growth;
+        var r = Simulators.MonthlyRate(apy);
+        if (r == 0)
+        {
+            var linear = target - start;
+            return linear <= 0 ? 0m : MoneyRounding.Round(linear / months, 2);
+        }
+
+        // deposit = (target - start * g) * r / (g - 1) with g = (1 + r)^months. Multiplying through by v^months (v = 1 / (1 + r))
+        // keeps every term below 1, so it stays in decimal and cannot overflow however long the horizon or high the rate.
+        var vn = LoanMath.PowInt(1m / (1m + r), months);
+        var need = target * vn - start;
         if (need <= 0)
         {
             return 0m;
         }
 
-        var annuity = r == 0 ? months : (growth - 1) / r;
-        return MoneyRounding.Round((decimal)(need / annuity), 2);
+        return MoneyRounding.Round(need * r / (1m - vn), 2);
     }
 
     public static GoalPlan Plan(GoalRequest q, GoalContext ctx, MarketRates rates)

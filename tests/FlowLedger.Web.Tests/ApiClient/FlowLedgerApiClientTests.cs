@@ -441,6 +441,21 @@ public sealed class FlowLedgerApiClientTests
     }
 
     [Fact]
+    public async Task GetForecastAsync_CarriesTheMixedCurrencyWarningToTheUi()
+    {
+        const string warning = "Accounts use multiple currencies (EUR, USD). FlowLedger does not convert currencies.";
+        var json = FlatForecastJson.Replace("\"overdraftWarnings\": []", "\"overdraftWarnings\": [], \"warnings\": [\"" + warning + "\"]");
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        var result = await BuildClient(response).GetForecastAsync(months: 3);
+
+        result!.Warnings.Should().ContainSingle().Which.Should().Be(warning);
+    }
+
+    [Fact]
     public async Task GetForecastAsync_WithNestedDomainShape_ThrowsApiClientException()
     {
         // This is the ORIGINAL bug: accountId serialized as {"value":"<guid>"} cannot be

@@ -1,3 +1,4 @@
+using FlowLedger.Api;
 using FlowLedger.Api.Auth;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Api.Jobs;
@@ -14,6 +15,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Quartz;
+
+// One-shot schema migration (`dotnet FlowLedger.Api.dll --migrate`): the compose `migrate` service runs this and exits, so the
+// long-running API need not auto-migrate in production (#195).
+if (args.Contains(MigrateCommand.Flag))
+{
+    Environment.ExitCode = await MigrateCommand.RunAsync(args);
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -204,6 +213,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseRateLimiter(); // after authentication: partitions trust the tenant header only for valid API-key callers
 app.UseAuthorization();
+app.UseMiddleware<FlowLedger.Api.Middleware.AuditMiddleware>(); // append-only audit_events row for sensitive endpoints
 
 // ── Aspire health + liveness endpoints (anonymous, all environments) ─────────
 app.MapDefaultEndpoints();

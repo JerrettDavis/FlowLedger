@@ -12,7 +12,7 @@ namespace FlowLedger.Web.Auth;
 /// from the tenant (or moved to another one with a link code), the cookie would otherwise keep granting the old
 /// tenant's data. Every <see cref="Interval"/> the mapping is re-checked against the API and the cookie is rejected
 /// on a definite mismatch. API outages never sign users out: the check is simply retried on the next request.
-/// Note: this runs on HTTP requests (page loads, circuit start), not inside an already-open Blazor circuit.
+/// This runs on HTTP requests (page loads, circuit start); an already-open Blazor circuit is covered by <see cref="TenantRevalidatingAuthenticationStateProvider"/> (#159).
 /// </summary>
 public static class TenantMappingValidator
 {
@@ -91,7 +91,7 @@ public static class TenantMappingValidator
 
     private sealed record IdentityRow(Guid UserId);
 
-    private static async Task<IReadOnlyCollection<Guid>?> ListUserIdsAsync(IServiceProvider services, Guid tenant, CancellationToken ct)
+    internal static async Task<IReadOnlyCollection<Guid>?> ListUserIdsAsync(IServiceProvider services, Guid tenant, CancellationToken ct)
     {
         var authOptions = services.GetRequiredService<IOptions<FlowLedger.Web.ApiClient.ApiAuthOptions>>().Value;
         var apiKey = authOptions.Key;

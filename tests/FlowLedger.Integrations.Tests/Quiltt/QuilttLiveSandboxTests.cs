@@ -1,12 +1,13 @@
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Quiltt;
+using FlowLedger.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Integrations.Tests.Quiltt;
 
 /// <summary>
-/// Opt-in checks against the real Quiltt SANDBOX. They return immediately (pass silently) unless the environment says otherwise:
+/// Opt-in checks against the real Quiltt SANDBOX. Reported as skipped (see <see cref="LiveFactAttribute"/>) unless the environment says otherwise:
 /// <list type="bullet">
 /// <item><c>QUILTT_LIVE_KEY</c> - sandbox API key secret (never commit it).</item>
 /// <item><c>QUILTT_LIVE_PROFILE</c> - a sandbox profile id (<c>p_...</c>) holding the scenario connection(s).</item>
@@ -18,12 +19,12 @@ namespace FlowLedger.Integrations.Tests.Quiltt;
 /// </summary>
 public sealed class QuilttLiveSandboxTests
 {
-    [Fact]
+    [LiveFact("QUILTT_LIVE_KEY")]
     public async Task LiveProfile_HealthMatchesExpectedKind_AndReadsAgree()
     {
         var key = Environment.GetEnvironmentVariable("QUILTT_LIVE_KEY");
         var profile = Environment.GetEnvironmentVariable("QUILTT_LIVE_PROFILE");
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile))
+        if (string.IsNullOrWhiteSpace(profile))
         {
             return;
         }

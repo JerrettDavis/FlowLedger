@@ -8,23 +8,27 @@ namespace FlowLedger.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// Per-tenant Home Assistant sharing settings plus the "already sent" ledger, through EF (#154). The interface still takes a
 /// tenant id; it must be the current tenant, otherwise the call fails loudly. The webhook URL is a secret: encrypted at rest with
-/// AES-256-GCM using <c>HomeAssistant:EncryptionKey</c> (base64, 32 bytes), refused when no key is configured and never returned
+/// AES-256-GCM (v2 envelope bound to tenant and purpose, #156) using <c>Secrets:EncryptionKey</c> / <c>HomeAssistant:EncryptionKey</c> (base64, 32 bytes), refused when no key is configured and never returned
 /// by any read model. The ledger stores only opaque dedupe keys, never amounts.
 /// </summary>
 internal sealed class EfHomeAssistantStore : IHomeAssistantStore
 {
     private readonly FlowLedgerDbContext _db;
     private readonly ITenantContext _tenant;
-    private readonly byte[]? _key;
+    private readonly SecretKeyRing _ring;
 
-    public EfHomeAssistantStore(FlowLedgerDbContext db, ITenantContext tenant, string? base64Key = null)
+    internal const string Purpose = "home-assistant-webhook";
+
+    public EfHomeAssistantStore(FlowLedgerDbContext db, ITenantContext tenant, string? base64Key = null, SecretKeyRing? ring = null)
     {
         _db = db;
         _tenant = tenant;
-        _key = SecretBox.ParseKey(base64Key);
+        _ring = ring ?? SecretKeyRing.From(base64Key);
     }
 
-    public bool CanStoreWebhook => _key is not null;
+    public bool CanStoreWebhook => _ring.CanSeal;
+
+    private string? OpenWebhook(Guid tenantId, string stored) => SecretBox.Open(stored, _ring, SecretBox.Aad(tenantId, Purpose));
 
     private void Guard(Guid tenantId)
     {
@@ -43,7 +47,7 @@ internal sealed class EfHomeAssistantStore : IHomeAssistantStore
             return HomeAssistantSettings.Default;
         }
 
-        var url = r.Webhook is null ? null : SecretBox.Open(r.Webhook, _key);
+        var url = r.Webhook is null ? null : OpenWebhook(tenantId, r.Webhook);
         var kinds = r.Kinds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(HaEventKinds.All.Contains).ToList();
         return new HomeAssistantSettings(
@@ -55,19 +59,19 @@ internal sealed class EfHomeAssistantStore : IHomeAssistantStore
     {
         Guard(tenantId);
         var stored = await _db.HomeAssistantSettings.AsNoTracking().Select(r => r.Webhook).FirstOrDefaultAsync(ct);
-        return stored is null ? null : SecretBox.Open(stored, _key);
+        return stored is null ? null : OpenWebhook(tenantId, stored);
     }
 
     public async Task SaveAsync(Guid tenantId, bool enabled, string? webhookUrl, bool clearWebhook, bool shareAmounts, bool includeNames,
         int leadDays, IReadOnlyList<string> kinds, CancellationToken ct = default)
     {
         Guard(tenantId);
-        if (webhookUrl is not null && _key is null)
+        if (webhookUrl is not null && !_ring.CanSeal)
         {
             throw new InvalidOperationException("Set HomeAssistant:EncryptionKey before storing a webhook URL.");
         }
 
-        var sealedUrl = webhookUrl is null ? null : SecretBox.Seal(webhookUrl, _key!);
+        var sealedUrl = webhookUrl is null ? null : SecretBox.SealV2(webhookUrl, _ring, SecretBox.Aad(tenantId, Purpose));
         var hasWebhook = webhookUrl is not null;
         var kindsText = string.Join(',', kinds);
         await _db.Database.ExecuteSqlInterpolatedAsync(

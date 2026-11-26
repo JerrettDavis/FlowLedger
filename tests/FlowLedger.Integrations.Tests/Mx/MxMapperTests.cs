@@ -32,15 +32,44 @@ public sealed class MxMapperTests
         dto.CurrencyCode.Should().Be("USD");
     }
 
-    [Fact]
-    public void ToProviderAccount_defaults_currency_when_missing()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("XY")]
+    [InlineData("US1")]
+    public void ToProviderAccount_does_not_default_to_USD_when_currency_is_missing_or_invalid(string? code)
     {
-        var mx = new MxAccount("ACT-1", "X", "CHECKING", null, 1m, null, null, "MBR-1", "USR-1");
+        var mx = new MxAccount("ACT-1", "X", "CHECKING", null, 1m, null, code, "MBR-1", "USR-1");
 
-        var dto = MxMapper.ToProviderAccount(mx);
+        var act = () => MxMapper.ToProviderAccount(mx);
 
-        dto.CurrencyCode.Should().Be("USD");
-        dto.AvailableBalance.Should().BeNull();
+        act.Should().Throw<UnknownCurrencyException>();
+    }
+
+    private static MxTransaction Tx(string? currency) =>
+        new("TXN-1", "ACT-1", 5m, currency, "2026-01-02", null, null, "Coffee", null, null, null, null, "POSTED", "DEBIT");
+
+    [Fact]
+    public void ToProviderTransaction_inherits_the_account_currency_when_it_has_none()
+    {
+        MxMapper.ToProviderTransaction(Tx(null), null, "EUR").Amount.Currency.Code.Should().Be("EUR");
+        MxMapper.ToProviderTransaction(Tx("gbp"), null, "EUR").Amount.Currency.Code.Should().Be("GBP", "its own currency wins");
+    }
+
+    [Fact]
+    public void ToProviderTransaction_does_not_default_to_USD_when_the_account_currency_is_unknown_too()
+    {
+        var act = () => MxMapper.ToProviderTransaction(Tx(null));
+
+        act.Should().Throw<UnknownCurrencyException>();
+    }
+
+    [Fact]
+    public void ToProviderAccount_normalises_lowercase_currency()
+    {
+        var mx = new MxAccount("ACT-1", "X", "CHECKING", null, 1m, null, " eur ", "MBR-1", "USR-1");
+
+        MxMapper.ToProviderAccount(mx).CurrencyCode.Should().Be("EUR");
     }
 
     [Fact]

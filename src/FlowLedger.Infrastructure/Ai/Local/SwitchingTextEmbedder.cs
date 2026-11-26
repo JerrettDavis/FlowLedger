@@ -78,6 +78,11 @@ public sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, IDis
 
             try
             {
+                if (!_models.VerifyIntegrity(model))
+                {
+                    throw new InvalidDataException("A model file does not match its catalog checksum; remove the model and download it again.");
+                }
+
                 var spec = model.Embedding;
                 var raw = new OnnxTextEmbedder(model.Id, Path.Combine(_models.Directory, spec.OnnxFile), Path.Combine(_models.Directory, spec.VocabFile), spec);
                 _onnxRaw?.Dispose();

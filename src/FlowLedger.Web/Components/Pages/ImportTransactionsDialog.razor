@@ -86,8 +86,9 @@
         try
         {
             await using var stream = e.File.OpenReadStream(5 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-            _content = await reader.ReadToEndAsync();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _content = FlowLedger.Contracts.ImportTextDecoder.Decode(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)); // UTF-8, else Windows-1252 (#128)
             _fileName = e.File.Name;
             _error = null;
         }

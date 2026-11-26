@@ -1,3 +1,4 @@
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,7 @@ public sealed class WorkerHeartbeatTests
 
     [Fact]
     public void Missing_file_is_unhealthy()
-        => WorkerHeartbeat.IsHealthy(TempFile(), TimeSpan.FromSeconds(60), DateTimeOffset.UtcNow).Should().BeFalse();
+        => WorkerHeartbeat.IsHealthy(TempFile(), TimeSpan.FromSeconds(60), TestClock.Instant).Should().BeFalse();
 
     [Fact]
     public void Fresh_file_is_healthy_and_stale_file_is_not()
@@ -20,7 +21,7 @@ public sealed class WorkerHeartbeatTests
         var path = TempFile();
         try
         {
-            var written = DateTimeOffset.UtcNow;
+            var written = TestClock.Instant;
             File.WriteAllText(path, written.ToString("O"));
 
             WorkerHeartbeat.IsHealthy(path, TimeSpan.FromSeconds(60), written.AddSeconds(30)).Should().BeTrue();
@@ -39,7 +40,7 @@ public sealed class WorkerHeartbeatTests
         try
         {
             File.WriteAllText(path, "not a timestamp");
-            WorkerHeartbeat.IsHealthy(path, TimeSpan.FromSeconds(60), DateTimeOffset.UtcNow).Should().BeFalse();
+            WorkerHeartbeat.IsHealthy(path, TimeSpan.FromSeconds(60), TestClock.Instant).Should().BeFalse();
         }
         finally
         {

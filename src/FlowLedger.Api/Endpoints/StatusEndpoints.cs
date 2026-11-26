@@ -10,7 +10,11 @@ internal static class StatusEndpoints
         var group = app.MapGroup("/api").WithTags("Status")
             .RequireRateLimiting("api");
 
-        group.MapGet("/status", () => Results.Ok(new { status = "ok", version = "0.1.0" }))
+        group.MapGet("/status", (IConfiguration configuration) =>
+            {
+                var build = BuildInfo.From(configuration);
+                return Results.Ok(new { status = "ok", version = build.Version, commit = build.Commit });
+            })
             .WithName("GetStatus")
             .WithSummary("Returns API status");
 

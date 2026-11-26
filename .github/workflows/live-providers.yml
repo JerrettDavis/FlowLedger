@@ -1,0 +1,48 @@
+name: Live providers
+
+# Weekly confirmation against the REAL provider sandboxes (MX, Quiltt). The tests are [LiveFact]s: without the secrets
+# below they report as skipped, so this workflow is a no-op on forks. Failures open (or comment on) a tracking issue.
+# Needs repository secrets: MX_API_KEY / MX_CLIENT_ID / MX_WEBHOOK_SECRET, QUILTT_LIVE_KEY, QUILTT_LIVE_PROFILE.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  live:
+    name: Live sandbox tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      Mx__Enabled: "true"
+      Mx__ApiKey: ${{ secrets.MX_API_KEY }}
+      Mx__ClientId: ${{ secrets.MX_CLIENT_ID }}
+      Mx__BaseUrl: https://int-api.mx.com
+      Mx__WebhookSecret: ${{ secrets.MX_WEBHOOK_SECRET }}
+      QUILTT_LIVE_KEY: ${{ secrets.QUILTT_LIVE_KEY }}
+      QUILTT_LIVE_PROFILE: ${{ secrets.QUILTT_LIVE_PROFILE }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Run live sandbox tests
+        run: dotnet test tests/FlowLedger.Integrations.Tests --configuration Release --filter "FullyQualifiedName~LiveSandbox" --logger "trx" --results-directory ./artifacts/live
+      - name: Open or update a tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Live provider sandbox tests failing"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number')
+          body="Weekly live run failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

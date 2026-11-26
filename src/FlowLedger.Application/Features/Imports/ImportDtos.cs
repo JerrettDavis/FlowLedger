@@ -18,7 +18,9 @@ public sealed record CsvColumnMapping(
     /// Null means try a standard set of common formats.
     /// </summary>
     string[]? DateFormats = null,
-    bool HasHeaderRow = true);
+    bool HasHeaderRow = true,
+    /// <summary>Column holding a bank-assigned transaction id (OFX FITID); anchors the dedupe fingerprint when present (#128).</summary>
+    int? ProviderIdColumnIndex = null);
 
 // ── Import command ────────────────────────────────────────────────────────────
 

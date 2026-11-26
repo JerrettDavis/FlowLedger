@@ -133,6 +133,7 @@ public static class DependencyInjection
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System); // one injectable clock for handlers and sync (#127); tests replace it
         services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
         services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
@@ -287,7 +288,7 @@ public static class DependencyInjection
                 TimeSpan.FromMinutes(Math.Max(0, minutes)),
                 async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                     db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
-                    c => (DateTimeOffset?)c.LastSyncedAt, ct),
+                    c => c.LastSuccessfulSyncAt, ct),
                 crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
@@ -324,6 +325,19 @@ public static class DependencyInjection
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 TenancySettings.Legacy(configuration)));
+        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlWebhookReplayStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlTenantRegistry(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddScoped<FlowLedger.Application.Features.Users.ITenantErasure>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.EfTenantErasure(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                TenancySettings.Legacy(configuration).LegacyTenantId,
+                sp.GetServices<FlowLedger.Application.Features.Users.ITenantFileEraser>()));
 
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryMaintenanceStore(
@@ -346,6 +360,16 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        // -- Audit log of sensitive actions (append-only, ad hoc table) --
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IAuditLog>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlAuditLog(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        // -- Durable background job run history (ad hoc table; worker writes, API reads) --
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlJobRunStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
@@ -359,7 +383,7 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.Persistence.Repositories.EfHomeAssistantStore(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
-                configuration["HomeAssistant:EncryptionKey"]));
+                ring: SecretsKeyRing(configuration, "HomeAssistant:EncryptionKey")));
         services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
             .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(10));
@@ -372,7 +396,7 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.Persistence.Repositories.EfIntegrationStore(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
-                configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
+                ring: SecretsKeyRing(configuration, "Integrations:EncryptionKey", "HomeAssistant:EncryptionKey")));
         foreach (var clientName in new[]
         {
             FlowLedger.Infrastructure.DataSafety.IntegrationTransport.HttpClientName,
@@ -403,16 +427,43 @@ public static class DependencyInjection
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
     }
 
+    /// <summary>
+    /// Key ring for secrets stored at rest (#156). Seals with <c>Secrets:EncryptionKey</c>, else the first configured legacy key;
+    /// opens with that key plus <c>Secrets:EncryptionKeyPrevious</c> (comma separated) plus every legacy key, so rows written
+    /// before the v2 envelope (or before a rotation) stay readable.
+    /// </summary>
+    internal static FlowLedger.Infrastructure.DataSafety.SecretKeyRing SecretsKeyRing(IConfiguration configuration, params string[] legacyKeys)
+    {
+        var legacy = legacyKeys.Select(k => configuration[k]).ToArray();
+        var current = configuration["Secrets:EncryptionKey"];
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            current = legacy.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        }
+
+        return FlowLedger.Infrastructure.DataSafety.SecretKeyRing.From(current, [configuration["Secrets:EncryptionKeyPrevious"], .. legacy]);
+    }
+
     /// <summary>Object storage, raw payload archive and readiness checks.</summary>
     private static void AddStorageAndHealth(IServiceCollection services, IConfiguration configuration)
     {
+        FlowLedger.Infrastructure.Configuration.FlowLedgerOptionsExtensions.AddFlowLedgerTypedOptions(services, configuration);
+
         // ── Object storage ──────────────────────────────────────────────────────
         services.AddOptions<ObjectStorageOptions>()
             .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath), "ObjectStorage:RootPath must not be empty.")
             .ValidateOnStart();
-        services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
+        services.AddSingleton<LocalDiskObjectStorage>();
+        services.AddSingleton<IObjectStorage>(sp => sp.GetRequiredService<LocalDiskObjectStorage>());
+        services.AddSingleton<IObjectStorageBrowser>(sp => sp.GetRequiredService<LocalDiskObjectStorage>());
+        // Raw archive (#142): tenant-partitioned keys; sealing and retention are opt-in (Storage:EncryptionKey, Storage:RawArchiveRetentionDays).
+        services.AddSingleton(RawArchiveSettings.From(configuration));
         services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
+        services.AddSingleton(sp => new RawArchiveMaintenance(
+            sp.GetRequiredService<IObjectStorage>(), sp.GetRequiredService<IObjectStorageBrowser>(), sp.GetRequiredService<RawArchiveSettings>()));
+        services.AddSingleton<FlowLedger.Integrations.Abstractions.IRawPayloadDecryptor>(sp => sp.GetRequiredService<RawArchiveMaintenance>());
+        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantFileEraser>(sp => sp.GetRequiredService<RawArchiveMaintenance>());
 
         // Readiness probes (/ready): Postgres + migrations, Redis (if configured), backup freshness.
         FlowLedger.Infrastructure.Health.ReadinessHealthExtensions.AddFlowLedgerReadinessChecks(services);
