@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -155,6 +156,34 @@ public static class AuthSetup
             $"Sign-in is not configured (Auth:Oidc:Authority / Auth:Oidc:ClientId are empty) and the environment is '{env.EnvironmentName}'. " +
             "Without OIDC anyone who can reach the Web UI sees and changes the household's data. Configure Auth__Oidc__* " +
             "(see docs/self-hosting/multi-user-auth.md) or, for a trusted single-user network only, set Auth__AllowAnonymous=true.");
+    }
+
+    /// <summary>Config key for the directory that holds the persisted ASP.NET Data Protection key ring.</summary>
+    public const string DataProtectionKeyPathKey = "DataProtection:KeyPath";
+
+    /// <summary>
+    /// Persists the Data Protection key ring so session cookies and antiforgery tokens survive restarts and
+    /// are shared by replicas. When OIDC sign-in is on outside Development a key path is mandatory, because an
+    /// ephemeral ring silently signs every user out on each container recreate.
+    /// </summary>
+    public static void ConfigureDataProtection(IServiceCollection services, OidcOptions oidc, IHostEnvironment env, IConfiguration cfg)
+    {
+        var keyPath = cfg[DataProtectionKeyPathKey];
+        if (string.IsNullOrWhiteSpace(keyPath))
+        {
+            if (oidc.Enabled && !env.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    $"{DataProtectionKeyPathKey} is not set. Without a persisted key ring every restart invalidates all sessions " +
+                    "and antiforgery tokens. Mount a volume and set DataProtection__KeyPath (see docs/self-hosting/production.md).");
+            }
+
+            return;
+        }
+
+        services.AddDataProtection()
+            .SetApplicationName("FlowLedger.Web")
+            .PersistKeysToFileSystem(new DirectoryInfo(keyPath));
     }
 
     public static void MapFlowLedgerAuthEndpoints(this WebApplication app)
