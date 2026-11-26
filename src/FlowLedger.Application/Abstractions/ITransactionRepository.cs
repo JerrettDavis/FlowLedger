@@ -32,6 +32,19 @@ public interface ITransactionRepository
         bool everydayOnly = false,
         string? search = null);
 
+    /// <summary>
+    /// How many transactions match the same filters as <see cref="ListAsync"/> (ignoring paging), so a grid can show
+    /// "1-50 of 1,234" and page on the server. Stores should override this with a COUNT query.
+    /// </summary>
+    async Task<int> CountMatchingAsync(
+        AccountId? accountId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        CancellationToken ct = default,
+        bool everydayOnly = false,
+        string? search = null)
+        => (await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search)).Count;
+
     // search: case-insensitive match on description, merchant name or notes, applied by the store before paging.
 
     // everydayOnly: when no account is given, leave out transactions of disabled accounts and of hidden accounts
