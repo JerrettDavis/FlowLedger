@@ -1,0 +1,33 @@
+name: OpenSSF Scorecard
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Weekly Monday 5am UTC
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  scorecard:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@23f22cd43608bae7a1f1fa2603d7314dee9538a5 # v2.6.0
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: false
+      - name: Upload Scorecard artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: scorecard-sarif
+          path: scorecard.sarif
+          if-no-files-found: warn

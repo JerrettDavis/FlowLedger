@@ -107,6 +107,16 @@ jobs:
           path:              trivy-${{ matrix.service }}.sarif
           if-no-files-found: warn
 
+      # Gate: fail on fixable CRITICAL vulnerabilities (HIGH stays informational above).
+      - name: Trivy gate (fixable CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          format:            table
+          severity:          CRITICAL
+          exit-code:         "1"
+          ignore-unfixed:    true
+
   # ── Push to GHCR (tagged releases only; the only job with packages: write) ─
   push:
     name: Push (${{ matrix.service }})
@@ -171,8 +181,7 @@ jobs:
       # The ephemeral CI stack has no identity provider.
       AUTH__ALLOWANONYMOUS: "true"
     needs: build
-    # Run on push to default branch or on tagged release; skip on PRs to save minutes
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Runs on every trigger including PRs, so a broken Dockerfile or compose stack fails the PR.
 
     steps:
       - name: Checkout
