@@ -133,6 +133,7 @@ public static class DependencyInjection
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System); // one injectable clock for handlers and sync (#127); tests replace it
         services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
         services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();

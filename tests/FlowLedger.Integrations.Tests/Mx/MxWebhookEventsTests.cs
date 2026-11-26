@@ -1,4 +1,6 @@
+using System.Text;
 using FlowLedger.Integrations.Mx;
+using Microsoft.Extensions.Configuration;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 
@@ -30,6 +32,38 @@ public sealed class MxWebhookEventsTests
         string[] configured = ["statement"];
         MxWebhookEvents.IsSyncTrigger("statement", configured).Should().BeTrue();
         MxWebhookEvents.IsSyncTrigger("aggregation", configured).Should().BeFalse();
-        MxWebhookEvents.IsSyncTrigger("aggregation", []).Should().BeFalse("an empty list syncs on nothing");
+        MxWebhookEvents.IsSyncTrigger("aggregation", []).Should().BeFalse();
+    }
+
+    private static IConfiguration Config(string json) =>
+        new ConfigurationBuilder().AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes(json))).Build();
+
+    [Fact]
+    public void Nothing_configured_uses_the_default()
+        => MxWebhookEvents.FromConfiguration(Config("{}")).Should().BeEquivalentTo(MxWebhookEvents.DefaultSyncEventTypes);
+
+    [Theory]
+    [InlineData("""{"Mx":{"WebhookSyncEventTypes":"statement, History"}}""")]
+    [InlineData("""{"Mx":{"WebhookSyncEventTypes":["statement","History"]}}""")]
+    public void A_comma_separated_string_or_a_json_array_replaces_the_default(string json)
+    {
+        var list = MxWebhookEvents.FromConfiguration(Config(json));
+
+        list.Should().BeEquivalentTo(["statement", "History"]);
+        MxWebhookEvents.IsSyncTrigger("HISTORY", list).Should().BeTrue();
+        MxWebhookEvents.IsSyncTrigger("aggregation", list).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_empty_array_falls_back_to_the_default_because_configuration_drops_it()
+        => MxWebhookEvents.FromConfiguration(Config("""{"Mx":{"WebhookSyncEventTypes":[]}}""")).Should().BeEquivalentTo(MxWebhookEvents.DefaultSyncEventTypes);
+
+    [Fact]
+    public void The_single_value_none_disables_webhook_triggered_syncs()
+    {
+        var list = MxWebhookEvents.FromConfiguration(Config("""{"Mx":{"WebhookSyncEventTypes":"none"}}"""));
+
+        list.Should().BeEmpty();
+        MxWebhookEvents.IsSyncTrigger("aggregation", list).Should().BeFalse();
     }
 }

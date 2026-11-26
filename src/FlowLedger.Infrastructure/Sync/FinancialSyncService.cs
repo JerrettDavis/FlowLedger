@@ -39,6 +39,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly IProviderAccountCatalog? _catalog;
     private readonly bool _autoCreateAccounts;
     private readonly IProviderConnectionStore? _health;
+    private readonly TimeProvider? _clock;
 
     /// <summary>Per-tenant stored-transaction ceiling the provider path enforces; tests lower it.</summary>
     internal int MaxTransactionsPerTenant { get; init; } = TransactionQuota.MaxPerTenant;
@@ -57,8 +58,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null,
         IAccountConnectorLinkStore? links = null,
         IProviderAccountCatalog? catalog = null,
-        IProviderConnectionStore? health = null)
+        IProviderConnectionStore? health = null,
+        TimeProvider? clock = null)
     {
+        _clock = clock;
         _health = health;
         _links = links;
         _catalog = catalog;
@@ -385,7 +388,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)
             {
                 var updatedBalance = new Money(providerAmount, new Currency(pa.CurrencyCode));
-                try { existing.ApplyProviderBalance(updatedBalance); }
+                try { existing.ApplyProviderBalance(updatedBalance, _clock); }
                 catch (Domain.Exceptions.CurrencyMismatchException ex)
                 {
                     // A provider changing an account's currency must not abort the whole sync.
@@ -428,7 +431,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             accountType,
             balance,
             creditLimit: null,
-            institution: pa.ProviderId); // Institution stores provider id for lookup
+            institution: pa.ProviderId, // Institution stores provider id for lookup
+            time: _clock);
 
         await _db.Accounts.AddAsync(newAccount, ct);
         if (_links is not null)
@@ -612,7 +616,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         }
                     }
 
-                    var mapped = MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint);
+                    var mapped = MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint, _clock);
                     toInsert.Add(mapped);
                     insertedByFingerprint[x.Fingerprint.Value] = mapped;
                 }
@@ -721,7 +725,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         ProviderTransaction pt,
         AccountId accountId,
         TenantId tenantId,
-        TransactionFingerprint fingerprint)
+        TransactionFingerprint fingerprint,
+        TimeProvider? clock)
     {
         // Signed amount from provider: negative = debit, positive = credit
         var direction = pt.Amount.Amount < 0m
@@ -740,7 +745,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             effectiveDate: pt.PostedDate,
             postedDate: pt.IsPending ? null : pt.PostedDate,
             source: TransactionSource.MxAggregation,
-            fingerprint: fingerprint);
+            fingerprint: fingerprint,
+            time: clock);
     }
 
     /// <summary>
@@ -828,7 +834,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 startDate: today,
                 endDate: null,
                 amountModel: AmountModel.Fixed,
-                counterparty: seed.Counterparty);
+                counterparty: seed.Counterparty,
+                time: _clock);
 
             await _db.RecurringFlows.AddAsync(flow, ct);
             existingNameSet.Add(seed.Name); // guard against duplicates within the same batch

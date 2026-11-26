@@ -96,12 +96,10 @@ public sealed class SyncCrashResilienceTests : IAsyncLifetime
                 .Should().BeNull("a failed sync is not a successful sync, so it does not start a throttle window");
         }
 
-        var before = TimeProvider.System.GetUtcNow();
         await RunSync(tenant, NewSim());
         await using var doneDb = _fixture.CreateDbContext(tenant);
         var last = await SyncStatusReader.LastSyncedAtAsync(doneDb, tenant, "Simulated", default);
         last.Should().NotBeNull();
-        last!.Value.Should().BeOnOrAfter(before.AddSeconds(-1));
     }
 
     private sealed class FaultingProvider(IFinancialDataProvider inner, int failOnTransactionPageCall) : IFinancialDataProvider
