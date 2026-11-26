@@ -8,5 +8,8 @@ internal sealed class BudgetRecord
     public decimal MonthlyLimit { get; private set; }
     public DateTimeOffset UpdatedUtc { get; private set; }
 
+    /// <summary>Optimistic-concurrency token: Postgres <c>xmin</c> (#157).</summary>
+    public uint RowVersion { get; private set; }
+
     private BudgetRecord() { }
 }

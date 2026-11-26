@@ -50,6 +50,13 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasColumnName("parent_id")
             .HasConversion(StronglyTypedIdConverters.NullableCategoryIdConverter);
 
+        // Optimistic concurrency (#157): Postgres' own xmin system column, so no schema change is needed.
+        builder.Property(c => c.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         // Indexes
         builder.HasIndex("TenantId").HasDatabaseName("ix_categories_tenant_id");
         builder.HasIndex("TenantId", nameof(Category.Path))
