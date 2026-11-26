@@ -369,7 +369,7 @@
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to create recurring flow");
-                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't create flow. Please try again.", Severity.Error);
+                Snackbar.AddFailure(ex, fallback: "Couldn't create flow. Please try again.");
             }
         }
     }
@@ -394,7 +394,7 @@
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to update recurring flow {FlowId}", flow.Id);
-                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't update flow. Please try again.", Severity.Error);
+                Snackbar.AddFailure(ex, fallback: "Couldn't update flow. Please try again.");
             }
         }
     }
@@ -420,7 +420,7 @@
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to delete recurring flow {FlowId}", flow.Id);
-                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't delete flow. Please try again.", Severity.Error);
+                Snackbar.AddFailure(ex, fallback: "Couldn't delete flow. Please try again.");
             }
         }
     }

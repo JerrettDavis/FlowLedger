@@ -95,7 +95,7 @@ public sealed class QueryDatasetProvider(
     IAssetRepository assets,
     IBalanceHistoryReader balanceHistory)
 {
-    private const int MaxTransactions = 50_000;
+    private const int MaxTransactions = TransactionQuota.ProcessingCap;
 
     private Task<IReadOnlyDictionary<string, QueryTable>>? _cached;
 

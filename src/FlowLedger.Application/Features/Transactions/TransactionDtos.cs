@@ -49,4 +49,5 @@ public sealed record ListTransactionsQuery(
     DateOnly? To = null,
     int Skip = 0,
     int Take = 100,
-    bool IncludeHidden = false);
+    bool IncludeHidden = false,
+    string? Search = null);

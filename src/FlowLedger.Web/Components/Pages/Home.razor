@@ -306,45 +306,31 @@ else
 
         <!-- Balance Projection Chart -->
         <div class="fl-masonry-item">
-            <MudCard>
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Balance Projection</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_horizonMonths-month household cash balance forecast</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (_forecastPoints.Count >= 2)
-                    {
-                        <ChartFigure Title="Balance projection"
-                                     Summary="@ProjectionSummary()">
-                            <div style="height:220px;overflow:hidden">
-                                @((MarkupString)SvgChart.BuildBalanceProjection(
-                                    _forecastPoints,
-                                    zeroLine: 0m,
-                                    breaches: _breachDates,
-                                    lowWaterMark: _lwmTuple))
-                            </div>
-                        </ChartFigure>
-                    }
-                    else if (_forecastUnavailable)
-                    {
-                        <EmptyState Icon="@Icons.Material.Outlined.ErrorOutline"
-                                    Title="Couldn't load the forecast"
-                                    Description="The numbers above are unknown, not zero.">
-                            <Action>
-                                <MudButton Variant="Variant.Outlined" OnClick="@(() => OnHorizonChanged(_horizonMonths))">Retry</MudButton>
-                            </Action>
-                        </EmptyState>
-                    }
-                    else
-                    {
-                        <EmptyState Icon="@Icons.Material.Outlined.ShowChart"
-                                    Title="No forecast yet"
-                                    Description="@OnboardingCopy.LoadData(Status?.Environment)" />
-                    }
-                </MudCardContent>
-            </MudCard>
+            <DashboardCard Title="Balance Projection"
+                           Caption="@($"{_horizonMonths}-month household cash balance forecast")"
+                           State="@(_forecastUnavailable && _forecastPoints.Count < 2 ? DashboardCardState.Error : DashboardCardState.Ready)"
+                           ErrorText="Couldn't load the forecast. The numbers above are unknown, not zero."
+                           OnRetry="@(() => OnHorizonChanged(_horizonMonths))">
+                @if (_forecastPoints.Count >= 2)
+                {
+                    <ChartFigure Title="Balance projection"
+                                 Summary="@ProjectionSummary()">
+                        <div style="height:220px;overflow:hidden">
+                            @((MarkupString)SvgChart.BuildBalanceProjection(
+                                _forecastPoints,
+                                zeroLine: 0m,
+                                breaches: _breachDates,
+                                lowWaterMark: _lwmTuple))
+                        </div>
+                    </ChartFigure>
+                }
+                else
+                {
+                    <EmptyState Icon="@Icons.Material.Outlined.ShowChart"
+                                Title="No forecast yet"
+                                Description="@OnboardingCopy.LoadData(Status?.Environment)" />
+                }
+            </DashboardCard>
         </div>
 
         <!-- Upcoming Flows -->

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Duplicates;
@@ -48,7 +49,7 @@ public sealed class DuplicateOptions
 /// </summary>
 public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions options)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public async Task<DuplicateScanResult> ScanAsync(CancellationToken ct = default)
     {

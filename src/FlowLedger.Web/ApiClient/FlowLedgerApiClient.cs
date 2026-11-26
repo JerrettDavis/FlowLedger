@@ -246,9 +246,15 @@ public sealed class FlowLedgerApiClient
         int skip = 0,
         int take = 100,
         CancellationToken ct = default,
-        bool includeHidden = false)
+        bool includeHidden = false,
+        string? search = null)
     {
         var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            qs.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        }
+
         if (includeHidden)
         {
             qs.Add("includeHidden=true");
@@ -425,7 +431,8 @@ public sealed class FlowLedgerApiClient
         throw new ApiClientException(
             detail is { Length: > 0 } ? detail : $"Couldn't {description} (server returned {(int)response.StatusCode}).",
             response.StatusCode,
-            problem: problem.Extensions);
+            problem: problem.Extensions,
+            fieldErrors: problem.FieldErrors);
     }
 
     private static async Task<ProblemDocument> ReadProblemAsync(HttpResponseMessage response, CancellationToken ct)
@@ -1161,7 +1168,8 @@ public sealed class FlowLedgerApiClient
         return await ExecuteAsync("read alerts", async () =>
         {
             var response = await _http.GetAsync("/api/alerts", ct);
-            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<AlertDto>>(JsonOptions, ct) : null;
+            await ThrowIfFailedAsync(response, "read alerts", ct);
+            return await response.Content.ReadFromJsonAsync<List<AlertDto>>(JsonOptions, ct);
         });
     }
 

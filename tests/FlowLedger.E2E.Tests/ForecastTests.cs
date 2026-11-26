@@ -84,9 +84,9 @@ public class ForecastTests : E2ETestBase
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
 
-        // role="img" aria-label="Aggregate balance projection chart" from Forecasts.razor.
+        // role="img" named by the ChartFigure caption "Aggregate balance projection" (Forecasts.razor).
         // Only rendered when AggregateSeries.Count > 0; otherwise "No forecast data" shown.
-        var chart = Page!.GetByRole(AriaRole.Img, new() { Name = "Aggregate balance projection chart" });
+        var chart = Page!.GetByRole(AriaRole.Img, new() { Name = "Aggregate balance projection" });
 
         await chart.WaitForAsync(new LocatorWaitForOptions
         {

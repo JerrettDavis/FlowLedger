@@ -55,7 +55,7 @@ public sealed class RecurringSuggestionService(
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     public const double AutoAddConfidence = 0.9;
-    private const int ScanLimit = 50_000;
+    private const int ScanLimit = TransactionQuota.ProcessingCap;
 
     public async Task<IReadOnlyList<RecurringSuggestionDto>> GetSuggestionsAsync(CancellationToken ct = default)
     {

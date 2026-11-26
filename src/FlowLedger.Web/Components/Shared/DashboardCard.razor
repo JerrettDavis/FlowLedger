@@ -1,0 +1,52 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@* A dashboard card that owns its own loading, error and empty states, so one failing source never blanks the page and every card
+   explains itself the same way. The error state is announced (role=alert) and offers Retry when a handler is supplied. *@
+<MudCard Class="@Class" data-state="@State.ToString().ToLowerInvariant()" aria-busy="@(State == DashboardCardState.Loading ? "true" : "false")">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">@Title</MudText>
+            @if (!string.IsNullOrEmpty(Caption))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Caption</MudText>
+            }
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @switch (State)
+        {
+            case DashboardCardState.Loading:
+                <div role="status" aria-label="@($"Loading {Title}")">
+                    <CardSkeleton Height="@SkeletonHeight" />
+                </div>
+                break;
+            case DashboardCardState.Error:
+                <MudAlert Severity="Severity.Warning" Dense="true" role="alert">
+                    @(ErrorText ?? $"Couldn't load {Title.ToLowerInvariant()}.")
+                    @if (OnRetry.HasDelegate)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit" OnClick="OnRetry">Retry</MudButton>
+                    }
+                </MudAlert>
+                break;
+            case DashboardCardState.Empty:
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@(EmptyText ?? "Nothing to show yet.")</MudText>
+                break;
+            default:
+                @ChildContent
+                break;
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public DashboardCardState State { get; set; } = DashboardCardState.Ready;
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public string SkeletonHeight { get; set; } = "120px";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

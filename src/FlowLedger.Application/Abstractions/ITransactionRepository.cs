@@ -29,7 +29,10 @@ public interface ITransactionRepository
         int skip = 0,
         int take = 100,
         CancellationToken ct = default,
-        bool everydayOnly = false);
+        bool everydayOnly = false,
+        string? search = null);
+
+    // search: case-insensitive match on description, merchant name or notes, applied by the store before paging.
 
     // everydayOnly: when no account is given, leave out transactions of disabled accounts and of hidden accounts
     // (holdings / "hide transactions"). Pass an account id to drill into one regardless.

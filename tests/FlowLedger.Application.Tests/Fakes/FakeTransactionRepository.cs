@@ -27,9 +27,17 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         int skip = 0,
         int take = 100,
         CancellationToken ct = default,
-        bool everydayOnly = false)
+        bool everydayOnly = false,
+        string? search = null)
     {
         var query = _store.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(t => t.Description.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || (t.MerchantName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (t.Notes?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
         if (accountId.HasValue)
         {
             query = query.Where(t => t.AccountId == accountId.Value);

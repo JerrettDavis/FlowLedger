@@ -251,7 +251,7 @@ public static class SpendingInsightsAnalyzer
 public sealed class GetSpendingBreakdownHandler(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories)
 {
-    private const int MaxTransactions = 50_000;
+    private const int MaxTransactions = TransactionQuota.ProcessingCap;
     private const int TransferPadDays = 14;
 
     public async Task<BreakdownResult> HandleAsync(BreakdownQuery q, CancellationToken ct = default)

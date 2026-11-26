@@ -46,7 +46,7 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="8" md="6">
-            <MudTextField @bind-Value="Search" Immediate="true" DebounceInterval="300" Label="Search description or merchant" Clearable="true"
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Immediate="true" DebounceInterval="300" Label="Search description or merchant" Clearable="true"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                           aria-label="Search transactions" />
         </MudItem>
@@ -104,7 +104,7 @@
              RowsPerPage="50"
              aria-label="Transactions table">
     <ToolBarContent>
-        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary">@Visible.Count of @_transactions.Count transaction(s)@(_transactions.Count >= TakeLimit ? $" (showing the newest {TakeLimit}; narrow the dates to see older ones)" : "")</MudText>
+        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status">@_transactions.Count transaction(s) loaded@(_hasMore ? ", newest first" : "")</MudText>
     </ToolBarContent>
     <Columns>
         <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.EffectiveDate">
@@ -207,6 +207,13 @@
     </PagerContent>
 </MudDataGrid>
 
+@if (_hasMore && !_loading)
+{
+    <div class="d-flex justify-center mt-3">
+        <MudButton Variant="Variant.Outlined" OnClick="LoadMoreAsync" aria-label="Load older transactions">Load older transactions</MudButton>
+    </div>
+}
+
 @code {
     private bool _loading = true;
     private string? _error;
@@ -222,7 +229,9 @@
     private string? _search;
     private bool _applyToMerchant;
     private bool _categorizing;
-    private const int TakeLimit = 5000;
+    private const int PageSize = 500;
+    private bool _hasMore;
+    private int _loadSeq;
 
     private List<FlowLedger.Web.ApiClient.TransactionDto> _visible = [];
     private Dictionary<Guid, FlowLedger.Web.ApiClient.CategoryDto> _categoryById = [];
@@ -231,23 +240,13 @@
 
     private List<FlowLedger.Web.ApiClient.TransactionDto> Visible => _visible;
 
-    private string? Search
+    private Task OnSearchChanged(string? value)
     {
-        get => _search;
-        set
-        {
-            _search = value;
-            RecomputeVisible();
-        }
+        _search = value;
+        return LoadAsync();
     }
 
-    private void RecomputeVisible()
-        => _visible = string.IsNullOrWhiteSpace(_search)
-            ? _transactions
-            : _transactions.Where(t =>
-                t.Description.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                (t.MerchantName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (t.Notes?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+    private void RecomputeVisible() => _visible = _transactions;
 
     private void RebuildLookups()
     {
@@ -287,8 +286,14 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadPageAsync(append: false);
+
+    private Task LoadMoreAsync() => LoadPageAsync(append: true);
+
+    /// <summary>Loads one page from the server (filters and search are applied there); append adds the next older page.</summary>
+    private async Task LoadPageAsync(bool append)
     {
+        var seq = ++_loadSeq;
         _loading = true;
         _error = null;
         try
@@ -296,24 +301,37 @@
             var from = _fromDate.HasValue ? DateOnly.FromDateTime(_fromDate.Value) : (DateOnly?)null;
             var to = _toDate.HasValue ? DateOnly.FromDateTime(_toDate.Value) : (DateOnly?)null;
 
-            _transactions = await ApiClient.GetTransactionsAsync(
+            var page = await ApiClient.GetTransactionsAsync(
                 accountId: _filterAccountId,
                 from: from,
                 to: to,
-                take: TakeLimit,
-                includeHidden: _includeHidden);
+                skip: append ? _transactions.Count : 0,
+                take: PageSize,
+                includeHidden: _includeHidden,
+                search: _search);
+            if (seq != _loadSeq)
+            {
+                return; // a newer filter or search superseded this response
+            }
+
+            _transactions = append ? [.. _transactions, .. page] : page;
+            _hasMore = page.Count >= PageSize;
             RecomputeVisible();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load transactions");
-            _error = ex is FlowLedger.Web.ApiClient.ApiClientException ace
-                ? ace.Message
-                : "Failed to load transactions. Please try again.";
+            if (seq == _loadSeq)
+            {
+                _error = SnackbarExtensions.ProblemText(ex, "Failed to load transactions. Please try again.");
+            }
         }
         finally
         {
-            _loading = false;
+            if (seq == _loadSeq)
+            {
+                _loading = false;
+            }
         }
     }
 

@@ -55,12 +55,12 @@ public class ScreenshotCaptureTests : E2ETestBase
     /// </summary>
     private static readonly (string Path, string BaseName, string WaitForSelector)[] Pages =
     [
-        ("/",               "dashboard",       "[aria-label='Balance projection chart']"),
+        ("/",               "dashboard",       "figure[aria-labelledby] [role='img']"),
         ("/accounts",       "accounts",        "[aria-label='Accounts table']"),
         ("/transactions",   "transactions",    "[aria-label='Transactions table']"),
         ("/money-plan",     "money-plan",      "[aria-label='Money plan spreadsheet']"),
         ("/recurring-flows","recurring-flows", "[aria-label='Recurring flows table']"),
-        ("/forecasts",      "forecast",        "[aria-label='Aggregate balance projection chart']"),
+        ("/forecasts",      "forecast",        "figure[aria-labelledby] [role='img']"),
     ];
 
     // ── Screenshot tests ──────────────────────────────────────────────────────
