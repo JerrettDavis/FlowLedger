@@ -97,7 +97,7 @@ public sealed class SharedContractSerializationTests
         var category = new CategoryDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Food.Dining", "Dining", false, null);
         var json = JsonSerializer.Serialize(category, ApiOptions);
 
-        Assert.Equal("""{"id":"22222222-2222-2222-2222-222222222222","path":"Food.Dining","displayName":"Dining","isSystem":false,"parentId":null}""", json);
+        Assert.Equal("""{"id":"22222222-2222-2222-2222-222222222222","path":"Food.Dining","displayName":"Dining","isSystem":false,"parentId":null,"version":0}""", json);
         Assert.Equal(category, JsonSerializer.Deserialize<CategoryDto>(json, WebOptions));
 
         var create = new CreateCategoryRequest("A.B", "B", Guid.NewGuid());

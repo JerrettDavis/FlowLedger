@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;
@@ -13,11 +14,19 @@ internal static class CategorizationEndpoints
     internal static IEndpointRouteBuilder MapCategorizationEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPut("/api/transactions/{id:guid}/recategorize", async (
-                Guid id, [FromBody] RecategorizeRequest request, CategoryRuleService service, CancellationToken ct) =>
+                Guid id, [FromBody] RecategorizeRequest request, CategoryRuleService service, HttpRequest httpRequest, HttpResponse response, GetTransactionHandler reader, CancellationToken ct) =>
             {
+                var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+                if (malformed)
+                {
+                    return RowVersioning.Malformed("transaction");
+                }
+
                 try
                 {
-                    return Results.Ok(new { changed = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct, request.Note) });
+                    var recategorized = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct, request.Note, expected);
+                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
+                    return Results.Ok(new { changed = recategorized });
                 }
                 catch (KeyNotFoundException)
                 {
@@ -51,11 +60,18 @@ internal static class CategorizationEndpoints
             .RequireRateLimiting("write");
 
         app.MapPut("/api/transactions/{id:guid}/category", async (
-                Guid id, [FromBody] SetCategoryRequest request, CategorizationService service, CancellationToken ct) =>
+                Guid id, [FromBody] SetCategoryRequest request, CategorizationService service, HttpRequest httpRequest, HttpResponse response, GetTransactionHandler reader, CancellationToken ct) =>
             {
+                var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+                if (malformed)
+                {
+                    return RowVersioning.Malformed("transaction");
+                }
+
                 try
                 {
-                    var changed = await service.SetCategoryAsync(id, request.CategoryId, request.ApplyToMerchant, ct);
+                    var changed = await service.SetCategoryAsync(id, request.CategoryId, request.ApplyToMerchant, ct, expected);
+                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
                     return Results.Ok(new { changed });
                 }
                 catch (KeyNotFoundException)

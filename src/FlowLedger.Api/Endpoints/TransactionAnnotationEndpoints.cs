@@ -14,11 +14,18 @@ internal static class TransactionAnnotationEndpoints
     {
         var group = app.MapGroup("/api/transactions").WithTags("Transactions").RequireRateLimiting("api");
 
-        group.MapPut("/{id:guid}/note", async (Guid id, [FromBody] SetNoteRequest request, TransactionAnnotationService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}/note", async (Guid id, [FromBody] SetNoteRequest request, TransactionAnnotationService service, HttpRequest httpRequest, HttpResponse response, GetTransactionHandler reader, CancellationToken ct) =>
             {
+                var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+                if (malformed)
+                {
+                    return RowVersioning.Malformed("transaction");
+                }
+
                 try
                 {
-                    await service.SetNoteAsync(id, request.Note, ct);
+                    await service.SetNoteAsync(id, request.Note, ct, expected);
+                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
                     return Results.NoContent();
                 }
                 catch (KeyNotFoundException)
@@ -34,11 +41,18 @@ internal static class TransactionAnnotationEndpoints
             .WithSummary("Set a transaction's note (blank removes it)")
             .RequireRateLimiting("write");
 
-        group.MapPut("/{id:guid}/splits", async (Guid id, [FromBody] SetSplitsRequest request, TransactionAnnotationService service, CancellationToken ct) =>
+        group.MapPut("/{id:guid}/splits", async (Guid id, [FromBody] SetSplitsRequest request, TransactionAnnotationService service, HttpRequest httpRequest, HttpResponse response, GetTransactionHandler reader, CancellationToken ct) =>
             {
+                var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+                if (malformed)
+                {
+                    return RowVersioning.Malformed("transaction");
+                }
+
                 try
                 {
-                    await service.SetSplitsAsync(id, request.Splits ?? [], ct);
+                    await service.SetSplitsAsync(id, request.Splits ?? [], ct, expected);
+                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
                     return Results.NoContent();
                 }
                 catch (KeyNotFoundException)
