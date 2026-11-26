@@ -14,6 +14,9 @@ jobs:
   build-and-test:
     name: Build & Test (.NET 10)
     runs-on: ubuntu-latest
+    env:
+      # Docker-gated tests must run in CI; a missing daemon fails instead of silently skipping.
+      FLOWLEDGER_REQUIRE_DOCKER: "true"
 
     steps:
       - name: Checkout
@@ -36,11 +39,19 @@ jobs:
       - name: Run unit tests
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category!=E2E"
+          --filter "Category!=E2E&Category!=Perf"
           --logger "trx;LogFileName=test-results.trx"
           --collect:"XPlat Code Coverage"
           --results-directory ./artifacts/tests
           -- xunit.parallelizeAssembly=true
+
+      - name: Run JS tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run JS unit tests
+        run: node --test tests/js
 
       - name: Publish test results
         if: always()

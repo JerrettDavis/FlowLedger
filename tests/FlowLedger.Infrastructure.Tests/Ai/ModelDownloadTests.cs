@@ -40,6 +40,7 @@ public class ModelDownloadTests : IDisposable
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
         async Task Wait()
         {
+            // Bounded poll (5 s cap): LocalModelManager exposes no completion signal, only the State property.
             for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
             {
                 await Task.Delay(25);
