@@ -616,6 +616,88 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("savings_goals", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.HomeAssistantSentRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("DedupeKey")
+                        .HasColumnType("text")
+                        .HasColumnName("dedupe_key");
+
+                    b.Property<DateTimeOffset>("SentUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "DedupeKey");
+
+                    b.ToTable("home_assistant_sent", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.HomeAssistantSettingsRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enabled");
+
+                    b.Property<bool>("IncludeNames")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("include_names");
+
+                    b.Property<string>("Kinds")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("kinds");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastSentUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_sent_utc");
+
+                    b.Property<int>("LeadDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("lead_days");
+
+                    b.Property<bool>("ShareAmounts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("share_amounts");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Webhook")
+                        .HasColumnType("text")
+                        .HasColumnName("webhook");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("home_assistant_settings", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.MerchantAliasRecord", b =>
                 {
                     b.Property<Guid>("TenantId")
