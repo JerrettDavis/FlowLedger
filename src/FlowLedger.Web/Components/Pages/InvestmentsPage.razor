@@ -5,7 +5,7 @@
 <PageTitle>Investments — FlowLedger</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5">Investment performance</MudText>
+    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Investment performance</MudText>
     <DateRangeSelector Label="Range" Preset="@_preset" From="@(_from ?? default)" To="@_to"
                        Presets="@RangePresets" Changed="OnRangeChanged" />
 </div>

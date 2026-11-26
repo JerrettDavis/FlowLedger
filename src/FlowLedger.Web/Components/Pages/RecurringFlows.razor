@@ -8,7 +8,7 @@
 <PageTitle>Recurring Flows — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4">
-    <MudText Typo="Typo.h4">Recurring Flows</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Recurring Flows</MudText>
     <div class="d-flex gap-2 align-center" style="flex-wrap:wrap">
     <DateRangeSelector Label="Active during" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
                        From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
