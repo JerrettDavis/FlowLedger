@@ -70,7 +70,7 @@ public sealed class RealtyApiValuationFeed(
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
             var amount = HttpJsonAppraisalFeed.ReadDecimal(doc.RootElement, "details.avm.__root.avmInfo.predictedValue");
-            return amount is > 0m ? new AssetFeedQuote(Math.Round(amount.Value, 0), asOf, "Redfin Estimate via RealtyAPI") : null;
+            return amount is > 0m ? new AssetFeedQuote(FlowLedger.Domain.ValueObjects.MoneyRounding.Round(amount.Value, 0), asOf, "Redfin Estimate via RealtyAPI") : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
         {

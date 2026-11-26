@@ -29,14 +29,37 @@ public static class LoanMath
             return 0m;
         }
 
-        var r = (double)annualRatePercent / 1200.0;
+        var r = annualRatePercent / 1200m;
         if (r == 0)
         {
             return MoneyRounding.Round(balance / months, 2);
         }
 
-        var pow = Math.Pow(1 + r, months);
-        return MoneyRounding.Round((decimal)((double)balance * r * pow / (pow - 1)), 2);
+        // payment = balance * r / (1 - (1 + r)^-n), in decimal so cents are exact (no binary-double drift) and a long term or a
+        // high rate shrinks toward 0 instead of overflowing.
+        var discount = PowInt(1m / (1m + r), months);
+        return MoneyRounding.Round(balance * r / (1m - discount), 2);
+    }
+
+    /// <summary><paramref name="b"/> to a non-negative integer power by repeated squaring, entirely in decimal.</summary>
+    public static decimal PowInt(decimal b, int n)
+    {
+        var result = 1m;
+        while (n > 0)
+        {
+            if ((n & 1) == 1)
+            {
+                result *= b;
+            }
+
+            n >>= 1;
+            if (n > 0)
+            {
+                b *= b;
+            }
+        }
+
+        return result;
     }
 }
 

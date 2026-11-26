@@ -192,7 +192,7 @@ public sealed class Asset : AggregateRoot
     private Money BlendedValue(DateOnly anchor, int windowDays, Currency currency)
     {
         var perSource = LatestPerSource(anchor, windowDays);
-        return new Money(Math.Round(perSource.Average(v => v.Amount), 2, MidpointRounding.AwayFromZero), currency);
+        return new Money(MoneyRounding.Round(perSource.Average(v => v.Amount)), currency);
     }
 
     private List<AssetValuation> LatestPerSource(DateOnly anchor, int windowDays)
@@ -225,8 +225,8 @@ public sealed class Asset : AggregateRoot
         var mid = amounts.Count / 2;
         var median = amounts.Count % 2 == 1 ? amounts[mid] : (amounts[mid - 1] + amounts[mid]) / 2m;
         return new ValuationSpread(
-            amounts[0], amounts[^1], Math.Round(median, 2, MidpointRounding.AwayFromZero),
-            Math.Round(amounts.Average(), 2, MidpointRounding.AwayFromZero), amounts.Count, windowDays);
+            amounts[0], amounts[^1], MoneyRounding.Round(median),
+            MoneyRounding.Round(amounts.Average()), amounts.Count, windowDays);
     }
 
     /// <summary>Links (or, with null, unlinks) an account. The account must belong to the same tenant.</summary>
