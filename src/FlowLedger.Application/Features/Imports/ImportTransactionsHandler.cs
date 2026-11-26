@@ -111,7 +111,7 @@ public sealed class ImportTransactionsHandler
 
             try
             {
-                var (tx, fp) = ParseRow(fields, rowNumber, tenantId, accountId, mapping, dateFormats, occurrences);
+                var (tx, fp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences);
 
                 uniqueTransactions.Add((tx, fp));
             }
@@ -234,6 +234,7 @@ public sealed class ImportTransactionsHandler
         int rowNumber,
         TenantId tenantId,
         AccountId accountId,
+        Currency currency,
         CsvColumnMapping mapping,
         string[] dateFormats,
         Dictionary<string, int> occurrences)
@@ -298,7 +299,7 @@ public sealed class ImportTransactionsHandler
 
         // Direction: negative amount = debit, positive = credit
         var direction = rawAmount < 0m ? TransactionDirection.Debit : TransactionDirection.Credit;
-        var absAmount = new Money(Math.Abs(rawAmount), new Currency("USD"));
+        var absAmount = new Money(Math.Abs(rawAmount), currency);
 
         // Fingerprint: the Nth identical row in the file carries ordinal N-1, so a re-import matches
         // each stored row one-to-one and only a genuine surplus is inserted.

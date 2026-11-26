@@ -147,6 +147,12 @@ public sealed class ForecastResult
     /// </summary>
     public IReadOnlyList<ForecastBandPoint> Bands { get; set; } = [];
 
+    /// <summary>
+    /// Human-readable caveats about the run, e.g. that accounts in different currencies were forecast separately and no
+    /// aggregate is produced (there is no FX conversion).
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; set; } = [];
+
     /// <summary>The typical unscheduled weekly spend the bands are based on.</summary>
     public SpendingProfile SpendingProfile { get; set; } = SpendingProfile.None;
 }

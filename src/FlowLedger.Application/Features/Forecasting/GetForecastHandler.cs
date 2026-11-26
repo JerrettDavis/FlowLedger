@@ -151,8 +151,15 @@ public sealed class GetForecastHandler
 
         // Everyday spending the schedule does not cover: debits from the last ~26 weeks, minus transfers and anything an
         // active recurring flow already accounts for. Best-effort: a failure here must never break the deterministic forecast.
+        var mixedCurrencies = startingBalances.Values.Select(m => m.Currency).Distinct().Count() > 1;
         try
         {
+            if (mixedCurrencies)
+            {
+                // Bands add raw amounts across accounts, which is meaningless across currencies; the engine already warned.
+                return result;
+            }
+
             var historyFrom = query.AsOf.AddDays(-7 * ForecastBands.HistoryWeeks);
             var history = await _transactions.ListForAccountsAsync(accountIds, historyFrom, query.AsOf, ct);
             var dtos = history.Select(Transactions.TransactionMapper.ToDto).ToList();

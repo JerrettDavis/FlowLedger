@@ -13,7 +13,9 @@ namespace FlowLedger.Application.Features.Assets;
 ///  • an asset linked to a Loan/Mortgage/CreditCard/ManualLiability account is counted at full value;
 ///    the liability is already subtracted via accounts, so equity (value − liability) is informational;
 ///  • a link to a deactivated or unknown account is ignored (the asset counts as unlinked).
-/// Amounts are summed as-is (single-currency assumption, same as the existing dashboard).
+/// Currencies are never added together: totals are computed per currency. With a single currency the top-level figures are
+/// that currency's totals; with several, <see cref="NetWorthDto.MixedCurrencies"/> is set, <see cref="NetWorthDto.ByCurrency"/>
+/// lists every currency, and the top-level figures describe only the primary (most populated) currency.
 /// </summary>
 public static class NetWorthCalculator
 {
@@ -29,27 +31,61 @@ public static class NetWorthCalculator
     {
         var activeAccounts = accounts.Where(a => a.IsActive).ToDictionary(a => a.Id);
 
-        var accountAssets = activeAccounts.Values
-            .Where(a => AssetAccountTypes.Contains(a.AccountType)).Sum(a => a.CurrentBalance.Amount);
-        var liabilities = activeAccounts.Values
-            .Where(a => LiabilityAccountTypes.Contains(a.AccountType)).Sum(a => a.CurrentBalance.Amount);
+        var accountAssets = new Dictionary<string, decimal>();
+        var liabilities = new Dictionary<string, decimal>();
+        var physical = new Dictionary<string, decimal>();
+        var carried = new Dictionary<string, decimal>();
+        var population = new Dictionary<string, int>();
 
-        decimal physical = 0m;
-        decimal carried = 0m;
+        static void Add(Dictionary<string, decimal> d, string c, decimal v) => d[c] = d.GetValueOrDefault(c) + v;
+
+        foreach (var a in activeAccounts.Values)
+        {
+            var c = a.CurrentBalance.Currency.Code;
+            population[c] = population.GetValueOrDefault(c) + 1;
+            if (AssetAccountTypes.Contains(a.AccountType))
+            {
+                Add(accountAssets, c, a.CurrentBalance.Amount);
+            }
+            else if (LiabilityAccountTypes.Contains(a.AccountType))
+            {
+                Add(liabilities, c, a.CurrentBalance.Amount); // sign preserved (#125): an overpaid card reduces liabilities
+            }
+        }
+
         foreach (var asset in assets.Where(a => a.IsActive))
         {
-            var value = AssetValuationEstimator.Estimate(asset, asOf).Amount;
+            var estimate = AssetValuationEstimator.Estimate(asset, asOf);
+            var c = estimate.Currency.Code;
+            population[c] = population.GetValueOrDefault(c) + 1;
             if (asset.LinkedAccountId is { } linkId
                 && activeAccounts.TryGetValue(linkId, out var linked)
                 && linked.AccountType == AccountType.ManualAsset)
             {
-                carried += value;
+                Add(carried, c, estimate.Amount);
                 continue;
             }
 
-            physical += value;
+            Add(physical, c, estimate.Amount);
         }
 
-        return new NetWorthDto(accountAssets, liabilities, physical, accountAssets - liabilities + physical, carried);
+        var totals = population.Keys.OrderBy(c => c, StringComparer.Ordinal).Select(c =>
+        {
+            var aa = accountAssets.GetValueOrDefault(c);
+            var li = liabilities.GetValueOrDefault(c);
+            var ph = physical.GetValueOrDefault(c);
+            return new CurrencyTotalDto(c, aa, li, ph, aa - li + ph, carried.GetValueOrDefault(c));
+        }).ToList();
+
+        if (totals.Count == 0)
+        {
+            return new NetWorthDto(0m, 0m, 0m, 0m, 0m);
+        }
+
+        var primaryCode = population.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key;
+        var primary = totals.Single(t => t.Currency == primaryCode);
+        return new NetWorthDto(
+            primary.AccountAssets, primary.AccountLiabilities, primary.PhysicalAssets, primary.NetWorth, primary.CarriedByAccounts,
+            primary.Currency, totals.Count > 1, totals);
     }
 }
