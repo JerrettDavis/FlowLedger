@@ -69,7 +69,7 @@ public static class Extensions
             {
                 o.IncludeScopes = true;
                 o.UseUtcTimestamp = true;
-                o.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z' ";
+                o.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
             });
         }
 
