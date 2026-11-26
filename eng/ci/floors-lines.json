@@ -1,0 +1,7 @@
+{
+  "_comment": "Line-coverage floors, ratcheted from a measured baseline (Domain 68.6%, Application 74.3% from the Domain.Tests/Application.Tests projects alone, Windows, 2026-11-26). Raise as coverage improves. Issue #134 targets 80% Domain / 70% Application.",
+  "lineFloors": {
+    "FlowLedger.Domain": 65,
+    "FlowLedger.Application": 70
+  }
+}

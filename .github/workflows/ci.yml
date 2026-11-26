@@ -39,6 +39,7 @@ jobs:
           --filter "Category!=E2E"
           --logger "trx;LogFileName=test-results.trx"
           --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
           --results-directory ./artifacts/tests
           -- xunit.parallelizeAssembly=true
 
@@ -50,9 +51,7 @@ jobs:
           path: artifacts/tests/**/*.trx
           reporter: dotnet-trx
 
-      # Informational only: renders a line/branch coverage table in the job summary. It never fails the build.
-      # To gate later, measure the current baseline from this summary and add a threshold check just below it,
-      # so the gate only catches regressions.
+      # Renders a line/branch coverage table in the job summary (informational, never fails the build).
       - name: Coverage summary
         if: always()
         continue-on-error: true
@@ -64,6 +63,11 @@ jobs:
             "-reporttypes:MarkdownSummaryGithub" \
             "-assemblyfilters:+FlowLedger.*;-*.Tests"
           cat artifacts/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Gate: fails the build when Domain/Application line coverage drops below the floors in
+      # eng/ci/floors-lines.json (ratchet: raise the floors as coverage improves).
+      - name: Coverage floor gate
+        run: python3 eng/ci/check-coverage.py eng/ci/floors-lines.json "artifacts/tests/**/coverage.cobertura.xml" "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage
         if: always()
