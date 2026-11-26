@@ -83,15 +83,25 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var accounts = await ApiClient.GetAccountsAsync();
-        // Providers report liabilities as positive owed amounts (and some as negative), so key off the account type and use the magnitude.
-        foreach (var a in accounts.Where(a => a.IsActive && Liabilities.Contains(a.AccountType) && a.BalanceAmount != 0))
+        try
         {
-            var owed = Math.Abs(a.BalanceAmount);
-            _rows.Add(new Row { Name = a.Name, Balance = owed, Minimum = Math.Max(25m, Math.Round(owed * 0.02m, 0)) });
+            var accounts = await ApiClient.GetAccountsAsync();
+            // Providers report liabilities as positive owed amounts (and some as negative), so key off the account type and use the magnitude.
+            foreach (var a in accounts.Where(a => a.IsActive && Liabilities.Contains(a.AccountType) && a.BalanceAmount != 0))
+            {
+                var owed = Math.Abs(a.BalanceAmount);
+                _rows.Add(new Row { Name = a.Name, Balance = owed, Minimum = Math.Max(25m, Math.Round(owed * 0.02m, 0)) });
+            }
         }
-
-        _loading = false;
+        catch (Exception ex)
+        {
+            // The planner still works with hand-entered debts; say why the pre-fill is missing.
+            Snackbar.AddProblem(ex, "Couldn't pre-fill debts from your accounts");
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private void AddRow() => _rows.Add(new Row { Name = "New debt" });
