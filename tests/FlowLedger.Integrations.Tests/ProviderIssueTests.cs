@@ -1,6 +1,6 @@
 using FlowLedger.Integrations.Abstractions;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Integrations.Tests;
 

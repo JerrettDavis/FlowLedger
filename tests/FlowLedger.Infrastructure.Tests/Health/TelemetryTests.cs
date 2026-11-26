@@ -1,7 +1,7 @@
 using System.Diagnostics.Metrics;
 using FlowLedger.Infrastructure.Observability;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Health;
 

@@ -3,9 +3,9 @@ using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Npgsql;
-using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 

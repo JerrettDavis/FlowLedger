@@ -3,10 +3,10 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 
