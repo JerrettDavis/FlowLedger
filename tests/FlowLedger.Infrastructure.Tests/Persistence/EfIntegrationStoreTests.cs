@@ -18,10 +18,12 @@ public sealed class EfIntegrationStoreTests(IntegrationTestFixture fixture) : IA
     private EfIntegrationStore Store(TestTenantContext tenant, string? key = null)
         => new(fixture.CreateProductionStyleContext(tenant), tenant, key);
 
+    private static readonly DateTimeOffset Fixed = new(2026, 11, 20, 12, 0, 0, TimeSpan.Zero);
+
     private static Integration NewIntegration(string name) => new(
         Guid.NewGuid(), name, IntegrationKind.Webhook, true,
         new IntegrationConfig("https://example.com/hook", IntegrationAuth.None, null, new Dictionary<string, string>(), ["bill_due"], null),
-        false, false, DateTimeOffset.UtcNow, null, null);
+        false, false, Fixed, null, null);
 
     [DockerFact]
     public async Task Integrations_round_trip_are_tenant_scoped_and_secrets_are_sealed()
@@ -86,7 +88,7 @@ public sealed class EfIntegrationStoreTests(IntegrationTestFixture fixture) : IA
         var integ = NewIntegration("hook");
         await store.SaveAsync(a.TenantId, integ, null, false, null);
 
-        var start = DateTimeOffset.UtcNow.AddMinutes(-200);
+        var start = Fixed;
         for (var i = 0; i < 105; i++)
         {
             await store.RecordDeliveryAsync(a.TenantId, new IntegrationDelivery(
