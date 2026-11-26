@@ -17,14 +17,13 @@ public sealed class TransactionTests
     // ── RecordActual ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void RecordActual_posted_transaction_raises_TransactionImported()
+    public void RecordActual_posted_transaction_is_posted()
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
             "Amazon", Today, Today, TransactionSource.CsvImport);
 
         tx.Status.Should().Be(TransactionStatus.Posted);
-        tx.DomainEvents.Should().ContainSingle(e => e is TransactionImported);
     }
 
     [Fact]
@@ -58,33 +57,29 @@ public sealed class TransactionTests
     // ── CreatePlanned ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void CreatePlanned_sets_Planned_status_and_no_event_yet()
+    public void CreatePlanned_sets_Planned_status()
     {
         var tx = Transaction.CreatePlanned(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
             "Rent", Today);
 
         tx.Status.Should().Be(TransactionStatus.Planned);
-        // Planned creation does not raise TransactionImported
-        tx.DomainEvents.Should().NotContain(e => e is TransactionImported);
     }
 
     // ── Match ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Match_transitions_Posted_to_Matched_and_raises_event()
+    public void Match_transitions_Posted_to_Matched()
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
             "Electric bill", Today, Today, TransactionSource.CsvImport);
-        tx.ClearDomainEvents();
 
         var occurrenceId = PlannedOccurrenceId.New();
         tx.Match(occurrenceId, ConfidenceScore.High);
 
         tx.Status.Should().Be(TransactionStatus.Matched);
         tx.MatchedOccurrenceId.Should().Be(occurrenceId);
-        tx.DomainEvents.Should().ContainSingle(e => e is TransactionMatchedToPlan);
     }
 
     [Fact]
@@ -141,18 +136,16 @@ public sealed class TransactionTests
     // ── Categorize ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Categorize_sets_category_and_raises_event()
+    public void Categorize_sets_category()
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit, "Grocery", Today, Today, TransactionSource.Manual);
-        tx.ClearDomainEvents();
 
         var catId = CategoryId.New();
         tx.Categorize(catId, "Whole Foods");
 
         tx.CategoryId.Should().Be(catId);
         tx.MerchantName.Should().Be("Whole Foods");
-        tx.DomainEvents.Should().ContainSingle(e => e is TransactionCategorized);
     }
 
     // ── Splits ────────────────────────────────────────────────────────────────

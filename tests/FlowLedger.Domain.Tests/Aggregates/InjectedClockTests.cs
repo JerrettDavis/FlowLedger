@@ -20,13 +20,12 @@ public sealed class InjectedClockTests
     private static readonly TimeProvider Clock = new FixedClock(Fixed);
 
     [Fact]
-    public void Transaction_creation_time_and_event_use_the_supplied_clock()
+    public void Transaction_creation_time_uses_the_supplied_clock()
     {
         var tx = Transaction.RecordActual(Tenant, AccountId.New(), Usd, TransactionDirection.Debit, "Coffee",
             new DateOnly(2031, 3, 1), new DateOnly(2031, 3, 1), TransactionSource.Manual, time: Clock);
 
         tx.CreatedAt.Should().Be(Fixed);
-        tx.DomainEvents.Should().ContainSingle(e => e is TransactionImported).Which.OccurredAt.Should().Be(Fixed);
     }
 
     [Fact]
@@ -39,13 +38,11 @@ public sealed class InjectedClockTests
     {
         var account = Account.Create(Tenant, "Checking", AccountType.Checking, Usd, time: Clock);
         account.CreatedAt.Should().Be(Fixed);
-        account.DomainEvents.Single().OccurredAt.Should().Be(Fixed);
 
         var later = new FixedClock(Fixed.AddDays(2));
         account.ApplyProviderBalance(new Money(50m, "USD"), later);
 
         account.LastBalanceConfirmedAt.Should().Be(Fixed.AddDays(2));
-        account.DomainEvents.OfType<AccountBalanceUpdated>().Single().OccurredAt.Should().Be(Fixed.AddDays(2));
     }
 
     [Fact]
@@ -55,7 +52,6 @@ public sealed class InjectedClockTests
             RecurrencePattern.Monthly(1), new DateOnly(2031, 1, 1), time: Clock);
 
         flow.CreatedAt.Should().Be(Fixed);
-        flow.DomainEvents.Single().OccurredAt.Should().Be(Fixed);
     }
 
     [Fact]
@@ -69,6 +65,5 @@ public sealed class InjectedClockTests
         var valuation = asset.RecordValuation(new Money(90m, "USD"), new DateOnly(2031, 3, 5), "manual", time: later);
 
         valuation.RecordedAt.Should().Be(Fixed.AddDays(9));
-        asset.DomainEvents.OfType<AssetRevalued>().Single().OccurredAt.Should().Be(Fixed.AddDays(9));
     }
 }

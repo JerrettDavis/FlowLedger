@@ -111,7 +111,6 @@ public sealed class RecurringFlow : AggregateRoot
             counterparty?.Trim(),
             Now(time));
 
-        flow.RaiseEvent(new RecurringFlowCreated(flow.RecurringFlowId, flow.TenantId, flow.AccountId, direction), flow.CreatedAt);
         return flow;
     }
 
@@ -152,7 +151,6 @@ public sealed class RecurringFlow : AggregateRoot
             date);
 
         _occurrences.Add(occurrence);
-        RaiseEvent(new PlannedOccurrenceGenerated(occurrence.PlannedOccurrenceId, rfId, TenantId, date, effectiveAmount));
         return occurrence;
     }
 

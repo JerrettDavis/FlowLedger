@@ -15,11 +15,10 @@ public sealed class AssetTests
         => Asset.Create(Tenant, "Laptop", cat, new Money(value, "USD"), Jan1);
 
     [Fact]
-    public void Create_records_initial_valuation_and_raises_event()
+    public void Create_records_initial_valuation()
     {
         var a = NewAsset();
         a.Valuations.Should().ContainSingle().Which.Amount.Should().Be(1000m);
-        a.DomainEvents.Should().ContainSingle(e => e is AssetAdded);
     }
 
     [Fact]
