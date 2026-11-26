@@ -41,6 +41,7 @@ jobs:
           dotnet test --no-build --configuration Release
           --filter "Category!=E2E&Category!=Perf"
           --logger "trx;LogFileName=test-results.trx"
+          --settings eng/coverage.runsettings
           --collect:"XPlat Code Coverage"
           --results-directory ./artifacts/tests
           -- xunit.parallelizeAssembly=true
@@ -61,9 +62,7 @@ jobs:
           path: artifacts/tests/**/*.trx
           reporter: dotnet-trx
 
-      # Informational only: renders a line/branch coverage table in the job summary. It never fails the build.
-      # To gate later, measure the current baseline from this summary and add a threshold check just below it,
-      # so the gate only catches regressions.
+      # Renders a line/branch coverage table in the job summary (informational; the gate is the next-but-one step).
       - name: Coverage summary
         if: always()
         continue-on-error: true
@@ -75,6 +74,10 @@ jobs:
             "-reporttypes:MarkdownSummaryGithub" \
             "-assemblyfilters:+FlowLedger.*;-*.Tests"
           cat artifacts/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Floors sit just under the measured baseline (see eng/check-coverage.py); raise them as coverage grows.
+      - name: Enforce coverage floors (Domain, Application)
+        run: python3 eng/check-coverage.py artifacts/tests
 
       - name: Upload coverage
         if: always()
