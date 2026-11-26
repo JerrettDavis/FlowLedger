@@ -22,8 +22,14 @@ public sealed record TransactionFingerprint
         DateOnly postedDate,
         decimal amount,
         string normalizedDescription,
-        string? providerTransactionId = null)
+        string? providerTransactionId = null,
+        int occurrence = 0)
     {
+        if (occurrence < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(occurrence));
+        }
+
         if (string.IsNullOrWhiteSpace(normalizedDescription))
         {
             throw new Exceptions.EmptyStringException(nameof(normalizedDescription));
@@ -32,6 +38,13 @@ public sealed record TransactionFingerprint
         var raw = string.IsNullOrWhiteSpace(providerTransactionId)
             ? $"{accountId.Value}|{postedDate:O}|{amount:F4}|{normalizedDescription.ToUpperInvariant()}"
             : $"pid:{providerTransactionId}|{accountId.Value}";
+
+        // Occurrence 0 keeps the historical value so stored fingerprints stay valid; the Nth identical
+        // provider-less row on the same day (n >= 1) gets a "|n" suffix so genuine repeats stay distinct.
+        if (occurrence > 0 && string.IsNullOrWhiteSpace(providerTransactionId))
+        {
+            raw = $"{raw}|{occurrence}";
+        }
 
         return new TransactionFingerprint(raw);
     }
@@ -45,8 +58,9 @@ public sealed record TransactionFingerprint
         DateOnly postedDate,
         decimal amount,
         string rawDescription,
-        string? providerTransactionId = null)
-        => Create(accountId, postedDate, amount, NormalizeDescription(rawDescription), providerTransactionId);
+        string? providerTransactionId = null,
+        int occurrence = 0)
+        => Create(accountId, postedDate, amount, NormalizeDescription(rawDescription), providerTransactionId, occurrence);
 
     /// <summary>
     /// Stable description normalisation for fingerprinting: trim, collapse every run of whitespace to a single
