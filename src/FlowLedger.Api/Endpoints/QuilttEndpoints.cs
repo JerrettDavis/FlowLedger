@@ -87,7 +87,7 @@ internal static class QuilttEndpoints
                 if (rawBody is null)
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "too_large");
-                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
                 // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
@@ -102,13 +102,13 @@ internal static class QuilttEndpoints
                 catch (InvalidWebhookSignatureException)
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "invalid_signature");
-                return Results.Unauthorized();
+                    return Results.Unauthorized();
                 }
 
                 if (WebhookReplayGuard.SeenRecently(rawBody))
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
-                return Results.Accepted(value: new { duplicate = true });
+                    return Results.Accepted(value: new { duplicate = true });
                 }
 
                 await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
