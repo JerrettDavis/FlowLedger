@@ -121,6 +121,9 @@ public static class WorkerHostBuilderFactory
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         builder.Services.AddHostedService<WorkerHeartbeat>();
+
+        // Transactional outbox dispatcher (#92): delivers committed domain events to handlers with retry and dead-lettering.
+        builder.Services.AddHostedService<OutboxDispatcherService>();
     }
 
     /// <summary>
