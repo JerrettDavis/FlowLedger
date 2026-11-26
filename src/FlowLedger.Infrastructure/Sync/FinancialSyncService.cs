@@ -310,6 +310,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Flush all outstanding changes once after the full loop
         await _db.SaveChangesAsync(ct);
 
+        // Only now is the sync a success: stamp the throttle clock (#120). A failure above leaves the previous stamp, so a partly
+        // failed sync (cursors advanced, then an error) does not start a fresh minimum-interval window.
+        await _cursorStore.MarkSuccessfulAsync(_provider.ProviderName, providerIdToAccount.Keys.ToList(), ct);
+
         var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded);
         _logger.LogInformation(
             "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added",
