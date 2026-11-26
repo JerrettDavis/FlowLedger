@@ -154,6 +154,33 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
+    public async Task Accounts_WithoutACurrency_AreSkippedNotBookedAsUsd_AndRowsInheritTheAccountCurrency()
+    {
+        const string accounts = """
+            {"data":{"accounts":[
+              {"id":"acc_1","name":"Euro","kind":"DEPOSITORY","state":"OPEN","currencyCode":"EUR","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}},
+              {"id":"acc_2","name":"Mystery","kind":"DEPOSITORY","state":"OPEN","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}}
+            ]}}
+            """;
+        var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2).ToString("yyyy-MM-dd");
+        var stub = new Stub((req, body) =>
+            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            : body.Contains("FlowLedgerAccounts") ? Json(accounts)
+            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day + "\",\"description\":\"X\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}},"
+                + "{\"id\":\"t2\",\"date\":\"" + day + "\",\"description\":\"Y\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_2\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
+        var p = Make(stub);
+
+        var mapped = await p.GetAccountsAsync("p_1");
+        mapped.Should().ContainSingle().Which.CurrencyCode.Should().Be("EUR");
+
+        (await p.GetTransactionsAsync("acc_1", SyncCursor.Initial)).Items.Should().ContainSingle()
+            .Which.Amount.Currency.Code.Should().Be("EUR");
+        var unknown = await p.GetTransactionsAsync("acc_2", SyncCursor.Initial);
+        unknown.Items.Should().BeEmpty("no currency can be inherited, and USD is never assumed");
+        unknown.SkippedCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Transactions_AccountWithOnlyPendingRows_AdvancesItsCursor()
     {
         var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-4);

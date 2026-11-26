@@ -55,14 +55,14 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     public async Task<IReadOnlyList<ProviderAccount>> GetAccountsAsync(string memberProviderId, CancellationToken cancellationToken = default)
     {
         var res = await FetchAsync(cancellationToken).ConfigureAwait(false);
-        return res.Accounts!.Select(SimpleFinMapper.ToAccount).ToList();
+        return UsableAccounts(res).Select(SimpleFinMapper.ToAccount).ToList();
     }
 
     public async Task<TransactionPage> GetTransactionsAsync(
         string providerAccountId, SyncCursor cursor, int pageSize = 100, CancellationToken cancellationToken = default)
     {
         var res = await FetchAsync(cancellationToken).ConfigureAwait(false);
-        var acct = res.Accounts!.FirstOrDefault(a => SimpleFinMapper.AccountId(a) == providerAccountId);
+        var acct = UsableAccounts(res).FirstOrDefault(a => SimpleFinMapper.AccountId(a) == providerAccountId);
         if (acct?.Transactions is null)
         {
             return TransactionPage.Empty(cursor);
@@ -104,6 +104,22 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
         var next = new SyncCursor(FormatCursor(nextDate, backfillRequested && backfillComplete ? _options.BackfillDays : 0));
         return new TransactionPage(items, next.Value.Length == 0 ? cursor : next, HasMore: false) { SkippedCount = skipped };
+    }
+
+    /// <summary>Accounts whose currency the bridge did not report as ISO are left out (and logged), never booked as USD (#124).</summary>
+    private IEnumerable<SfAccount> UsableAccounts(SfResponse res)
+    {
+        foreach (var a in res.Accounts!)
+        {
+            if (SimpleFinMapper.HasUsableCurrency(a))
+            {
+                yield return a;
+            }
+            else
+            {
+                _logger.LogWarning("Skipping SimpleFIN account {AccountId}: no usable ISO currency reported.", SimpleFinMapper.AccountId(a));
+            }
+        }
     }
 
     private static (DateOnly? Date, int BackfilledDays) ParseCursor(SyncCursor cursor)

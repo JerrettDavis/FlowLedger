@@ -146,6 +146,21 @@ public sealed class SimpleFinProviderTests
         accounts[1].Balance.Amount.Should().Be(350.25m);
     }
 
+    [Theory]
+    [InlineData("\"currency\": \"EUR\"", true)]
+    [InlineData("\"currency\": \"https://example.com/fantasy-coin\"", false)]
+    [InlineData("\"currency\": \"\"", false)]
+    public async Task An_account_without_an_ISO_currency_is_skipped_instead_of_becoming_USD(string currencyField, bool kept)
+    {
+        var json = Json(Today).Replace("\"currency\": \"USD\"", currencyField);
+        var (p, _) = Make(json);
+
+        var accounts = await p.GetAccountsAsync("simplefin");
+
+        accounts.Should().HaveCount(0 + (kept ? 2 : 0));
+        accounts.Should().NotContain(a => a.CurrencyCode == "USD");
+    }
+
     [Fact]
     public async Task Overpaid_card_keeps_its_sign_as_a_negative_amount_owed()
     {

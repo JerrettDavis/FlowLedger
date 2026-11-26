@@ -216,8 +216,8 @@ public sealed class QuilttIssueMappingTests
     public async Task HealthyConnectionPlusBrokenOne_StillSyncsAndReportsTheBrokenOne()
     {
         var accounts = "{\"data\":{\"accounts\":[" +
-            "{\"id\":\"a1\",\"name\":\"Spending\",\"kind\":\"DEPOSITORY\",\"state\":\"OPEN\",\"connection\":{\"id\":\"ok\",\"status\":\"SYNCED\"}}," +
-            "{\"id\":\"a2\",\"name\":\"Old\",\"kind\":\"DEPOSITORY\",\"state\":\"OPEN\",\"connection\":{\"id\":\"bad\",\"status\":\"ERROR_REPAIRABLE\"}}]}}";
+            "{\"id\":\"a1\",\"name\":\"Spending\",\"kind\":\"DEPOSITORY\",\"state\":\"OPEN\",\"currencyCode\":\"USD\",\"connection\":{\"id\":\"ok\",\"status\":\"SYNCED\"}}," +
+            "{\"id\":\"a2\",\"name\":\"Old\",\"kind\":\"DEPOSITORY\",\"state\":\"OPEN\",\"currencyCode\":\"USD\",\"connection\":{\"id\":\"bad\",\"status\":\"ERROR_REPAIRABLE\"}}]}}";
         var p = Provider(Wire(Connections(("ok", "SYNCED"), ("bad", "ERROR_REPAIRABLE")), accounts));
 
         (await p.GetAccountsAsync("p_1")).Should().HaveCount(2);

@@ -48,9 +48,13 @@ internal static class SimpleFinMapper
         return "CHECKING";
     }
 
+    /// <summary>True when the account reports a usable ISO currency; otherwise it is skipped rather than read as USD (#124).</summary>
+    public static bool HasUsableCurrency(SfAccount a) => ProviderCurrency.Normalize(a.Currency) is not null;
+
     public static ProviderAccount ToAccount(SfAccount a)
     {
-        var currency = NormalizeCurrency(a.Currency);
+        var currency = ProviderCurrency.Normalize(a.Currency)
+            ?? throw new UnknownCurrencyException($"SimpleFIN account {AccountId(a)} reports no usable ISO currency.");
         var type = InferType(a);
         var balance = ParseDecimal(a.Balance) ?? 0m;
         var available = ParseDecimal(a.AvailableBalance);
@@ -76,7 +80,8 @@ internal static class SimpleFinMapper
 
     public static ProviderTransaction ToTransaction(SfAccount a, SfTransaction t)
     {
-        var currency = NormalizeCurrency(a.Currency);
+        var currency = ProviderCurrency.Normalize(a.Currency)
+            ?? throw new UnknownCurrencyException($"SimpleFIN account {AccountId(a)} reports no usable ISO currency.");
         var pending = t.Pending == true || t.Posted <= 0;
         var epoch = t.Posted > 0 ? t.Posted : (t.TransactedAt ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime);
@@ -90,7 +95,4 @@ internal static class SimpleFinMapper
     private static decimal? ParseDecimal(string? s) =>
         decimal.TryParse(s, NumberStyles.Number | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var d) ? d : null;
 
-    // SimpleFIN currency may be an ISO code or a custom-currency URL; anything unusual falls back to USD.
-    private static string NormalizeCurrency(string? c) =>
-        c is { Length: 3 } && c.All(char.IsLetter) ? c.ToUpperInvariant() : "USD";
 }
