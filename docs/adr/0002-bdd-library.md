@@ -133,6 +133,19 @@ side effect is required; it would consume the same forecast output.
 | **TinyBDD + TinyBDD.Xunit 0.19.23** | **Adopted** — native net10.0, code-first, integrates with xUnit + Testcontainers. |
 | `Reqnroll.xUnit` (Gherkin .feature files) | Considered fallback; not needed. Ships a .NET 8/9-compatible release, but the lighter code-first dependency won once the TinyBDD net10.0 spike passed. |
 
+## Amendment: current state (2026-11-26)
+
+- **Version drift.** The pinned version is now TinyBDD / TinyBDD.Xunit **0.19.48** (`Directory.Packages.props`), not `0.19.23`. The
+  `0.19.23` text above records the original spike and decision. The scoped `<NoWarn>` workaround
+  (`CS8602;CS8625;CS0168` in `tests/FlowLedger.Bdd.Tests/FlowLedger.Bdd.Tests.csproj`) was written for `0.19.23`; it has not been
+  re-validated against `0.19.48`, so whether it is still needed (or still sufficient) is unknown.
+- **Coverage is small.** The suite is five scenario classes with six `[DockerFact]` scenarios (forecasting, matching, import,
+  simulated sync, MX sync). There are no scenarios yet for transfer pairing, recurring detection to forecast, budget alerts,
+  multi-user tenant isolation or provider-failure repair. The BDD suite is therefore not by itself acceptance evidence for those
+  behaviours.
+- **Docker-gated.** Every scenario needs Docker and skips without it.
+- Follow-up tracked in issue #161: add scenarios mapped to user stories, publish scenario output as a CI artifact.
+
 ## References
 
 - Phase 6b spike report (TinyBDD net10.0 compile-and-run verification).

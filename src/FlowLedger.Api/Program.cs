@@ -7,6 +7,7 @@ using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.ServiceDefaults;
 using FlowLedger.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -35,6 +36,7 @@ builder.Services.AddOpenApi();
 // Non-Development: HeaderTenantContext fails closed (throws TenantResolutionException
 // → 401) when no valid X-Tenant-Id header is supplied.
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<FlowLedger.Api.Tenancy.TenantOverride>();
 // Tenancy:RequireTenantHeader=true makes even Development fail closed (no demo-tenant fallback) - set it on any stack with real users.
 if (builder.Environment.IsDevelopment()
     && !builder.Configuration.GetValue("Tenancy:RequireTenantHeader", false)
@@ -76,7 +78,8 @@ if (builder.Environment.IsDevelopment() || builder.Configuration.GetValue("Datab
 // production boundary. Registered AFTER the migration service so the schema exists first.
 builder.Services.AddDataEnvironmentGuard();
 
-// ── ProblemDetails (with TenantResolutionException → 401 mapping) ─────────────
+// ── ProblemDetails (TenantResolutionException → 401; any ProviderException → ProviderExceptionHandler, ADR 0018) ──
+builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ProviderExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = ctx =>
@@ -124,8 +127,16 @@ builder.Services.AddRateLimiter(opts =>
 
     opts.AddFixedWindowPolicy("api", permitLimit: 300, queueLimit: 10);
     opts.AddFixedWindowPolicy("write", permitLimit: 60, queueLimit: 5);
-    opts.AddFixedWindowPolicy("webhook", permitLimit: 30, queueLimit: 0); // No queue; reject immediately.
+    // Pre-verification webhook limit per (provider, IP): generous so real deliveries are not starved by junk, no queue.
+    opts.AddWebhookPolicy("webhook", builder.Configuration.GetValue("RateLimiting:WebhookPerIpPerMinute", RateLimitPartitions.DefaultWebhookPerIpPerMinute));
+    // Backstop for every request (per-IP cap + stricter cap on rejected credentials) and Retry-After on 429.
+    opts.GlobalLimiter = RateLimitPartitions.CreateGlobalLimiter(builder.Configuration);
+    opts.OnRejected = RateLimitPartitions.OnRejected;
 });
+
+// Opt-in forwarded headers (ForwardedHeaders:Enabled + KnownProxies/KnownNetworks): without it, behind a proxy the rate limiter and
+// the loopback guard see the proxy address.
+var trustForwardedHeaders = builder.AddFlowLedgerForwardedHeaders();
 
 var app = builder.Build();
 
@@ -133,7 +144,9 @@ var app = builder.Build();
 {
     var apiOpts = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
     if (!string.IsNullOrEmpty(apiOpts.TenantSigningKey)
-        && (apiOpts.TenantSigningKey.Length < 32 || string.Equals(apiOpts.TenantSigningKey, apiOpts.Key, StringComparison.Ordinal)))
+        && (apiOpts.TenantSigningKey.Length < 32
+            || string.Equals(apiOpts.TenantSigningKey, apiOpts.Key, StringComparison.Ordinal)
+            || string.Equals(apiOpts.TenantSigningKey, apiOpts.PreviousKey, StringComparison.Ordinal)))
     {
         throw new InvalidOperationException(
             "Api:TenantSigningKey must be at least 32 characters and different from Api:Key (e.g. `openssl rand -hex 32`).");
@@ -146,19 +159,17 @@ if (!app.Environment.IsDevelopment())
 {
     var apiOptions = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
 
-    if (string.IsNullOrWhiteSpace(apiOptions.Key))
+    // Strength (>= 32 chars, no well-known placeholder) for Api:Key and, during rotation, Api:PreviousKey.
+    if (ApiKeyPolicy.ValidateOptions(apiOptions) is { } keyError)
     {
         throw new InvalidOperationException(
-            "Api:Key must be set to a non-empty value outside Development. " +
-            "Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
+            keyError + " Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
     }
 
-    const string devDefault = "dev-local-key-not-for-production";
-    if (apiOptions.Key.Equals(devDefault, StringComparison.Ordinal))
+    if (ConfigGuards.LooksLikePlaceholder(apiOptions.Key))
     {
         throw new InvalidOperationException(
-            "Api:Key is the development default in a non-Development environment. " +
-            "Generate a strong random key (e.g. `openssl rand -hex 32`) and set Api__Key.");
+            "Api:Key still contains a template placeholder (e.g. from .env.example). Generate a strong random key (`openssl rand -hex 32`).");
     }
 }
 
@@ -179,6 +190,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 app.UseExceptionHandler();
 app.UseSecureHeaders();
 

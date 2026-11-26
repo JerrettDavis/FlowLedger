@@ -1,0 +1,74 @@
+# 0018 - Connector-neutral error handling
+
+Status: accepted (implemented; Quiltt is the reference mapping)
+
+## Context
+Every connector (SimpleFIN, MX, Quiltt, Simulated, future ones) can fail in the same handful of ways: the user must re-authenticate,
+credentials are wrong, the bank is down, the aggregator network is down, the vendor's own service is down, we are throttled, the link was
+removed, something internal broke. Today each connector throws its own mix of `ProviderException`s, only `NeedsUserAction` is handled
+in one endpoint, retry/backoff is decided ad hoc, nothing is persisted, and the UI cannot tell a user *what to do*.
+
+## Decision: one vocabulary, written once, consumed everywhere
+```
+connector-native status/error ──(connector maps, ONLY connector-specific code)──▶ ProviderIssue / ConnectionHealth   (Integrations.Abstractions)
+                                                                                    │
+        persisted per connection  ◀── FinancialSyncService / worker jobs ◀──────────┤   (Infrastructure, connector-agnostic)
+        ProblemDetails + extensions ◀── one exception handler ◀─────────────────────┤   (Api, connector-agnostic)
+        badge + repair CTA ◀── connections DTO ◀────────────────────────────────────┘   (Web, connector-agnostic)
+```
+* `ProviderIssueKind`: None, ReauthRequired, InvalidCredentials, InstitutionUnavailable, ProviderUnavailable, ServiceUnavailable,
+  RateLimited, Disconnected, Internal, Unknown. `ProviderIssue` carries `Retryable`, `RequiresUserAction`, `RetryAfter`, `ProviderCode`.
+* Every `ProviderException` has `Kind` (defaulting from its type; a connector refines it with an object initializer).
+* `IFinancialDataProvider.GetConnectionHealthAsync` (default method derives from `GetConnectionStatusAsync`; connectors with richer state override).
+* **Rule:** nothing outside a connector project may reference a connector's native status strings or error shapes. Anything that needs new
+  behaviour for a new failure mode adds a `ProviderIssueKind` (or a policy keyed on one), never a connector `if`.
+
+## Shared behaviour (implemented once, keyed on `ProviderIssue`)
+| Concern | Rule |
+|---|---|
+| Persistence | `IProviderConnectionStore.RecordHealthAsync(provider, ConnectionIssueInfo?)`: set on failure (increments `ConsecutiveFailures`), cleared on success. Columns on `provider_connections`: `issue_kind, issue_message, issue_retryable, issue_requires_user_action, issue_retry_after, issue_at, consecutive_failures`. |
+| Sync | `FinancialSyncService` catches `ProviderException`, classifies via `ProviderIssue.FromException`, records health, rethrows. Success records recovery. Never swallow. |
+| Scheduled/on-demand jobs | Retryable -> back off (honour `RetryAfter`, otherwise exponential with cap, stop escalating at N failures); `RequiresUserAction` -> do NOT retry until the user acts, skip silently; Internal/Unknown -> bounded retries then stop and log. |
+| HTTP | One `IExceptionHandler` maps any `ProviderException` to RFC 7807 ProblemDetails: 409 for RequiresUserAction, 429 for RateLimited (+`Retry-After`), 503 for Institution/Provider/ServiceUnavailable, 502 for Internal/Unknown. Extension members: `issueKind`, `retryable`, `requiresUserAction`, `retryAfterSeconds`, `provider`. Endpoints stop hand-rolling catches. |
+| UI | Connection list returns `issue`. Badge by kind. `RequiresUserAction` shows a **Reconnect** button (provider-appropriate: Quiltt `Quiltt.reconnect(connectorId,{connectionId})`, others link out). Retryable shows "will retry automatically" with the time. Errors surfaced via the shared ProblemDetails reader, never string matching. |
+| Secrets | Issue messages never contain tokens, API keys, account numbers or response bodies. |
+
+## Quiltt sandbox as the reference simulation
+Quiltt's Mock Sandbox Bank offers logins that simulate each failure mode (aggregator down, institution error, provider error, service error,
+internal error, invalid credentials, multi-error, ...) and `connectionSimulateError` flips a connection to `ERROR_REPAIRABLE`. The Quiltt
+connector maps each simulated scenario to a `ProviderIssueKind`; the mapping table lives in `docs/quiltt-sandbox-scenarios.md`. Because the downstream
+layers only see `ProviderIssue`, the same handling covers MX, SimpleFIN and any future connector that maps its errors onto the contract.
+
+## Testing
+* Contract/taxonomy: `ProviderIssueTests` (Integrations.Tests).
+* Connector mapping: per-connector unit tests with recorded/stubbed wire shapes, plus opt-in live tests (env-var gated) against sandboxes.
+* Shared layers are tested with a fake connector that throws every `ProviderIssueKind`, proving behaviour is connector-independent.
+
+## As implemented
+* **Contract:** `ProviderIssue` (+ `RepairRef`: an opaque, connector-defined handle the UI hands back to that connector's repair flow; for Quiltt the connection id),
+  `ConnectionHealth`, `ProviderException.Kind`, `ProviderCapabilities.ConnectionHealth` (opt-in: only connectors that can report real per-connection state are
+  asked after each sync, because the call can cost an extra provider request).
+* **Persistence:** `provider_connections.issue_*`, `consecutive_failures`, `issue_provider_code`, `issue_repair_ref` via `IProviderConnectionStore.RecordHealthAsync`.
+  A *successful read is not recovery*: connectors with the health capability are asked, so a reconnect-needed connection with readable (stale) data keeps its issue.
+* **Retry:** `SyncRetryPolicy` + `SyncAttemptGate` decide Retry / SkipUntilUserAction / GiveUp from a `ProviderIssue`; scheduled and on-demand jobs consult it.
+* **HTTP:** `ProviderExceptionHandler` (409 user action, 429 rate limit, 503 unavailable, 502 internal/unknown) with `issueKind`, `retryable`, `requiresUserAction`, `retryAfterSeconds`.
+* **UI:** `ConnectionHealthBadge`, pluggable `IConnectionRepairHandler` (Quiltt reconnect mode), `ProblemToast`, `AutoSyncPolicy`; a successful reconnect runs a sync, which clears the issue.
+* **Quiltt:** see `docs/quiltt-sandbox-scenarios.md`. `QuilttIssueMapper` is the only place Quiltt statuses/errors are interpreted; `QuilttSessionCache` keeps minting under
+  Quiltt's 10-sessions/hour/profile limit.
+
+## Known limits
+* The Mock Sandbox Bank's failure logins (aggregator down, invalid credentials, timeouts, internal error, multi-error) fail inside the hosted Connector and leave **no
+  server-visible state**, and `ERROR_INSTITUTION/PROVIDER/SERVICE` were never produced by any sandbox login (mapped from the schema only). Only `ERROR_REPAIRABLE`
+  (via `connectionSimulateError`) and `DISCONNECTED` are reproducible server-side. Capturing the Connector's exit event and reporting it to the API is the remaining gap.
+* Webhook-driven issue updates (`connection.synced.errored.*`) are mapped but untested end to end (no public URL).
+* `FinancialSyncService` still names connectors for tenancy/provisioning rules (not error handling); move to connector descriptors in a follow-up.
+
+## Live verification (2026-11-25, isolated sandbox stack, real Quiltt sandbox)
+`connectionSimulateError` on the in-app connection -> app auto-sync threw `ReauthRequired` -> HTTP 409 -> toast with Reconnect -> persisted `issue_kind=ReauthRequired`,
+`issue_repair_ref=conn_...`, `consecutive_failures` incrementing -> persistent app-bar **Reconnect** button (works for non-owner tenants via
+`GET /api/integrations/connections`) -> Quiltt Connector opened in reconnect mode for exactly that connection ("Action needed!") -> mock OAuth authorize ->
+sync -> issue cleared, failures 0, button gone, Quiltt connection back to `SYNCING`.
+Bugs this run exposed and fixed: (1) a *thrown* failure lost the reconnect reference (exceptions now carry `RepairRef`); (2) the owner-only Connectors page was the only
+Reconnect surface, unreachable for per-user tenants; (3) an issue observed after a clean read must be informational (never counts toward give-up or blocks the gate).
+Note: the two new migrations (`AddProviderConnectionIssue`, `AddProviderConnectionIssueRepairRef`) apply to whatever database the stack points at on its next start,
+including `flowledger_prod`.

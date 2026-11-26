@@ -1,11 +1,11 @@
 @page "/home-assistant"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Home Assistant — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Home Assistant</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Home Assistant</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Send heads-up alerts to Home Assistant: a bill coming due or paid, a paycheck on the way or landed, an overdraft.
     By default only the <em>alert</em> is shared, never your balances or amounts.
@@ -160,7 +160,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -170,6 +170,11 @@ else
 
     private async Task Disconnect()
     {
+        if (!await DialogService.ConfirmAsync("Remove webhook", "Remove the saved Home Assistant webhook? FlowLedger stops sending updates until you add one again.", "Remove"))
+        {
+            return;
+        }
+
         _enabled = false;
         await Save(clearWebhook: true);
     }
@@ -193,7 +198,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {

@@ -1,8 +1,70 @@
 # Production Hardening & Secrets
 
-This guide covers what you must do before exposing a FlowLedger instance to real users
-or real financial data. Read it before switching `Mx__Enabled` to `true` in a non-dev
-environment.
+This guide is the ordered runbook for exposing a FlowLedger instance to real users or real
+financial data. Follow the steps in [Go-live runbook](#go-live-runbook) in order; the sections
+after it are the reference material each step points to. Read it before switching any real
+provider on (`Mx__Enabled`, `SimpleFin__Enabled`, `Quiltt__Enabled`) in a non-dev environment.
+
+> **Compose forwards only some settings.** `docker-compose.yml` passes an explicit list of
+> variables to the containers and hard-codes `Mx__Enabled=false`. Settings that are not in
+> that list (providers, backups, `Integrations__EncryptionKey`, `ForwardedHeaders__Enabled`,
+> `Worker__MaxParallelTenants`, ...) must be added to the `environment:` of the `api`/`worker`/`web`
+> services in a `docker-compose.override.yml`. See [.env.example](../../.env.example).
+
+## Go-live runbook
+
+1. **Secrets and database.** Set `POSTGRES_PASSWORD` and `API__KEY` to strong random values
+   (`openssl rand -hex 32`). Keep Postgres on loopback or a private network and enable TLS if it
+   is remote ([database.md](database.md)). See [Supplying secrets](#supplying-secrets-in-production).
+2. **Sign-in.** Configure OIDC (`Auth__Oidc__*`, [multi-user-auth.md](multi-user-auth.md)). Without
+   it the Web UI has no login and refuses to start outside Development. Set
+   `AUTH__ALLOWANONYMOUS=true` only on a trusted single-user host where every port stays bound
+   to `127.0.0.1`. For multi-user stacks also set `Api__TenantSigningKey` (same value on api and web).
+3. **TLS and proxy.** Put a TLS reverse proxy in front of the Web UI
+   ([TLS termination](#tls-termination)) and, if the proxy is the only path to the Web port, set
+   `ForwardedHeaders__Enabled=true` ([Reverse proxy / TLS](#reverse-proxy--tls)).
+4. **Encryption keys.** Set `HomeAssistant__EncryptionKey` (and `Integrations__EncryptionKey` if you
+   use integrations) to `openssl rand -base64 32`, the same value on `api` and `worker`. Without a
+   key FlowLedger refuses to store webhook URLs and integration credentials.
+5. **Backups.** Configure off-site backups (restic, `Backup__Restic__*`, `B2_ACCOUNT_*`) and run
+   **Back up now** on the Data & Backups page; confirm it shows an off-site copy. Back up the raw
+   payload archive volume (`objects_data`) as well. Details and recovery:
+   [backups-and-recovery.md](backups-and-recovery.md). The built-in backup is a daily logical
+   snapshot (RPO up to 24 hours; see [database.md](database.md)).
+6. **Fresh database for real data.** Real data must go into a database that never held demo or
+   sandbox data. The `data_environment` marker (`demo` / `sandbox` / `production`) makes the API and
+   Worker refuse to start when it disagrees with the provider settings; follow
+   [Switching from demo/sandbox to real data](backups-and-recovery.md#switching-from-demosandbox-to-real-data).
+7. **Providers.** Enable exactly the provider you intend, with its credentials from a secrets
+   manager: MX ([mx-integration.md](../architecture/mx-integration.md), `Mx__Environment=production`,
+   `Mx__BaseUrl=https://api.mx.com`), SimpleFIN (`SimpleFin__Enabled`, `SimpleFin__AccessUrl`), or
+   Quiltt (`Quiltt__Enabled`, `Quiltt__Environment=production`,
+   [ADR 0017](../adr/0017-quiltt-embedded-connector.md)). Set the API cost budgets
+   (`Mx__Provider__DailyCallBudget`, `Mx__Provider__MonthlyCallBudget`) if you use MX.
+8. **Data admin endpoints.** `GET /api/data/export`, `POST /api/data/import` and
+   `POST /api/data/backup-now` accept loopback callers only. Leave `DataAdmin__AllowRemote` unset
+   unless you understand the exposure; never publish these through the proxy.
+9. **Observability.** Wire `OTEL_EXPORTER_OTLP_ENDPOINT` if you want traces, metrics and logs
+   exported. Application logs are not redacted (see [SECURITY.md](../../SECURITY.md)); treat the
+   telemetry backend as sensitive.
+10. **Verify** with the checklist below, then take a fresh backup.
+
+### Checklist before going live
+
+- [ ] `POSTGRES_PASSWORD` is a strong random value (compose refuses to start without one).
+- [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
+- [ ] OIDC sign-in is configured, or `AUTH__ALLOWANONYMOUS=true` is set deliberately on a trusted single-user host.
+- [ ] Postgres and Redis ports are not exposed to the public internet; Postgres uses TLS if remote.
+- [ ] TLS termination is in place; all HTTP redirects to HTTPS; only the Web UI (and provider webhook endpoints) are exposed.
+- [ ] `ForwardedHeaders__Enabled=true` if a proxy terminates TLS in front of the Web app.
+- [ ] `HomeAssistant__EncryptionKey` / `Integrations__EncryptionKey` are set (if those features are used) and shared by api and worker.
+- [ ] Real data is in a fresh database; the `data_environment` marker is `production`.
+- [ ] Exactly one real provider is enabled and points at its production endpoint (e.g. `Mx__BaseUrl=https://api.mx.com`, `Quiltt__Environment=production`); `Mx__Enabled=false` if you are not using MX.
+- [ ] Secrets live in a secrets manager, not in a `.env` on the server.
+- [ ] Off-site backup (restic) is configured, **Back up now** succeeded and the Data & Backups page is green.
+- [ ] The `postgres_data` and `objects_data` volumes are covered by your host backups or snapshots.
+- [ ] `DataAdmin__AllowRemote` is unset and `/api/data/*` is not reachable through the proxy.
+- [ ] `OTEL_EXPORTER_OTLP_ENDPOINT` is set if you want telemetry exported.
 
 ## The simulated-vs-real toggle
 
@@ -90,22 +152,24 @@ Ensure the proxy:
 
 ## Rotating `API__KEY` without downtime
 
-`API__KEY` is the bearer token shared between the Web frontend and the API. To rotate it:
+`API__KEY` is the bearer token shared between the Web frontend, the Worker and the API. Outside
+Development the API refuses to start unless the key is at least 32 characters and is not a
+well-known placeholder (`changeme...`, `password...`, `dev-local-key...`, `ci-test-api-key...`).
+Generate one with `openssl rand -hex 32`.
 
-1. Generate a new key: `openssl rand -hex 32`
-2. Update the secret in your secrets manager / deployment platform.
-3. Perform a rolling restart of the `api` and `web` containers so both pick up the new
-   value simultaneously. (They must match — a Web container with the old key will get
-   401 errors from an API container with the new key.)
+The API also accepts an optional `API__PREVIOUSKEY` (`Api:PreviousKey`) so rotation does not need
+every service restarted at the same instant:
 
-   With compose:
-   ```bash
-   docker compose --profile full up --build -d --no-deps api web
-   ```
+1. Generate the new key: `openssl rand -hex 32`
+2. On the **API**: set `API__PREVIOUSKEY` to the *old* key and `API__KEY` to the *new* key, restart it.
+   Callers still sending the old key keep working; each such request logs a Warning
+   ("authenticated with Api:PreviousKey").
+3. Roll `web` (and `worker`) with `API__KEY` set to the new key.
+4. When the Warnings stop, remove `API__PREVIOUSKEY` from the API and restart it. The old key is
+   rejected from then on. The previous key must also meet the strength rules and differ from the new key.
 
-   With Kubernetes: update the Secret, then roll the Deployments.
-
-4. Verify the Web UI loads correctly after the restart.
+Rejected keys are logged at Warning (method, path, remote IP, never the key) and counted in the
+`flowledger.api.auth.failures` metric (meter `FlowLedger.Api`).
 
 ## Rotating `Mx__ApiKey` / `Mx__ClientId` / `Mx__WebhookSecret`
 
@@ -140,10 +204,36 @@ permanently lost.
   never publish the database on a public interface.
 - Restrict the `flowledger` user to the minimum required privileges on the `flowledger`
   database; do not use the PostgreSQL superuser in application connection strings.
+- Enable TLS for the Postgres connection (Npgsql syntax: `SSL Mode=VerifyFull`) when the
+  database is not on the same private network as the app. The compose connection string
+  has no TLS option; see [database.md](database.md) for an override example, pool sizing,
+  RPO/RTO and the major-version upgrade procedure.
 - Enable SSL for the Postgres connection by adding `sslmode=require` to the connection
   string when the database is not on the same private network as the app.
 
+## Data Protection key ring (web sign-in cookies, antiforgery)
+
+The web app encrypts its sign-in cookie and antiforgery tokens with an ASP.NET Data Protection key ring. By default
+that ring lives in the container's home directory and is lost on every recreate, which logs every user out; with
+more than one web replica each would use a different ring and sign-in would break.
+
+- Mount a persistent volume into the web container and set `DataProtection__KeysPath` to it (for example
+  `/keys`, owned by the container user). All replicas must share it.
+- Optional: `DataProtection__CertificatePath` (+ `DataProtection__CertificatePassword`) encrypts the key files at
+  rest with a PFX. Without it the key files are plain XML, so restrict the volume to the container user.
+- Set `DataProtection__Required=true` once the volume is mounted: outside Development the web app then refuses to
+  start without a key path, instead of silently using an ephemeral ring.
+- Include the key directory in the recovery set (back it up with the database; restoring the database without it
+  only costs users a re-sign-in).
+- Rotation: keys roll automatically every 90 days; old keys stay in the directory so existing cookies keep working.
+  To force every session to end (suspected compromise), stop the web app, move the key files out of the directory,
+  and start it again. Never delete keys while the app is running.
+- Verification: sign in, run `docker compose up -d --force-recreate web`, reload: you must still be signed in.
+  (Not yet verified end to end; compose does not mount the volume yet.)
+
 ## Checklist before going live
+
+- [ ] `DataProtection__KeysPath` points at a persistent volume (and `DataProtection__Required=true`).
 
 - [ ] `POSTGRES_PASSWORD` is a strong random value (not the default).
 - [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
@@ -157,8 +247,20 @@ permanently lost.
 
 ## Reverse proxy / TLS
 
-If a proxy terminates TLS in front of the Web app, set `ForwardedHeaders__Enabled=true` so the OIDC `redirect_uri` is built as https from `X-Forwarded-Proto`/`Host`. Enable it only when the Web port is reachable solely through that proxy; otherwise clients could spoof those headers.
+If a proxy terminates TLS in front of the Web app (or the API), set `ForwardedHeaders__Enabled=true` **and** name the proxy: `ForwardedHeaders__KnownProxies=<ip>[,<ip>]` and/or `ForwardedHeaders__KnownNetworks=<cidr>[,<cidr>]` (the address the app sees, e.g. the compose bridge gateway `172.18.0.0/16`). The app refuses to start if forwarding is enabled without either, and headers from any other caller are ignored. `X-Forwarded-Host` is honoured only when `AllowedHosts` is restricted (e.g. `AllowedHosts=flowledger.example.com;localhost`); outside Development a startup warning is logged while `AllowedHosts` is `*`. Include `localhost` (or whatever your container health check uses) in `AllowedHosts`.
 
 ## Many tenants
 
 Scheduled jobs visit tenants one at a time by default. With more than a handful of users set `Worker__MaxParallelTenants` (1-16, e.g. 4) on the worker to sync several tenants concurrently; keep it small so provider rate limits and the database connection pool hold.
+
+## Session key ring (Data Protection)
+
+The Web app persists its ASP.NET Data Protection key ring at `DataProtection__KeyPath` (compose mounts the
+`web_keys` volume at `/keys`). With OIDC enabled outside Development the Web app refuses to start without it.
+Include the volume in your backups; losing it only signs users out. See [key rotation](../runbooks/key-rotation.md).
+
+## Single worker replica
+
+Run exactly one Worker. Quartz uses the in-memory store, so a second replica would double-run scheduled
+backup and alert jobs (per-tenant sync is protected by an advisory lock). Migrations are serialized by an
+advisory lock, so concurrent API/Worker starts are safe.

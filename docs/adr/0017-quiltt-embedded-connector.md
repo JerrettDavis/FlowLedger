@@ -18,7 +18,36 @@ inside FlowLedger. Quiltt provides an embeddable Connector (browser) plus a per-
 ## Config
 `Quiltt:Enabled, ApiKeySecret, ConnectorId, WebhookSecret, Environment` (AppHost user-secrets, forwarded to api + worker).
 
-## Unverified until keys arrive
-GraphQL field names/filters (`QuilttApiClient` constants), webhook header/payload shape (`QuilttWebhookVerifier`, `ParseWebhookAsync`), Connector JS API
-(`quiltt-interop.js`), account-type and status strings. All are isolated in those files and covered by stubbed tests.
-Webhook-triggered syncs currently run for the household tenant (no profile-to-tenant lookup yet); scheduled sync is the per-tenant backstop.
+## Verified against Quiltt docs (2026-11-25), not yet against a live sandbox
+- Session API: `POST auth.quiltt.io/v1/users/sessions`, Bearer API secret, `{userId}` for an existing profile; response `token/userId/expiresAt`.
+- GraphQL: `accounts` is an **unpaginated list** with `kind` (DEPOSITORY/INVESTMENT/CREDIT/LOAN/INSURANCE), not `type`; `transactions` is Relay-paginated
+  (`first<=100`, `filter.date_gte`, `sort: DATE_ASC`). Connection status enum: SYNCED, SYNCING, INITIALIZING, ERROR_REPAIRABLE/INSTITUTION/PROVIDER/SERVICE, DISCONNECTED.
+- Webhooks: `Quiltt-Timestamp` + `Quiltt-Signature` = Base64(HMAC-SHA256(secret, `"1" + timestamp + body`)); body batches `events[]` each with `profile.id`.
+- Connector JS: `cdn.quiltt.io/v1/connector.js`, `Quiltt.authenticate(token)`, `Quiltt.connect(id, {onExitSuccess,...}).open()`.
+
+## Still unverified until keys arrive
+`institution { name }` field list, webhook processing of multi-event/multi-profile batches (only the first event drives the sync),
+and an end-to-end Connector link in the sandbox. Webhook-triggered syncs currently run for the household tenant (no profile-to-tenant lookup yet);
+scheduled sync is the per-tenant backstop.
+
+## Live-run checklist (first sandbox session)
+1. Open Connect bank, link Quiltt's mock institution; confirm `ProviderConnections` row for `Quiltt` and accounts appear after a sync.
+2. Watch for **session rate limits**: Quiltt allows 10 sessions/hour and 20/day per profile and every sync mints one. If hit (HTTP 429), cache the token
+   until `expiresAt` or switch server-to-server GraphQL to Basic auth (`profileId:apiKeySecret`, documented as unlimited).
+3. Send a test webhook from the Quiltt dashboard; only `connection.synced.successful*`, `connection.created` and `account.verified` trigger a sync (`IsSyncTrigger`).
+4. Confirm `institution { name }` is accepted by the GraphQL schema (not listed in the docs we read).
+
+## Live sandbox verification (2026-11-25)
+Against the real Quiltt sandbox (Mock Sandbox Bank profile): session API returns 201 (`token,userId,userUuid,environmentId,expiration,expiresAt`);
+`accounts { id name kind state mask currencyCode balance{current available} institution{name} connection{id status} }` and the paginated `transactions`
+query both succeed; `balance.available` can be null. `QuilttProviderTests.Live_Sandbox_ReadsAccountsAndTransactions` (opt-in via `QUILTT_LIVE_KEY`/`QUILTT_LIVE_PROFILE`) runs
+the real provider end to end. Not yet exercised: the in-app Connector UI (needs signed-in user) and webhook delivery (needs a public URL).
+
+## In-app end-to-end verification (2026-11-25, isolated sandbox stack)
+Signed-in user -> Connect bank -> real Quiltt Connector (email auth, Mock Sandbox Bank, OAuth consent) -> Sync now: 2 accounts, 168 transactions and 2 balance snapshots
+landed in the tenant's rows and render on /accounts tagged Quiltt. Run on a throwaway DB (`FlowLedger__PostgresVolume`/`DatabaseName` + `SimpleFin__Enabled=false` env overrides);
+never link a sandbox bank into the production database.
+Findings: (1) Connect bank was hidden unless environment=production (fixed: also sandbox). (2) The Connectors page demanded the webhook secret for "credentials set" (fixed).
+(3) The Web ApiClient binds the tenant header once per circuit; a first click right after the OIDC redirect can carry no tenant and, in Development without
+`Tenancy:RequireTenantHeader=true`, falls back to the demo tenant, so the Quiltt connection was saved under the wrong tenant and sync found nothing. Set
+`Tenancy:RequireTenantHeader=true` on any stack with real users so this fails closed. Webhook delivery is still untested (needs a public URL).

@@ -30,7 +30,7 @@ public sealed class DedupingSyncService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogWarning(ex, "Duplicate merge after sync failed; it will retry on the next sync.");
+                logger.LogError(ex, "Duplicate merge after sync failed; it will retry on the next sync.");
             }
         }
 

@@ -66,7 +66,9 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             ? DateOnly.MinValue
             : c.AddDays(-Math.Max(0, _options.OverlapDays));
 
-        var items = acct.Transactions
+        var dated = acct.Transactions.Where(SimpleFinMapper.HasUsableDate).ToList();
+        var skipped = acct.Transactions.Count - dated.Count;
+        var items = dated
             .Select(t => SimpleFinMapper.ToTransaction(acct, t))
             .Where(t => t.PostedDate >= floor)
             .OrderBy(t => t.PostedDate)
@@ -74,7 +76,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
         var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
-        return new TransactionPage(items, next, HasMore: false);
+        return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
 
     public Task VerifyWebhookAsync(ReadOnlyMemory<byte> rawBody, string signatureHeader, CancellationToken cancellationToken = default) =>

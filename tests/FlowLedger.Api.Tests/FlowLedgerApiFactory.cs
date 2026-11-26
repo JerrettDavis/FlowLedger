@@ -37,17 +37,27 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     /// Production startup guard is satisfied in <see cref="FailClosedApiFactory"/>.</summary>
     public const string DevApiKey = "integration-test-key-not-for-production";
 
+    /// <summary>Explicit Simulated webhook secret; the provider has no default (#133).</summary>
+    public const string WebhookSecret = "api-test-webhook-secret";
+
     /// <summary>The demo tenant ID used when tests need a valid tenant header.</summary>
     // Static ctor: env vars outrank user-secrets and are read when the host builder is created
     // (unlike ConfigureAppConfiguration, which Program's eager config reads can miss). Without
     // this, a developer's Api user-secrets (Mx:Enabled=true + real creds) leak into tests and
     // could make real, billable MX calls.
-    static FlowLedgerApiFactory() => Environment.SetEnvironmentVariable("Mx__Enabled", "false");
+    static FlowLedgerApiFactory()
+    {
+        Environment.SetEnvironmentVariable("Mx__Enabled", "false");
+        // Readiness results are cached for 5 s in production; tests stop and start the database and need the live answer.
+        Environment.SetEnvironmentVariable("Health__CacheSeconds", "0");
+    }
 
     public static readonly Guid DemoTenantId = new("00000000-0000-0000-0000-000000000001");
 
     /// <summary>Connection string of the test container, for tests that must tweak rows directly (e.g. expire a link code).</summary>
     public string ConnectionString => _postgres.GetConnectionString();
+
+    protected Task StopPostgresAsync() => _postgres.StopAsync();
 
     public async Task InitializeAsync()
     {
@@ -110,6 +120,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 ["ConnectionStrings:flowledger"] = _postgres.GetConnectionString(),
                 ["Api:Key"] = DevApiKey,
                 ["Mx:Enabled"] = "false",
+                ["SimulatedProvider:WebhookSecret"] = WebhookSecret,
                 ["ObjectStorage:RootPath"] = _objectStoragePath,
                 ["HomeAssistant:EncryptionKey"] = Convert.ToBase64String(new byte[32].Select((_, i) => (byte)(i + 7)).ToArray()),
             });
@@ -123,7 +134,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name));
 
         // Null tenant context → no query filters / no tenant resolution required.
-        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), tenantContext: null);
+        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), UnscopedTenantContext.Instance);
     }
 
     private sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher

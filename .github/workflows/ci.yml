@@ -14,15 +14,27 @@ jobs:
   build-and-test:
     name: Build & Test (.NET 10)
     runs-on: ubuntu-latest
+    env:
+      # Honoured by the Docker availability checks once they are changed to throw instead of skip
+      # (tracked in #151). Until then the TRX skipped-test gate below is the effective guard.
+      FLOWLEDGER_REQUIRE_DOCKER: "true"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: '10.0.x'
+
+      - name: Setup Node (JS tests)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+
+      - name: Run JS tests
+        run: node --test "tests/js/**/*.test.mjs"
 
       - name: Restore packages
         run: dotnet restore
@@ -36,23 +48,27 @@ jobs:
       - name: Run unit tests
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category!=E2E"
-          --logger "trx;LogFileName=test-results.trx"
+          --filter "Category!=E2E&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests"
+          --logger "trx"
           --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
           --results-directory ./artifacts/tests
           -- xunit.parallelizeAssembly=true
 
       - name: Publish test results
         if: always()
-        uses: dorny/test-reporter@v3
+        uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3
         with:
           name: xUnit Test Results
           path: artifacts/tests/**/*.trx
           reporter: dotnet-trx
 
-      # Informational only: renders a line/branch coverage table in the job summary. It never fails the build.
-      # To gate later, measure the current baseline from this summary and add a threshold check just below it,
-      # so the gate only catches regressions.
+      # Docker-gated suites skip (rather than fail) when no Docker daemon is reachable. Fail the build
+      # if anything other than the credentialed live-sandbox tests was skipped, or nothing ran.
+      - name: Fail on unexpected skipped tests
+        run: python3 eng/ci/check-trx.py "artifacts/tests/**/*.trx" --allow-skip "LiveSandbox" --min-executed 500
+
+      # Renders a line/branch coverage table in the job summary (informational, never fails the build).
       - name: Coverage summary
         if: always()
         continue-on-error: true
@@ -65,9 +81,14 @@ jobs:
             "-assemblyfilters:+FlowLedger.*;-*.Tests"
           cat artifacts/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
+      # Gate: fails the build when Domain/Application line coverage drops below the floors in
+      # eng/ci/floors-lines.json (ratchet: raise the floors as coverage improves).
+      - name: Coverage floor gate
+        run: python3 eng/ci/check-coverage.py eng/ci/floors-lines.json "artifacts/tests/**/coverage.cobertura.xml" "$GITHUB_STEP_SUMMARY"
+
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage
           path: artifacts/tests/**/coverage.cobertura.xml

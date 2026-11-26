@@ -32,6 +32,15 @@ window.FlowLedgerTheme = {
     },
 
     /**
+     * Keeps the <html data-theme> attribute (set pre-paint by the head script) in step with the live theme.
+     */
+    applyScheme: function (isDark) {
+        var root = document.documentElement;
+        root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        root.style.colorScheme = isDark ? 'dark' : 'light';
+    },
+
+    /**
      * Removes the explicit preference so the system preference takes over.
      * Never throws.
      */
@@ -57,6 +66,15 @@ window.FlowLedgerTheme = {
         }
     }
 };
+
+// Skip link: move focus to <main> without a server round trip or a base-href navigation.
+document.addEventListener('click', function (e) {
+    var link = e.target && e.target.closest && e.target.closest('.fl-skip-link');
+    if (!link) { return; }
+    e.preventDefault();
+    var main = document.getElementById('main-content');
+    if (main) { main.focus(); main.scrollIntoView(); }
+});
 
 // Used by MainLayout's auto-sync: only sync while the tab is actually on screen.
 window.FlowLedgerPage = {

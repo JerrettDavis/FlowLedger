@@ -37,7 +37,7 @@ internal static class MxEndpoints
             }
 
             // With several connectors enabled the primary provider may not be MX: use the MX connector when it is on.
-            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
+            var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             if (provider is not MxFinancialDataProvider mx)
             {
                 return Results.Problem(
@@ -80,18 +80,13 @@ internal static class MxEndpoints
             IConnectorRegistry connectors,
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
+            IWebhookTenantResolver tenantResolver,
             CancellationToken ct) =>
         {
-            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
-            // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
-            if (request.ContentLength > MaxWebhookBodyBytes)
-            {
-                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-            }
-
+            var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             // Read the raw body bytes — required for exact HMAC verification. Bounded read: chunked bodies
             // carry no Content-Length, so stop as soon as the cap is exceeded.
-            var rawBody = await ReadBoundedAsync(request.Body, MaxWebhookBodyBytes, ct);
+            var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
             if (rawBody is null)
             {
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
@@ -119,7 +114,7 @@ internal static class MxEndpoints
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
-            await archive.ArchiveAsync("MX", "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
 
             ProviderWebhookEvent evt;
             try
@@ -150,8 +145,16 @@ internal static class MxEndpoints
             // to the specific member when targeted per-member sync is supported.
             // Note: webhook-triggered syncs intentionally bypass the manual-refresh cooldown
             // (they are platform-initiated events, not user-initiated refreshes).
+            // The webhook is per member: sync the tenant that owns it, and nobody if it is unknown (#150).
+            var owner = await tenantResolver.ResolveAsync(provider.ProviderName, evt.MemberId, ct);
+            if (owner is null)
+            {
+                return Results.Accepted(value: new { ignored = "unknown member", memberId = evt.MemberId });
+            }
+
             var jobData = new JobDataMap
             {
+                [OnDemandSyncJob.TenantIdKey] = owner.Value.ToString(),
                 [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
                 [OnDemandSyncJob.EventTypeKey] = evt.EventType,
             };
@@ -169,25 +172,5 @@ internal static class MxEndpoints
         return app;
     }
 
-    /// <summary>MX webhook payloads are small JSON events; anything larger is refused before signature work.</summary>
-    internal const int MaxWebhookBodyBytes = 1024 * 1024;
-
     /// <summary>Reads at most <paramref name="limit"/> bytes; returns null as soon as the body exceeds it.</summary>
-    private static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
-    {
-        using var ms = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        int read;
-        while ((read = await body.ReadAsync(buffer, ct)) > 0)
-        {
-            if (ms.Length + read > limit)
-            {
-                return null;
-            }
-
-            ms.Write(buffer, 0, read);
-        }
-
-        return ms.ToArray();
-    }
 }

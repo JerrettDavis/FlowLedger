@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
 
+[Trait("Invariant", "INV-09")]
 public sealed class GuardedSyncServiceTests
 {
     private sealed class FakeSync : IFinancialSyncService

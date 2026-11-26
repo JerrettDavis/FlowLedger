@@ -14,15 +14,17 @@ public sealed record PastWhatIfRequest(
 /// <summary>Loads the user's ledger, reduces it to <see cref="StrategyInputs"/>, and runs the engine and simulators.</summary>
 public sealed class StrategyService(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories, IMarketRateProvider rateProvider,
-    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, ILocalLlm? llm = null)
+    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, ILocalLlm? llm = null, TimeProvider? time = null)
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     private const int MaxTransactions = 50_000;
     private const int TransferPadDays = 14;
 
     public async Task<StrategyReport> GetReportAsync(CancellationToken ct = default)
     {
         var data = await LoadAsync(12, ct);
-        var report = StrategyEngine.Analyze(data, DateTimeOffset.UtcNow);
+        var report = StrategyEngine.Analyze(data, _time.GetUtcNow());
         var trajectory = CashTrajectoryProjector.Project(data.Months, report.LiquidCash, report.AvgMonthlySpend);
         var coach = await StrategyCoach.PlanAsync(report, llm, ct);
         return report with { Coach = coach, Trajectory = trajectory };
@@ -72,14 +74,14 @@ public sealed class StrategyService(
         var recent = data.Months.TakeLast(6).ToList();
         var income = recent.Count > 0 ? recent.Average(m => m.Income) : 0m;
         var spend = recent.Count > 0 ? recent.Average(m => m.Spend) : 0m;
-        var debts = data.Accounts.Where(a => a.IsLiability && a.Rate is > 0 && a.Balance != 0)
-            .Select(a => new GoalDebt(a.Name, Math.Abs(a.Balance), a.Rate!.Value, a.RemainingMonths ?? 60)).ToList();
+        var debts = data.Accounts.Where(a => a.IsLiability && a.Rate is > 0 && a.Balance > 0)
+            .Select(a => new GoalDebt(a.Name, a.Balance, a.Rate!.Value, a.RemainingMonths ?? 60)).ToList();
         return GoalPlanner.Plan(r, new GoalContext(income, spend, debts), data.Rates);
     }
 
     private async Task<StrategyInputs> LoadAsync(int months, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime);
         var firstOfThisMonth = new DateOnly(today.Year, today.Month, 1);
         var from = firstOfThisMonth.AddMonths(-months);
         var to = firstOfThisMonth.AddDays(-1); // complete months only
@@ -101,7 +103,7 @@ public sealed class StrategyService(
         foreach (var t in dtos)
         {
             var date = t.PostedDate ?? t.EffectiveDate;
-            if (date < from || date > to || t.Status is "Planned" or "Skipped" || transfers.Contains(t.Id) || investmentAccounts.Contains(t.AccountId))
+            if (date < from || date > to || !FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) || transfers.Contains(t.Id) || investmentAccounts.Contains(t.AccountId))
             {
                 continue;
             }

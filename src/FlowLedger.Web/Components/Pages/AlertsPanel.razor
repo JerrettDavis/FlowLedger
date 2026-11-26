@@ -15,5 +15,16 @@
 @code {
     private List<FlowLedger.Web.ApiClient.AlertDto>? _alerts;
 
-    protected override async Task OnInitializedAsync() => _alerts = await ApiClient.GetAlertsAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        // Alerts are supplementary: if the API is unreachable the page should still render, not take the circuit down.
+        try
+        {
+            _alerts = await ApiClient.GetAlertsAsync();
+        }
+        catch (Exception ex) when (ex is FlowLedger.Web.ApiClient.ApiClientException or HttpRequestException or TaskCanceledException)
+        {
+            _alerts = null;
+        }
+    }
 }

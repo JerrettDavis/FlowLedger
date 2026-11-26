@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
@@ -31,6 +32,18 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        AddCategorizationAndLocalAi(services, configuration);
+        AddPersistence(services, configuration);
+        AddProvidersAndSync(services, configuration);
+        AddStorageAndHealth(services, configuration);
+        services.AddPostgresVersionGuard();
+
+        return services;
+    }
+
+    /// <summary>ML categorizer tuning and the in-process local AI stack.</summary>
+    private static void AddCategorizationAndLocalAi(IServiceCollection services, IConfiguration configuration)
+    {
         // ML categorizer tuning ("Categorization:MlThreshold" / ":SuggestionFloor"); defaults keep auto-apply off.
         var categorization = new FlowLedger.Application.Features.Categories.CategorizationOptions();
         if (double.TryParse(configuration["Categorization:MlThreshold"], System.Globalization.CultureInfo.InvariantCulture, out var mlThreshold))
@@ -51,7 +64,9 @@ public static class DependencyInjection
         configuration.GetSection(FlowLedger.Application.Features.LocalAi.LocalAiOptions.SectionName).Bind(localAi);
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.LocalAi.LocalAiOptions>(services);
         services.AddSingleton(localAi);
-        services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30));
+        // No auto-redirect + connect-time IP guard (public addresses only): LocalModelManager validates every redirect hop itself.
+        services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30))
+            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler);
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>();
         services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiModels>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>());
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LlamaSharpLocalLlm>();
@@ -59,7 +74,11 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>();
         services.AddSingleton<FlowLedger.Application.Abstractions.ITextEmbedder>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
         services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiRuntime>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
+    }
 
+    /// <summary>EF Core context, domain-event dispatch, repositories and configuration (#108).</summary>
+    private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".
@@ -111,6 +130,9 @@ public static class DependencyInjection
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
+        services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
+        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
+        services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();
         services.AddScoped<FlowLedger.Application.Abstractions.IBillSheetStore, FlowLedger.Infrastructure.Reports.EfBillSheetStore>();
@@ -123,7 +145,11 @@ public static class DependencyInjection
         {
             services.AddSingleton<IConfiguration>(configuration);
         }
+    }
 
+    /// <summary>Connector registry, provider wiring, asset feeds, sync pipeline, ad-hoc stores and backups (shares the connector list).</summary>
+    private static void AddProvidersAndSync(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Provider wiring ────────────────────────────────────────────────────
         // Provider selection is config-only:
         //   Mx:Enabled = true  → real MX provider (FlowLedger.Integrations.Mx)
@@ -154,39 +180,33 @@ public static class DependencyInjection
         if (simpleFinEnabled)
         {
             services.AddSimpleFinProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new("SimpleFIN", "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true));
         }
 
         if (mxOptions.Enabled)
         {
             services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new("MX", "MX", "Aggregator (widget)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", SharedCredentials: true));
         }
 
         if (quilttEnabled)
         {
             services.AddQuilttProvider(configuration, registerAsDefault: connectors.Count == 0);
             // Per-user profiles: Quiltt isolates each tenant itself, so unlike SimpleFIN/MX it is not tied to the household tenant.
-            connectors.Add(new("Quiltt", "Quiltt", "Aggregator (embedded)", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", SharedCredentials: false));
         }
 
         if (simulatedEnabled)
         {
             services.AddSimulatedProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new("Simulated", "Simulated demo data", "Demo", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false));
         }
 
-        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountConnectorLinkStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
 
-        services.AddScoped<FlowLedger.Application.Abstractions.IProviderAccountCatalog>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderAccountCatalog(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Abstractions.IProviderAccountCatalog,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfProviderAccountCatalog>();
 
         services.AddScoped<FlowLedger.Integrations.Abstractions.IConnectorRegistry>(sp =>
             new FlowLedger.Infrastructure.Sync.ConnectorRegistry(sp, connectors));
@@ -254,7 +274,7 @@ public static class DependencyInjection
             }
 
             // Real connectors default to 30 min between syncs; the free Simulated provider is unthrottled.
-            var defaultMinutes = usable.Any(c => c.Id != "Simulated") ? 30 : 0;
+            var defaultMinutes = usable.Any(c => c.Id != FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated) ? 30 : 0;
             var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
             var db = sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>();
             var connectorIds = usable.Select(c => c.Id).ToArray();
@@ -308,56 +328,35 @@ public static class DependencyInjection
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
-        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryRuleStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
-        services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlMerchantAliasStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryRuleStore>();
+        services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfMerchantAliasStore>();
 
-        services.AddScoped<FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlSuspiciousDismissalStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfSuspiciousDismissalStore>();
 
-        services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlRecurringDismissalStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfRecurringDismissalStore>();
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Budgets (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore(
-            configuration.GetConnectionString("flowledger")
-            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Savings goals (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore(
-            configuration.GetConnectionString("flowledger")
-            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        services.AddSingleton<FlowLedger.Application.Features.Budgets.IBudgetStore>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore>());
-        services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
+        // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
+        services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
+        services.AddScoped<FlowLedger.Application.Features.Goals.IGoalStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore>();
         // -- Account rates (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton<FlowLedger.Application.Features.Strategies.IAccountRateStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountRateStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddScoped<FlowLedger.Application.Features.Strategies.IAccountRateStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfAccountRateStore>();
         // -- Home Assistant sharing (per-tenant settings + sent ledger; alerts only by default) --
-        services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlHomeAssistantStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+        services.AddScoped<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(sp =>
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfHomeAssistantStore(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
                 configuration["HomeAssistant:EncryptionKey"]));
         services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
@@ -367,10 +366,10 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
             FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
         // -- Integrations (REST / SOAP / signed webhooks; per-tenant definitions, encrypted secrets, delivery log) --
-        services.AddSingleton<FlowLedger.Application.Features.Integrations.IIntegrationStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlIntegrationStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+        services.AddScoped<FlowLedger.Application.Features.Integrations.IIntegrationStore>(sp =>
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfIntegrationStore(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
                 configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
         foreach (var clientName in new[]
         {
@@ -394,13 +393,25 @@ public static class DependencyInjection
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.BackupSettings>(),
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.BackupRunStore>(),
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup")));
+        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.DataRetention(
+            configuration.GetConnectionString("flowledger")
+            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
+    }
+
+    /// <summary>Object storage, raw payload archive and readiness checks.</summary>
+    private static void AddStorageAndHealth(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Object storage ──────────────────────────────────────────────────────
-        services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
+        services.AddOptions<ObjectStorageOptions>()
+            .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath), "ObjectStorage:RootPath must not be empty.")
+            .ValidateOnStart();
         services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
         services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
 
-        return services;
+        // Readiness probes (/ready): Postgres + migrations, Redis (if configured), backup freshness.
+        FlowLedger.Infrastructure.Health.ReadinessHealthExtensions.AddFlowLedgerReadinessChecks(services);
     }
 }

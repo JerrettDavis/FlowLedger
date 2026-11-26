@@ -1,11 +1,10 @@
 @page "/debt"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
 
 <PageTitle>Debt payoff — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Debt payoff planner</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Debt payoff planner</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Compare paying the highest-rate debt first (avalanche, least interest) with the smallest balance first (snowball, quickest wins).
     Balances are pre-filled from your credit and loan accounts; enter each debt's rate and minimum payment.
@@ -83,15 +82,25 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var accounts = await ApiClient.GetAccountsAsync();
-        // Providers report liabilities as positive owed amounts (and some as negative), so key off the account type and use the magnitude.
-        foreach (var a in accounts.Where(a => a.IsActive && Liabilities.Contains(a.AccountType) && a.BalanceAmount != 0))
+        try
         {
-            var owed = Math.Abs(a.BalanceAmount);
-            _rows.Add(new Row { Name = a.Name, Balance = owed, Minimum = Math.Max(25m, Math.Round(owed * 0.02m, 0)) });
+            var accounts = await ApiClient.GetAccountsAsync();
+            // Providers report liabilities as positive owed amounts (and some as negative), so key off the account type and use the magnitude.
+            foreach (var a in accounts.Where(a => a.IsActive && Liabilities.Contains(a.AccountType) && a.BalanceAmount != 0))
+            {
+                var owed = Math.Abs(a.BalanceAmount);
+                _rows.Add(new Row { Name = a.Name, Balance = owed, Minimum = Math.Max(25m, Math.Round(owed * 0.02m, 0)) });
+            }
         }
-
-        _loading = false;
+        catch (Exception ex)
+        {
+            // The planner still works with hand-entered debts; say why the pre-fill is missing.
+            Snackbar.AddFailure(ex, "Couldn't pre-fill debts from your accounts");
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private void AddRow() => _rows.Add(new Row { Name = "New debt" });
@@ -105,7 +114,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 }

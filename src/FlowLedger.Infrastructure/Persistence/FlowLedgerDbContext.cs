@@ -13,7 +13,8 @@ namespace FlowLedger.Infrastructure.Persistence;
 ///
 /// Multi-tenancy (PLAN §13): every aggregate root receives a global query filter keyed off
 /// <see cref="ITenantContext.TenantId"/>. All queries are automatically scoped to the
-/// current tenant. Tests may inject a <c>null</c> tenant context to disable the filter.
+/// current tenant. A tenant context is mandatory; admin, design-time and restore-drill code
+/// passes <see cref="UnscopedTenantContext.Instance"/> explicitly to opt out of the filter.
 ///
 /// Domain events (PLAN §9): on <see cref="SaveChangesAsync"/> all uncommitted domain events
 /// are collected from tracked aggregate roots, then dispatched after the database transaction
@@ -21,10 +22,17 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// </summary>
 public sealed class FlowLedgerDbContext : DbContext
 {
-    private readonly ITenantContext? _tenantContext;
+    private readonly ITenantContext _tenantContext;
 
-    /// <summary>The tenant this context is scoped to (null at design time / in tenant-free contexts).</summary>
-    internal Guid? CurrentTenantId => _tenantContext?.TenantId;
+    /// <summary>True for the explicit admin/design-time scope (<see cref="UnscopedTenantContext"/>).</summary>
+    internal bool IsUnscoped => _tenantContext is UnscopedTenantContext;
+
+    /// <summary>The tenant this context is scoped to; null only for an explicitly unscoped context.</summary>
+    internal Guid? CurrentTenantId => IsUnscoped ? null : _tenantContext.TenantId;
+
+    // Read by the query filters at query time (EF parameterises context members), so the
+    // cached model is identical for every context and never depends on who built it first.
+    private Guid FilterTenantGuid => IsUnscoped ? Guid.Empty : _tenantContext.TenantId;
     private readonly IDomainEventDispatcher _eventDispatcher;
 
     // ── DbSets ────────────────────────────────────────────────────────────────
@@ -40,6 +48,21 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<SavedReportRecord> SavedReports => Set<SavedReportRecord>();
     internal DbSet<SheetBillRecord> SheetBills => Set<SheetBillRecord>();
     internal DbSet<SheetPaymentRecord> SheetPayments => Set<SheetPaymentRecord>();
+    internal DbSet<RecurringDismissalRecord> RecurringDismissals => Set<RecurringDismissalRecord>();
+    internal DbSet<SuspiciousDismissalRecord> SuspiciousDismissals => Set<SuspiciousDismissalRecord>();
+    internal DbSet<AccountRateRecord> AccountRates => Set<AccountRateRecord>();
+    internal DbSet<BudgetRecord> Budgets => Set<BudgetRecord>();
+    internal DbSet<GoalRecord> Goals => Set<GoalRecord>();
+    internal DbSet<CategoryRuleRecord> CategoryRules => Set<CategoryRuleRecord>();
+    internal DbSet<MerchantAliasRecord> MerchantAliases => Set<MerchantAliasRecord>();
+    internal DbSet<DuplicateDismissalRecord> DuplicateDismissals => Set<DuplicateDismissalRecord>();
+    internal DbSet<MergedTransactionRecord> MergedTransactions => Set<MergedTransactionRecord>();
+    internal DbSet<IntegrationDeliveryRecord> IntegrationDeliveries => Set<IntegrationDeliveryRecord>();
+    internal DbSet<IntegrationRecord> Integrations => Set<IntegrationRecord>();
+    internal DbSet<HomeAssistantSentRecord> HomeAssistantSent => Set<HomeAssistantSentRecord>();
+    internal DbSet<HomeAssistantSettingsRecord> HomeAssistantSettings => Set<HomeAssistantSettingsRecord>();
+    internal DbSet<ProviderAccountRecord> ProviderAccounts => Set<ProviderAccountRecord>();
+    internal DbSet<AccountConnectorLinkRecord> AccountConnectorLinks => Set<AccountConnectorLinkRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -49,11 +72,11 @@ public sealed class FlowLedgerDbContext : DbContext
     public FlowLedgerDbContext(
         DbContextOptions<FlowLedgerDbContext> options,
         IDomainEventDispatcher eventDispatcher,
-        ITenantContext? tenantContext = null)
+        ITenantContext tenantContext)
         : base(options)
     {
         _eventDispatcher = eventDispatcher;
-        _tenantContext = tenantContext;
+        _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
     // ── Model building ───────────────────────────────────────────────────────
@@ -74,50 +97,77 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SavedReportRecordConfiguration());
         modelBuilder.ApplyConfiguration(new SheetBillRecordConfiguration());
         modelBuilder.ApplyConfiguration(new SheetPaymentRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new RecurringDismissalRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SuspiciousDismissalRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AccountRateRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new BudgetRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new GoalRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new CategoryRuleRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new MerchantAliasRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AccountConnectorLinkRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ProviderAccountRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new HomeAssistantSettingsRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new HomeAssistantSentRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new IntegrationRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new IntegrationDeliveryRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new MergedTransactionRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new DuplicateDismissalRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
-        // If _tenantContext is null (design-time or test override), filters are
-        // omitted so migrations and cross-tenant admin queries can work.
-        if (_tenantContext is not null)
-        {
-            // The filter expression is stored as an expression tree. EF Core evaluates
-            // it against the current context instance on each query. Closing over
-            // _tenantContext (an instance field) ensures the correct tenant ID is used
-            // per context — provided service provider caching is disabled so each
-            // context builds its own model (see AddInfrastructure / test fixture).
-            modelBuilder.Entity<Account>()
-                .HasQueryFilter(a => EF.Property<TenantId>(a, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Transaction>()
-                .HasQueryFilter(t => EF.Property<TenantId>(t, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<RecurringFlow>()
-                .HasQueryFilter(rf => EF.Property<TenantId>(rf, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Category>()
-                .HasQueryFilter(c => EF.Property<TenantId>(c, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Asset>()
-                .HasQueryFilter(a => EF.Property<TenantId>(a, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<SyncCursorRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<ProviderConnectionRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<AccountBalanceSnapshotRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SavedReportRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SheetBillRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SheetPaymentRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-        }
+        // Always built (never conditional on the tenant context). The tenant is read from the
+        // context instance at query time, and an explicitly unscoped context bypasses the filter.
+        modelBuilder.Entity<Account>()
+            .HasQueryFilter(a => IsUnscoped || EF.Property<TenantId>(a, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Transaction>()
+            .HasQueryFilter(t => IsUnscoped || EF.Property<TenantId>(t, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<RecurringFlow>()
+            .HasQueryFilter(rf => IsUnscoped || EF.Property<TenantId>(rf, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Category>()
+            .HasQueryFilter(c => IsUnscoped || EF.Property<TenantId>(c, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Asset>()
+            .HasQueryFilter(a => IsUnscoped || EF.Property<TenantId>(a, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<SyncCursorRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<ProviderConnectionRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<AccountBalanceSnapshotRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SavedReportRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SheetBillRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SheetPaymentRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<RecurringDismissalRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SuspiciousDismissalRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<AccountRateRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<BudgetRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<GoalRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<CategoryRuleRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<MerchantAliasRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<AccountConnectorLinkRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<ProviderAccountRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<HomeAssistantSettingsRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<HomeAssistantSentRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<IntegrationRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<IntegrationDeliveryRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<MergedTransactionRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<DuplicateDismissalRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 
     // ── SaveChanges ──────────────────────────────────────────────────────────
@@ -125,10 +175,16 @@ public sealed class FlowLedgerDbContext : DbContext
     /// <inheritdoc/>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        StampTenantId();
-        var events = CollectDomainEvents();
+        ValidateTenantBoundaries();
+        var (events, aggregates) = CollectDomainEvents();
 
         var result = await base.SaveChangesAsync(cancellationToken);
+
+        // Only a committed save consumes the events; if it threw they stay on the aggregates (#92).
+        foreach (var aggregate in aggregates)
+        {
+            aggregate.ClearDomainEvents();
+        }
 
         // Dispatch after successful persistence so handlers see committed state.
         if (events.Count > 0)
@@ -139,70 +195,58 @@ public sealed class FlowLedgerDbContext : DbContext
         return result;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Synchronous saves are not supported: domain events are dispatched asynchronously after commit, and blocking on that
+    /// (sync-over-async) can deadlock or swallow handler failures (#116, #92). Use <see cref="SaveChangesAsync"/>.
+    /// </summary>
     public override int SaveChanges()
-    {
-        StampTenantId();
-        var events = CollectDomainEvents();
-
-        var result = base.SaveChanges();
-
-        // Fire-and-forget dispatch on sync path (sync callers should prefer async).
-        if (events.Count > 0)
-        {
-            _eventDispatcher.DispatchAsync(events).GetAwaiter().GetResult();
-        }
-
-        return result;
-    }
+        => throw new NotSupportedException("Use SaveChangesAsync: synchronous SaveChanges would block on asynchronous domain event dispatch.");
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Validates that all mutations stay within the current tenant boundary.
-    /// TenantId is always set by the domain aggregate factories — this method guards
-    /// against accidental cross-tenant writes (e.g., a bug passing the wrong aggregate).
+    /// Validates that every tracked write stays inside the current tenant. Model-driven (#172): it checks every entity type that
+    /// has a TenantId property (aggregates and persistence records alike), so a newly added tenant-owned type is covered
+    /// without remembering to list it here.
     /// </summary>
-    private void StampTenantId()
+    private void ValidateTenantBoundaries()
     {
-        if (_tenantContext is null)
+        if (IsUnscoped)
         {
             return;
         }
 
-        var tid = _tenantContext.TenantId; // Guid from ITenantContext
-
-        ValidateTenantBoundary(ChangeTracker.Entries<Account>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Transaction>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<RecurringFlow>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Category>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Asset>(), tid);
-    }
-
-    private static void ValidateTenantBoundary<T>(
-        IEnumerable<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T>> entries,
-        Guid currentTenantId)
-        where T : class
-    {
-        foreach (var entry in entries)
+        var current = _tenantContext.TenantId;
+        foreach (var entry in ChangeTracker.Entries())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
                 continue;
             }
 
-            var tenantProp = entry.Property("TenantId");
-            if (tenantProp.CurrentValue is TenantId storedId && storedId.Value != currentTenantId)
+            if (entry.Metadata.FindProperty("TenantId") is null)
+            {
+                continue;
+            }
+
+            var owner = entry.Property("TenantId").CurrentValue switch
+            {
+                TenantId strong => strong.Value,
+                Guid raw => raw,
+                _ => (Guid?)null,
+            };
+
+            if (owner is { } ownerId && ownerId != current)
             {
                 throw new InvalidOperationException(
-                    $"Cross-tenant mutation attempt: current tenant {currentTenantId} tried to modify " +
-                    $"entity of type {typeof(T).Name} owned by tenant {storedId.Value}.");
+                    $"Cross-tenant mutation attempt: current tenant {current} tried to modify " +
+                    $"entity of type {entry.Metadata.ClrType.Name} owned by tenant {ownerId}.");
             }
         }
     }
 
-    /// <summary>Collects all uncommitted domain events from tracked aggregate roots and clears them.</summary>
-    private List<IDomainEvent> CollectDomainEvents()
+    /// <summary>Collects (without clearing) all uncommitted domain events from tracked aggregate roots.</summary>
+    private (List<IDomainEvent> Events, List<IAggregateRoot> Aggregates) CollectDomainEvents()
     {
         var aggregates = ChangeTracker.Entries<IAggregateRoot>()
             .Where(e => e.Entity.DomainEvents.Count > 0)
@@ -213,11 +257,6 @@ public sealed class FlowLedgerDbContext : DbContext
             .SelectMany(a => a.DomainEvents)
             .ToList();
 
-        foreach (var aggregate in aggregates)
-        {
-            aggregate.ClearDomainEvents();
-        }
-
-        return events;
+        return (events, aggregates);
     }
 }

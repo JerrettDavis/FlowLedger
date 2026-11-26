@@ -5,9 +5,10 @@ using FlowLedger.Integrations.Abstractions;
 namespace FlowLedger.Integrations.Quiltt;
 
 /// <summary>
-/// Verifies the <c>Quiltt-Signature</c> header: <c>t=&lt;unix seconds&gt;,v1=&lt;hex HMAC-SHA256&gt;</c> over <c>"{t}.{rawBody}"</c>,
-/// keyed by the webhook secret, constant-time compared, with a timestamp tolerance against replay.
-/// The exact header format is isolated here so it can be adjusted against the Quiltt sandbox in one place.
+/// Verifies a Quiltt webhook per https://www.quiltt.dev/webhooks: <c>Quiltt-Signature</c> is the Base64 HMAC-SHA256 of
+/// <c>"1" + Quiltt-Timestamp + rawBody</c> (no separators), keyed by the subscription secret, constant-time compared, with a
+/// timestamp tolerance against replay. The provider interface carries one header string, so the endpoint passes the two Quiltt
+/// headers as <c>t=&lt;Quiltt-Timestamp&gt;,v1=&lt;Quiltt-Signature&gt;</c>.
 /// </summary>
 internal sealed class QuilttWebhookVerifier
 {
@@ -61,7 +62,7 @@ internal sealed class QuilttWebhookVerifier
         var expected = Encoding.UTF8.GetBytes(Sign(t, rawBody));
         foreach (var candidate in v1)
         {
-            var presented = Encoding.UTF8.GetBytes(candidate.ToLowerInvariant());
+            var presented = Encoding.UTF8.GetBytes(candidate);
             if (presented.Length == expected.Length && CryptographicOperations.FixedTimeEquals(presented, expected))
             {
                 return;
@@ -73,10 +74,10 @@ internal sealed class QuilttWebhookVerifier
 
     public string Sign(string timestamp, ReadOnlySpan<byte> rawBody)
     {
-        var prefix = Encoding.UTF8.GetBytes(timestamp + ".");
+        var prefix = Encoding.UTF8.GetBytes("1" + timestamp);
         var payload = new byte[prefix.Length + rawBody.Length];
         prefix.CopyTo(payload, 0);
         rawBody.CopyTo(payload.AsSpan(prefix.Length));
-        return Convert.ToHexString(HMACSHA256.HashData(_secret, payload)).ToLowerInvariant();
+        return Convert.ToBase64String(HMACSHA256.HashData(_secret, payload));
     }
 }

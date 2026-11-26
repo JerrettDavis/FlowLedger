@@ -46,16 +46,20 @@ public sealed class CreateTransactionHandler
 {
     private readonly ITransactionRepository _repo;
     private readonly ITenantContext _tenant;
+    private readonly IReferenceValidator _references;
 
-    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant)
+    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant, IReferenceValidator references)
     {
         _repo = repo;
         _tenant = tenant;
+        _references = references;
     }
 
     public async Task<TransactionDto> HandleAsync(CreateTransactionRequest request, CancellationToken ct = default)
     {
         await TransactionQuota.EnsureRoomAsync(_repo, 1, ct);
+        await _references.EnsureAccountAsync(request.AccountId, ct);
+        await _references.EnsureCategoryAsync(request.CategoryId, ct);
         var direction = Enum.Parse<TransactionDirection>(request.Direction, ignoreCase: true);
         var currency = new Currency(request.Currency.ToUpperInvariant());
         var amount = new Money(request.Amount, currency);

@@ -24,6 +24,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
     private QuilttSession? _session;
     private Task<IReadOnlyList<QAccount>>? _accounts;
+    private Task<IReadOnlyList<QConnectionNode>>? _connections;
     private (DateOnly From, Task<IReadOnlyList<QTransaction>> Task)? _transactions;
     private readonly Dictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
@@ -46,7 +47,8 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         | ProviderCapabilities.IncrementalTransactions
         | ProviderCapabilities.FullTransactionHistory
         | ProviderCapabilities.WebhookVerification
-        | ProviderCapabilities.WebhookParsing;
+        | ProviderCapabilities.WebhookParsing
+        | ProviderCapabilities.ConnectionHealth;
 
     /// <summary>The public Connector id the browser opens (not a secret).</summary>
     public string? ConnectorId => _options.ConnectorId;
@@ -71,26 +73,19 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         return new ProviderMemberRef(session.ProfileId, "Quiltt", ConnectionStatus.ConnectionPending);
     }
 
-    public async Task<ConnectionStatus> GetConnectionStatusAsync(string memberProviderId, CancellationToken cancellationToken = default)
+    public async Task<ConnectionStatus> GetConnectionStatusAsync(string memberProviderId, CancellationToken cancellationToken = default) =>
+        (await GetConnectionHealthAsync(memberProviderId, cancellationToken).ConfigureAwait(false)).Status;
+
+    /// <summary>
+    /// Reads every Quiltt Connection of the profile and folds them into one health: the worst classified issue wins (see
+    /// <see cref="QuilttIssueMapper.Aggregate"/>). The issue's <c>ProviderCode</c> carries the Quiltt connection id for reconnect
+    /// (<see cref="QuilttProviderCode.TryGetConnectionId"/>). Transport/HTTP failures throw typed provider exceptions.
+    /// </summary>
+    public async Task<ConnectionHealth> GetConnectionHealthAsync(string memberProviderId, CancellationToken cancellationToken = default)
     {
-        var accounts = await GetAccountsCoreAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
-        if (accounts.Count == 0)
-        {
-            return ConnectionStatus.ConnectionPending;
-        }
-
-        var statuses = accounts.Select(a => a.Connection?.Status?.ToUpperInvariant()).ToList();
-        if (statuses.Any(s => s is "ERROR_REPAIRABLE" or "ERROR_REAUTH" or "REAUTH_REQUIRED" or "ERROR_INSTITUTION" or "NEEDS_ATTENTION"))
-        {
-            return ConnectionStatus.NeedsUserAction;
-        }
-
-        if (statuses.Any(s => s is "SYNCING" or "INITIALIZING"))
-        {
-            return ConnectionStatus.Syncing;
-        }
-
-        return statuses.Any(s => s is "ERROR" or "ERROR_PROVIDER") ? ConnectionStatus.Degraded : ConnectionStatus.Healthy;
+        var session = await EnsureSessionAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
+        var connections = await (_connections ??= _client.ListConnectionsAsync(session.Token, cancellationToken)).ConfigureAwait(false);
+        return QuilttIssueMapper.Aggregate([.. connections.Select(c => (c.Id, c.Status))]);
     }
 
     // ── Accounts ─────────────────────────────────────────────────────────────
@@ -107,17 +102,37 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         return mapped;
     }
 
-    private async Task<IReadOnlyList<QAccount>> GetAccountsCoreAsync(string profileId, CancellationToken ct)
+    private async Task<QuilttSession> EnsureSessionAsync(string profileId, CancellationToken ct)
     {
         if (_session is null || !string.Equals(_session.ProfileId, profileId, StringComparison.Ordinal))
         {
             _session = await _client.CreateSessionAsync(profileId, ct).ConfigureAwait(false);
             _accounts = null;
+            _connections = null;
             _transactions = null;
         }
 
-        var session = _session;
-        return await (_accounts ??= _client.ListAccountsAsync(session.Token, ct)).ConfigureAwait(false);
+        return _session;
+    }
+
+    private async Task<IReadOnlyList<QAccount>> GetAccountsCoreAsync(string profileId, CancellationToken ct)
+    {
+        var session = await EnsureSessionAsync(profileId, ct).ConfigureAwait(false);
+        var accounts = await (_accounts ??= _client.ListAccountsAsync(session.Token, ct)).ConfigureAwait(false);
+
+        // Reads keep working on stale data while a connection is broken; refuse to report a "successful" sync of nothing but
+        // broken connections so the shared layers record the issue instead of a false recovery.
+        var byConnection = accounts
+            .Where(a => a.Connection?.Id is not null)
+            .GroupBy(a => a.Connection!.Id!)
+            .Select(g => (Id: (string?)g.Key, Status: g.First().Connection!.Status))
+            .ToList();
+        if (QuilttIssueMapper.BlockingException(byConnection) is { } blocked)
+        {
+            throw blocked;
+        }
+
+        return accounts;
     }
 
     // ── Transactions ─────────────────────────────────────────────────────────
@@ -125,8 +140,9 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     public async Task<TransactionPage> GetTransactionsAsync(
         string providerAccountId, SyncCursor cursor, int pageSize = 100, CancellationToken cancellationToken = default)
     {
-        var session = _session ?? throw new NeedsUserActionProviderException(
-            "Quiltt accounts must be read before transactions.", "Run a sync from the start.");
+        var session = _session ?? throw new FatalProviderException(
+            "Quiltt accounts must be read before transactions.", "SEQUENCE")
+        { Kind = ProviderIssueKind.Internal };
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = cursor.IsInitial || !DateOnly.TryParse(cursor.Value, out var c)
@@ -141,8 +157,19 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
         var all = await _transactions.Value.Task.ConfigureAwait(false);
         var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId, "USD");
-        var items = all
+        var forAccount = all
             .Where(t => string.Equals(t.Account?.Id, providerAccountId, StringComparison.Ordinal))
+            .ToList();
+
+        // PROJECTED rows are forecast items, not ledger entries; rows without a date cannot be placed on the ledger.
+        var ingestible = forAccount.Where(QuilttMapper.IsIngestible).ToList();
+        var skipped = forAccount.Count - ingestible.Count;
+        foreach (var bad in forAccount.Except(ingestible))
+        {
+            _logger.LogWarning("Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.", bad.Id);
+        }
+
+        var items = ingestible
             .Select(t => QuilttMapper.ToTransaction(t, fallback))
             .Where(t => t.PostedDate >= from)
             .OrderBy(t => t.PostedDate)
@@ -151,7 +178,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
         var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
         _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
-        return new TransactionPage(items, next, HasMore: false);
+        return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
 
     // ── Webhooks ─────────────────────────────────────────────────────────────
@@ -216,6 +243,17 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             throw new FatalProviderException("Quiltt webhook payload is not valid JSON.", inner: ex);
         }
     }
+
+    /// <summary>
+    /// Whether a webhook event type means new bank data is available. Quiltt recommends prefix matching
+    /// (subscribing to <c>connection.synced.successful</c> also delivers its <c>.initial</c>/<c>.historical</c> children).
+    /// Events such as <c>profile.created</c> carry no data, so they must not trigger a sync.
+    /// </summary>
+    public static bool IsSyncTrigger(string? eventType) =>
+        eventType is not null
+        && (eventType.StartsWith("connection.synced.successful", StringComparison.OrdinalIgnoreCase)
+            || eventType.Equals("connection.created", StringComparison.OrdinalIgnoreCase)
+            || eventType.Equals("account.verified", StringComparison.OrdinalIgnoreCase));
 
     private static JsonElement? Obj(JsonElement? e, string name) =>
         e is { ValueKind: JsonValueKind.Object } o && o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;

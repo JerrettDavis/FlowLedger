@@ -22,10 +22,25 @@ after a mapping bug — is unacceptable.
 5. The archive directory is pinned to a persistent path (AppHost: `~/.flowledger/objects`; compose:
    `objects_data` volume) and `eng/scripts/backup.ps1` backs up DB + archive together.
 
+## Amendment: deletion exception (tenant offboarding)
+"Keep everything" applies to routine operation. When a tenant is offboarded or a data-subject deletion is
+requested, the tenant's archive objects and rows MUST be removable by an explicit operator action; the
+procedure and the current implementation gap are documented in
+`docs/privacy/data-inventory-and-retention.md`. Backups age out under the restic retention window, or are
+crypto-shredded by destroying the repository password.
+
 ## Consequences
 - Disk grows without bound; acceptable for a personal-scale deployment. Secrets/PII live in the
   archive: protect the directory like the database.
 - Unverified (bad-signature) webhooks are not archived, to avoid disk-fill by anonymous callers.
+
+## Amendment: deletion exception (2026-11-26)
+"Keep everything" is the default, not an absolute. A tenant's right to have their data deleted overrides it: when a tenant
+offboarding path exists it must remove that tenant's archive objects, and existing backups must expire on a stated schedule
+(or be crypto-shredded). **That path is not built yet**; until it is, nothing deletes archive objects and the archive layout
+(`raw/{provider}/{yyyy}/{MM}/{dd}/...`) is not per tenant, so per-tenant deletion would need a layout or encryption change.
+Decision 2 above ("nothing in the codebase deletes or overwrites archive objects") remains true of the code today. See
+[data inventory and retention](../privacy/data-inventory-and-retention.md).
 
 ## Follow-ups
 - DONE: `MxArchiveReplayHandler` serves archived responses (by method+path+query, newest wins) through the real client/mapper; wiring it as the HttpClient handler gives a zero-cost re-ingest. Selected via `Mx:Provider:ReplayArchivePath`. Verified live: 910 sandbox transactions replayed into a fresh tenant with MX unreachable.

@@ -177,8 +177,18 @@ public sealed class ForecastEngine : IForecastEngine
             goalOutcomes.Add(outcome);
         }
 
+        var warnings = new List<string>();
+        var distinctCurrencies = accountSeries.Select(s => s.StartingBalance.Currency.Code).Distinct().OrderBy(c => c).ToList();
+        if (distinctCurrencies.Count > 1)
+        {
+            warnings.Add(
+                $"Accounts use multiple currencies ({string.Join(", ", distinctCurrencies)}). FlowLedger does not convert currencies, " +
+                "so each account is forecast separately and no combined (aggregate) series, range or low-water mark is produced.");
+        }
+
         return new ForecastResult
         {
+            Warnings = warnings,
             ForecastRunId = Guid.NewGuid(),
             AsOf = request.AsOf,
             Horizon = request.Horizon,
@@ -209,8 +219,10 @@ public sealed class ForecastEngine : IForecastEngine
 
         // ── 1. Actual transactions (already realized) ─────────────────────────
         // Only include transactions with statuses that are "real" (not planned).
-        // Actuals within the horizon are included regardless of asOf; they represent
-        // already-settled reality the starting balance may not yet reflect.
+        // The starting balance is the account balance as of asOf, so anything already settled on or before
+        // asOf is inside it and must not be applied again. Pending items are not yet in the settled balance, so
+        // they are applied (a pending item dated before the horizon lands on its first day); anything dated
+        // after asOf has not yet been reflected either.
         foreach (var tx in actuals)
         {
             if (tx.Status is TransactionStatus.Planned or TransactionStatus.Skipped
@@ -219,13 +231,20 @@ public sealed class ForecastEngine : IForecastEngine
                 continue;
             }
 
-            if (tx.EffectiveDate < horizon.Start || tx.EffectiveDate > horizonEnd)
+            var isPending = tx.Status == TransactionStatus.Pending;
+            if (!isPending && tx.EffectiveDate <= asOf)
+            {
+                continue; // already reflected in the starting balance
+            }
+
+            if (tx.EffectiveDate > horizonEnd || (tx.EffectiveDate < horizon.Start && !isPending))
             {
                 continue;
             }
 
             var delta = SignedDelta(tx.Amount, tx.Direction);
-            events.Add((tx.EffectiveDate, new ForecastLineItem
+            var eventDate = tx.EffectiveDate < horizon.Start ? horizon.Start : tx.EffectiveDate;
+            events.Add((eventDate, new ForecastLineItem
             {
                 Source = ForecastItemSource.ActualTransaction,
                 SourceId = tx.TransactionId.Value,
@@ -453,10 +472,7 @@ public sealed class ForecastEngine : IForecastEngine
         decimal? requiredMonthly = null;
         if (goal.TargetDate.HasValue && goal.TargetDate.Value > asOf)
         {
-            var monthsLeft = MonthsBetween(asOf, goal.TargetDate.Value);
-            requiredMonthly = monthsLeft > 0
-                ? Math.Round(remaining.Amount / monthsLeft, 2)
-                : null;
+            requiredMonthly = Goals.GoalMath.MonthlyNeeded(remaining.Amount, goal.TargetDate, asOf);
         }
 
         // Find earliest date where the projected account balance exceeds remaining amount
@@ -464,14 +480,21 @@ public sealed class ForecastEngine : IForecastEngine
         DateOnly? affordableBy = null;
         if (linkedSeries is not null)
         {
-            // Walk the series; find first point where balance >= remaining
-            var runningBalance = linkedSeries.StartingBalance;
-            foreach (var point in linkedSeries.Points)
+            if (linkedSeries.StartingBalance >= remaining)
             {
-                if (point.Balance >= remaining)
+                // The linked account already covers the goal as of asOf, with or without any scheduled events.
+                affordableBy = asOf;
+            }
+            else
+            {
+                // Walk the series; find first point where balance >= remaining
+                foreach (var point in linkedSeries.Points)
                 {
-                    affordableBy = point.Date;
-                    break;
+                    if (point.Balance >= remaining)
+                    {
+                        affordableBy = point.Date;
+                        break;
+                    }
                 }
             }
         }
@@ -496,12 +519,4 @@ public sealed class ForecastEngine : IForecastEngine
     /// </summary>
     private static Money SignedDelta(Money amount, TransactionDirection direction) =>
         direction == TransactionDirection.Credit ? amount : amount.Negate();
-
-    private static decimal MonthsBetween(DateOnly from, DateOnly to)
-    {
-        var months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
-        // Add fractional month from day difference
-        var dayFraction = (to.Day - from.Day) / 30m;
-        return Math.Max(0m, months + dayFraction);
-    }
 }

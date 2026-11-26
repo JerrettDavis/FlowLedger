@@ -26,4 +26,10 @@ public enum ProviderCapabilities
 
     /// <summary>Provider supports injected fault simulation (test doubles only).</summary>
     FaultSimulation = 1 << 5,
+
+    /// <summary>
+    /// <see cref="IFinancialDataProvider.GetConnectionHealthAsync"/> reports real per-connection state (not just a derived status), so the
+    /// sync records it after every run. Opt-in because the call may cost an extra (possibly billable) provider request.
+    /// </summary>
+    ConnectionHealth = 1 << 6,
 }

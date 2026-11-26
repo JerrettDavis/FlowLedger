@@ -1,4 +1,6 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Sync;
+using FlowLedger.Integrations.Abstractions;
 using Quartz;
 
 namespace FlowLedger.Api.Jobs;
@@ -26,6 +28,9 @@ public sealed class OnDemandSyncJob : IJob
     /// <summary>JobDataMap key carrying the MX member id that triggered the webhook.</summary>
     public const string MemberIdKey = "memberId";
 
+    /// <summary>JobDataMap key carrying the owning tenant id resolved by the webhook endpoint (#150). Required.</summary>
+    public const string TenantIdKey = "tenantId";
+
     /// <summary>JobDataMap key carrying the MX webhook event type (e.g. "MEMBER_STATUS_UPDATED").</summary>
     public const string EventTypeKey = "eventType";
 
@@ -48,7 +53,25 @@ public sealed class OnDemandSyncJob : IJob
             "OnDemandSyncJob: starting webhook-triggered sync (memberId={MemberId}, eventType={EventType}).",
             memberId, eventType);
 
+        // The webhook endpoint resolved the owning tenant from the verified member id. Never fall back to the
+        // household tenant: without a tenant there is nothing safe to sync.
+        if (!data.ContainsKey(TenantIdKey) || !Guid.TryParse(data.GetString(TenantIdKey), out var tenantId))
+        {
+            _logger.LogWarning("OnDemandSyncJob: no tenant in the job data; refusing to sync (memberId={MemberId}).", memberId);
+            return;
+        }
+
         await using var scope = _services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<FlowLedger.Api.Tenancy.TenantOverride>().Use(tenantId);
+        // ADR 0018: honour any back-off window shared with the scheduler. A webhook is itself evidence that a connection waiting
+        // for the user (or given up on) may have changed, so those states get one attempt (SyncTrigger.ProviderEvent).
+        var gate = scope.ServiceProvider.GetService<SyncAttemptGate>();
+        if (gate is not null && await gate.CheckAsync(SyncTrigger.ProviderEvent, cancellationToken) is { Allowed: false, Blocking: { } blocked })
+        {
+            _logger.LogInformation("OnDemandSyncJob: skipped — {Reason}", blocked.Reason);
+            return;
+        }
+
         var syncService = scope.ServiceProvider.GetRequiredService<IFinancialSyncService>();
 
         try
@@ -60,11 +83,58 @@ public sealed class OnDemandSyncJob : IJob
                 "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.",
                 result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
         }
+        catch (SyncThrottledException ex)
+        {
+            // Not a failure: the minimum-interval guard refused the call. Run once more when the window ends (coalesced).
+            _logger.LogInformation("OnDemandSyncJob: throttled; deferring one sync by {Delay}.", ex.RetryAfter);
+            await DeferAsync(context.Scheduler, tenantId, memberId, eventType, ex.RetryAfter, cancellationToken);
+        }
+        catch (SyncAlreadyRunningException)
+        {
+            _logger.LogInformation("OnDemandSyncJob: a sync is already running; deferring one more run.");
+            await DeferAsync(context.Scheduler, tenantId, memberId, eventType, TimeSpan.FromMinutes(1), cancellationToken);
+        }
+        catch (ProviderException ex)
+        {
+            // Classified and persisted by the sync service; the shared retry policy decides when it is tried again.
+            _logger.LogWarning("OnDemandSyncJob: webhook-triggered sync failed ({Kind}): {Message}",
+                ProviderIssue.FromException(ex).Kind, ex.Message);
+        }
         catch (Exception ex)
         {
             // Swallow-and-log: a webhook-triggered sync failure must not crash the host;
             // the scheduled worker sync remains the durable backstop.
             _logger.LogError(ex, "OnDemandSyncJob: webhook-triggered sync faulted.");
         }
+    }
+
+    /// <summary>
+    /// Schedules at most ONE deferred run per tenant: later events inside the window coalesce into the pending trigger
+    /// (the sync fetches everything, so one run covers them all). Returns true when a new trigger was created.
+    /// </summary>
+    public static async Task<bool> DeferAsync(
+        IScheduler scheduler, Guid tenantId, string? memberId, string? eventType, TimeSpan delay, CancellationToken ct = default)
+    {
+        var key = new TriggerKey($"deferred-{tenantId:N}", "FlowLedger");
+        if (await scheduler.GetTrigger(key, ct) is not null)
+        {
+            return false;
+        }
+
+        var map = new JobDataMap
+        {
+            [TenantIdKey] = tenantId.ToString(),
+            [MemberIdKey] = memberId ?? string.Empty,
+            [EventTypeKey] = eventType ?? string.Empty,
+        };
+        // A dedicated, non-durable job per tenant: it disappears after it fires, and its identity makes the coalescing check trivial.
+        var job = JobBuilder.Create<OnDemandSyncJob>().WithIdentity($"deferred-{tenantId:N}", "FlowLedger").Build();
+        var trigger = TriggerBuilder.Create()
+            .WithIdentity(key)
+            .UsingJobData(map)
+            .StartAt(DateTimeOffset.UtcNow + (delay > TimeSpan.Zero ? delay : TimeSpan.FromSeconds(5)) + TimeSpan.FromSeconds(1))
+            .Build();
+        await scheduler.ScheduleJob(job, trigger, default(ScheduleJobOptions), ct);
+        return true;
     }
 }

@@ -1,16 +1,16 @@
 @page "/reports/{Id}"
-@rendermode InteractiveServer
 @using FlowLedger.Web.ApiClient
 @using FlowLedger.Web.Components.Shared
 @inject FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>@(_report?.Name ?? "Report") — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter">
     <div>
         <MudButton Href="reports" StartIcon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" Class="mb-1">All reports</MudButton>
-        <MudText Typo="Typo.h4">@(_report?.Name ?? "Report")</MudText>
+        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">@(_report?.Name ?? "Report")</MudText>
         @if (_report?.Description is { Length: > 0 } d)
         {
             <MudText Typo="Typo.body2" Color="Color.Secondary">@d</MudText>
@@ -132,6 +132,11 @@
             return;
         }
 
+        if (!await DialogService.ConfirmAsync("Remove panel", "Remove this panel from the report?", "Remove"))
+        {
+            return;
+        }
+
         var panels = _report.Panels.Where((_, i) => i != index).ToList();
         try
         {
@@ -141,7 +146,7 @@
         }
         catch (ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 }

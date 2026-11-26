@@ -94,6 +94,21 @@ public sealed class DataSafetyHardeningTests : IAsyncLifetime
         third.Should().NotBeNull("the lock is free again after dispose");
     }
 
+    [DockerFact]
+    public async Task AcquireAsync_waits_for_the_holder_and_times_out_otherwise()
+    {
+        var holder = await PostgresAdvisoryLock.TryAcquireAsync(_fixture.ConnectionString, "flowledger-migrate:test");
+        holder.Should().NotBeNull();
+
+        var blocked = () => PostgresAdvisoryLock.AcquireAsync(_fixture.ConnectionString, "flowledger-migrate:test", TimeSpan.FromMilliseconds(600));
+        await blocked.Should().ThrowAsync<TimeoutException>();
+
+        var waiter = PostgresAdvisoryLock.AcquireAsync(_fixture.ConnectionString, "flowledger-migrate:test", TimeSpan.FromSeconds(10));
+        await holder!.DisposeAsync();
+        await using var acquired = await waiter;
+        acquired.Should().NotBeNull();
+    }
+
     private sealed class CountingSync : IFinancialSyncService
     {
         public int Calls { get; private set; }

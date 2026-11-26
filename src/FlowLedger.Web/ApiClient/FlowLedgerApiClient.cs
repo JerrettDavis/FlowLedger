@@ -406,7 +406,10 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<AssetDto>(JsonOptions, ct);
         });
 
-    /// <summary>Throws an <see cref="ApiClientException"/> carrying the API's 400 problem detail when present.</summary>
+    /// <summary>
+    /// Throws an <see cref="ApiClientException"/> carrying the API's 400 problem detail when present, and the
+    /// connector-neutral issue extensions (<see cref="ProblemExtensions"/>) for any failed status.
+    /// </summary>
     private async Task ThrowIfFailedAsync(HttpResponseMessage response, string description, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
@@ -415,32 +418,43 @@ public sealed class FlowLedgerApiClient
         }
 
         _logger.LogError("Non-success status {StatusCode} during {Operation}", (int)response.StatusCode, description);
-        string? detail = null;
-        if (response.StatusCode == HttpStatusCode.BadRequest)
-        {
-            try
-            {
-                using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-                if (doc.RootElement.TryGetProperty("detail", out var d))
-                {
-                    detail = d.GetString();
-                }
-                else if (doc.RootElement.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Object)
-                {
-                    detail = string.Join(" ", errs.EnumerateObject().SelectMany(p => p.Value.EnumerateArray().Select(e => e.GetString())));
-                }
-            }
-            catch (JsonException)
-            {
-                // Fall through to the generic message.
-            }
-        }
-
+        var problem = await ReadProblemAsync(response, ct);
+        var detail = response.StatusCode == HttpStatusCode.BadRequest
+            ? problem.Detail ?? problem.ValidationMessage
+            : problem.Extensions is null ? null : problem.Detail; // issue problems carry a user-safe, secret-free detail
         throw new ApiClientException(
             detail is { Length: > 0 } ? detail : $"Couldn't {description} (server returned {(int)response.StatusCode}).",
-            response.StatusCode);
+            response.StatusCode,
+            problem: problem.Extensions);
     }
 
+    private static async Task<ProblemDocument> ReadProblemAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            return ProblemDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or ObjectDisposedException)
+        {
+            return ProblemDocument.Empty;
+        }
+    }
+
+    /// <summary>"Couldn't X (server returned N): reason", with the issue extensions attached for the UI.</summary>
+    private static async Task<ApiClientException> ProblemExceptionAsync(HttpResponseMessage response, string prefix, CancellationToken ct)
+    {
+        var problem = await ReadProblemAsync(response, ct);
+        var reason = problem.ValidationMessage ?? problem.Detail ?? problem.Title;
+        if (reason is { Length: > 200 })
+        {
+            reason = reason[..200];
+        }
+
+        return new ApiClientException(
+            $"{prefix} (server returned {(int)response.StatusCode}){(string.IsNullOrEmpty(reason) ? string.Empty : ": " + reason)}",
+            response.StatusCode,
+            problem: problem.Extensions);
+    }
     // Query & reports ----------------------------------------------------------
 
     public Task<QuerySchemaDto?> GetQuerySchemaAsync(CancellationToken ct = default)
@@ -761,13 +775,7 @@ public sealed class FlowLedgerApiClient
         return await ExecuteAsync("connect provider", async () =>
         {
             var response = await _http.PostAsync("/api/connect", null, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Non-success status {StatusCode} connecting provider", (int)response.StatusCode);
-                throw new ApiClientException(
-                    $"Couldn't connect provider (server returned {(int)response.StatusCode}).",
-                    response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "connect provider", ct);
 
             return await response.Content.ReadFromJsonAsync<ConnectResult>(JsonOptions, ct);
         });
@@ -778,13 +786,7 @@ public sealed class FlowLedgerApiClient
         return await ExecuteAsync("sync data", async () =>
         {
             var response = await _http.PostAsync("/api/sync", null, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Non-success status {StatusCode} syncing data", (int)response.StatusCode);
-                throw new ApiClientException(
-                    $"Couldn't sync data (server returned {(int)response.StatusCode}).",
-                    response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "sync data", ct);
 
             return await response.Content.ReadFromJsonAsync<SyncResult>(JsonOptions, ct);
         });
@@ -1545,55 +1547,11 @@ public sealed class FlowLedgerApiClient
             var response = await _http.PutAsJsonAsync($"/api/accounts/{accountId}/connector", request, JsonOptions, ct);
             if (!response.IsSuccessStatusCode)
             {
-                throw new ApiClientException(
-                    $"Couldn't change the data source (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
-                    response.StatusCode);
+                throw await ProblemExceptionAsync(response, "Couldn't change the data source", ct);
             }
 
             return true;
         });
-
-    /// <summary>
-    /// Short, user-safe reason from an RFC 7807 problem response (title or the first validation message), never the raw body.
-    /// Returns an empty string when there is nothing safe to show.
-    /// </summary>
-    private static async Task<string> ProblemSummaryAsync(HttpResponseMessage response, CancellationToken ct)
-    {
-        try
-        {
-            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            var root = doc.RootElement;
-            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
-            {
-                foreach (var field in errors.EnumerateObject())
-                {
-                    if (field.Value.ValueKind == JsonValueKind.Array && field.Value.GetArrayLength() > 0
-                        && field.Value[0].ValueKind == JsonValueKind.String)
-                    {
-                        return ": " + Trim(field.Value[0].GetString());
-                    }
-                }
-            }
-
-            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
-            {
-                return ": " + Trim(detail.GetString());
-            }
-
-            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
-            {
-                return ": " + Trim(title.GetString());
-            }
-        }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
-        {
-            // Not a problem document: show only the status code.
-        }
-
-        return string.Empty;
-
-        static string Trim(string? text) => text is { Length: > 200 } ? text[..200] : text ?? string.Empty;
-    }
 
     /// <summary>Removes an account's connector link.</summary>
     public async Task ClearAccountConnectorAsync(Guid accountId, CancellationToken ct = default) =>
@@ -1602,13 +1560,21 @@ public sealed class FlowLedgerApiClient
             var response = await _http.DeleteAsync($"/api/accounts/{accountId}/connector", ct);
             if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
             {
-                throw new ApiClientException(
-                    $"Couldn't clear the data source (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
-                    response.StatusCode);
+                throw await ProblemExceptionAsync(response, "Couldn't clear the data source", ct);
             }
 
             return true;
         });
+
+    /// <summary>The signed-in tenant's own connections and their health; empty on any failure (never blocks the shell).</summary>
+    public async Task<IReadOnlyList<MyConnectionDto>> GetMyConnectionsAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read connections", async () =>
+        {
+            var response = await _http.GetAsync("/api/integrations/connections", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<MyConnectionDto>>(JsonOptions, ct) ?? []
+                : [];
+        }) ?? [];
 
     /// <summary>Whether the in-app Quiltt Connector is enabled (false on any failure, so callers fall back to the old flow).</summary>
     public async Task<QuilttConfigDto> GetQuilttConfigAsync(CancellationToken ct = default) =>
@@ -1627,9 +1593,7 @@ public sealed class FlowLedgerApiClient
             var response = await _http.PostAsync("/api/integrations/quiltt/session", null, ct);
             if (!response.IsSuccessStatusCode)
             {
-                throw new ApiClientException(
-                    $"Couldn't start the bank connection (server returned {(int)response.StatusCode}){await ProblemSummaryAsync(response, ct)}",
-                    response.StatusCode);
+                throw await ProblemExceptionAsync(response, "Couldn't start the bank connection", ct);
             }
 
             return await response.Content.ReadFromJsonAsync<QuilttSessionDto>(JsonOptions, ct);

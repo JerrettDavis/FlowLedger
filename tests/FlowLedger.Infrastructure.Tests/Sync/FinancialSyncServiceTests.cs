@@ -1,9 +1,12 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
+using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Simulated;
+using FlowLedger.SharedKernel;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -17,6 +20,7 @@ namespace FlowLedger.Infrastructure.Tests.Sync;
 /// Postgres database (via Testcontainers). Tests skip cleanly when Docker is not available.
 /// </summary>
 [Collection("Integration")]
+[Trait("Invariant", "INV-02")]
 public sealed class FinancialSyncServiceTests : IAsyncLifetime
 {
     private readonly IntegrationTestFixture _fixture;
@@ -371,5 +375,45 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
                 HasWarning = true;
             }
         }
+    }
+
+    private sealed class MixedCurrencyProvider : IFinancialDataProvider
+    {
+        public string ProviderName => "Simulated";
+        public ProviderCapabilities Capabilities => ProviderCapabilities.Accounts;
+        public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default)
+            => Task.FromResult(new ProviderMemberRef("m", "Bank", ConnectionStatus.Connected));
+        public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default)
+            => Task.FromResult(ConnectionStatus.Connected);
+        public Task<IReadOnlyList<ProviderAccount>> GetAccountsAsync(string m, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ProviderAccount>>(
+                [new ProviderAccount("a1", "Checking", "CHECKING", new Money(100m, new Currency("USD")), null, "USD")]);
+        public Task<TransactionPage> GetTransactionsAsync(string a, SyncCursor c, int p = 100, CancellationToken ct = default)
+            => Task.FromResult(new TransactionPage(
+                [
+                    new ProviderTransaction("t1", a, new DateOnly(2026, 1, 5), false, new Money(-10m, new Currency("USD")), "Coffee", null, null),
+                    new ProviderTransaction("t2", a, new DateOnly(2026, 1, 6), false, new Money(-20m, new Currency("EUR")), "Cafe", null, null),
+                ],
+                new SyncCursor("done"), false));
+        public Task VerifyWebhookAsync(ReadOnlyMemory<byte> b, string s, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<ProviderWebhookEvent> ParseWebhookAsync(ReadOnlyMemory<byte> b, CancellationToken ct = default)
+            => throw new NotSupportedException();
+    }
+
+    [DockerFact]
+    public async Task SyncAsync_SkipsTransactionsInAnotherCurrencyThanTheAccount()
+    {
+        var tenant = TestTenantContext.New();
+        await using var db = _fixture.CreateDbContext(tenant);
+        var service = new FinancialSyncService(
+            new MixedCurrencyProvider(), db, tenant, new EfSyncCursorStore(db, tenant), NullLogger<FinancialSyncService>.Instance);
+
+        var result = await service.SyncAsync();
+
+        result.TransactionsAdded.Should().Be(1);
+        result.TransactionsSkipped.Should().Be(1);
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.Transactions.ToListAsync()).Should().ContainSingle()
+            .Which.Amount.Currency.Code.Should().Be("USD");
     }
 }

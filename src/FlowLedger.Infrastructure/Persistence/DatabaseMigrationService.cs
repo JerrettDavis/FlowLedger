@@ -19,6 +19,8 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// </summary>
 public sealed class DatabaseMigrationService : IHostedService
 {
+    /// <summary>Advisory-lock name shared by every process that may apply migrations.</summary>
+
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DatabaseMigrationService> _logger;
     private readonly IConfiguration _config;
@@ -33,15 +35,32 @@ public sealed class DatabaseMigrationService : IHostedService
         _config = config;
     }
 
+    /// <summary>Cross-process lock name: serialises concurrent starters (API replicas, rolling deploys) on one database.</summary>
+    public const string LockName = "flowledger:migration";
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Applying EF Core migrations (Development mode)...");
-
         await using var scope = _serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>();
 
         try
         {
+            // One migrator at a time: the snapshot-then-migrate sequence is not safe to interleave, and a second
+            // starter must see the finished schema rather than race it. The lock is session-scoped, so a crashed
+            // starter releases it automatically.
+            var conn = db.Database.GetConnectionString()
+                ?? throw new InvalidOperationException("No connection string available for migrations.");
+            var waitSeconds = int.TryParse(_config["Database:MigrationLockTimeoutSeconds"], out var w) && w > 0 ? w : 300;
+            await using var migrationLock = await PostgresAdvisoryLock.AcquireAsync(conn, LockName, TimeSpan.FromSeconds(waitSeconds), cancellationToken);
+
+            var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+            if (pending.Count == 0)
+            {
+                _logger.LogInformation("EF Core schema is up to date; nothing to migrate.");
+                return;
+            }
+
+            _logger.LogInformation("{Count} pending migration(s) to apply (last: {Last}).", pending.Count, pending[^1]);
             await SnapshotBeforeMigratingAsync(db, cancellationToken);
             await db.Database.MigrateAsync(cancellationToken);
             _logger.LogInformation("EF Core migrations applied successfully.");

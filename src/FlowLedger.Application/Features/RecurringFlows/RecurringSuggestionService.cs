@@ -49,8 +49,11 @@ public sealed class RecurringSuggestionService(
     IRecurringFlowRepository flows,
     ICategoryRepository categories,
     IRecurringDismissalStore dismissals,
-    CreateRecurringFlowHandler creator)
+    CreateRecurringFlowHandler creator,
+    TimeProvider? time = null)
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     public const double AutoAddConfidence = 0.9;
     private const int ScanLimit = 50_000;
 
@@ -89,7 +92,7 @@ public sealed class RecurringSuggestionService(
                 Discretionary: category is not null && IsDiscretionaryCategory(category)));
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
         var detected = RecurringFlowDetector.Detect(inputs, today);
         var dismissed = await dismissals.ListAsync(ct);
         var existing = (await flows.ListAsync(ct)).Where(f => f.IsActive).ToList();

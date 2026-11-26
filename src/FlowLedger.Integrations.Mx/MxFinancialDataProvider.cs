@@ -258,7 +258,11 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             throw new NeedsUserActionProviderException(
                 "No financial institution connected yet. Use Connect to add one.",
                 userHint: "Connect a bank account using the Connect button.",
-                providerCode: "NoMembers");
+                providerCode: "NoMembers")
+            {
+                // Nothing is wrong with a credential: the user simply has not linked an institution yet.
+                Kind = ProviderIssueKind.Disconnected,
+            };
         }
 
         var ready = members.FirstOrDefault(m => Classify(m) == MemberReadiness.Ready);
@@ -334,10 +338,14 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                 memberGuid, attempt, maxAttempts, current.ConnectionStatus, current.IsBeingAggregated);
         }
 
-        throw new NeedsUserActionProviderException(
+        // The member is healthy, just not finished aggregating. That is retryable, not a reason to ask the user to act.
+        throw new TransientProviderException(
             "Account is still connecting; data will appear shortly.",
-            userHint: "Your bank connection is in progress. Please try syncing again in a moment.",
-            providerCode: "StillAggregating");
+            retryAfter: TimeSpan.FromMinutes(1),
+            providerCode: "StillAggregating")
+        {
+            Kind = ProviderIssueKind.ProviderUnavailable,
+        };
     }
 
     [System.Diagnostics.CodeAnalysis.DoesNotReturn]
@@ -483,12 +491,34 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken, position.FromDate)
             .ConfigureAwait(false);
 
-        var items = (response.Transactions ?? [])
+        var mapped = (response.Transactions ?? [])
             .Select(t => MxMapper.ToProviderTransaction(t, _logger))
             .Select(t => t with { ProviderAccountId = providerAccountId })
             .ToList();
 
-        var hasMore = HasMorePages(response.Pagination, position.Page);
+        // A row with no parseable date maps to DateOnly.MinValue (year 0001); never persist that sentinel.
+        var items = mapped.Where(t => t.PostedDate != DateOnly.MinValue).ToList();
+        var skipped = mapped.Count - items.Count;
+        foreach (var bad in mapped.Where(t => t.PostedDate == DateOnly.MinValue))
+        {
+            _logger.LogWarning("Skipping MX transaction {ProviderTransactionId}: no usable date.", bad.ProviderId);
+        }
+
+        // Without pagination metadata a full page may be truncated: keep paging (a short page ends the pass) so the
+        // date watermark is only written once the pass really completed.
+        var hasMore = response.Pagination is null
+            ? (response.Transactions?.Count ?? 0) >= position.RecordsPerPage
+            : HasMorePages(response.Pagination, position.Page);
+
+        // Bound a runaway pass: stop here WITHOUT a watermark and resume from the next page on the next sync, so a
+        // truncated pass never moves the date watermark past unread history.
+        if (hasMore && position.Page >= Math.Max(1, _options.MaxPages))
+        {
+            _logger.LogWarning(
+                "GetTransactionsAsync: reached MaxPages limit ({MaxPages}); resuming on the next sync.",
+                _options.MaxPages);
+            return new TransactionPage(items, position.Next().Encode(), HasMore: false) { SkippedCount = skipped };
+        }
 
         // Mid-pass: advance to the next page (same date window) so a crash resumes here.
         // End of pass: persist a date WATERMARK (page 1, from = today - overlap), never "last page + 1".
@@ -499,7 +529,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                 position.RecordsPerPage,
                 DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-Math.Max(0, _options.IncrementalOverlapDays))).Encode();
 
-        return new TransactionPage(items, nextCursor, hasMore);
+        return new TransactionPage(items, nextCursor, hasMore) { SkippedCount = skipped };
     }
 
     // ── Webhooks ──────────────────────────────────────────────────────────────

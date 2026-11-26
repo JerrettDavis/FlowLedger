@@ -10,7 +10,7 @@ namespace FlowLedger.Web.Security;
 /// <item>CSP (outside Development: hot reload / the WASM debugger inject scripts): scripts only from self, plus
 ///   <c>'wasm-unsafe-eval'</c> for the WebAssembly runtime and a per-request nonce for the inline
 ///   <c>&lt;ImportMap&gt;</c>. MudBlazor sets inline styles, so <c>style-src</c> needs <c>'unsafe-inline'</c>;
-///   the Inter font comes from Google Fonts. <c>form-action</c> is deliberately NOT set: the OIDC sign-out POST
+///   the Inter font is self-hosted from wwwroot/fonts. <c>form-action</c> is deliberately NOT set: the OIDC sign-out POST
 ///   redirects to the identity provider, which Chrome would block.</item>
 /// </list>
 /// </summary>
@@ -24,8 +24,8 @@ public static class SecurityHeaders
     public static string BuildCsp(string nonce) => string.Join("; ",
         "default-src 'self'",
         $"script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' data: https://fonts.gstatic.com",
+        "style-src 'self' 'unsafe-inline'",
+        "font-src 'self' data:",
         "img-src 'self' data: blob:",
         "connect-src 'self'",
         "worker-src 'self' blob:",

@@ -100,8 +100,8 @@ public class TransactionsTests : E2ETestBase
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
-        // aria-label="Apply filters" on the Filter button from Transactions.razor
-        var filterBtn = Page!.GetByRole(AriaRole.Button, new() { Name = "Apply filters" });
+        // aria-label="Search transactions" on the search field from Transactions.razor
+        var filterBtn = Page!.GetByLabel("Search transactions");
         (await filterBtn.CountAsync()).Should().BeGreaterThan(0);
         (await filterBtn.IsVisibleAsync()).Should().BeTrue();
         AssertNoPageErrors();

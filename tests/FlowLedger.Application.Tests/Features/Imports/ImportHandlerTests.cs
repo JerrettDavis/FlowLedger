@@ -133,17 +133,58 @@ public sealed class ImportHandlerTests
     // ── Duplicate detection ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task Import_SameRowTwiceInFile_OnlyImportsOnce()
+    public async Task Import_IdenticalSameDayRows_AreBothImported_AndReimportIsIdempotent()
     {
         var (handler, txRepo, _, _, account) = BuildSut();
-        var csv = "Date,Amount,Description\n2024-01-10,-50.00,Grocery\n2024-01-10,-50.00,Grocery";
+        var csv = "Date,Amount,Description\n2024-01-10,-2.75,Transit\n2024-01-10,-2.75,Transit";
 
         var summary = await handler.HandleAsync(
             new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
 
+        summary.ImportedCount.Should().Be(2);
+        summary.DuplicateCount.Should().Be(0);
+        txRepo.All.Should().HaveCount(2);
+
+        var again = await handler.HandleAsync(
+            new ImportTransactionsCommand(account.Id, csv, DefaultMapping()));
+
+        again.ImportedCount.Should().Be(0);
+        again.DuplicateCount.Should().Be(2);
+        txRepo.All.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Import_OfxWithTwoIdenticalRowsAndDistinctFitids_ImportsTwoAndReimportsZero()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        var ofx = "OFXHEADER:100\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>\n"
+            + "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20240110<TRNAMT>-2.75<FITID>A1<NAME>Transit</STMTTRN>\n"
+            + "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20240110<TRNAMT>-2.75<FITID>A2<NAME>Transit</STMTTRN>\n"
+            + "</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
+        var normalized = ImportNormalizer.Normalize(ofx);
+
+        var first = await handler.HandleAsync(new ImportTransactionsCommand(account.Id, normalized.Csv, NormalizedImport.Mapping));
+        var second = await handler.HandleAsync(new ImportTransactionsCommand(account.Id, normalized.Csv, NormalizedImport.Mapping));
+
+        first.ImportedCount.Should().Be(2);
+        second.ImportedCount.Should().Be(0);
+        txRepo.All.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Import_ThreeIdenticalRowsOnTopOfExistingTwo_AddsOnlyTheSurplus()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        var two = "Date,Amount,Description\n2024-01-10,-2.75,Transit\n2024-01-10,-2.75,Transit";
+        var three = two + "\n2024-01-10,-2.75,Transit";
+
+        await handler.HandleAsync(new ImportTransactionsCommand(account.Id, two, DefaultMapping()));
+        var summary = await handler.HandleAsync(
+            new ImportTransactionsCommand(account.Id, three, DefaultMapping()));
+
         summary.ImportedCount.Should().Be(1);
-        summary.DuplicateCount.Should().Be(1);
-        txRepo.All.Should().HaveCount(1);
+        summary.DuplicateCount.Should().Be(2);
+        txRepo.All.Should().HaveCount(3);
     }
 
     [Fact]

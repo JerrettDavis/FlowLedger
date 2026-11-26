@@ -61,7 +61,7 @@ public class DashboardTests : E2ETestBase
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
         // NavMenu renders with aria-label="Main navigation menu" (NavMenu.razor)
-        var nav = Page!.GetByRole(AriaRole.Navigation, new() { Name = "Main navigation menu" });
+        var nav = Page!.GetByRole(AriaRole.Navigation, new() { Name = "Main navigation" });
         (await nav.CountAsync()).Should().BeGreaterThan(0);
         (await nav.IsVisibleAsync()).Should().BeTrue();
         AssertNoPageErrors();
@@ -124,7 +124,7 @@ public class DashboardTests : E2ETestBase
 
         // role="img" aria-label="Balance projection chart" only renders when _forecastSeries.Count > 0.
         // Wait up to 20 s for the chart — the forecast computation may run asynchronously.
-        var chart = Page!.GetByRole(AriaRole.Img, new() { Name = "Balance projection chart" });
+        var chart = Page!.GetByRole(AriaRole.Img, new() { Name = "Balance projection" });
 
         await chart.WaitForAsync(new LocatorWaitForOptions
         {

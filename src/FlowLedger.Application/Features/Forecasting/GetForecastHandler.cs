@@ -23,6 +23,8 @@ public sealed class GetForecastHandler
     private readonly IForecastEngine _engine;
     private readonly ITenantContext _tenant;
 
+    private const int PendingLookbackDays = 14;
+
     public GetForecastHandler(
         IAccountRepository accounts,
         IRecurringFlowRepository flows,
@@ -43,7 +45,8 @@ public sealed class GetForecastHandler
     {
         // ── Resolve horizon ───────────────────────────────────────────────────
 
-        DateOnly horizonStart = query.HorizonStart ?? query.AsOf;
+        // History belongs to a different view: the starting balance is as of AsOf, so never start earlier.
+        DateOnly horizonStart = query.HorizonStart is { } requested && requested > query.AsOf ? requested : query.AsOf;
         DateOnly horizonEnd = query.HorizonEnd
             ?? query.AsOf.AddMonths(query.Months ?? 3);
 
@@ -113,7 +116,8 @@ public sealed class GetForecastHandler
 
         // Load transactions from horizon start through horizon end; include actuals
         // that fall within the window.
-        var txList = await _transactions.ListForAccountsAsync(accountIds, horizonStart, horizonEnd, ct);
+        // A short look-back picks up pending items dated just before the horizon (not yet in the settled balance).
+        var txList = await _transactions.ListForAccountsAsync(accountIds, horizonStart.AddDays(-PendingLookbackDays), horizonEnd, ct);
 
         var actualInputs = txList
             .Select(t => new ForecastTransactionInput
@@ -147,8 +151,15 @@ public sealed class GetForecastHandler
 
         // Everyday spending the schedule does not cover: debits from the last ~26 weeks, minus transfers and anything an
         // active recurring flow already accounts for. Best-effort: a failure here must never break the deterministic forecast.
+        var mixedCurrencies = startingBalances.Values.Select(m => m.Currency).Distinct().Count() > 1;
         try
         {
+            if (mixedCurrencies)
+            {
+                // Bands add raw amounts across accounts, which is meaningless across currencies; the engine already warned.
+                return result;
+            }
+
             var historyFrom = query.AsOf.AddDays(-7 * ForecastBands.HistoryWeeks);
             var history = await _transactions.ListForAccountsAsync(accountIds, historyFrom, query.AsOf, ct);
             var dtos = history.Select(Transactions.TransactionMapper.ToDto).ToList();
@@ -182,7 +193,7 @@ public sealed class GetForecastHandler
             }
 
             var unscheduled = dtos
-                .Where(t => t.Direction == "Debit" && t.Status is not ("Planned" or "Skipped") && !transfers.Contains(t.Id) && !Scheduled(t))
+                .Where(t => t.Direction == "Debit" && FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) && !transfers.Contains(t.Id) && !Scheduled(t))
                 .Select(t => (t.PostedDate ?? t.EffectiveDate, t.Amount));
             var profile = ForecastBands.BuildProfile(unscheduled, query.AsOf);
             result.SpendingProfile = profile;

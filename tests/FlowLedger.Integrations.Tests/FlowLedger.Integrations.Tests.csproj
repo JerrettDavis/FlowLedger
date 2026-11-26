@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="FluentAssertions" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />
@@ -31,6 +35,7 @@
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Quiltt\FlowLedger.Integrations.Quiltt.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.SimpleFin\FlowLedger.Integrations.SimpleFin.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

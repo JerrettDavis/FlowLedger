@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace FlowLedger.Domain.Tests.ValueObjects;
 
+[Trait("Invariant", "INV-04")]
 public sealed class MoneyTests
 {
     private static readonly Currency Usd = Currency.Usd;

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using FlowLedger.Integrations.Simulated;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 
 namespace FlowLedger.Api.Tests.Endpoints;
 
@@ -83,7 +84,7 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         using var anon = factory.CreateClient();
 
         var badJson = Encoding.UTF8.GetBytes("this is { not valid ] json at all");
-        var signature = SimulatedFinancialDataProvider.BuildTestSignature(badJson);
+        var signature = SimulatedFinancialDataProvider.BuildSignature(badJson, FlowLedgerApiFactory.WebhookSecret);
 
         anon.DefaultRequestHeaders.Add("X-MX-Signature", signature);
         var content = new ByteArrayContent(badJson);
@@ -93,6 +94,26 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
             "a syntactically invalid webhook payload must return 400, not 500");
+    }
+
+    [Fact]
+    public async Task Post_webhook_signed_with_the_old_public_secret_is_rejected_when_no_secret_is_configured()
+    {
+        // #133: with default config (no SimulatedProvider:WebhookSecret) the anonymous webhook must not
+        // verify anything, even a signature built from the secret that used to be hard-coded in the repo.
+        using var noSecret = factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
+            c.AddInMemoryCollection(new Dictionary<string, string?> { ["SimulatedProvider:WebhookSecret"] = "" })));
+        using var anon = noSecret.CreateClient();
+
+        var body = Encoding.UTF8.GetBytes("{\"event_type\":\"SYNC_COMPLETE\",\"member_id\":\"sim-member-001\"}");
+        anon.DefaultRequestHeaders.Add("X-MX-Signature",
+            SimulatedFinancialDataProvider.BuildSignature(body, "sim-test-webhook-secret-do-not-use-in-production"));
+        var content = new ByteArrayContent(body);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+        var response = await anon.PostAsync("/api/integrations/mx/webhooks", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ── Webhook body cap (anonymous endpoint: bound memory before HMAC work) ──
@@ -114,7 +135,7 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         using var anon = factory.CreateClient();
         var big = new byte[WebhookCap + 1];
         Array.Fill(big, (byte)'a');
-        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildTestSignature(big));
+        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildSignature(big, FlowLedgerApiFactory.WebhookSecret));
 
         var response = await anon.PostAsync("/api/integrations/mx/webhooks", Body(big, chunked));
 
@@ -127,7 +148,7 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         using var anon = factory.CreateClient();
         var body = new byte[WebhookCap];
         Array.Fill(body, (byte)'a');
-        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildTestSignature(body));
+        anon.DefaultRequestHeaders.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildSignature(body, FlowLedgerApiFactory.WebhookSecret));
 
         var response = await anon.PostAsync("/api/integrations/mx/webhooks", Body(body, chunked: true));
 

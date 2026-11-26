@@ -1,12 +1,11 @@
 @page "/connectors"
-@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Authorization
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject NavigationManager Nav
 
 <PageTitle>Connectors — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Connectors</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Connectors</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     The financial data feeds FlowLedger knows about, which are enabled, and which accounts each one feeds. Credentials are never shown here.
 </MudText>
@@ -111,7 +110,16 @@ else
                             <tbody>
                             @foreach (var l in c.Connections)
                             {
-                                <tr><td>@l.Institution</td><td title="@l.UpdatedAt.ToLocalTime().ToString("g")">@l.Status</td><td class="fl-hide-lg">@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
+                                <tr><td>@l.Institution</td><td title="@l.UpdatedAt.ToLocalTime().ToString("g")">
+                                    @if (l.Issue is not null)
+                                    {
+                                        <ConnectionHealthBadge Issue="l.Issue" Provider="@c.Id" Institution="@l.Institution" OnRepaired="LoadAsync" />
+                                    }
+                                    else
+                                    {
+                                        @l.Status
+                                    }
+                                </td><td class="fl-hide-lg">@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
                             }
                             </tbody>
                         </MudSimpleTable>

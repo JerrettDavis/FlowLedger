@@ -8,7 +8,7 @@ should not run simultaneously.
 Aspire orchestrates all services with hot-reload, the Aspire dashboard, and automatic
 service discovery wiring.
 
-**Prerequisites:** .NET 10 SDK (10.0.301+), Docker Desktop
+**Prerequisites:** .NET 10 SDK (10.0.109 or later; see `global.json`), Docker Desktop
 
 ```bash
 # Start everything
@@ -130,7 +130,8 @@ accounts + 4 months of transaction history).
 | Endpoint                        | Description                      |
 |---------------------------------|----------------------------------|
 | `GET  /alive`                   | Liveness check (always 200)      |
-| `GET  /health`                  | Readiness check                  |
+| `GET  /ready`                   | Readiness (Postgres, migrations) |
+| `GET  /health`                  | All checks                       |
 | `GET  /openapi/v1.json`         | OpenAPI spec                     |
 | `POST /api/connect`             | Register Simulated provider      |
 | `POST /api/sync`                | Run full/incremental sync        |

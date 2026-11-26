@@ -11,15 +11,7 @@ namespace FlowLedger.Infrastructure.Tests.Persistence;
 [Collection("Integration")]
 public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsyncLifetime
 {
-    public async Task InitializeAsync()
-    {
-        await fixture.ResetAsync();
-        await using var conn = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = new Npgsql.NpgsqlCommand(
-            "DROP TABLE IF EXISTS merged_transactions; DROP TABLE IF EXISTS duplicate_dismissals;", conn);
-        await cmd.ExecuteNonQueryAsync();
-    }
+    public async Task InitializeAsync() => await fixture.ResetAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 
@@ -29,21 +21,52 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
             TransactionFingerprint.FromRawDescription(a, d, 18.40m, desc, pid));
 
     [DockerFact]
+    public async Task Merge_commits_under_the_production_retrying_execution_strategy()
+    {
+        var tenantCtx = TestTenantContext.New();
+        var tenant = TenantId.From(tenantCtx.TenantId);
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
+        var day = new DateOnly(2026, 11, 10);
+        var survivor = Tx(tenant, acct, "SQ *COFFEE HOUSE TULSA OK", day, "TRN-9");
+        var duplicate = Tx(tenant, acct, "Coffee House Tulsa", day.AddDays(1), null);
+
+        await using (var seed = fixture.CreateProductionStyleContext(tenantCtx))
+        {
+            seed.Transactions.AddRange(survivor, duplicate);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var db = fixture.CreateProductionStyleContext(tenantCtx))
+        {
+            var store = new DuplicateStore(db, tenantCtx);
+            var s = await db.Transactions.SingleAsync(t => t.Id == survivor.Id);
+            var d = await db.Transactions.SingleAsync(t => t.Id == duplicate.Id);
+            await store.MergeAsync(s, d, auto: false, "test", "{}");
+        }
+
+        await using var verify = fixture.CreateProductionStyleContext(tenantCtx);
+        (await verify.Transactions.AnyAsync(t => t.Id == duplicate.Id)).Should().BeFalse();
+        (await new DuplicateStore(verify, tenantCtx).RecentMergesAsync(5)).Should().ContainSingle();
+    }
+
+    [DockerFact]
     public async Task Auto_merge_removes_the_imported_twin_keeps_its_category_and_blocks_it_from_coming_back()
     {
         var tenantCtx = TestTenantContext.New();
         var tenant = TenantId.From(tenantCtx.TenantId);
-        var acct = AccountId.New();
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
         var day = new DateOnly(2026, 11, 10);
         var bank = Tx(tenant, acct, "SQ *COFFEE HOUSE TULSA OK", day, "TRN-9");
         var csv = Tx(tenant, acct, "Coffee House Tulsa", day.AddDays(1), null);
-        var cat = CategoryId.New();
+        var category = Category.Create(tenant, new CategoryPath("Food/Coffee"), "Coffee");
+        var cat = CategoryId.From(category.Id);
         csv.Categorize(cat, null, CategorySource.Manual);
         csv.AppendNote("team lunch");
         var bankFingerprint = bank.Fingerprint!.Value;
 
         await using (var seed = fixture.CreateDbContext(tenantCtx))
         {
+            seed.Categories.Add(category);
             seed.Transactions.AddRange(bank, csv);
             await seed.SaveChangesAsync();
         }
@@ -76,7 +99,7 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
     {
         var tenantCtx = TestTenantContext.New();
         var tenant = TenantId.From(tenantCtx.TenantId);
-        var acct = AccountId.New();
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
         var day = new DateOnly(2026, 11, 10);
         var a = Tx(tenant, acct, "365 VEND DDA PIN POS", day, "TRN-1");
         var b = Tx(tenant, acct, "365 VEND DDA PIN POS", day, "TRN-2");
@@ -95,5 +118,23 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
         await service.DismissAsync(a.Id, b.Id);
         (await service.ScanAsync()).Total.Should().Be(0);
         (await db.Transactions.CountAsync()).Should().Be(2);
+    }
+
+    [DockerFact]
+    public async Task Dismissals_and_merge_log_are_tenant_scoped()
+    {
+        var a = TestTenantContext.New();
+        var b = TestTenantContext.New();
+
+        await using (var dbA = fixture.CreateProductionStyleContext(a))
+        {
+            await new DuplicateStore(dbA, a).DismissAsync("pair-1");
+            await new DuplicateStore(dbA, a).DismissAsync("pair-1");
+            (await new DuplicateStore(dbA, a).DismissedKeysAsync()).Should().BeEquivalentTo(["pair-1"]);
+        }
+
+        await using var dbB = fixture.CreateProductionStyleContext(b);
+        (await new DuplicateStore(dbB, b).DismissedKeysAsync()).Should().BeEmpty("tenant B must not see tenant A's dismissals");
+        (await new DuplicateStore(dbB, b).RecentMergesAsync(10)).Should().BeEmpty();
     }
 }

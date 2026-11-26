@@ -43,6 +43,12 @@ public sealed class ApiOptions
     /// </summary>
     public string? TenantSigningKey { get; set; }
 
+    /// <summary>
+    /// Optional rotation key (Api:PreviousKey). While set, callers presenting it are still authenticated (and a Warning is logged),
+    /// so Api, Web and Worker can be restarted with the new <see cref="Key"/> one at a time. Remove it once rotation is complete.
+    /// </summary>
+    public string? PreviousKey { get; set; }
+
     /// <summary>The effective household tenant id for background jobs.</summary>
     public Guid EffectiveTenantId =>
         TenantId is { } id && id != Guid.Empty ? id : DefaultTenantId;

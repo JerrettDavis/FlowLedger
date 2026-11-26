@@ -43,6 +43,12 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("external_account_ref");
 
+                    b.Property<bool>("HideTransactions")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("hide_transactions");
+
                     b.Property<string>("Institution")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -53,12 +59,6 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
-
-                    b.Property<bool>("HideTransactions")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("hide_transactions");
 
                     b.Property<DateTimeOffset?>("LastBalanceConfirmedAt")
                         .HasColumnType("timestamp with time zone")
@@ -400,12 +400,12 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "EffectiveDate")
                         .HasDatabaseName("ix_transactions_tenant_date");
 
+                    b.HasIndex("TenantId", "AccountId", "EffectiveDate")
+                        .HasDatabaseName("ix_transactions_tenant_account_date");
+
                     b.HasIndex("TenantId", "EffectiveDate", "CreatedAt")
                         .IsDescending(false, true, true)
                         .HasDatabaseName("ix_transactions_tenant_date_created");
-
-                    b.HasIndex("TenantId", "AccountId", "EffectiveDate")
-                        .HasDatabaseName("ix_transactions_tenant_account_date");
 
                     b.ToTable("transactions", (string)null);
                 });
@@ -459,11 +459,510 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_balance_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AccountConnectorLinkRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("ConnectorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("connector_id");
+
+                    b.Property<DateTimeOffset>("LinkedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider_account_id");
+
+                    b.HasKey("TenantId", "AccountId");
+
+                    b.HasIndex("TenantId", "ConnectorId", "ProviderAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_account_connector_links_provider");
+
+                    b.ToTable("account_connector_links", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AccountRateRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(7, 3)
+                        .HasColumnType("numeric(7,3)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<int?>("RemainingMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("remaining_months");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "AccountId");
+
+                    b.ToTable("account_rates", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.BudgetRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Category")
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
+                    b.Property<decimal>("MonthlyLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("monthly_limit");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "Category");
+
+                    b.ToTable("budgets", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.CategoryRuleRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Pattern")
+                        .HasColumnType("text")
+                        .HasColumnName("pattern");
+
+                    b.Property<string>("CategoryPath")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("category_path");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "Pattern");
+
+                    b.ToTable("category_rules", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.DuplicateDismissalRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("PairKey")
+                        .HasColumnType("text")
+                        .HasColumnName("pair_key");
+
+                    b.Property<DateTimeOffset>("DismissedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dismissed_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "PairKey");
+
+                    b.ToTable("duplicate_dismissals", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.GoalRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("SavedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("saved_amount");
+
+                    b.Property<decimal>("TargetAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("target_amount");
+
+                    b.Property<DateOnly?>("TargetDate")
+                        .HasColumnType("date")
+                        .HasColumnName("target_date");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.ToTable("savings_goals", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.HomeAssistantSentRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("DedupeKey")
+                        .HasColumnType("text")
+                        .HasColumnName("dedupe_key");
+
+                    b.Property<DateTimeOffset>("SentUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "DedupeKey");
+
+                    b.ToTable("home_assistant_sent", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.HomeAssistantSettingsRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enabled");
+
+                    b.Property<bool>("IncludeNames")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("include_names");
+
+                    b.Property<string>("Kinds")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("kinds");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastSentUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_sent_utc");
+
+                    b.Property<int>("LeadDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("lead_days");
+
+                    b.Property<bool>("ShareAmounts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("share_amounts");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Webhook")
+                        .HasColumnType("text")
+                        .HasColumnName("webhook");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("home_assistant_settings", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.IntegrationDeliveryRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("integration_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("target");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trigger");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "IntegrationId", "AtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_integration_deliveries_integration");
+
+                    b.ToTable("integration_deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.IntegrationRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("config");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastUsedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Secrets")
+                        .HasColumnType("text")
+                        .HasColumnName("secrets");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.ToTable("integrations", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.MerchantAliasRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Pattern")
+                        .HasColumnType("text")
+                        .HasColumnName("pattern");
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("alias");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "Pattern");
+
+                    b.ToTable("merchant_aliases", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.MergedTransactionRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("DuplicateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("duplicate_id");
+
+                    b.Property<bool>("Auto")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("auto");
+
+                    b.Property<string>("Fingerprint")
+                        .HasColumnType("text")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<DateTimeOffset>("MergedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("merged_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Snapshot")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("snapshot");
+
+                    b.Property<Guid>("SurvivorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("survivor_id");
+
+                    b.HasKey("TenantId", "DuplicateId");
+
+                    b.HasIndex("TenantId", "Fingerprint")
+                        .HasDatabaseName("ix_merged_transactions_tenant_fingerprint");
+
+                    b.ToTable("merged_transactions", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.ProviderAccountRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("ConnectorId")
+                        .HasColumnType("text")
+                        .HasColumnName("connector_id");
+
+                    b.Property<string>("ProviderAccountId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("account_type");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("balance");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTimeOffset>("LastSeenUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.HasKey("TenantId", "ConnectorId", "ProviderAccountId");
+
+                    b.ToTable("connector_provider_accounts", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.ProviderConnectionRecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<int>("ConsecutiveFailures")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("consecutive_failures");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -474,6 +973,52 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("institution");
+
+                    b.Property<DateTimeOffset?>("IssueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issue_at");
+
+                    b.Property<bool>("IssueInformational")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_informational");
+
+                    b.Property<string>("IssueKind")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("issue_kind");
+
+                    b.Property<string>("IssueMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("issue_message");
+
+                    b.Property<string>("IssueProviderCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("issue_provider_code");
+
+                    b.Property<string>("IssueRepairRef")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("issue_repair_ref");
+
+                    b.Property<bool>("IssueRequiresUserAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_requires_user_action");
+
+                    b.Property<DateTimeOffset?>("IssueRetryAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issue_retry_after");
+
+                    b.Property<bool>("IssueRetryable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_retryable");
 
                     b.Property<string>("MemberProviderId")
                         .IsRequired()
@@ -508,6 +1053,27 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_provider_connections_tenant_provider");
 
                     b.ToTable("provider_connections", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.RecurringDismissalRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("SuggestionKey")
+                        .HasColumnType("text")
+                        .HasColumnName("suggestion_key");
+
+                    b.Property<DateTimeOffset>("DismissedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dismissed_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "SuggestionKey");
+
+                    b.ToTable("recurring_dismissals", (string)null);
                 });
 
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SavedReportRecord", b =>
@@ -740,6 +1306,31 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_sheet_payments_bill_month");
 
                     b.ToTable("sheet_payments", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SuspiciousDismissalRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.Property<DateTimeOffset>("DismissedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dismissed_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.HasKey("TenantId", "TransactionId");
+
+                    b.ToTable("suspicious_dismissals", (string)null);
                 });
 
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.SyncCursorRecord", b =>

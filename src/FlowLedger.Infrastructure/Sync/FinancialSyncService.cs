@@ -37,6 +37,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly IAccountConnectorLinkStore? _links;
     private readonly IProviderAccountCatalog? _catalog;
     private readonly bool _autoCreateAccounts;
+    private readonly IProviderConnectionStore? _health;
 
     /// <param name="configuration">
     /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
@@ -51,8 +52,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         ILogger<FinancialSyncService> logger,
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null,
         IAccountConnectorLinkStore? links = null,
-        IProviderAccountCatalog? catalog = null)
+        IProviderAccountCatalog? catalog = null,
+        IProviderConnectionStore? health = null)
     {
+        _health = health;
         _links = links;
         _catalog = catalog;
         // Connectors:<id>:AutoCreateAccounts (default true): when false, provider accounts that match no existing account are only
@@ -73,7 +76,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private void EnsureTenantMayUseProvider()
     {
         if (_householdTenantId is { } household
-            && _provider.ProviderName is not ("Simulated" or "Quiltt") // Quiltt keeps one profile per tenant
+            && _provider.ProviderName is not (ConnectorIds.Simulated or ConnectorIds.Quiltt) // Quiltt keeps one profile per tenant
             && _tenant.TenantId != household)
         {
             throw new NeedsUserActionProviderException(
@@ -130,21 +133,102 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     // ── Sync ──────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Runs the sync and records the connection's health (ADR 0018): a classified <see cref="ProviderIssue"/> when the provider
+    /// fails (the original exception is then rethrown untouched), or recovery (clears any issue) when it succeeds.
+    /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
+    {
+        SyncResult result;
+        try
+        {
+            result = await SyncCoreAsync(ct);
+        }
+        catch (ProviderException ex)
+        {
+            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(ProviderIssue.FromException(ex), DateTimeOffset.UtcNow), CancellationToken.None);
+            throw; // never swallow: callers (UI, jobs) still see the original failure
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // An unexpected failure (a database constraint, a bug) must still leave a trail: record it as Internal so the
+            // retry policy bounds the attempts (MaxBoundedFailures) instead of repeating it forever with no UI issue.
+            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(
+                ProviderIssue.Of(ProviderIssueKind.Internal, $"Unexpected {ex.GetType().Name} during sync."), DateTimeOffset.UtcNow), CancellationToken.None);
+            throw;
+        }
+
+        await RecordHealthSafelyAsync(await ReadProviderHealthAsync(ct), ct);
+        return result;
+    }
+
+    /// <summary>
+    /// A read can succeed against a connection that still needs repair (stale data), so for connectors that can report real
+    /// per-connection health (<see cref="ProviderCapabilities.ConnectionHealth"/>) ask them; otherwise a clean sync means recovery (null).
+    /// </summary>
+    private async Task<ConnectionIssueInfo?> ReadProviderHealthAsync(CancellationToken ct)
+    {
+        if (!_provider.Capabilities.HasFlag(ProviderCapabilities.ConnectionHealth))
+        {
+            return null;
+        }
+
+        try
+        {
+            var member = await _db.ProviderConnections
+                .Where(c => c.ProviderName == _provider.ProviderName)
+                .Select(c => c.MemberProviderId)
+                .FirstOrDefaultAsync(ct);
+            if (member is null)
+            {
+                return null;
+            }
+
+            var health = await _provider.GetConnectionHealthAsync(member, ct);
+            return health.IsHealthy || health.Issue is null
+                ? null
+                : ProviderIssueMapping.ToInfo(health.Issue, DateTimeOffset.UtcNow, informational: true); // reads succeeded, so never a gate/give-up input
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not read connection health for {Provider}; treating the clean sync as healthy.", _provider.ProviderName);
+            return null;
+        }
+    }
+
+    /// <summary>Health bookkeeping must never mask the sync outcome: its own failures are logged and dropped.</summary>
+    private async Task RecordHealthSafelyAsync(ConnectionIssueInfo? issue, CancellationToken ct)
+    {
+        if (_health is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _health.RecordHealthAsync(_provider.ProviderName, issue, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not record connection health for {Provider}.", _provider.ProviderName);
+        }
+    }
+
+    private async Task<SyncResult> SyncCoreAsync(CancellationToken ct)
     {
         EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
-        if (_provider.ProviderName == "Quiltt"
-            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == "Quiltt", ct))
+        if (_provider.ProviderName == ConnectorIds.Quiltt
+            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == ConnectorIds.Quiltt, ct))
         {
             return new SyncResult(0, 0, 0, 0); // this tenant has not linked a bank through the Quiltt Connector yet
         }
 
         var memberRef = await GetOrProvisionConnectionAsync(
-            tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
+            tenantId, ct, allowProvision: _provider.ProviderName is ConnectorIds.Simulated or ConnectorIds.SimpleFin); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
 
         // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
         if (_provider is IMemberIdResolver resolver)
@@ -206,7 +290,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             await _db.BalanceSnapshots.AddAsync(AccountBalanceSnapshotRecord.Create(
                 _tenant.TenantId, domainAccount.AccountId.Value, _provider.ProviderName, pa.ProviderId,
                 domainAccount.TypeLockedByUser && Account.IsLiabilityType(domainAccount.AccountType)
-                    ? Math.Abs(pa.Balance.Amount)
+                    ? ToOwed(pa.Balance.Amount)
                     : pa.Balance.Amount,
                 pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
 
@@ -285,7 +369,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 && Account.IsLiabilityType(existing.AccountType)
                 && !(TryMapProviderAccountType(pa.AccountType, out var providerType) && Account.IsLiabilityType(providerType)))
             {
-                providerAmount = Math.Abs(providerAmount);
+                providerAmount = ToOwed(providerAmount);
             }
 
             // Update balance if changed (account may carry a stale balance from last sync)
@@ -293,13 +377,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)
             {
                 var updatedBalance = new Money(providerAmount, new Currency(pa.CurrencyCode));
-                try { existing.UpdateBalance(updatedBalance); }
-                catch (Domain.Exceptions.InvalidBalanceException)
+                try { existing.ApplyProviderBalance(updatedBalance); }
+                catch (Domain.Exceptions.CurrencyMismatchException ex)
                 {
-                    // Asset-account negative balance guard — provider may return negative
-                    // for overdraft situations. Accept as-is without throwing.
-                    _logger.LogWarning(
-                        "Skipping balance update for account {AccountId}: provider returned negative balance on asset account.",
+                    // A provider changing an account's currency must not abort the whole sync.
+                    _logger.LogWarning(ex,
+                        "Skipping balance update for account {AccountId}: provider currency differs from the stored account currency.",
                         existing.Id);
                 }
             }
@@ -313,9 +396,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 var previousType = existing.AccountType;
                 if (existing.ChangeType(mappedType))
                 {
-                    _logger.LogInformation(
-                        "Account {AccountId} reclassified {Previous} -> {Current} from provider data.",
-                        existing.Id, previousType, mappedType);
+                    _logger.LogInformation("Account {AccountId} reclassified from provider data.", existing.Id);
                 }
             }
 
@@ -344,6 +425,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         await _db.Accounts.AddAsync(newAccount, ct);
         if (_links is not null)
         {
+            // The link row has a DB-level composite foreign key to the account (#146), so the account is committed first. A crash
+            // between the two leaves an unlinked account, which the next sync finds by Institution and links again (lazy backfill).
+            await _db.SaveChangesAsync(ct);
             await _links.LinkAsync(newAccount.Id, _provider.ProviderName, pa.ProviderId, ct);
         }
 
@@ -371,8 +455,15 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                          && t.Source == TransactionSource.MxAggregation)
                      .ToListAsync(ct))
         {
-            AddSettleCandidate(settleCandidates, p);
+            PendingSettlement.AddSettleCandidate(settleCandidates, p);
         }
+
+        // Rows added earlier in this sync are not in the database yet, so a later page repeating one of them would
+        // otherwise be inserted again and hit the unique (tenant, fingerprint) index.
+        var insertedByFingerprint = new Dictionary<string, Transaction>();
+
+        // Pending fingerprints the provider (re)reported during this sync; only the others can be considered stale.
+        var seenPending = new HashSet<string>(StringComparer.Ordinal);
 
         bool hasMore = true;
         while (hasMore)
@@ -391,12 +482,35 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     skipped += zeroAmount;
                 }
 
+                // A row in another currency than its account would be stored with the account's currency semantics lost
+                // (or rejected by the domain); skip it loudly instead of corrupting totals (#124).
+                var accountCurrency = account.CurrentBalance.Currency.Code;
+                var foreignCurrency = page.Items.Count(pt => pt.Amount.Amount != 0m
+                    && !string.Equals(pt.Amount.Currency.Code, accountCurrency, StringComparison.OrdinalIgnoreCase));
+                if (foreignCurrency > 0)
+                {
+                    _logger.LogWarning(
+                        "Skipping {Count} transaction(s) whose currency differs from the account currency {Currency}.",
+                        foreignCurrency, accountCurrency);
+                    skipped += foreignCurrency;
+                }
+
                 var fingerprintMap = page.Items
-                    .Where(pt => pt.Amount.Amount != 0m)
+                    .Where(pt => pt.Amount.Amount != 0m
+                        && string.Equals(pt.Amount.Currency.Code, accountCurrency, StringComparison.OrdinalIgnoreCase))
                     .Select(pt => (
                         ProviderTx: pt,
                         Fingerprint: BuildFingerprint(account.AccountId, pt)))
                     .ToList();
+
+                // One page can repeat a transaction (overlapping backfill windows, a bank listing it twice). Keep a single
+                // copy per fingerprint, preferring the posted version over the pending one.
+                var distinct = fingerprintMap
+                    .GroupBy(x => x.Fingerprint.Value)
+                    .Select(g => g.FirstOrDefault(x => !x.ProviderTx.IsPending) is { ProviderTx: not null } posted ? posted : g.First())
+                    .ToList();
+                var repeatedInPage = fingerprintMap.Count - distinct.Count;
+                fingerprintMap = distinct;
 
                 var candidateFingerprints = fingerprintMap
                     .Select(x => x.Fingerprint.Value)
@@ -412,10 +526,29 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
                 var toInsert = new List<Transaction>();
                 var settled = 0;
+
+                // Register the whole page's pending rows first: a pending authorization the provider still reports is alive
+                // and must never be absorbed by a different posted row (#104).
+                foreach (var live in fingerprintMap.Where(f => f.ProviderTx.IsPending))
+                {
+                    seenPending.Add(live.Fingerprint.Value);
+                }
+
                 foreach (var x in fingerprintMap)
                 {
+
                     if (mergedAway.Contains(x.Fingerprint.Value))
                     {
+                        continue;
+                    }
+
+                    if (insertedByFingerprint.TryGetValue(x.Fingerprint.Value, out var insertedRow))
+                    {
+                        // Already added earlier in this sync (not saved yet): settle it in place, never insert a second copy.
+                        if (!x.ProviderTx.IsPending && insertedRow.Settle(x.ProviderTx.PostedDate))
+                        {
+                            settled++;
+                        }
                         continue;
                     }
 
@@ -447,15 +580,30 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                                 .ToList()
                             : [];
                         var pending = matches.Count == 1 ? matches[0] : null;
-                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint))
+                        var finalAmount = (Money?)null;
+                        if (pending is null && matches.Count == 0)
                         {
-                            bucket!.Remove(pending);
+                            // Posted total differs from the authorization (a tip): absorb one unambiguous pending row
+                            // of the same merchant whose amount is within tolerance below the posted total (#104).
+                            var tolerant = PendingSettlement.FindTipSettleCandidate(settleCandidates, direction, amount, x.ProviderTx, seenPending);
+                            if (tolerant is not null)
+                            {
+                                pending = tolerant;
+                                finalAmount = new Money(amount, x.ProviderTx.Amount.Currency);
+                            }
+                        }
+
+                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount))
+                        {
+                            PendingSettlement.RemoveSettleCandidate(settleCandidates, pending);
                             settled++;
                             continue;
                         }
                     }
 
-                    toInsert.Add(MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint));
+                    var mapped = MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint);
+                    toInsert.Add(mapped);
+                    insertedByFingerprint[x.Fingerprint.Value] = mapped;
                 }
 
                 if (toInsert.Count > 0)
@@ -465,14 +613,20 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
                                  && t.Status == TransactionStatus.Pending && t.Source == TransactionSource.MxAggregation))
                     {
-                        AddSettleCandidate(settleCandidates, inserted);
+                        PendingSettlement.AddSettleCandidate(settleCandidates, inserted);
                     }
                 }
                 if (settled > 0)
                 {
-                    _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
+                    _logger.LogInformation("Settled {Count} pending transactions during sync", settled);
                 }
-                skipped += fingerprintMap.Count - toInsert.Count - settled;
+                skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
+            }
+
+            if (page.SkippedCount > 0)
+            {
+                skipped += page.SkippedCount;
+                _logger.LogInformation("The provider dropped {Count} row(s) without a usable date on one account.", page.SkippedCount);
             }
 
             cursor = page.NextCursor;
@@ -483,18 +637,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             await _cursorStore.SetAsync(_provider.ProviderName, providerAccountId, cursor.Value, ct);
         }
 
-        return (added, skipped);
-    }
-
-    private static void AddSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)
-    {
-        var key = (t.Direction, t.Amount.Amount);
-        if (!lookup.TryGetValue(key, out var list))
+        // Authorizations the provider never settled or re-reported (cancelled holds, fuel pre-auths) must not count as
+        // spend forever. Anything still pending after the TTL that this sync did not just receive is retired.
+        var staleBefore = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-PendingSettlement.StalePendingDays);
+        foreach (var list in settleCandidates.Values)
         {
-            lookup[key] = list = [];
+            foreach (var stale in list.Where(t => t.Status == TransactionStatus.Pending && t.EffectiveDate < staleBefore
+                         && (t.Fingerprint is null || !seenPending.Contains(t.Fingerprint.Value))).ToList())
+            {
+                if (stale.AbandonPending())
+                {
+                    _logger.LogInformation("Retired a stale pending transaction (pending since {Date}).", stale.EffectiveDate);
+                }
+            }
         }
 
-        list.Add(t);
+        return (added, skipped);
     }
 
     private static TransactionFingerprint BuildFingerprint(AccountId accountId, ProviderTransaction pt)
@@ -656,6 +814,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Collapse whitespace, trim, uppercase for stable fingerprinting
         return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
     }
+
+    /// <summary>
+    /// Converts a provider balance to FlowLedger's "owed is positive" convention for a liability the user pinned
+    /// by hand. SimpleFIN and Quiltt report what you HAVE (a card owing 200 is -200), so negate once; MX already
+    /// reports what you owe. The sign is kept: an overpaid card stays a negative debt (a credit), never flipped.
+    /// </summary>
+    private decimal ToOwed(decimal providerAmount) =>
+        _provider.ProviderName is ConnectorIds.SimpleFin or ConnectorIds.Quiltt ? -providerAmount : providerAmount;
 
     /// <summary>Maps a canonical provider type token; false (no change) when the type is unknown/unmapped.</summary>
     private static bool TryMapProviderAccountType(string providerType, out AccountType type)

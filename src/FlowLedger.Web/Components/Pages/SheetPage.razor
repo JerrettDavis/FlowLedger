@@ -1,5 +1,4 @@
 @page "/sheet"
-@rendermode InteractiveServer
 @using FlowLedger.Web.ApiClient
 @inject FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
@@ -11,7 +10,7 @@
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter" style="flex-wrap:wrap;gap:8px">
     <div>
-        <MudText Typo="Typo.h4">Sheet</MudText>
+        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Sheet</MudText>
         <MudText Typo="Typo.caption" Color="Color.Secondary">
             Your bill sheet. Cells tick themselves when a matching payment syncs; click a cell to override.
         </MudText>
@@ -316,7 +315,7 @@
         }
         catch (ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -339,7 +338,7 @@
         }
         catch (ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 
@@ -358,7 +357,7 @@
         }
         catch (ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 
@@ -392,6 +391,11 @@
                     await ApiClient.SaveSheetBillAsync(row?.Id, req);
                     break;
                 case string s when s == SheetBillDialog.DeleteResult && row is not null:
+                    if (!await DialogService.ConfirmAsync("Delete bill", $"Delete \"{row.Name}\" from the sheet?", "Delete"))
+                    {
+                        return;
+                    }
+
                     await ApiClient.DeleteSheetBillAsync(row.Id);
                     break;
             }
@@ -399,7 +403,7 @@
         }
         catch (ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 

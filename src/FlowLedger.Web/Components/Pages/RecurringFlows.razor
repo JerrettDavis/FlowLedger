@@ -1,5 +1,4 @@
 @page "/recurring-flows"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -8,7 +7,7 @@
 <PageTitle>Recurring Flows — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4">
-    <MudText Typo="Typo.h4">Recurring Flows</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Recurring Flows</MudText>
     <div class="d-flex gap-2 align-center" style="flex-wrap:wrap">
     <DateRangeSelector Label="Active during" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
                        From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
@@ -84,7 +83,7 @@
 {
     <EmptyState Icon="@Icons.Material.Outlined.Repeat"
                 Title="No recurring flows"
-                Description="Add a recurring flow or use Connect & Sync to load demo data.">
+                Description="@($"Add a recurring flow. {OnboardingCopy.LoadData(Status?.Environment)}")">
         <Action>
             <MudButton StartIcon="@Icons.Material.Filled.Add"
                        Color="Color.Primary"
@@ -153,6 +152,9 @@
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _allFlows = [];

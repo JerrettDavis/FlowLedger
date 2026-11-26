@@ -19,6 +19,7 @@ public class AdHocSchemaTests
 }
 
 [Collection("Integration")]
+[Trait("Invariant", "INV-11")]
 public sealed class AdHocSchemaRestoreTests : IAsyncLifetime
 {
     private readonly FlowLedger.Infrastructure.Tests.Helpers.IntegrationTestFixture _fixture;
