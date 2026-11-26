@@ -19,6 +19,8 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
+<a href="#main-content" class="fl-skip-link">Skip to main content</a>
+
 <MudLayout>
     <MudAppBar Color="Color.Surface" Elevation="0" Class="fl-appbar" aria-label="FlowLedger application bar">
         <MudIconButton Icon="@Icons.Material.Filled.Menu"
@@ -30,7 +32,10 @@
         <MudSpacer />
         @if (_syncing)
         {
-            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-label="Syncing" />
+            <span role="status" aria-live="polite" class="mr-2">
+                <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" aria-hidden="true" />
+                <span class="fl-visually-hidden">Syncing</span>
+            </span>
         }
         @if (_backupAlert is not null && _backupAlert != _dismissedBackupAlert && _environment == "production")
         {
@@ -118,7 +123,7 @@
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
+        <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page" id="main-content" tabindex="-1">
             @Body
         </MudContainer>
     </MudMainContent>
