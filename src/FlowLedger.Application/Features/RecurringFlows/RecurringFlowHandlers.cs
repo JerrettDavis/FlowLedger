@@ -54,15 +54,19 @@ public sealed class CreateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly ITenantContext _tenant;
+    private readonly IReferenceValidator _references;
 
-    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant)
+    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references)
     {
         _repo = repo;
         _tenant = tenant;
+        _references = references;
     }
 
     public async Task<RecurringFlowDto> HandleAsync(CreateRecurringFlowRequest request, CancellationToken ct = default)
     {
+        await _references.EnsureAccountAsync(request.AccountId, ct);
+        await _references.EnsureCategoryAsync(request.CategoryId, ct);
         var direction = Enum.Parse<TransactionDirection>(request.Direction, ignoreCase: true);
         var amountModel = Enum.Parse<AmountModel>(request.AmountModel, ignoreCase: true);
         var currency = new Currency(request.Currency.ToUpperInvariant());

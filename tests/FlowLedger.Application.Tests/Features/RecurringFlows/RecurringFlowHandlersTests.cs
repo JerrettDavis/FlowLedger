@@ -29,7 +29,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task CreateRecurringFlow_EndDate_is_inclusive_so_the_last_charge_is_forecast()
     {
-        var handler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var handler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var req = MonthlyRentRequest() with { DayOfMonth = 31, EndDate = new DateOnly(2026, 12, 31) };
 
         var dto = await handler.HandleAsync(req);
@@ -46,7 +46,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task CreateRecurringFlow_Monthly_StoresAndReturnsDto()
     {
-        var handler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var handler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var dto = await handler.HandleAsync(MonthlyRentRequest());
 
         dto.Name.Should().Be("Rent");
@@ -59,7 +59,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task CreateRecurringFlow_Weekly_StoresPattern()
     {
-        var handler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var handler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var req = MonthlyRentRequest() with
         {
             RecurrenceFrequency = "Weekly",
@@ -75,7 +75,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task GetRecurringFlow_ExistingId_ReturnsDto()
     {
-        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var created = await createHandler.HandleAsync(MonthlyRentRequest());
 
         var getHandler = new GetRecurringFlowHandler(_repo);
@@ -88,7 +88,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task UpdateRecurringFlow_ChangesAmount()
     {
-        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var created = await createHandler.HandleAsync(MonthlyRentRequest());
 
         var updateHandler = new UpdateRecurringFlowHandler(_repo);
@@ -101,7 +101,7 @@ public sealed class RecurringFlowHandlersTests
     [Fact]
     public async Task DeactivateRecurringFlow_RemovesFromActiveList()
     {
-        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant);
+        var createHandler = new CreateRecurringFlowHandler(_repo, _tenant, new FakeReferenceValidator());
         var created = await createHandler.HandleAsync(MonthlyRentRequest());
 
         var deactivateHandler = new DeactivateRecurringFlowHandler(_repo);
