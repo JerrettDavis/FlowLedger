@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -131,7 +132,7 @@ internal sealed class QuilttApiClient
         for (var page = 0; page < _options.MaxPages; page++)
         {
             var data = await QueryAsync<QTransactionsData>(sessionToken, TransactionsQuery,
-                new { first = _options.PageSize, after, from = from.ToString("yyyy-MM-dd") }, ct).ConfigureAwait(false);
+                new { first = _options.PageSize, after, from = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) }, ct).ConfigureAwait(false);
             var conn = data?.Transactions;
             all.AddRange(conn?.Nodes ?? []);
             if (conn?.PageInfo is not { HasNextPage: true, EndCursor: { Length: > 0 } next })

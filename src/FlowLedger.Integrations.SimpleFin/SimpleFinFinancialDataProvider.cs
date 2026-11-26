@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Domain.ValueObjects;
@@ -136,7 +137,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
     private static string FormatCursor(DateOnly? date, int backfilledDays)
     {
-        var text = date?.ToString("yyyy-MM-dd") ?? string.Empty;
+        var text = date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
         return backfilledDays > 0 ? text + BackfillMarker + backfilledDays : text;
     }
 

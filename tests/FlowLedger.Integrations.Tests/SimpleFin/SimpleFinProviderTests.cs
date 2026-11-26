@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using FlowLedger.Integrations.Abstractions;
@@ -130,7 +131,7 @@ public sealed class SimpleFinProviderTests
 
         page.Items.Should().HaveCount(1);
         page.NextCursor.IsInitial.Should().BeFalse();
-        page.NextCursor.Value.Should().Be(DateOnly.FromDateTime(pendingDay.UtcDateTime).AddDays(-1).ToString("yyyy-MM-dd"));
+        page.NextCursor.Value.Should().Be(DateOnly.FromDateTime(pendingDay.UtcDateTime).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -193,7 +194,7 @@ public sealed class SimpleFinProviderTests
         var old = DateTimeOffset.UtcNow.AddDays(-40).ToUnixTimeSeconds();
         var (p, _) = Make(Json(old));
         var accounts = await p.GetAccountsAsync("simplefin");
-        var cursor = new SyncCursor(DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"));
+        var cursor = new SyncCursor(DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
         var page = await p.GetTransactionsAsync(accounts[0].ProviderId, cursor);
         page.Items.Should().BeEmpty();

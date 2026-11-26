@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
@@ -94,7 +95,7 @@ public sealed class MalformedPageTests : IAsyncLifetime
         {
             var index = c == SyncCursor.Initial ? 0 : int.Parse(c.Value);
             var items = index < pages.Length ? pages[index] : [];
-            return Task.FromResult(new TransactionPage(items, new SyncCursor((index + 1).ToString()), index + 1 < pages.Length));
+            return Task.FromResult(new TransactionPage(items, new SyncCursor((index + 1).ToString(CultureInfo.InvariantCulture)), index + 1 < pages.Length));
         }
         public Task VerifyWebhookAsync(ReadOnlyMemory<byte> b, string s, CancellationToken ct = default) => Task.CompletedTask;
         public Task<ProviderWebhookEvent> ParseWebhookAsync(ReadOnlyMemory<byte> b, CancellationToken ct = default)

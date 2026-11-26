@@ -149,7 +149,7 @@ public sealed class CategorizationLocalAiTests
         await Service(new HashingTextEmbedder(), llm, new LocalAiOptions { Llm = { Enabled = true, FewShot = true } }).RunAsync(allowLlm: true);
 
         llm.LastUser.Should().Contain("Labelled examples").And.Contain("=> Food/Coffee");
-        llm.LastUser.Split((char)10).Count(l => l.StartsWith("Answer:")).Should().Be(1, "a crafted descriptor must not inject prompt lines");
+        llm.LastUser.Split((char)10).Count(l => l.StartsWith("Answer:", StringComparison.Ordinal)).Should().Be(1, "a crafted descriptor must not inject prompt lines");
     }
 
     [Fact]

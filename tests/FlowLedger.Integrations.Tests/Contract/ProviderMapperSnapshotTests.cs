@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FlowLedger.Integrations.Abstractions;
 
@@ -33,7 +34,7 @@ public sealed class ProviderMapperSnapshotTests
                 {
                     t.ProviderId,
                     t.ProviderAccountId,
-                    PostedDate = t.PostedDate.ToString("yyyy-MM-dd"),
+                    PostedDate = t.PostedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     t.IsPending,
                     Amount = t.Amount.Amount,
                     Currency = t.Amount.Currency.Code,

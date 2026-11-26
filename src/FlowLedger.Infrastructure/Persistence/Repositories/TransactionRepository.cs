@@ -50,9 +50,12 @@ internal sealed class TransactionRepository : ITransactionRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLowerInvariant();
+            // ToLower() on the column is deliberate: EF translates it to SQL lower(); string.Contains(string, StringComparison) is not translatable.
+#pragma warning disable CA1304, CA1311, CA1862
             query = query.Where(t => t.Description.ToLower().Contains(term)
                 || (t.MerchantName != null && t.MerchantName.ToLower().Contains(term))
                 || (t.Notes != null && t.Notes.ToLower().Contains(term)));
+#pragma warning restore CA1304, CA1311, CA1862
         }
 
         return await query

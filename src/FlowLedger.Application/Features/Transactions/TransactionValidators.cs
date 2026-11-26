@@ -4,7 +4,7 @@ namespace FlowLedger.Application.Features.Transactions;
 
 public sealed class CreateTransactionRequestValidator : AbstractValidator<CreateTransactionRequest>
 {
-    private static readonly string[] ValidDirections = Enum.GetNames(typeof(Domain.Aggregates.TransactionDirection));
+    private static readonly string[] ValidDirections = Enum.GetNames<Domain.Aggregates.TransactionDirection>();
 
     public CreateTransactionRequestValidator()
     {

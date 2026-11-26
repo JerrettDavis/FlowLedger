@@ -68,10 +68,12 @@ public static class RecurringDetector
     /// <summary>Grouping key; forwards to <see cref="MerchantKey.From"/> (kept for existing callers).</summary>
     internal static string Key(string text) => MerchantKey.From(text);
 
+    private static readonly System.Buffers.SearchValues<char> Digits = System.Buffers.SearchValues.Create("0123456789");
+
     /// <summary>Text up to the first digit (card references and dates vary), falling back to the whole label.</summary>
     internal static string MatchTextFor(string label)
     {
-        var cut = label.IndexOfAny("0123456789".ToCharArray());
+        var cut = label.AsSpan().IndexOfAny(Digits);
         var head = cut > 0 ? label[..cut].Trim(' ', '*', '#', '-', '_') : label.Trim();
         return head.Length >= 3 ? head : label.Trim();
     }

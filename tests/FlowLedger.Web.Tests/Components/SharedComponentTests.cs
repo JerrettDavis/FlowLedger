@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -134,14 +135,14 @@ public sealed class SharedComponentTests : IAsyncDisposable
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result));
 
         cut.FindAll("th[scope=col]").Select(e => e.TextContent).Should().Equal("Merchant", "Total");
-        cut.FindAll("td").Select(e => e.TextContent).Should().Equal("Coffee", 1234.5m.ToString("N2"));
+        cut.FindAll("td").Select(e => e.TextContent).Should().Equal("Coffee", 1234.5m.ToString("N2", CultureInfo.InvariantCulture));
         cut.FindAll("td")[1].ClassList.Should().Contain("num");
     }
 
     [Fact]
     public void ResultTable_caps_rows_and_says_so()
     {
-        var rows = Enumerable.Range(0, 5).Select(i => new List<JsonElement> { Json(i.ToString()) }).ToList();
+        var rows = Enumerable.Range(0, 5).Select(i => new List<JsonElement> { Json(i.ToString(CultureInfo.InvariantCulture)) }).ToList();
         var result = new QueryResultDto([new QueryColumnDto("n", "number")], rows, false, 1);
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result).Add(c => c.MaxRows, 2));

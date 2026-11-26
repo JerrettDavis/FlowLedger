@@ -496,7 +496,7 @@ internal sealed class QueryParser
 
             if (Cur.Kind == Tok.Ident && Cur.Text.ToLowerInvariant() is "contains" or "startswith" or "endswith" or "has")
             {
-                var op = Cur.Text.ToLowerInvariant() == "has" ? "contains" : Cur.Text.ToLowerInvariant();
+                var op = string.Equals(Cur.Text, "has", StringComparison.OrdinalIgnoreCase) ? "contains" : Cur.Text.ToLowerInvariant();
                 _p++;
                 Expr e = new Binary(op, left, ParseAdditive());
                 left = negated ? new Unary("not", e) : e;

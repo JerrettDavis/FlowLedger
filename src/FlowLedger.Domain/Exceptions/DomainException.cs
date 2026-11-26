@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace FlowLedger.Domain.Exceptions;
 
 /// <summary>
@@ -42,7 +44,7 @@ public sealed class InvalidStatusTransitionException : DomainException
 public sealed class OccurrenceDateOutOfRangeException : DomainException
 {
     public OccurrenceDateOutOfRangeException(DateOnly date, DateOnly start, DateOnly? end)
-        : base($"Occurrence date {date:O} is outside the active window [{start:O}, {end?.ToString("O") ?? "open"}].") { }
+        : base($"Occurrence date {date:O} is outside the active window [{start:O}, {end?.ToString("O", CultureInfo.InvariantCulture) ?? "open"}].") { }
 }
 
 /// <summary>Thrown when a transaction is matched to a plan occurrence that already has a match.</summary>

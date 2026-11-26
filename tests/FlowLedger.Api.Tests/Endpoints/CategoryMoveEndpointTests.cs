@@ -59,7 +59,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
         paths.Should().Contain(["Meals", "Meals/Dining"]).And.NotContain(["Food", "Food/Dining"]);
         (await CategoryOf(tx.Id)).Should().Be(dining.Id); // identity kept, only the path changed
         (await _client.GetFromJsonAsync<List<CategoryRuleDto>>("/api/category-rules"))!
-            .Should().ContainSingle(r => r.Pattern.ToUpper() == "CAFE" && r.CategoryPath == "Meals/Dining");
+            .Should().ContainSingle(r => string.Equals(r.Pattern, "CAFE", StringComparison.OrdinalIgnoreCase) && r.CategoryPath == "Meals/Dining");
         (await _client.GetFromJsonAsync<BudgetOverview>("/api/budgets"))!.Budgets
             .Should().ContainSingle(b => b.Category == "Meals/Dining" && b.MonthlyLimit == 100m);
     }

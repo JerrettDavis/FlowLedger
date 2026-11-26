@@ -117,7 +117,7 @@ public sealed class CreateRecurringFlowHandler
                 RecurrencePattern.Monthly(request.DayOfMonth ?? 1),
             RecurrenceFrequency.LastBusinessDay =>
                 RecurrencePattern.LastBusinessDay(),
-            _ => throw new ArgumentOutOfRangeException(nameof(request.RecurrenceFrequency), freq, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(request), freq, "Unsupported recurrence frequency.")
         };
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -95,7 +96,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         var page = allTransactions.Skip(startIndex).Take(pageSize).ToList();
         var nextIndex = startIndex + page.Count;
         var hasMore = nextIndex < allTransactions.Count;
-        var nextCursor = new SyncCursor(nextIndex.ToString());
+        var nextCursor = new SyncCursor(nextIndex.ToString(CultureInfo.InvariantCulture));
 
         return new TransactionPage(page, nextCursor, hasMore);
     }
