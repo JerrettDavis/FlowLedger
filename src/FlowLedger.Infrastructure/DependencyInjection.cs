@@ -394,6 +394,9 @@ public static class DependencyInjection
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.BackupSettings>(),
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.BackupRunStore>(),
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup")));
+        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.DataRetention(
+            configuration.GetConnectionString("flowledger")
+            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
         // ── Object storage ──────────────────────────────────────────────────────
