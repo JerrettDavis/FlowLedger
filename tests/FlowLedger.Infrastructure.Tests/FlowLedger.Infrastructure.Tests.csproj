@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\FlowLedger.Infrastructure\FlowLedger.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>
