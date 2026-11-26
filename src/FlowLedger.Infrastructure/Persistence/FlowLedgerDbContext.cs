@@ -119,7 +119,7 @@ public sealed class FlowLedgerDbContext : DbContext
     /// <inheritdoc/>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        StampTenantId();
+        ValidateTenantBoundaries();
         var events = CollectDomainEvents();
 
         var result = await base.SaveChangesAsync(cancellationToken);
@@ -136,7 +136,7 @@ public sealed class FlowLedgerDbContext : DbContext
     /// <inheritdoc/>
     public override int SaveChanges()
     {
-        StampTenantId();
+        ValidateTenantBoundaries();
         var events = CollectDomainEvents();
 
         var result = base.SaveChanges();
@@ -153,44 +153,42 @@ public sealed class FlowLedgerDbContext : DbContext
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Validates that all mutations stay within the current tenant boundary.
-    /// TenantId is always set by the domain aggregate factories — this method guards
-    /// against accidental cross-tenant writes (e.g., a bug passing the wrong aggregate).
+    /// Validates that every tracked write stays inside the current tenant. Model-driven (#172): it checks every entity type that
+    /// has a TenantId property (aggregates and persistence records alike), so a newly added tenant-owned type is covered
+    /// without remembering to list it here.
     /// </summary>
-    private void StampTenantId()
+    private void ValidateTenantBoundaries()
     {
         if (IsUnscoped)
         {
             return;
         }
 
-        var tid = _tenantContext.TenantId; // Guid from ITenantContext
-
-        ValidateTenantBoundary(ChangeTracker.Entries<Account>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Transaction>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<RecurringFlow>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Category>(), tid);
-        ValidateTenantBoundary(ChangeTracker.Entries<Asset>(), tid);
-    }
-
-    private static void ValidateTenantBoundary<T>(
-        IEnumerable<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<T>> entries,
-        Guid currentTenantId)
-        where T : class
-    {
-        foreach (var entry in entries)
+        var current = _tenantContext.TenantId;
+        foreach (var entry in ChangeTracker.Entries())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
             {
                 continue;
             }
 
-            var tenantProp = entry.Property("TenantId");
-            if (tenantProp.CurrentValue is TenantId storedId && storedId.Value != currentTenantId)
+            if (entry.Metadata.FindProperty("TenantId") is null)
+            {
+                continue;
+            }
+
+            var owner = entry.Property("TenantId").CurrentValue switch
+            {
+                TenantId strong => strong.Value,
+                Guid raw => raw,
+                _ => (Guid?)null,
+            };
+
+            if (owner is { } ownerId && ownerId != current)
             {
                 throw new InvalidOperationException(
-                    $"Cross-tenant mutation attempt: current tenant {currentTenantId} tried to modify " +
-                    $"entity of type {typeof(T).Name} owned by tenant {storedId.Value}.");
+                    $"Cross-tenant mutation attempt: current tenant {current} tried to modify " +
+                    $"entity of type {entry.Metadata.ClrType.Name} owned by tenant {ownerId}.");
             }
         }
     }
