@@ -76,8 +76,8 @@ public sealed class JobRetryTests
             var scheduler = await host.Services.GetRequiredService<ISchedulerFactory>().GetScheduler();
             await scheduler.TriggerJob(new JobKey("ScheduledBackupJob", "FlowLedger"));
 
-            var deadline = DateTime.UtcNow.AddSeconds(15);
-            while (Volatile.Read(ref FailingJob.Runs) < 3 && DateTime.UtcNow < deadline)
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (Volatile.Read(ref FailingJob.Runs) < 3 && timer.Elapsed < TimeSpan.FromSeconds(15))
             {
                 await Task.Delay(50);
             }

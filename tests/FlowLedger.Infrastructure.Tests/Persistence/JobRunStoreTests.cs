@@ -23,7 +23,7 @@ public sealed class JobRunStoreTests(IntegrationTestFixture fixture) : IAsyncLif
     public async Task Runs_are_persisted_newest_first_and_old_rows_are_pruned()
     {
         var store = new NpgsqlJobRunStore(fixture.ConnectionString);
-        var now = DateTimeOffset.UtcNow;
+        var now = FlowLedger.TestSupport.TestClock.Instant;
 
         await store.AppendAsync(new JobRunEntry("ScheduledBackupJob", now.AddDays(-200), now.AddDays(-200).AddSeconds(5), true, null, 1));
         await store.AppendAsync(new JobRunEntry("ScheduledBackupJob", now.AddMinutes(-10), now.AddMinutes(-10).AddSeconds(3), false, "boom", 1));
