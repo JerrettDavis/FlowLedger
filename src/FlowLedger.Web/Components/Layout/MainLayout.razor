@@ -4,9 +4,6 @@
 @inject ILogger<MainLayout> Logger
 @inject IJSRuntime JS
 @inject IDialogService DialogService
-@inject NavigationManager Nav
-@inject ConnectionRepairService Repair
-@using FlowLedger.Web.Connections
 @inject ThemeService ThemeService
 @inject PersistentComponentState Persisted
 @implements IDisposable
@@ -32,10 +29,14 @@
                        aria-label="Toggle navigation drawer" />
         <MudText Typo="Typo.h6" Class="ml-2">FlowLedger</MudText>
         <MudSpacer />
-        @if (_syncing)
-        {
-            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-label="Syncing" />
-        }
+        @* Always rendered so assistive tech registers the live region before it changes. *@
+        <span data-testid="sync-status" role="status" aria-live="polite" class="d-inline-flex align-center">
+            @if (_syncing)
+            {
+                <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-hidden="true" />
+            }
+            <span class="fl-sr-only">@_syncAnnouncement</span>
+        </span>
         @if (_backupAlert is not null && _backupAlert != _dismissedBackupAlert && _environment == "production")
         {
             <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Error" Variant="Variant.Filled" Href="data"
@@ -48,7 +49,7 @@
             <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
                      aria-label="@($"Data environment {_environment}")">@_environment.ToUpperInvariant() DATA</MudChip>
         }
-        @if (_environment is "production" or "sandbox") // sandbox = a real provider (Quiltt/MX sandbox) is configured
+        @if (_environment == "production")
         {
             <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
                 <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
@@ -60,19 +61,6 @@
                     <span class="fl-bar-label">Connect bank</span>
                 </MudButton>
             </MudTooltip>
-            @if (_needsRepair)
-            {
-                <MudTooltip Text="A bank connection needs you to sign in again">
-                    <MudButton StartIcon="@Icons.Material.Filled.LinkOff"
-                               Color="Color.Warning"
-                               Variant="Variant.Text"
-                               OnClick="RepairNeededAsync"
-                               Disabled="_syncing"
-                               aria-label="Reconnect bank">
-                        <span class="fl-bar-label">Reconnect</span>
-                    </MudButton>
-                </MudTooltip>
-            }
             <MudTooltip Text="Fetch new data from your connected institutions">
                 <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
                            Color="Color.Inherit"
@@ -141,7 +129,7 @@
 
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
-            <AppErrorBoundary>@Body</AppErrorBoundary>
+            @Body
         </MudContainer>
     </MudMainContent>
 </MudLayout>
@@ -149,6 +137,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _syncing = false;
+    private string _syncAnnouncement = "";
     private bool _share;
     private LayoutStatus _status = LayoutStatus.Unknown;
     private string _environment => _status.Environment;
@@ -169,7 +158,6 @@
     private readonly CancellationTokenSource _autoCts = new();
     private DateTimeOffset? _lastSyncedAt;
     private DateTimeOffset _autoBackoffUntil = DateTimeOffset.MinValue;
-    private bool _autoStopped;   // a connection needs the user (reconnect); auto-sync stays off until a manual sync succeeds
     private TimeSpan _serverMinInterval = TimeSpan.FromMinutes(30);
 
     // True once the user has made an explicit choice that we've persisted;
@@ -367,63 +355,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect bank failed");
-            Snackbar.AddProblem(ex, "Connect", () => _ = RepairNeededAsync());
-        }
-    }
-
-
-    private bool _needsRepair;
-
-    /// <summary>True when the signed-in tenant has a connection only the user can fix. Failures to read never block the shell.</summary>
-    private async Task RefreshRepairStateAsync()
-    {
-        try
-        {
-            var connections = await ApiClient.GetMyConnectionsAsync();
-            _needsRepair = connections.Any(c => c.Issue is { RequiresUserAction: true });
-        }
-        catch (Exception ex)
-        {
-            Logger.LogDebug(ex, "Could not read connection health");
-        }
-    }
-
-    /// <summary>Repairs the first connection that needs the user, through the provider's pluggable repair handler, then syncs.</summary>
-    private async Task RepairNeededAsync()
-    {
-        _syncing = true;
-        try
-        {
-            var target = (await ApiClient.GetMyConnectionsAsync()).FirstOrDefault(c => c.Issue is { RequiresUserAction: true });
-            if (target is null)
-            {
-                _needsRepair = false;
-                return;
-            }
-
-            var result = await Repair.RepairAsync(new ConnectionRef(target.Provider, target.Issue?.RepairRef, target.Institution));
-            switch (result.Status)
-            {
-                case RepairStatus.Repaired:
-                    Snackbar.Add("Reconnected. Syncing your accounts…", Severity.Success);
-                    await RunSyncAsync(auto: false); // a successful sync is what clears the stored issue
-                    break;
-                case RepairStatus.Cancelled:
-                    break;
-                default:
-                    Snackbar.Add(result.Message ?? "The reconnect did not complete.", Severity.Warning);
-                    break;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Reconnect failed");
-            Snackbar.AddProblem(ex, "Reconnect");
-        }
-        finally
-        {
-            _syncing = false;
-            await RefreshRepairStateAsync();
+            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
         }
     }
 
@@ -440,21 +372,20 @@
 
             var result = await JS.InvokeAsync<QuilttConnectResult>(
                 "flowledgerQuiltt.open", session.ScriptUrl, session.ConnectorId, session.Token);
-            var outcome = ConnectExit.Parse(result.Status);
-            if (ConnectExit.Message(outcome) is var (message, severity))
+            if (result.Status == "success")
             {
-                Snackbar.Add(message, severity);
-            }
-
-            if (outcome == ConnectOutcome.Success)
-            {
+                Snackbar.Add("Bank linked. Syncing your accounts…", Severity.Success);
                 await SyncNow();
+            }
+            else if (result.Status == "error")
+            {
+                Snackbar.Add("The bank connection did not complete. Please try again.", Severity.Warning);
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Quiltt connect failed");
-            Snackbar.AddProblem(ex, "Connect", () => _ = RepairNeededAsync());
+            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
         }
     }
 
@@ -479,7 +410,7 @@
 
     private async Task AutoSyncIfDueAsync()
     {
-        if (_syncing || _autoStopped || DateTimeOffset.UtcNow < _autoBackoffUntil)
+        if (_syncing || DateTimeOffset.UtcNow < _autoBackoffUntil)
         {
             return;
         }
@@ -521,21 +452,29 @@
     private async Task RunSyncAsync(bool auto)
     {
         _syncing = true;
+        _syncAnnouncement = "Syncing";
         if (auto) StateHasChanged();
         try
         {
             var result = await ApiClient.SyncAsync();
-            _autoStopped = false;
-            await RefreshRepairStateAsync(); // a clean sync may have cleared an issue; a still-broken connection keeps the Reconnect button
             if (auto)
             {
                 if (result is { TransactionsAdded: > 0 })
                 {
                     Snackbar.Add($"Auto-sync: {result.TransactionsAdded} new transactions", Severity.Info);
+                    _syncAnnouncement = $"Sync finished: {result.TransactionsAdded} new transactions";
                 }
+                else
+                {
+                    _syncAnnouncement = "Sync finished";
+                }
+
                 return;
             }
 
+            _syncAnnouncement = result is not null
+                ? $"Sync complete: {result.TransactionsAdded} new transactions"
+                : "Sync complete";
             Snackbar.Add(result is not null
                 ? $"Sync complete — {result.TransactionsAdded} new transactions"
                 : "Sync complete", Severity.Success);
@@ -543,25 +482,16 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Sync failed");
-            if (ex is ApiClientException { RequiresUserAction: true })
-            {
-                _needsRepair = true;
-            }
-
             if (auto)
             {
-                // Throttled / outage: back off (honouring Retry-After); needs-reauth: stop until the user acts.
-                var decision = AutoSyncPolicy.AfterFailure(ex, DateTimeOffset.UtcNow, AutoSyncBackoff);
-                _autoBackoffUntil = decision.BackoffUntil;
-                if (decision.StopUntilUserActs && !_autoStopped)
-                {
-                    _autoStopped = true;
-                    Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync()); // tell the user once, not every tick
-                }
+                // Throttled / budget / needs-reauth / provider outage: stay quiet and back off.
+                _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
+                _syncAnnouncement = "";
             }
             else
             {
-                Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync());
+                _syncAnnouncement = "Sync failed";
+                Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
             }
         }
         finally
@@ -582,12 +512,11 @@
                 ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
                 : "Sync complete";
             Snackbar.Add(msg, Severity.Success);
-            _autoStopped = false;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect & Sync failed");
-            Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync());
+            Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
         }
         finally
         {
