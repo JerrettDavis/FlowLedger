@@ -68,6 +68,8 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         optionsBuilder.UseNpgsql(ConnectionString, npgsql =>
         {
             npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
+            // Same as AddInfrastructure: a retrying execution strategy forbids bare user transactions (#143).
+            npgsql.EnableRetryOnFailure(maxRetryCount: 5);
         });
 
         return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), (ITenantContext?)tenantContext ?? UnscopedTenantContext.Instance);
