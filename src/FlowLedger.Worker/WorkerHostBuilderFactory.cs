@@ -2,6 +2,7 @@ using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Worker.Jobs;
+using FlowLedger.Worker.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -62,7 +63,7 @@ public static class WorkerHostBuilderFactory
                 q.AddTrigger(opts => opts
                     .ForJob(jobKey)
                     .WithIdentity($"{nameof(ScheduledSyncJob)}-trigger", "FlowLedger")
-                    .WithCronSchedule(cron));
+                    .WithCronSchedule(cron, c => c.WithMisfireInstruction(CronTriggerMisfireInstruction.FireAndProceed)));
             }
 
             // Daily verified backup (+ restore drill + off-site copy). Default 03:15 local; Backup:Enabled=false disables.
@@ -75,7 +76,7 @@ public static class WorkerHostBuilderFactory
                 q.AddTrigger(opts => opts
                     .ForJob(backupKey)
                     .WithIdentity($"{nameof(ScheduledBackupJob)}-trigger", "FlowLedger")
-                    .WithCronSchedule(backupCron));
+                    .WithCronSchedule(backupCron, c => c.WithMisfireInstruction(CronTriggerMisfireInstruction.FireAndProceed)));
             }
 
             // Monthly home/real-estate revaluation from the configured appraisal feed (no-op when no feed is enabled).
@@ -88,7 +89,7 @@ public static class WorkerHostBuilderFactory
                 q.AddTrigger(opts => opts
                     .ForJob(valKey)
                     .WithIdentity($"{nameof(ScheduledAssetValuationJob)}-trigger", "FlowLedger")
-                    .WithCronSchedule(valCron));
+                    .WithCronSchedule(valCron, c => c.WithMisfireInstruction(CronTriggerMisfireInstruction.FireAndProceed)));
             }
 
             // Home Assistant alert push (hourly by default). A no-op for households that have not enabled sharing.
@@ -101,8 +102,21 @@ public static class WorkerHostBuilderFactory
                 q.AddTrigger(opts => opts
                     .ForJob(haKey)
                     .WithIdentity($"{nameof(ScheduledHomeAssistantJob)}-trigger", "FlowLedger")
-                    .WithCronSchedule(haCron));
+                    .WithCronSchedule(haCron, c => c.WithMisfireInstruction(CronTriggerMisfireInstruction.FireAndProceed)));
             }
+        });
+
+        // Every run is logged, counted and kept in a bounded in-memory history; a Postgres advisory lock per job keeps
+        // two worker processes (rolling deploy, accidental second replica) from running the same job at once.
+        builder.Services.AddSingleton<JobRunHistory>();
+        builder.Services.AddSingleton<JobExclusion>();
+        builder.Services.AddSingleton<JobRunRecorder>();
+        builder.Services.AddSingleton<JobRunListener>();
+        builder.Services.AddSingleton<JobExclusionTriggerListener>();
+        builder.Services.AddQuartz(q =>
+        {
+            q.AddJobListener<JobRunListener>();
+            q.AddTriggerListener<JobExclusionTriggerListener>();
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);

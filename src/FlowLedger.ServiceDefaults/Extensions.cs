@@ -67,7 +67,8 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter("FlowLedger"); // custom metrics (FlowLedgerTelemetry in Infrastructure)
             })
             .WithTracing(tracing =>
             {
