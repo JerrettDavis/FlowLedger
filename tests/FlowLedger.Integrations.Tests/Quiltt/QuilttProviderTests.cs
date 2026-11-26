@@ -162,7 +162,7 @@ public sealed class QuilttProviderTests
               {"id":"acc_2","name":"Mystery","kind":"DEPOSITORY","state":"OPEN","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}}
             ]}}
             """;
-        var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2).ToString("yyyy-MM-dd");
+        var day = DateOnly.FromDateTime(TimeProvider.System.GetUtcNow().UtcDateTime).AddDays(-2).ToString("yyyy-MM-dd");
         var stub = new Stub((req, body) =>
             req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
             : body.Contains("FlowLedgerAccounts") ? Json(accounts)
@@ -183,7 +183,7 @@ public sealed class QuilttProviderTests
     [Fact]
     public async Task Transactions_AccountWithOnlyPendingRows_AdvancesItsCursor()
     {
-        var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-4);
+        var day = DateOnly.FromDateTime(TimeProvider.System.GetUtcNow().UtcDateTime).AddDays(-4);
         var stub = new Stub((req, body) =>
             req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
             : body.Contains("FlowLedgerAccounts") ? Json(AccountsJson)
@@ -200,7 +200,7 @@ public sealed class QuilttProviderTests
     public async Task Transactions_HittingMaxPages_ContinueInTheSyncLoopInsteadOfFailing()
     {
         // Five days of rows, one per day, two rows per page and a one-page bound: the read is cut every time.
-        var d0 = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-10);
+        var d0 = DateOnly.FromDateTime(TimeProvider.System.GetUtcNow().UtcDateTime).AddDays(-10);
         var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
         var stub = new Stub((req, body) =>
         {
