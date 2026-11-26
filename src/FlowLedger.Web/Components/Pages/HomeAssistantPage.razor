@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Home Assistant — FlowLedger</PageTitle>
 
@@ -170,6 +171,11 @@ else
 
     private async Task Disconnect()
     {
+        if (!await DialogService.ConfirmAsync("Remove webhook", "Remove the saved Home Assistant webhook? FlowLedger stops sending updates until you add one again.", "Remove"))
+        {
+            return;
+        }
+
         _enabled = false;
         await Save(clearWebhook: true);
     }

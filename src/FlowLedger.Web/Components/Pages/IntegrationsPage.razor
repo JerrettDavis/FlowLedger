@@ -230,9 +230,8 @@ else
 
     private async Task DeleteAsync(IntegrationDto i)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Delete integration", $"Delete '{i.Name}' and its activity log? This can't be undone.", yesText: "Delete", cancelText: "Cancel");
-        if (confirmed != true)
+        if (!await DialogService.ConfirmAsync(
+                "Delete integration", $"Delete '{i.Name}' and its activity log? This can't be undone.", "Delete"))
         {
             return;
         }

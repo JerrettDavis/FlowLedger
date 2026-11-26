@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Rules — FlowLedger</PageTitle>
 
@@ -77,6 +78,11 @@ else
 
     private async Task Remove(string pattern)
     {
+        if (!await DialogService.ConfirmAsync("Remove rule", $"Remove the rule for \"{pattern}\"? Future transactions will no longer be categorized by it.", "Remove"))
+        {
+            return;
+        }
+
         try
         {
             await ApiClient.DeleteCategoryRuleAsync(pattern);

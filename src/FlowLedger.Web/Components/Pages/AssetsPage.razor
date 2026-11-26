@@ -223,10 +223,8 @@
 
     private async Task Remove(FlowLedger.Web.ApiClient.AssetDto asset)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync("Remove asset",
-            $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.",
-            yesText: "Remove", cancelText: "Cancel");
-        if (confirmed == true)
+        if (await DialogService.ConfirmAsync("Remove asset",
+                $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.", "Remove"))
         {
             await Run("Asset removed", async () => { await ApiClient.DeleteAssetAsync(asset.Id); return (object?)null; });
         }
