@@ -86,8 +86,10 @@ services:
   # ── Infrastructure ────────────────────────────────────────────────────────
   postgres:
     profiles: [infra, full]
-    image: postgres:17-alpine
+    # Tag + digest (verified by pulling); Dependabot's docker ecosystem keeps both current.
+    image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
     restart: unless-stopped
+    networks: [backend]
     environment:
       POSTGRES_USER: flowledger
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 32)}
@@ -123,8 +125,9 @@ services:
 
   redis:
     profiles: [infra, full]
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     restart: unless-stopped
+    networks: [backend]
     # Password required (REDIS_PASSWORD, falling back to POSTGRES_PASSWORD). redis-cli inside the
     # container authenticates through REDISCLI_AUTH.
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-${POSTGRES_PASSWORD}}"]
@@ -164,6 +167,8 @@ services:
       dockerfile: src/FlowLedger.Api/Dockerfile
     restart: unless-stopped
     <<: *app-hardening
+    # backend: postgres/redis; frontend: reachable by web. Web and the outside never see the data stores.
+    networks: [backend, frontend]
     mem_limit: 1g
     cpus: 2
     # Let in-flight requests (and a "Back up now" run) finish before SIGKILL.
@@ -205,6 +210,7 @@ services:
       dockerfile: src/FlowLedger.Web/Dockerfile
     restart: unless-stopped
     <<: *app-hardening
+    networks: [frontend]
     mem_limit: 512m
     cpus: 1
     stop_grace_period: 30s
@@ -242,6 +248,7 @@ services:
       dockerfile: src/FlowLedger.Worker/Dockerfile
     restart: unless-stopped
     <<: *app-hardening
+    networks: [backend]
     mem_limit: 1g
     cpus: 2
     # The worker waits for running jobs (sync, scheduled backup, restic copy) on shutdown; the
@@ -264,6 +271,11 @@ services:
     # disable keeps `docker compose ps` from reporting a misleading status.
     healthcheck:
       disable: true
+
+# Postgres and Redis sit on `backend` only (api + worker); web shares only `frontend` with the api.
+networks:
+  backend:
+  frontend:
 
 volumes:
   postgres_data:

@@ -79,6 +79,10 @@ See [local-dev.md](../development/local-dev.md) for the full Aspire workflow.
   drop all capabilities except those their entrypoints need to chown their data directory and step down to their own user.
   Because the root filesystem is read-only, ASP.NET Data Protection keys are in-memory only for now (sign-in cookies are
   invalidated on restart) until persistent key storage is added.
+* **Networks and images.** postgres and redis sit on a `backend` network shared only with api and worker; web shares just a
+  `frontend` network with the api. The postgres and redis images are pinned by tag and digest (Dependabot's docker
+  ecosystem proposes updates). Runtime images run as the non-root `APP_UID` (1654), and `appsettings.Development.json` is
+  excluded from images (it holds the public dev API key), so the images carry no Development-only settings.
 * **Limits.** Defaults: api 1 GiB / 2 CPUs, web 512 MiB / 1 CPU, worker 1 GiB / 2 CPUs, postgres 1 GiB / 2 CPUs
   (`shared_buffers=256MB`), redis 256 MiB. They suit a single household; raise `mem_limit` (and postgres
   `shared_buffers`/`effective_cache_size`, about 25%/75% of its limit) on larger hosts or for very large imports.
