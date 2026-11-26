@@ -16,7 +16,13 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<SimpleFinOptions>(configuration.GetSection(SimpleFinOptions.SectionName));
+        services.AddOptions<SimpleFinOptions>()
+            .Bind(configuration.GetSection(SimpleFinOptions.SectionName))
+            .Validate(o => string.IsNullOrWhiteSpace(o.AccessUrl) || Uri.TryCreate(o.AccessUrl, UriKind.Absolute, out _),
+                "SimpleFin:AccessUrl is not a valid absolute URL.")
+            .Validate(o => o.HistoryDays is > 0 and <= 90 && o.OverlapDays >= 0 && o.BackfillDays >= 0,
+                "SimpleFin:HistoryDays must be 1-90, and OverlapDays / BackfillDays must not be negative.")
+            .ValidateOnStart();
 
         services.AddHttpClient<SimpleFinFinancialDataProvider>((sp, http) =>
         {
