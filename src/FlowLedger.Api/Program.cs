@@ -127,7 +127,11 @@ builder.Services.AddRateLimiter(opts =>
 
     opts.AddFixedWindowPolicy("api", permitLimit: 300, queueLimit: 10);
     opts.AddFixedWindowPolicy("write", permitLimit: 60, queueLimit: 5);
-    opts.AddFixedWindowPolicy("webhook", permitLimit: 30, queueLimit: 0); // No queue; reject immediately.
+    // Pre-verification webhook limit per (provider, IP): generous so real deliveries are not starved by junk, no queue.
+    opts.AddWebhookPolicy("webhook", builder.Configuration.GetValue("RateLimiting:WebhookPerIpPerMinute", RateLimitPartitions.DefaultWebhookPerIpPerMinute));
+    // Backstop for every request (per-IP cap + stricter cap on rejected credentials) and Retry-After on 429.
+    opts.GlobalLimiter = RateLimitPartitions.CreateGlobalLimiter(builder.Configuration);
+    opts.OnRejected = RateLimitPartitions.OnRejected;
 });
 
 // Opt-in forwarded headers (ForwardedHeaders:Enabled + KnownProxies/KnownNetworks): without it, behind a proxy the rate limiter and
