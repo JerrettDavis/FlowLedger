@@ -19,8 +19,11 @@ public sealed partial class IntegrationService(
     IIntegrationStore store,
     IIntegrationTransport transport,
     IHomeAssistantNetworkPolicy network,
-    ITenantContext tenant)
+    ITenantContext tenant,
+    TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     public const int MaxIntegrationsPerTenant = 25;
     public const int MaxHeaders = 10;
     public const int MaxRequestBytes = 256 * 1024;
@@ -163,7 +166,7 @@ public sealed partial class IntegrationService(
             existing?.Id ?? Guid.NewGuid(), name, r.Kind, r.Enabled,
             new IntegrationConfig(url!, r.Auth, authUser, headers, events, soapEndpoint),
             hasCredential, existing?.HasSigningSecret == true || newSigning is not null,
-            existing?.CreatedUtc ?? DateTimeOffset.UtcNow, existing?.LastUsedUtc, existing?.LastError);
+            existing?.CreatedUtc ?? _clock.GetUtcNow(), existing?.LastUsedUtc, existing?.LastError);
         await store.SaveAsync(TenantId, saved, credential, clearCredential, newSigning, ct);
         return new IntegrationSaveResult(saved, null, newSigning);
     }
@@ -390,7 +393,7 @@ public sealed partial class IntegrationService(
         {
             await store.RecordDeliveryAsync(
                 TenantId,
-                new IntegrationDelivery(Guid.NewGuid(), integration.Id, DateTimeOffset.UtcNow, trigger, "POST",
+                new IntegrationDelivery(Guid.NewGuid(), integration.Id, _clock.GetUtcNow(), trigger, "POST",
                     IntegrationUrl.SafeTarget(integration.Config.Url), null, (int)DispatchTimeout.TotalMilliseconds, error),
                 CancellationToken.None);
         }
@@ -410,12 +413,12 @@ public sealed partial class IntegrationService(
             ["version"] = 1,
             ["event"] = eventKind,
             ["event_id"] = deliveryId,
-            ["occurred_at"] = DateTimeOffset.UtcNow,
+            ["occurred_at"] = _clock.GetUtcNow(),
             ["data"] = data,
         }, Json);
 
         var headers = BuildHeaders(integration.Config, secrets, new Dictionary<string, string>());
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var timestamp = _clock.GetUtcNow().ToUnixTimeSeconds().ToString();
         headers.Add(new(EventHeader, eventKind));
         headers.Add(new(DeliveryHeader, deliveryId));
         headers.Add(new(TimestampHeader, timestamp));
@@ -453,7 +456,7 @@ public sealed partial class IntegrationService(
         {
             await store.RecordDeliveryAsync(
                 TenantId,
-                new IntegrationDelivery(Guid.NewGuid(), integration.Id, DateTimeOffset.UtcNow, trigger, request.Method,
+                new IntegrationDelivery(Guid.NewGuid(), integration.Id, _clock.GetUtcNow(), trigger, request.Method,
                     IntegrationUrl.SafeTarget(request.Url), response.StatusCode, result.DurationMs, error),
                 CancellationToken.None);
         }
