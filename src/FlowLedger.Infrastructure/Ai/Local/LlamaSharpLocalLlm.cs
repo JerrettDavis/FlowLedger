@@ -14,7 +14,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// If the native backend or the model cannot load, <see cref="State"/> says so and <see cref="ChooseAsync"/> returns null: the
 /// caller then simply keeps the embedder's answer. Never started by the sync pipeline, only by an explicit categorization run.
 /// </summary>
-public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
+internal sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
 {
     private readonly LocalAiOptions _options;
     private readonly LocalModelManager _models;

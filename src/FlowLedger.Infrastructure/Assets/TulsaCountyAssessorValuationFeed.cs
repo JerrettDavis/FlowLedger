@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace FlowLedger.Infrastructure.Assets;
 
 /// <summary>Configuration for the Tulsa County (OK) Assessor feed. Bind from <c>TulsaAssessor</c>.</summary>
-public sealed class TulsaAssessorOptions
+internal sealed class TulsaAssessorOptions
 {
     public const string SectionName = "TulsaAssessor";
 
@@ -29,7 +29,7 @@ public sealed class TulsaAssessorOptions
 /// <c>/Property/Info?accountNo=</c> for the market value. Only the street address leaves the system.
 /// The value is an annual (Jan 1) assessment, not a live estimate.
 /// </summary>
-public sealed partial class TulsaCountyAssessorValuationFeed(
+internal sealed partial class TulsaCountyAssessorValuationFeed(
     IHttpClientFactory httpFactory,
     IOptions<TulsaAssessorOptions> options,
     ILogger<TulsaCountyAssessorValuationFeed> logger) : IAssetValuationFeed

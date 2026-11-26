@@ -14,7 +14,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// surfacing an obscure SQL error mid-migration. PostgreSQL 17 is the version built and tested against
 /// (docs/self-hosting/database.md); another supported major only logs a warning.
 /// </summary>
-public static class PostgresVersionGuard
+internal static class PostgresVersionGuard
 {
     public const int MinimumMajor = 16;
     public const int TestedMajor = 17;
@@ -47,7 +47,7 @@ public static class PostgresVersionGuard
 }
 
 /// <summary>Runs <see cref="PostgresVersionGuard"/> at host start, before the migration service.</summary>
-public sealed class PostgresVersionGuardService(IServiceProvider sp, ILogger<PostgresVersionGuardService> logger) : IHostedService
+internal sealed class PostgresVersionGuardService(IServiceProvider sp, ILogger<PostgresVersionGuardService> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {

@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// session metadata (token_type_ids is only fed when the model declares it); pooling and prefixes come from the
 /// <see cref="EmbeddingSpec"/>, so swapping models is a catalog entry, not code.
 /// </summary>
-public sealed class OnnxTextEmbedder : ITextEmbedder, IDisposable
+internal sealed class OnnxTextEmbedder : ITextEmbedder, IDisposable
 {
     private const int BatchSize = 32;
     private readonly InferenceSession _session;

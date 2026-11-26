@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// (webhook) job and the Worker: (1) at most one sync per tenant at a time, (2) a minimum interval since the
 /// last successful sync. Syncs inside the interval are skipped, never queued, so the provider is not called.
 /// </summary>
-public sealed class GuardedSyncService : IFinancialSyncService
+internal sealed class GuardedSyncService : IFinancialSyncService
 {
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> Locks = new();
 

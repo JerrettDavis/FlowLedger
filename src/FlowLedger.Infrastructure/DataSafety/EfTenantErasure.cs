@@ -12,7 +12,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// all in one transaction; then clears stored files and marks the registry row deleted. Hard delete: there is no retention window
 /// (owner decision #169 may add one). The household tenant is refused. Idempotent.
 /// </summary>
-public sealed class EfTenantErasure(
+internal sealed class EfTenantErasure(
     FlowLedgerDbContext db,
     Guid protectedTenantId,
     IEnumerable<ITenantFileEraser> fileErasers) : ITenantErasure

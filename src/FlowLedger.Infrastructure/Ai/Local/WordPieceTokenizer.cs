@@ -7,7 +7,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// BERT-style uncased tokenizer (lower-case, strip accents, split on punctuation, greedy longest-match WordPiece), enough for
 /// MiniLM / bge / e5-style vocab.txt files. Hand-rolled (about 100 lines) to avoid a heavy tokenizer dependency.
 /// </summary>
-public sealed class WordPieceTokenizer
+internal sealed class WordPieceTokenizer
 {
     private const int MaxCharsPerWord = 100;
     private readonly Dictionary<string, int> _vocab;

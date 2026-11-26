@@ -20,7 +20,7 @@ public static class HealthTags
 /// Readiness: Postgres reachable AND the schema is fully migrated. A reachable database with pending migrations is
 /// Unhealthy: the host would serve requests against a schema its code does not match.
 /// </summary>
-public sealed class PostgresReadinessCheck(IConfiguration configuration) : IHealthCheck
+internal sealed class PostgresReadinessCheck(IConfiguration configuration) : IHealthCheck
 {
     private static readonly Lazy<string[]> KnownMigrations = new(() =>
         typeof(PostgresReadinessCheck).Assembly.GetTypes()
@@ -74,7 +74,7 @@ public sealed class PostgresReadinessCheck(IConfiguration configuration) : IHeal
 /// Readiness: Redis reachable, but only when <c>ConnectionStrings:redis</c> is configured (Redis is optional; the
 /// in-memory cache is the fallback). A plain TCP connect, no extra client dependency.
 /// </summary>
-public sealed class RedisReadinessCheck(IConfiguration configuration) : IHealthCheck
+internal sealed class RedisReadinessCheck(IConfiguration configuration) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -141,7 +141,7 @@ public sealed class RedisReadinessCheck(IConfiguration configuration) : IHealthC
 /// Window: <c>Health:BackupMaxAgeHours</c> (default 36 h, one missed daily run plus slack). Skipped when
 /// <c>Backup:Enabled=false</c>.
 /// </summary>
-public sealed class BackupFreshnessCheck(IConfiguration configuration, TimeProvider clock) : IHealthCheck
+internal sealed class BackupFreshnessCheck(IConfiguration configuration, TimeProvider clock) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -195,7 +195,7 @@ public sealed class BackupFreshnessCheck(IConfiguration configuration, TimeProvi
 /// Readiness: the object-storage root (raw provider payload archive) exists or can be created and accepts a write.
 /// Unhealthy on failure, because ingest would lose the archive (ADR 0007). Writes and deletes a small probe file.
 /// </summary>
-public sealed class ObjectStorageWritableCheck(Microsoft.Extensions.Options.IOptions<FlowLedger.Infrastructure.Storage.ObjectStorageOptions> options) : IHealthCheck
+internal sealed class ObjectStorageWritableCheck(Microsoft.Extensions.Options.IOptions<FlowLedger.Infrastructure.Storage.ObjectStorageOptions> options) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -239,7 +239,7 @@ public sealed class ObjectStorageWritableCheck(Microsoft.Extensions.Options.IOpt
 /// backup): Degraded when the newest cursor is older than <c>Health:SyncMaxAgeHours</c> (default 48). Healthy when nothing has
 /// ever synced (no provider connected yet).
 /// </summary>
-public sealed class LastSyncAgeCheck(IConfiguration configuration, TimeProvider clock) : IHealthCheck
+internal sealed class LastSyncAgeCheck(IConfiguration configuration, TimeProvider clock) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
@@ -321,14 +321,14 @@ public static class ReadinessHealthExtensions
 }
 
 /// <summary>Shared (singleton) cache state per check name; health check instances are created per request, the cache must outlive them.</summary>
-public sealed class HealthCacheStore
+internal sealed class HealthCacheStore
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HealthCacheState> _states = new();
 
     public HealthCacheState For(string name) => _states.GetOrAdd(name, _ => new HealthCacheState());
 }
 
-public sealed class HealthCacheState
+internal sealed class HealthCacheState
 {
     internal SemaphoreSlim Gate { get; } = new(1, 1);
     internal HealthCheckResult Last { get; set; }
@@ -336,7 +336,7 @@ public sealed class HealthCacheState
 }
 
 /// <summary>Memoises the last result of an inner health check for a short time (includes failures, so an outage is not hammered).</summary>
-public sealed class CachedHealthCheck(IHealthCheck inner, TimeSpan ttl, TimeProvider time, HealthCacheState state) : IHealthCheck
+internal sealed class CachedHealthCheck(IHealthCheck inner, TimeSpan ttl, TimeProvider time, HealthCacheState state) : IHealthCheck
 {
     public static readonly TimeSpan DefaultTtl = TimeSpan.FromSeconds(5);
 

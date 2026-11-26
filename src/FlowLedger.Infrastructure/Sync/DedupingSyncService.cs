@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// After every successful sync that brought in new rows, folds unambiguous duplicates (High confidence only) before
 /// categorization/recurring detection run, so they never see the same purchase twice. Never fails the sync.
 /// </summary>
-public sealed class DedupingSyncService(
+internal sealed class DedupingSyncService(
     IFinancialSyncService inner,
     DuplicateService duplicates,
     ILogger<DedupingSyncService> logger) : IFinancialSyncService
