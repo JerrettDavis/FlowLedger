@@ -45,6 +45,12 @@ public sealed class QuilttOptions
     /// <summary>Safety cap on GraphQL pages per list per sync.</summary>
     public int MaxPages { get; set; } = 100;
 
+    /// <summary>
+    /// How long to back off after an HTTP 429 when Quiltt sends no Retry-After header (verified: it does not, for the per-profile
+    /// hourly session quota).
+    /// </summary>
+    public TimeSpan RateLimitFallback { get; set; } = TimeSpan.FromMinutes(15);
+
     /// <summary>Webhook timestamp tolerance, to reject replays of old captured deliveries.</summary>
     public TimeSpan WebhookTolerance { get; set; } = TimeSpan.FromMinutes(5);
 

@@ -24,6 +24,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
     private QuilttSession? _session;
     private Task<IReadOnlyList<QAccount>>? _accounts;
+    private Task<IReadOnlyList<QConnectionNode>>? _connections;
     private (DateOnly From, Task<IReadOnlyList<QTransaction>> Task)? _transactions;
     private readonly Dictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
@@ -71,26 +72,19 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         return new ProviderMemberRef(session.ProfileId, "Quiltt", ConnectionStatus.ConnectionPending);
     }
 
-    public async Task<ConnectionStatus> GetConnectionStatusAsync(string memberProviderId, CancellationToken cancellationToken = default)
+    public async Task<ConnectionStatus> GetConnectionStatusAsync(string memberProviderId, CancellationToken cancellationToken = default) =>
+        (await GetConnectionHealthAsync(memberProviderId, cancellationToken).ConfigureAwait(false)).Status;
+
+    /// <summary>
+    /// Reads every Quiltt Connection of the profile and folds them into one health: the worst classified issue wins (see
+    /// <see cref="QuilttIssueMapper.Aggregate"/>). The issue's <c>ProviderCode</c> carries the Quiltt connection id for reconnect
+    /// (<see cref="QuilttProviderCode.TryGetConnectionId"/>). Transport/HTTP failures throw typed provider exceptions.
+    /// </summary>
+    public async Task<ConnectionHealth> GetConnectionHealthAsync(string memberProviderId, CancellationToken cancellationToken = default)
     {
-        var accounts = await GetAccountsCoreAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
-        if (accounts.Count == 0)
-        {
-            return ConnectionStatus.ConnectionPending;
-        }
-
-        var statuses = accounts.Select(a => a.Connection?.Status?.ToUpperInvariant()).ToList();
-        if (statuses.Any(s => s is "ERROR_REPAIRABLE" or "ERROR_REAUTH" or "REAUTH_REQUIRED" or "ERROR_INSTITUTION" or "NEEDS_ATTENTION"))
-        {
-            return ConnectionStatus.NeedsUserAction;
-        }
-
-        if (statuses.Any(s => s is "SYNCING" or "INITIALIZING"))
-        {
-            return ConnectionStatus.Syncing;
-        }
-
-        return statuses.Any(s => s is "ERROR" or "ERROR_PROVIDER") ? ConnectionStatus.Degraded : ConnectionStatus.Healthy;
+        var session = await EnsureSessionAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
+        var connections = await (_connections ??= _client.ListConnectionsAsync(session.Token, cancellationToken)).ConfigureAwait(false);
+        return QuilttIssueMapper.Aggregate([.. connections.Select(c => (c.Id, c.Status))]);
     }
 
     // ── Accounts ─────────────────────────────────────────────────────────────
@@ -107,17 +101,37 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         return mapped;
     }
 
-    private async Task<IReadOnlyList<QAccount>> GetAccountsCoreAsync(string profileId, CancellationToken ct)
+    private async Task<QuilttSession> EnsureSessionAsync(string profileId, CancellationToken ct)
     {
         if (_session is null || !string.Equals(_session.ProfileId, profileId, StringComparison.Ordinal))
         {
             _session = await _client.CreateSessionAsync(profileId, ct).ConfigureAwait(false);
             _accounts = null;
+            _connections = null;
             _transactions = null;
         }
 
-        var session = _session;
-        return await (_accounts ??= _client.ListAccountsAsync(session.Token, ct)).ConfigureAwait(false);
+        return _session;
+    }
+
+    private async Task<IReadOnlyList<QAccount>> GetAccountsCoreAsync(string profileId, CancellationToken ct)
+    {
+        var session = await EnsureSessionAsync(profileId, ct).ConfigureAwait(false);
+        var accounts = await (_accounts ??= _client.ListAccountsAsync(session.Token, ct)).ConfigureAwait(false);
+
+        // Reads keep working on stale data while a connection is broken; refuse to report a "successful" sync of nothing but
+        // broken connections so the shared layers record the issue instead of a false recovery.
+        var byConnection = accounts
+            .Where(a => a.Connection?.Id is not null)
+            .GroupBy(a => a.Connection!.Id!)
+            .Select(g => (Id: (string?)g.Key, Status: g.First().Connection!.Status))
+            .ToList();
+        if (QuilttIssueMapper.BlockingException(byConnection) is { } blocked)
+        {
+            throw blocked;
+        }
+
+        return accounts;
     }
 
     // ── Transactions ─────────────────────────────────────────────────────────
@@ -125,8 +139,8 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     public async Task<TransactionPage> GetTransactionsAsync(
         string providerAccountId, SyncCursor cursor, int pageSize = 100, CancellationToken cancellationToken = default)
     {
-        var session = _session ?? throw new NeedsUserActionProviderException(
-            "Quiltt accounts must be read before transactions.", "Run a sync from the start.");
+        var session = _session ?? throw new FatalProviderException(
+            "Quiltt accounts must be read before transactions.", "SEQUENCE") { Kind = ProviderIssueKind.Internal };
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = cursor.IsInitial || !DateOnly.TryParse(cursor.Value, out var c)
