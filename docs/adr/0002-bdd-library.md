@@ -137,16 +137,17 @@ side effect is required; it would consume the same forecast output.
 
 - **Version drift.** The pinned version is now TinyBDD / TinyBDD.Xunit **0.19.48** (`Directory.Packages.props`), not `0.19.23`. The
   `0.19.23` text above records the original spike and decision. The scoped `<NoWarn>` workaround
-  (`CS8602;CS8625;CS0168` in `tests/FlowLedger.Bdd.Tests/FlowLedger.Bdd.Tests.csproj`) was written for `0.19.23`; it has not been
-  re-validated against `0.19.48`, so whether it is still needed (or still sufficient) is unknown.
-- **Coverage is small.** The suite is five scenario classes with six `[DockerFact]` scenarios (forecasting, matching, import,
-  simulated sync, MX sync). There are no scenarios yet for transfer pairing, recurring detection to forecast, budget alerts,
-  multi-user tenant isolation or provider-failure repair. The BDD suite is therefore not by itself acceptance evidence for those
-  behaviours.
-- **Docker-gated.** Every scenario needs Docker and skips without it.
-- Follow-up tracked in issue #161: add scenarios mapped to user stories, publish scenario output as a CI artifact.
+  (`CS8602;CS8625;CS0168`) was written for `0.19.23`. Re-validated against `0.19.48`: the project builds with zero warnings
+  without it (warnings are errors), so it has been removed.
+- **Coverage.** The suite is six scenario classes and 15 scenarios: six `[DockerFact]` scenarios (forecasting, matching, import,
+  simulated sync, MX sync) and nine database-free scenarios in `DomainRuleScenarios` (debt payoff order, bank-export sign
+  conventions, transfer detection). There are still no scenarios for recurring detection to forecast, budget alerts, multi-user
+  tenant isolation or provider-failure repair; those behaviours are covered by unit and API tests, not by this suite.
+- **Docker-gated, mostly.** The six Postgres-backed scenarios need Docker and skip without it; `DomainRuleScenarios` runs everywhere.
+  Non-Docker scenarios use `[Scenario(...), Fact, DisableOptimization]` (`[Scenario]` alone is not discovered as a test).
+- Still open in issue #161: scenarios mapped to user stories beyond these, and publishing scenario output as a CI artifact.
 
 ## References
 
 - Phase 6b spike report (TinyBDD net10.0 compile-and-run verification).
-- `tests/FlowLedger.Bdd.Tests/` — six scenarios across forecasting, matching, import, and sync.
+- `tests/FlowLedger.Bdd.Tests/` — 15 scenarios across forecasting, matching, import, sync, debt payoff, import formats and transfer detection.
