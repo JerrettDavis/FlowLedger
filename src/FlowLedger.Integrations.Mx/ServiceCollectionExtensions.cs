@@ -94,7 +94,7 @@ public static class ServiceCollectionExtensions
             var replay = sp.GetRequiredService<IOptions<MxProviderOptions>>().Value.ReplayArchivePath;
             return string.IsNullOrWhiteSpace(replay)
                 ? new SocketsHttpHandler()
-                : (HttpMessageHandler)new MxArchiveReplayHandler(replay);
+                : (HttpMessageHandler)new MxArchiveReplayHandler(replay, sp.GetService<IRawPayloadDecryptor>());
         });
         mxHttp.AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
 

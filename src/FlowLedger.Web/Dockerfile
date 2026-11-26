@@ -64,6 +64,16 @@ COPY --from=publish --chown=1654:1654 /keys /keys
 # ASP.NET chiseled images listen on 8080 (HTTP) by default.
 EXPOSE 8080
 
+# Build identity (release builds pass the pushed tag and the tagged commit; local builds leave them empty and the app falls back
+# to its assembly version). Surfaced by GET /api/status and as OCI labels.
+ARG VERSION=
+ARG COMMIT=
+ENV FLOWLEDGER_VERSION=$VERSION \
+    FLOWLEDGER_COMMIT=$COMMIT
+LABEL org.opencontainers.image.version=$VERSION \
+      org.opencontainers.image.revision=$COMMIT \
+      org.opencontainers.image.source="https://github.com/JerrettDavis/FlowLedger"
+
 # Explicit non-root user (the base image already sets APP_UID=1654; stated here so it is auditable).
 USER $APP_UID
 

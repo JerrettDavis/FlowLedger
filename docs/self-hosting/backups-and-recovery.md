@@ -119,7 +119,7 @@ database), and compares counts taken just before the backup, so run it against a
 `GET /api/data/export`, `POST /api/data/import` and `POST /api/data/backup-now` act on the whole database (every tenant), so on top of the household-tenant check they are gated as follows:
 
 * **Recommended: set `DataAdmin__Key`** (>= 32 random characters, `openssl rand -hex 32`) on the API and the Web app. Callers must then send it as the `X-Admin-Token` header (the Web app does this automatically for `/api/data/*`), from any address. Add `DataAdmin__RequireLoopback=true` to also require a direct loopback caller.
-* **Without a key** only a *direct* loopback caller is accepted. Requests that arrive through a reverse proxy are refused even when the proxy runs on the same host (they carry `X-Forwarded-*` headers), and `X-Forwarded-For` can never make a caller look local. `DataAdmin__AllowRemote=true` still disables the check entirely (not recommended; use the key instead).
+* **Without a key** (Development only; #139) only a *direct* loopback caller is accepted. Outside the Development environment a key is REQUIRED: an address is not a credential, so `/api/data/export`, `/import`, `/backup-now`, `/tenants`, `/tenants/{id}/offboard` and `/reencrypt-secrets` answer 403 until `DataAdmin__Key` is set. Requests that arrive through a reverse proxy are refused even when the proxy runs on the same host (they carry `X-Forwarded-*` headers), and `X-Forwarded-For` can never make a caller look local. `DataAdmin__AllowRemote=true` still disables the check entirely (not recommended; use the key instead).
 * Import accepts at most 256 MB and stops extracting as soon as the real uncompressed byte count exceeds the cap.
 
 The export zip is deleted from the server as soon as it has been sent.
@@ -160,3 +160,6 @@ data can never be adopted as production (unless you set `DataEnvironment__AdoptE
 * The incremental overlap (`Mx__Provider__IncrementalOverlapDays`, default 30) is intentionally **not** reduced: it is what
   catches late-posting and back-dated transactions, and trading it for fewer reads risks silent data loss. Revisit once MX's
   contractual billing unit is confirmed using the ledger numbers.
+
+`GET /api/data/export` exports every tenant by default (disaster recovery). `?scope=tenant` exports only the calling tenant and `?tenantId=<guid>` exports that tenant: every
+tenant-scoped table filtered to it, plus owned child tables, with the tenant recorded in the manifest. A single-tenant bundle is for portability and review; `POST /api/data/import` refuses it.

@@ -66,4 +66,26 @@ internal sealed class EfSyncCursorStore : ISyncCursorStore
 
         await _db.SaveChangesAsync(ct);
     }
+
+    public async Task MarkSuccessfulAsync(
+        string providerName,
+        IReadOnlyCollection<string> providerAccountIds,
+        CancellationToken ct = default)
+    {
+        if (providerAccountIds.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var records = await _db.SyncCursors
+            .Where(r => r.ProviderName == providerName && providerAccountIds.Contains(r.ProviderAccountId))
+            .ToListAsync(ct);
+        foreach (var record in records)
+        {
+            record.MarkSuccessful(now);
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
 }

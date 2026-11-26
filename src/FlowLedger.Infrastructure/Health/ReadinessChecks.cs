@@ -191,6 +191,106 @@ public sealed class BackupFreshnessCheck(IConfiguration configuration, TimeProvi
     }
 }
 
+/// <summary>
+/// Readiness: the object-storage root (raw provider payload archive) exists or can be created and accepts a write.
+/// Unhealthy on failure, because ingest would lose the archive (ADR 0007). Writes and deletes a small probe file.
+/// </summary>
+public sealed class ObjectStorageWritableCheck(Microsoft.Extensions.Options.IOptions<FlowLedger.Infrastructure.Storage.ObjectStorageOptions> options) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        string probe = string.Empty;
+        try
+        {
+            var root = Path.GetFullPath(options.Value.RootPath);
+            // A dedicated subdirectory keeps a leftover probe file out of the archive proper.
+            var probeDir = Path.Combine(root, ".health");
+            Directory.CreateDirectory(probeDir);
+            probe = Path.Combine(probeDir, $"probe-{Guid.NewGuid():N}");
+            await File.WriteAllTextAsync(probe, "ok", cancellationToken);
+            return HealthCheckResult.Healthy("Object storage is writable.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return HealthCheckResult.Unhealthy("Object storage root is not writable.", ex);
+        }
+        finally
+        {
+            try
+            {
+                if (probe.Length > 0 && File.Exists(probe))
+                {
+                    File.Delete(probe);
+                }
+            }
+            catch (IOException)
+            {
+                // Best effort cleanup; a leftover probe file is harmless.
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Reports provider sync freshness from <c>sync_cursors</c>. Never Unhealthy (a stale sync is an operator problem, like a stale
+/// backup): Degraded when the newest cursor is older than <c>Health:SyncMaxAgeHours</c> (default 48). Healthy when nothing has
+/// ever synced (no provider connected yet).
+/// </summary>
+public sealed class LastSyncAgeCheck(IConfiguration configuration, TimeProvider clock) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        var cs = configuration.GetConnectionString("flowledger");
+        if (string.IsNullOrWhiteSpace(cs))
+        {
+            return HealthCheckResult.Degraded("Connection string 'flowledger' is not configured.");
+        }
+
+        var maxAge = TimeSpan.FromHours(double.TryParse(configuration["Health:SyncMaxAgeHours"], out var h) && h > 0 ? h : 48);
+
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(cs) { Timeout = 3, CommandTimeout = 5 };
+            await using var conn = new NpgsqlConnection(builder.ConnectionString);
+            await conn.OpenAsync(cancellationToken);
+
+            await using var exists = new NpgsqlCommand("SELECT to_regclass('sync_cursors') IS NOT NULL", conn);
+            if (!(bool)(await exists.ExecuteScalarAsync(cancellationToken))!)
+            {
+                return HealthCheckResult.Healthy("No sync has run yet.");
+            }
+
+            await using var cmd = new NpgsqlCommand("SELECT max(last_synced_at) FROM sync_cursors", conn);
+            var last = await cmd.ExecuteScalarAsync(cancellationToken);
+            DateTimeOffset lastUtc;
+            switch (last)
+            {
+                case DateTimeOffset dto:
+                    lastUtc = dto;
+                    break;
+                case DateTime dt:
+                    lastUtc = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc));
+                    break;
+                default:
+                    return HealthCheckResult.Healthy("No sync has run yet.");
+            }
+
+            var age = clock.GetUtcNow() - lastUtc;
+            var data = new Dictionary<string, object> { ["lastSyncUtc"] = lastUtc, ["ageHours"] = Math.Round(age.TotalHours, 1) };
+            return age <= maxAge
+                ? HealthCheckResult.Healthy($"Last sync {age.TotalHours:F1} h ago.", data: data)
+                : HealthCheckResult.Degraded($"Last sync {age.TotalHours:F1} h ago (limit {maxAge.TotalHours:F0} h).", data: data);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return HealthCheckResult.Degraded("Last sync age could not be determined.", ex);
+        }
+    }
+}
+
 public static class ReadinessHealthExtensions
 {
     /// <summary>Registers the readiness-tagged checks (Postgres+migrations, Redis if configured, backup freshness).</summary>
@@ -209,6 +309,12 @@ public static class ReadinessHealthExtensions
                 failureStatus: null, tags: [HealthTags.Ready]))
             .Add(new HealthCheckRegistration("backup",
                 sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<BackupFreshnessCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("backup")),
+                failureStatus: null, tags: [HealthTags.Ready]))
+            .Add(new HealthCheckRegistration("object-storage",
+                sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<ObjectStorageWritableCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("object-storage")),
+                failureStatus: null, tags: [HealthTags.Ready]))
+            .Add(new HealthCheckRegistration("last-sync",
+                sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<LastSyncAgeCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("last-sync")),
                 failureStatus: null, tags: [HealthTags.Ready]));
         return services;
     }

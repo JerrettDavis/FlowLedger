@@ -35,16 +35,14 @@ public class ModelDownloadTests : IDisposable
         public HttpClient CreateClient(string name) => new(new H(respond));
     }
 
+    /// <summary>Upper bound for a download to finish; a guard against a hang, never a pacing delay.</summary>
+    private static readonly TimeSpan Guard = TimeSpan.FromSeconds(30);
+
     private async Task<(LocalModelManager Manager, Func<Task> Wait)> RunAsync(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
         var manager = new LocalModelManager(new LocalAiOptions { ModelDirectory = _dir }, new Factory(respond), NullLogger<LocalModelManager>.Instance);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
-        async Task Wait()
-        {
-            // LocalModelManager runs the download fire-and-forget and exposes no completion signal, so poll its state.
-            await Eventually.WaitAsync(() => manager.Download?.State != "Downloading", "the model download to leave the Downloading state");
-        }
-
+        Task Wait() => manager.DownloadCompletion.WaitAsync(Guard);
         await Wait();
         return (manager, Wait);
     }
@@ -172,26 +170,19 @@ public class ModelDownloadTests : IDisposable
             NullLogger<LocalModelManager>.Instance);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
 
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
 
         manager.Download!.State.Should().Be("Failed");
         manager.Download.Error.Should().Contain("stalled");
-        Directory.GetFiles(_dir).Should().BeEmpty("a failed download must not leave a .partial file behind");
+        Directory.GetFiles(_dir).Should().ContainSingle().Which.Should().EndWith(".partial", "an interrupted download keeps its bytes so the next attempt can resume (#130)");
         manager.TryStartDownload(ModelCatalog.MiniLm, out _).Should().BeTrue("the stalled download must release the single-download gate");
 
         // Let the second (also stalled) attempt finish so its file handle is released before the temp dir is removed.
-        await Task.Delay(50);
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
     }
 
     [Fact]
-    public async Task Host_shutdown_cancels_the_running_download_and_removes_the_partial_file()
+    public async Task Host_shutdown_cancels_the_running_download_and_keeps_the_partial_file_for_resume()
     {
         using var lifetime = new FakeLifetime();
         var manager = new LocalModelManager(
@@ -200,18 +191,149 @@ public class ModelDownloadTests : IDisposable
             NullLogger<LocalModelManager>.Instance,
             lifetime);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
-        await Task.Delay(100);
 
         lifetime.Stop();
 
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
 
         manager.Download!.State.Should().Be("Failed");
         manager.Download.Error.Should().Contain("cancel");
+        Directory.GetFiles(_dir).Should().OnlyContain(f => f.EndsWith(".partial"));
+    }
+
+    // ── Resume + integrity (#130) ────────────────────────────────────────────
+
+    private static readonly byte[] Payload = Enumerable.Range(0, 10_000).Select(i => (byte)((i * 31 + 7) % 251)).ToArray();
+
+    private static (CatalogModel Model, ModelFile File) TinyModel()
+    {
+        var sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Payload)).ToLowerInvariant();
+        var file = new ModelFile("tiny.bin", "https://huggingface.co/x/tiny.bin", sha, Payload.Length);
+        return (new CatalogModel("tiny", "llm", "Tiny", "t", "mit", [file]), file);
+    }
+
+    private LocalModelManager NewManager(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
+        new(new LocalAiOptions { ModelDirectory = _dir }, new Factory(respond), NullLogger<LocalModelManager>.Instance);
+
+    private static HttpResponseMessage PartialContent(int from)
+    {
+        var body = Payload[from..];
+        var response = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(body) };
+        response.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(from, Payload.Length - 1, Payload.Length);
+        return response;
+    }
+
+    [Fact]
+    public async Task An_interrupted_download_resumes_from_the_partial_with_a_Range_request_and_still_verifies_the_whole_file()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, file) = TinyModel();
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "tiny.bin.partial"), Payload[..4_000]);
+        var ranges = new List<long?>();
+        var manager = NewManager(req =>
+        {
+            ranges.Add(req.Headers.Range?.Ranges.Single().From);
+            return PartialContent(4_000);
+        });
+
+        await manager.DownloadFileAsync(model, file, 0, CancellationToken.None);
+
+        ranges.Should().Equal(4_000L);
+        (await File.ReadAllBytesAsync(Path.Combine(_dir, "tiny.bin"))).Should().Equal(Payload);
+        File.Exists(Path.Combine(_dir, "tiny.bin.partial")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_server_that_ignores_Range_restarts_the_file_from_the_beginning()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, file) = TinyModel();
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "tiny.bin.partial"), Payload[..4_000]);
+        var manager = NewManager(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Payload) });
+
+        await manager.DownloadFileAsync(model, file, 0, CancellationToken.None);
+
+        (await File.ReadAllBytesAsync(Path.Combine(_dir, "tiny.bin"))).Should().Equal(Payload);
+    }
+
+    [Fact]
+    public async Task A_corrupt_partial_fails_the_checksum_and_is_discarded_so_the_next_attempt_starts_clean()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, file) = TinyModel();
+        var corrupt = Payload[..4_000].ToArray();
+        corrupt[10] ^= 0xFF;
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "tiny.bin.partial"), corrupt);
+        var manager = NewManager(_ => PartialContent(4_000));
+
+        var act = () => manager.DownloadFileAsync(model, file, 0, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<InvalidDataException>()).Which.Message.Should().Contain("Checksum");
         Directory.GetFiles(_dir).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_rejected_range_discards_the_partial()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, file) = TinyModel();
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "tiny.bin.partial"), Payload[..4_000]);
+        var manager = NewManager(_ => new HttpResponseMessage(HttpStatusCode.RequestedRangeNotSatisfiable));
+
+        var act = () => manager.DownloadFileAsync(model, file, 0, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidDataException>();
+        Directory.GetFiles(_dir).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_complete_partial_is_verified_and_installed_without_any_request()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, file) = TinyModel();
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "tiny.bin.partial"), Payload);
+        var requests = 0;
+        var manager = NewManager(_ => { requests++; return new HttpResponseMessage(HttpStatusCode.NotFound); });
+
+        await manager.DownloadFileAsync(model, file, 0, CancellationToken.None);
+
+        requests.Should().Be(0);
+        (await File.ReadAllBytesAsync(Path.Combine(_dir, "tiny.bin"))).Should().Equal(Payload);
+    }
+
+    [Fact]
+    public async Task Installed_files_are_hash_verified_before_load_and_a_flipped_byte_is_refused()
+    {
+        Directory.CreateDirectory(_dir);
+        var (model, _) = TinyModel();
+        var path = Path.Combine(_dir, "tiny.bin");
+        await File.WriteAllBytesAsync(path, Payload);
+        var manager = NewManager(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        manager.VerifyIntegrity(model).Should().BeTrue();
+
+        // Same size, one byte different: IsInstalled (size only) would still accept it.
+        var tampered = Payload.ToArray();
+        tampered[123] ^= 0x01;
+        await File.WriteAllBytesAsync(path, tampered);
+        File.SetLastWriteTimeUtc(path, TestClock.Instant.UtcDateTime.AddMinutes(1)); // a changed file is re-hashed, not served from the cache
+
+        manager.IsInstalled(model).Should().BeTrue("size alone cannot tell");
+        manager.VerifyIntegrity(model).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Removing_a_model_also_removes_a_leftover_partial()
+    {
+        Directory.CreateDirectory(_dir);
+        var model = ModelCatalog.Find(ModelCatalog.MiniLm)!;
+        var partial = Path.Combine(_dir, model.Files[0].Name + ".partial");
+        File.WriteAllBytes(partial, [1, 2, 3]);
+        var manager = NewManager(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        manager.Remove(model.Id);
+
+        File.Exists(partial).Should().BeFalse();
     }
 
     private sealed class FakeLifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime, IDisposable

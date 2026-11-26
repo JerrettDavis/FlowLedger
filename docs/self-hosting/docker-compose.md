@@ -149,9 +149,11 @@ Seed/migrate scripts read `API__KEY` / `POSTGRES_PASSWORD` from the environment;
 
 ## Applying migrations manually
 
-When running the full stack, the API applies migrations automatically at startup
-(compose sets `Database__MigrateOnStartup=true`; a verified snapshot is taken first when
-migrations are pending against existing data). To apply migrations manually
+When running the full stack, a one-shot `migrate` service runs `dotnet FlowLedger.Api.dll --migrate`
+before the api and worker start (a verified snapshot is taken first when migrations are pending
+against existing data; the api waits for `service_completed_successfully`). The api does not
+auto-migrate in Production unless you set `DATABASE__MIGRATEONSTARTUP=true`; Development always does.
+To apply migrations manually
 against a running compose database:
 
 ```bash

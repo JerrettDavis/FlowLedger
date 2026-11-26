@@ -3,6 +3,7 @@ using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Npgsql;
 
@@ -49,7 +50,7 @@ public sealed class DataSafetyHardeningTests : IAsyncLifetime
     [DockerFact]
     public async Task After_import_new_ledger_and_backup_rows_can_still_be_inserted()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = TestClock.Instant;
         var sourceLedger = new NpgsqlProviderCallLedger(_fixture.ConnectionString);
         for (var i = 0; i < 3; i++)
         {

@@ -55,12 +55,14 @@ public sealed class CreateRecurringFlowHandler
     private readonly IRecurringFlowRepository _repo;
     private readonly ITenantContext _tenant;
     private readonly IReferenceValidator _references;
+    private readonly TimeProvider? _clock;
 
-    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references)
+    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider? clock = null)
     {
         _repo = repo;
         _tenant = tenant;
         _references = references;
+        _clock = clock;
     }
 
     public async Task<RecurringFlowDto> HandleAsync(CreateRecurringFlowRequest request, CancellationToken ct = default)
@@ -88,7 +90,8 @@ public sealed class CreateRecurringFlowHandler
             request.EndDate?.AddDays(1),
             amountModel,
             categoryId,
-            request.Counterparty);
+            request.Counterparty,
+            _clock);
 
         await _repo.AddAsync(flow, ct);
         await _repo.SaveChangesAsync(ct);

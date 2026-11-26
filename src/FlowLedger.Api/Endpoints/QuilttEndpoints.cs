@@ -75,6 +75,8 @@ internal static class QuilttEndpoints
                 IRawPayloadArchive archive,
                 ISchedulerFactory schedulerFactory,
                 IWebhookTenantResolver tenantResolver,
+                IWebhookReplayStore? replayStore,
+                ILoggerFactory loggers,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
@@ -86,6 +88,7 @@ internal static class QuilttEndpoints
                 var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
                 if (rawBody is null)
                 {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "too_large");
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
@@ -100,15 +103,18 @@ internal static class QuilttEndpoints
                 }
                 catch (InvalidWebhookSignatureException)
                 {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "invalid_signature");
                     return Results.Unauthorized();
                 }
 
-                if (WebhookReplayGuard.SeenRecently(rawBody))
+                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
                 {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
                     return Results.Accepted(value: new { duplicate = true });
                 }
 
-                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+                var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
+                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
 
                 ProviderWebhookEvent evt;
                 try
@@ -141,6 +147,7 @@ internal static class QuilttEndpoints
                 var scheduler = await schedulerFactory.GetScheduler(ct);
                 await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
 
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "accepted");
                 return Results.Accepted(value: new { received = evt.EventType, profileId = evt.MemberId });
             })
             .WithName("QuilttWebhook")

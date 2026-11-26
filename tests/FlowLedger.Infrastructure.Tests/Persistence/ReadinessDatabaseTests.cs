@@ -81,4 +81,19 @@ public sealed class ReadinessDatabaseTests(IntegrationTestFixture fixture) : IAs
         await store.AddAsync(new BackupRunResult(true, now, now, "y", 1, null, null, true, null));
         (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy);
     }
+
+    [DockerFact]
+    public async Task LastSync_check_is_healthy_when_empty_degrades_when_stale_and_recovers_when_fresh()
+    {
+        var check = new LastSyncAgeCheck(Config(), TimeProvider.System);
+        (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy, "nothing has synced yet");
+
+        await ExecAsync("INSERT INTO sync_cursors (id, tenant_id, provider_name, provider_account_id, cursor_value, last_synced_at, updated_at) " +
+                        "VALUES (gen_random_uuid(), gen_random_uuid(), 'p', 'a', 'c', now() - interval '5 days', now() - interval '5 days')");
+        (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Degraded, "last sync is 5 days old");
+
+        await ExecAsync("INSERT INTO sync_cursors (id, tenant_id, provider_name, provider_account_id, cursor_value, last_synced_at, updated_at) " +
+                        "VALUES (gen_random_uuid(), gen_random_uuid(), 'p', 'b', 'c', now(), now())");
+        (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy);
+    }
 }

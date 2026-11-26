@@ -111,6 +111,8 @@ public static class WorkerHostBuilderFactory
         builder.Services.AddSingleton<JobRunHistory>();
         builder.Services.AddSingleton<JobExclusion>();
         builder.Services.AddSingleton<JobRunRecorder>();
+        builder.Services.AddSingleton(JobRetryOptions.From(builder.Configuration));
+        builder.Services.AddSingleton<JobRetryScheduler>();
         builder.Services.AddSingleton<JobRunListener>();
         builder.Services.AddSingleton<JobExclusionTriggerListener>();
         builder.Services.AddQuartz(q =>

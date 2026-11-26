@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// Per-tenant integration definitions and their delivery log, through EF (#154). The interface still takes a tenant id; it must be
 /// the current tenant, otherwise the call fails loudly. Credentials and webhook signing secrets are encrypted at rest with AES-256-GCM
-/// (<c>Integrations:EncryptionKey</c>, falling back to <c>HomeAssistant:EncryptionKey</c>); with no key they are refused rather than
+/// (v2 envelope bound to tenant, purpose and row, #156; <c>Secrets:EncryptionKey</c>, then <c>Integrations:EncryptionKey</c>, then <c>HomeAssistant:EncryptionKey</c>); with no key they are refused rather than
 /// stored in clear text. The delivery log holds status and timing only, never request or response bodies.
 /// </summary>
 internal sealed class EfIntegrationStore : IIntegrationStore
@@ -20,16 +20,20 @@ internal sealed class EfIntegrationStore : IIntegrationStore
 
     private readonly FlowLedgerDbContext _db;
     private readonly ITenantContext _tenant;
-    private readonly byte[]? _key;
+    private readonly SecretKeyRing _ring;
 
-    public EfIntegrationStore(FlowLedgerDbContext db, ITenantContext tenant, string? base64Key = null)
+    internal const string Purpose = "integration-secrets";
+
+    public EfIntegrationStore(FlowLedgerDbContext db, ITenantContext tenant, string? base64Key = null, SecretKeyRing? ring = null)
     {
         _db = db;
         _tenant = tenant;
-        _key = SecretBox.ParseKey(base64Key);
+        _ring = ring ?? SecretKeyRing.From(base64Key);
     }
 
-    public bool CanStoreSecrets => _key is not null;
+    public bool CanStoreSecrets => _ring.CanSeal;
+
+    private byte[] Aad(Guid integrationId) => SecretBox.Aad(_tenant.TenantId, Purpose, integrationId);
 
     private void Guard(Guid tenantId)
     {
@@ -57,13 +61,13 @@ internal sealed class EfIntegrationStore : IIntegrationStore
     {
         Guard(tenantId);
         var stored = await _db.Integrations.AsNoTracking().Where(r => r.Id == id).Select(r => r.Secrets).FirstOrDefaultAsync(ct);
-        return stored is null ? new IntegrationSecrets(null, null) : OpenSecrets(stored);
+        return stored is null ? new IntegrationSecrets(null, null) : OpenSecrets(id, stored);
     }
 
     public async Task SaveAsync(Guid tenantId, Integration integration, string? credential, bool clearCredential, string? signingSecret, CancellationToken ct = default)
     {
         Guard(tenantId);
-        if ((credential is not null || signingSecret is not null) && _key is null)
+        if ((credential is not null || signingSecret is not null) && !_ring.CanSeal)
         {
             throw new InvalidOperationException("Set Integrations:EncryptionKey before storing integration secrets.");
         }
@@ -78,12 +82,12 @@ internal sealed class EfIntegrationStore : IIntegrationStore
             var stored = (await _db.Database.SqlQuery<string>(
                 $"SELECT secrets AS \"Value\" FROM integrations WHERE tenant_id = {tenantId} AND id = {integration.Id} AND secrets IS NOT NULL FOR UPDATE")
                 .ToListAsync(ct)).FirstOrDefault();
-            var current = stored is null ? new IntegrationSecrets(null, null) : OpenSecrets(stored);
+            var current = stored is null ? new IntegrationSecrets(null, null) : OpenSecrets(integration.Id, stored);
 
             var next = new IntegrationSecrets(
                 clearCredential ? null : credential ?? current.Credential,
                 signingSecret ?? current.SigningSecret);
-            var sealedSecrets = next is { Credential: null, SigningSecret: null } ? null : SealSecrets(next);
+            var sealedSecrets = next is { Credential: null, SigningSecret: null } ? null : SealSecrets(integration.Id, next);
 
             await _db.Database.ExecuteSqlInterpolatedAsync(
                 $@"INSERT INTO integrations (tenant_id, id, name, kind, enabled, config, secrets, created_utc)
@@ -142,18 +146,18 @@ internal sealed class EfIntegrationStore : IIntegrationStore
     {
         var config = JsonSerializer.Deserialize<IntegrationConfig>(r.Config, Json)
             ?? throw new InvalidOperationException("Integration config is unreadable.");
-        var secrets = r.Secrets is null ? new IntegrationSecrets(null, null) : OpenSecrets(r.Secrets);
+        var secrets = r.Secrets is null ? new IntegrationSecrets(null, null) : OpenSecrets(r.Id, r.Secrets);
         return new Integration(
             r.Id, r.Name, Enum.Parse<IntegrationKind>(r.Kind), r.Enabled, config,
             secrets.Credential is not null, secrets.SigningSecret is not null, r.CreatedUtc, r.LastUsedUtc, r.LastError);
     }
 
-    private string SealSecrets(IntegrationSecrets s) => SecretBox.Seal(JsonSerializer.Serialize(s, Json), _key!);
+    private string SealSecrets(Guid id, IntegrationSecrets s) => SecretBox.SealV2(JsonSerializer.Serialize(s, Json), _ring, Aad(id));
 
     /// <summary>A value that cannot be decrypted (key changed or removed) reads as having no secrets, so nothing is sent with them.</summary>
-    private IntegrationSecrets OpenSecrets(string stored)
+    private IntegrationSecrets OpenSecrets(Guid id, string stored)
     {
-        var plain = SecretBox.Open(stored, _key);
+        var plain = SecretBox.Open(stored, _ring, Aad(id));
         if (plain is null)
         {
             return new IntegrationSecrets(null, null);

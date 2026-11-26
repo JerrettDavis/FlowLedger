@@ -28,6 +28,12 @@ AuthSetup.ConfigureDataProtection(builder.Services, oidc, builder.Environment, b
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+if (oidc.Enabled)
+{
+    // #159: re-check the login -> tenant mapping inside open circuits too (the cookie validator only sees HTTP requests). Registered after
+    // AddInteractiveServerComponents so it replaces the default ServerAuthenticationStateProvider.
+    builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider, FlowLedger.Web.Auth.TenantRevalidatingAuthenticationStateProvider>();
+}
 
 // ── MudBlazor ───────────────────────────────────────────────────────────────
 builder.Services.AddMudServices();

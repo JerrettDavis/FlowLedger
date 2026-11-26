@@ -61,6 +61,14 @@ public static class WorkerConfigValidator
             errors.Add($"Worker:TenantId ('{tenant}') is not a valid GUID.");
         }
 
+        foreach (var key in new[] { "Worker:JobRetry:MaxAttempts", "Worker:JobRetry:BaseDelaySeconds", "Worker:JobRetry:MaxDelaySeconds" })
+        {
+            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, out var v) || v < 1))
+            {
+                errors.Add($"{key} must be a positive integer but is '{raw}'.");
+            }
+        }
+
         if (config["Backup:KeepLocalSnapshots"] is { Length: > 0 } keep && (!int.TryParse(keep, out var n) || n < 1))
         {
             errors.Add($"Backup:KeepLocalSnapshots must be a positive integer but is '{keep}'.");
@@ -102,9 +110,12 @@ public static class WorkerConfigValidator
                 }
             }
 
-            if (ConfigGuards.LooksLikePlaceholder(config["HomeAssistant:EncryptionKey"]))
+            foreach (var secretKey in new[] { "HomeAssistant:EncryptionKey", "Integrations:EncryptionKey", "Secrets:EncryptionKey", "Secrets:EncryptionKeyPrevious" })
             {
-                errors.Add("HomeAssistant:EncryptionKey still contains a template placeholder.");
+                if (ConfigGuards.LooksLikePlaceholder(config[secretKey]))
+                {
+                    errors.Add($"{secretKey} still contains a template placeholder.");
+                }
             }
         }
 

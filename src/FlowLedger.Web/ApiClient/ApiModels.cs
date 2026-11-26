@@ -19,6 +19,7 @@ public sealed class ForecastResultDto
     public List<AccountLowWaterMarkDto> LowWaterMarks { get; init; } = [];
     public AggregateLowWaterMarkDto? AggregateLowWaterMark { get; init; }
     public List<OverdraftWarningDto> OverdraftWarnings { get; init; } = [];
+    public List<string> Warnings { get; init; } = [];
     public List<ForecastBandPointDto> Bands { get; init; } = [];
     public decimal TypicalWeeklySpend { get; init; }
     public decimal WeeklySpendStdDev { get; init; }

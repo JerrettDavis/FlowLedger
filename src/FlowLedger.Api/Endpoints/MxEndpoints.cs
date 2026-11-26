@@ -81,6 +81,9 @@ internal static class MxEndpoints
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
             IWebhookTenantResolver tenantResolver,
+            IWebhookReplayStore? replayStore,
+            ILoggerFactory loggers,
+            IConfiguration configuration,
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
@@ -89,6 +92,7 @@ internal static class MxEndpoints
             var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
             if (rawBody is null)
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "too_large");
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
             }
 
@@ -102,19 +106,22 @@ internal static class MxEndpoints
             }
             catch (InvalidWebhookSignatureException)
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "invalid_signature");
                 return Results.Unauthorized();
             }
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
-            if (WebhookReplayGuard.SeenRecently(rawBody))
+            if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "duplicate");
                 return Results.Accepted(value: new { duplicate = true });
             }
 
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
-            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+            var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
+            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
 
             ProviderWebhookEvent evt;
             try
@@ -140,6 +147,13 @@ internal static class MxEndpoints
                     title: "Malformed webhook payload");
             }
 
+            // Only events that mean transactions/accounts changed are worth a billable sync (#120); the rest are acknowledged and ignored.
+            if (provider is MxFinancialDataProvider
+                && !MxWebhookEvents.IsSyncTrigger(evt.EventType, MxWebhookEvents.FromConfiguration(configuration)))
+            {
+                return Results.Accepted(value: new { ignored = evt.EventType });
+            }
+
             // Enqueue a background sync via Quartz so the heavy work runs off the request path.
             // Pass the webhook context in the JobDataMap so OnDemandSyncJob can scope the sync
             // to the specific member when targeted per-member sync is supported.
@@ -162,6 +176,7 @@ internal static class MxEndpoints
             var scheduler = await schedulerFactory.GetScheduler(ct);
             await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
 
+            FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "accepted");
             return Results.Accepted(value: new { received = evt.EventType, memberId = evt.MemberId });
         })
         .WithName("MxWebhook")

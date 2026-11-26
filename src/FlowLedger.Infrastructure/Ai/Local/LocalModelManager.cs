@@ -36,6 +36,7 @@ public sealed class LocalModelManager(
     private readonly object _gate = new();
     private LocalAiDownload? _download;
     private bool _running;
+    private Task _completion = Task.CompletedTask;
 
     public string Directory
     {
@@ -47,6 +48,9 @@ public sealed class LocalModelManager(
             return Path.GetFullPath(dir);
         }
     }
+
+    /// <summary>Completes when the most recently started download has finished (done, failed or cancelled) and released the single-download gate. Lets callers and tests await it instead of polling <see cref="Download"/>.</summary>
+    public Task DownloadCompletion { get { lock (_gate) { return _completion; } } }
 
     public LocalAiDownload? Download { get { lock (_gate) { return _download; } } }
 
@@ -89,7 +93,12 @@ public sealed class LocalModelManager(
 
         // The host's ApplicationStopping token cancels the download on shutdown; a stalled read is cut off by the inactivity timeout.
         var shutdown = lifetime?.ApplicationStopping ?? CancellationToken.None;
-        _ = Task.Run(() => RunAsync(model, shutdown));
+        var run = Task.Run(() => RunAsync(model, shutdown));
+        lock (_gate)
+        {
+            _completion = run;
+        }
+
         return true;
     }
 
@@ -104,6 +113,7 @@ public sealed class LocalModelManager(
         var removed = false;
         foreach (var f in model.Files)
         {
+            TryDelete(PathOf(f) + ".partial");
             var path = PathOf(f);
             if (File.Exists(path))
             {
@@ -158,7 +168,7 @@ public sealed class LocalModelManager(
         }
     }
 
-    private async Task DownloadFileAsync(CatalogModel model, ModelFile file, long alreadyDone, CancellationToken shutdown)
+    internal async Task DownloadFileAsync(CatalogModel model, ModelFile file, long alreadyDone, CancellationToken shutdown)
     {
         var uri = new Uri(file.Url);
         if (!IsAllowed(uri))
@@ -174,16 +184,13 @@ public sealed class LocalModelManager(
         cts.CancelAfter(idle);
         try
         {
+            // An interrupted download (shutdown, stall, dropped connection) keeps its .partial so the next attempt resumes it with a
+            // Range request (#130). Only a file that can never become valid is deleted (checksum mismatch, oversize, rejected range).
             await FetchToPartialAsync(model, file, alreadyDone, uri, tmp, idle, cts);
         }
         catch (OperationCanceledException) when (!shutdown.IsCancellationRequested && cts.IsCancellationRequested)
         {
             throw new TimeoutException($"Download of {file.Name} stalled: no data for {idle.TotalSeconds:0.#}s.");
-        }
-        finally
-        {
-            // Never leave a half-written file behind on any failure (the successful path moves it into place first).
-            TryDelete(tmp);
         }
     }
 
@@ -208,9 +215,21 @@ public sealed class LocalModelManager(
         var ct = cts.Token;
         using var client = http.CreateClient(HttpClientName);
 
-        // Redirects (HF -> CDN) are followed by hand: each hop is validated BEFORE it is requested, so a hostile redirect target
-        // never receives a request from this server. The client itself must not auto-follow (see DependencyInjection).
-        var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+        var resumeFrom = File.Exists(tmp) ? new FileInfo(tmp).Length : 0L;
+        if (resumeFrom > file.SizeBytes)
+        {
+            TryDelete(tmp); // longer than the catalog says: it can never be valid
+            resumeFrom = 0;
+        }
+
+        if (resumeFrom == file.SizeBytes && resumeFrom > 0)
+        {
+            // Everything is already on disk (the previous run died before the checksum/move): verify and finish without the network.
+            await SaveAsync(model, file, alreadyDone, response: null, tmp, resumeFrom, idle, cts);
+            return;
+        }
+
+        var response = await GetAsync(client, uri, resumeFrom, ct);
         try
         {
             for (var hop = 0; IsRedirect(response.StatusCode); hop++)
@@ -230,11 +249,22 @@ public sealed class LocalModelManager(
 
                 response.Dispose();
                 uri = next;
-                response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+                response = await GetAsync(client, uri, resumeFrom, ct);
+            }
+
+            if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable && resumeFrom > 0)
+            {
+                // The server will not continue this partial: discard it and let the next attempt start clean.
+                TryDelete(tmp);
+                throw new InvalidDataException("The server rejected resuming the partial download; it was discarded. Try again.");
             }
 
             response.EnsureSuccessStatusCode();
-            await SaveAsync(model, file, alreadyDone, response, tmp, idle, cts);
+
+            // 206 continues the partial file; a plain 200 means the server ignored the Range header, so start over.
+            var honoured = response.StatusCode == HttpStatusCode.PartialContent
+                && response.Content.Headers.ContentRange?.From == resumeFrom;
+            await SaveAsync(model, file, alreadyDone, response, tmp, honoured ? resumeFrom : 0L, idle, cts);
         }
         finally
         {
@@ -242,44 +272,128 @@ public sealed class LocalModelManager(
         }
     }
 
+    private static Task<HttpResponseMessage> GetAsync(HttpClient client, Uri uri, long resumeFrom, CancellationToken ct)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        if (resumeFrom > 0)
+        {
+            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeFrom, null);
+        }
+
+        return client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+    }
+
     private static bool IsRedirect(HttpStatusCode code) =>
         code is HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther
             or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect;
 
     private async Task SaveAsync(
-        CatalogModel model, ModelFile file, long alreadyDone, HttpResponseMessage response, string tmp, TimeSpan idle, CancellationTokenSource cts)
+        CatalogModel model, ModelFile file, long alreadyDone, HttpResponseMessage? response, string tmp, long resumeFrom,
+        TimeSpan idle, CancellationTokenSource cts)
     {
         var ct = cts.Token;
-        using var sha = SHA256.Create();
-        await using (var src = await response.Content.ReadAsStreamAsync(ct))
-        await using (var dst = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+        using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[81920];
+        long got = 0;
+        var valid = true;
+        try
         {
-            var buffer = new byte[81920];
-            long got = 0;
-            int n;
-            while ((n = await src.ReadAsync(buffer, ct)) > 0)
+            // The checksum covers the whole file, so the bytes already on disk are hashed first.
+            if (resumeFrom > 0)
             {
-                cts.CancelAfter(idle); // progress: re-arm the inactivity timer
-                await dst.WriteAsync(buffer.AsMemory(0, n), ct);
-                sha.TransformBlock(buffer, 0, n, null, 0);
-                got += n;
-                if (got > file.SizeBytes + 1024)
+                await using var existing = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+                int r;
+                while (got < resumeFrom && (r = await existing.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, resumeFrom - got)), ct)) > 0)
                 {
-                    throw new InvalidDataException("Download is larger than the catalog says; aborting.");
+                    sha.AppendData(buffer, 0, r);
+                    got += r;
                 }
-
-                lock (_gate) { _download = new LocalAiDownload(model.Id, "Downloading", alreadyDone + got, model.SizeBytes, null); }
             }
 
-            sha.TransformFinalBlock([], 0, 0);
+            if (response is not null)
+            {
+                await using var src = await response.Content.ReadAsStreamAsync(ct);
+                await using var dst = new FileStream(tmp, resumeFrom > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+                int n;
+                while ((n = await src.ReadAsync(buffer, ct)) > 0)
+                {
+                    cts.CancelAfter(idle); // progress: re-arm the inactivity timer
+                    await dst.WriteAsync(buffer.AsMemory(0, n), ct);
+                    sha.AppendData(buffer, 0, n);
+                    got += n;
+                    if (got > file.SizeBytes + 1024)
+                    {
+                        valid = false;
+                        throw new InvalidDataException("Download is larger than the catalog says; aborting.");
+                    }
+
+                    lock (_gate) { _download = new LocalAiDownload(model.Id, "Downloading", alreadyDone + got, model.SizeBytes, null); }
+                }
+            }
+        }
+        catch (InvalidDataException) when (!valid)
+        {
+            TryDelete(tmp);
+            throw;
         }
 
-        var hash = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+        var hash = Convert.ToHexString(sha.GetHashAndReset()).ToLowerInvariant();
         if (!hash.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
         {
+            TryDelete(tmp);
             throw new InvalidDataException($"Checksum mismatch for {file.Name}; the file was discarded.");
         }
 
         File.Move(tmp, PathOf(file), overwrite: true);
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime Modified, bool Ok)> _verified = new();
+
+    /// <summary>
+    /// Re-checks every installed file's SHA-256 before a model is loaded (#130). The download verified it once, but disk rot, a partial
+    /// copy or tampering since then would otherwise be fed straight to the native loader. A passing result is cached per file
+    /// (path, size, modified time), so the multi-GB hash is paid once per process, not per call.
+    /// </summary>
+    public bool VerifyIntegrity(CatalogModel model)
+    {
+        foreach (var f in model.Files)
+        {
+            var info = new FileInfo(PathOf(f));
+            if (!info.Exists || (f.SizeBytes > 0 && info.Length != f.SizeBytes))
+            {
+                return false;
+            }
+
+            if (_verified.TryGetValue(info.FullName, out var known) && known.Length == info.Length && known.Modified == info.LastWriteTimeUtc)
+            {
+                if (!known.Ok)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            bool ok;
+            try
+            {
+                using var stream = new FileStream(info.FullName, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
+                ok = Convert.ToHexString(SHA256.HashData(stream)).Equals(f.Sha256, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (IOException ex)
+            {
+                logger.LogWarning(ex, "Could not read model file {File} to verify it", f.Name);
+                return false;
+            }
+
+            _verified[info.FullName] = (info.Length, info.LastWriteTimeUtc, ok);
+            if (!ok)
+            {
+                logger.LogWarning("Model file {File} does not match its catalog checksum; refusing to load it. Remove the model and download it again.", f.Name);
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -82,7 +82,8 @@ public sealed class Account : AggregateRoot
         AccountType accountType,
         Money startingBalance,
         Money? creditLimit = null,
-        string? institution = null)
+        string? institution = null,
+        TimeProvider? time = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -102,7 +103,7 @@ public sealed class Account : AggregateRoot
             startingBalance,
             creditLimit,
             institution?.Trim(),
-            DateTimeOffset.UtcNow);
+            Now(time));
 
         // Investments are tracked as holdings by default: their buy/sell/dividend lines are noise in everyday views.
         if (accountType == AccountType.Investment)
@@ -113,7 +114,7 @@ public sealed class Account : AggregateRoot
         account.RaiseEvent(new AccountConnected(
             account.AccountId,
             account.TenantId,
-            accountType));
+            accountType), account.CreatedAt);
 
         return account;
     }
@@ -124,7 +125,7 @@ public sealed class Account : AggregateRoot
     /// Updates the current balance, e.g. after an import sync or manual reconciliation.
     /// Raises <see cref="AccountBalanceUpdated"/>.
     /// </summary>
-    public void UpdateBalance(Money newBalance)
+    public void UpdateBalance(Money newBalance, TimeProvider? time = null)
     {
         if (newBalance.Currency != CurrentBalance.Currency)
         {
@@ -138,7 +139,7 @@ public sealed class Account : AggregateRoot
                 $"Asset account '{Name}' cannot have a negative balance without an explicit credit limit.");
         }
 
-        SetBalance(newBalance);
+        SetBalance(newBalance, time);
     }
 
     /// <summary>
@@ -146,23 +147,24 @@ public sealed class Account : AggregateRoot
     /// "assets cannot go negative" input guard of <see cref="UpdateBalance"/> does not apply: an overdrawn
     /// checking account really is negative, and refusing it would leave a stale positive balance behind.
     /// </summary>
-    public void ApplyProviderBalance(Money newBalance)
+    public void ApplyProviderBalance(Money newBalance, TimeProvider? time = null)
     {
         if (newBalance.Currency != CurrentBalance.Currency)
         {
             throw new CurrencyMismatchException(CurrentBalance.Currency.Code, newBalance.Currency.Code);
         }
 
-        SetBalance(newBalance);
+        SetBalance(newBalance, time);
     }
 
-    private void SetBalance(Money newBalance)
+    private void SetBalance(Money newBalance, TimeProvider? time)
     {
         var previous = CurrentBalance;
         CurrentBalance = newBalance;
-        LastBalanceConfirmedAt = DateTimeOffset.UtcNow;
+        var now = Now(time);
+        LastBalanceConfirmedAt = now;
 
-        RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, newBalance));
+        RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, newBalance), now);
     }
 
     /// <summary>
