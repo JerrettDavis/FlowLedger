@@ -287,7 +287,7 @@ public static class DependencyInjection
                 TimeSpan.FromMinutes(Math.Max(0, minutes)),
                 async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                     db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
-                    c => (DateTimeOffset?)c.LastSyncedAt, ct),
+                    c => c.LastSuccessfulSyncAt, ct),
                 crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 

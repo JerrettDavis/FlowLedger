@@ -14,6 +14,12 @@ internal sealed class SyncCursorRecord
     public DateTimeOffset LastSyncedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// When a whole sync last COMPLETED successfully for this account (#120). <see cref="LastSyncedAt"/> advances on every
+    /// cursor write, i.e. also mid-way through a sync that later fails, so it must not drive the throttle window.
+    /// </summary>
+    public DateTimeOffset? LastSuccessfulSyncAt { get; private set; }
+
     // EF Core parameterless constructor
     private SyncCursorRecord() { }
 
@@ -42,4 +48,6 @@ internal sealed class SyncCursorRecord
         LastSyncedAt = now;
         UpdatedAt = now;
     }
+
+    public void MarkSuccessful(DateTimeOffset now) => LastSuccessfulSyncAt = now;
 }
