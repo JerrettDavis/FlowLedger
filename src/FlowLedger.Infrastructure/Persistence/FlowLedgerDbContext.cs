@@ -55,6 +55,7 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<GoalRecord> Goals => Set<GoalRecord>();
     internal DbSet<CategoryRuleRecord> CategoryRules => Set<CategoryRuleRecord>();
     internal DbSet<MerchantAliasRecord> MerchantAliases => Set<MerchantAliasRecord>();
+    internal DbSet<ProviderAccountRecord> ProviderAccounts => Set<ProviderAccountRecord>();
     internal DbSet<AccountConnectorLinkRecord> AccountConnectorLinks => Set<AccountConnectorLinkRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new CategoryRuleRecordConfiguration());
         modelBuilder.ApplyConfiguration(new MerchantAliasRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AccountConnectorLinkRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ProviderAccountRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
@@ -139,6 +141,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.Entity<MerchantAliasRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
         modelBuilder.Entity<AccountConnectorLinkRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<ProviderAccountRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 

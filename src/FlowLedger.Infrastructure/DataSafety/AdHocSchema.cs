@@ -19,7 +19,6 @@ public static class AdHocSchema
         NpgsqlProviderCallLedger.CreateSqlText,
         BackupRunStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
-        NpgsqlProviderAccountCatalog.CreateSqlText,
         NpgsqlHomeAssistantStore.CreateSqlText,
         NpgsqlIntegrationStore.CreateSqlText,
         FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore.CreateSqlText,
