@@ -120,7 +120,11 @@ internal sealed class QuilttApiClient
         return data?.Connections ?? [];
     }
 
-    public async Task<IReadOnlyList<QTransaction>> ListTransactionsAsync(string sessionToken, DateOnly from, CancellationToken ct)
+    /// <summary>
+    /// Reads up to <see cref="QuilttOptions.MaxPages"/> pages (oldest first). Hitting the bound is not an error: the result is
+    /// flagged <c>Truncated</c> and the caller continues from where it ended in its next sync-loop iteration (#128).
+    /// </summary>
+    public async Task<QTransactionsRead> ListTransactionsAsync(string sessionToken, DateOnly from, CancellationToken ct)
     {
         var all = new List<QTransaction>();
         string? after = null;
@@ -132,13 +136,13 @@ internal sealed class QuilttApiClient
             all.AddRange(conn?.Nodes ?? []);
             if (conn?.PageInfo is not { HasNextPage: true, EndCursor: { Length: > 0 } next })
             {
-                return all;
+                return new QTransactionsRead(all, Truncated: false);
             }
 
             after = next;
         }
 
-        throw new FatalProviderException($"Quiltt transactions exceeded {_options.MaxPages} pages; refusing to loop.");
+        return new QTransactionsRead(all, Truncated: true);
     }
 
     private async Task<T?> QueryAsync<T>(string token, string query, object variables, CancellationToken ct)
@@ -221,3 +225,6 @@ internal static class QuilttJwt
         }
     }
 }
+
+/// <summary>One bounded read of the transactions connection; <paramref name="Truncated"/> = more pages exist beyond the bound.</summary>
+internal sealed record QTransactionsRead(IReadOnlyList<QTransaction> Items, bool Truncated);
