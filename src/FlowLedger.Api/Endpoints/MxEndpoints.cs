@@ -84,12 +84,6 @@ internal static class MxEndpoints
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
-            // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
-            if (request.ContentLength > WebhookBody.MaxBytes)
-            {
-                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-            }
-
             // Read the raw body bytes — required for exact HMAC verification. Bounded read: chunked bodies
             // carry no Content-Length, so stop as soon as the cap is exceeded.
             var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);

@@ -515,8 +515,8 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         if (hasMore && position.Page >= Math.Max(1, _options.MaxPages))
         {
             _logger.LogWarning(
-                "GetTransactionsAsync: reached MaxPages limit ({MaxPages}) for account {AccountGuid}; resuming on the next sync.",
-                _options.MaxPages, accountGuid);
+                "GetTransactionsAsync: reached MaxPages limit ({MaxPages}); resuming on the next sync.",
+                _options.MaxPages);
             return new TransactionPage(items, position.Next().Encode(), HasMore: false) { SkippedCount = skipped };
         }
 
