@@ -185,7 +185,7 @@ public sealed class Transaction : AggregateRoot
     /// Settles a pending transaction once the provider reports it as posted. Optionally adopts the
     /// posted record's fingerprint so later syncs dedupe against it. No-op unless currently Pending.
     /// </summary>
-    public bool Settle(DateOnly postedDate, TransactionFingerprint? fingerprint = null)
+    public bool Settle(DateOnly postedDate, TransactionFingerprint? fingerprint = null, Money? finalAmount = null)
     {
         if (Status != TransactionStatus.Pending)
         {
@@ -194,11 +194,32 @@ public sealed class Transaction : AggregateRoot
 
         PostedDate = postedDate;
         Status = TransactionStatus.Posted;
+        if (finalAmount is { } final && final.Currency == Amount.Currency && final.Amount > 0m)
+        {
+            // The posted total can differ from the authorization (tips, adjusted holds).
+            Amount = final;
+        }
+
         if (fingerprint is not null)
         {
             Fingerprint = fingerprint;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// Retires a pending authorization the provider no longer returns (cancelled hold, fuel pre-auth): it is kept for
+    /// audit but no longer counts as spend. No-op unless currently Pending.
+    /// </summary>
+    public bool AbandonPending()
+    {
+        if (Status != TransactionStatus.Pending)
+        {
+            return false;
+        }
+
+        Status = TransactionStatus.Skipped;
         return true;
     }
 
