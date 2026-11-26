@@ -200,41 +200,6 @@ public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int 
 
 // Bill sheet (spreadsheet mode) ------------------------------------------------
 
-public sealed record SheetSlotDto(int Slot, DateOnly? Due, bool Paid, decimal? Amount, DateOnly? PaidOn, string? Source);
-
-public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, string Source, int PaidCount = 0, int Expected = 1);
-
-public sealed record SheetRowDto(
-    Guid Id, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
-    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRefMasked, string? MatchText,
-    bool NeedsMatchText, Dictionary<string, SheetCellDto> Cells,
-    string Frequency = "Monthly", int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null,
-    Dictionary<string, List<SheetSlotDto>>? Slots = null, decimal MonthlyEstimated = 0m);
-
-public sealed record SheetTotalsLine(decimal Total, decimal Optional, decimal Required, decimal Personal, decimal Business);
-
-public sealed record SheetTotalsDto(SheetTotalsLine Estimated, SheetTotalsLine Actual);
-
-public sealed record SheetSectionDto(string Name, List<SheetRowDto> Rows, SheetTotalsDto Totals);
-
-public sealed record SheetMonthSummaryDto(string Month, int PaidCount, int TotalCount, decimal PaidAmount, decimal RemainingEstimated);
-
-public sealed record SheetViewDto(
-    List<string> Months, string SelectedMonth, List<SheetSectionDto> Sections, SheetTotalsDto GrandTotals, SheetMonthSummaryDto Summary);
-
-public sealed record SaveBillRequest(
-    string Section, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
-    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRef, string? MatchText,
-    string? Frequency = null, int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null);
-
-public sealed record SetPaymentRequest(bool Paid, decimal? Amount, int Slot = 0);
-
-public sealed record ImportSheetRequest(string Csv, bool Replace);
-
-public sealed record SheetImportResult(int Sections, int Bills, int PaidMarks);
-
-public sealed record SheetRefreshResult(int Marked, int Cleared, int Added = 0);
-
 public sealed record AutoAddResultDto(int Added, List<string> Names);
 
 public sealed record ProviderInfoDto(string Provider, bool UsesWidget, string? ManageUrl);
