@@ -119,17 +119,54 @@ html, body {
     }
 }
 
-/* Tables never show scrollbars. When space runs out we truncate text, then drop low-priority columns. */
+/* Tables scroll horizontally when they do not fit (phones, narrow windows) instead of clipping data.
+   Text still truncates inside cells; low-priority columns drop only on genuinely narrow viewports, and
+   because the container scrolls, nothing is unreachable. Vertical overflow stays unconstrained. */
 .mud-table-container,
 .mud-simple-table,
 .mud-simple-table .mud-table-container {
-    overflow: hidden !important;
-    max-height: none !important;
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: none;
+    -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 1919.98px) { .fl-hide-lg { display: none !important; } }
-@media (max-width: 1599.98px) { .fl-hide-md { display: none !important; } }
-@media (max-width: 1279.98px) { .fl-hide-sm { display: none !important; } }
+@media (max-width: 1279.98px) { .fl-hide-lg { display: none !important; } }
+@media (max-width: 1023.98px) { .fl-hide-md { display: none !important; } }
+@media (max-width: 767.98px) { .fl-hide-sm { display: none !important; } }
+
+/* Keyboard focus: one visible ring everywhere, drawn from theme tokens (WCAG 2.4.7). */
+:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* Skip link: first focusable element, visible only when focused (WCAG 2.4.1). */
+.fl-skip-link {
+    position: absolute;
+    left: 8px;
+    top: -48px;
+    z-index: 2000;
+    padding: 8px 16px;
+    border-radius: 4px;
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+    text-decoration: none;
+}
+.fl-skip-link:focus { top: 8px; }
+
+/* Text for assistive tech only. */
+.fl-visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
 
 /* Gutters scale with the display: tight on phones, generous on 1440p/4K, content still fills the width. */
 .fl-page { padding-left: 16px; padding-right: 16px; }
