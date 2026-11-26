@@ -57,7 +57,8 @@ else
                 var selected = _selected?.Id == i.Id;
                 <MudItem xs="12" sm="6" md="4">
                     <MudPaper Outlined="true" Class="@($"pa-3 fl-integration-card{(selected ? " fl-integration-selected" : "")}")" Style="height:100%;cursor:pointer"
-                              @onclick="@(() => SelectAsync(i))">
+                              role="button" tabindex="0" aria-pressed="@(selected ? "true" : "false")" aria-label="@($"Open {i.Name}")"
+                              @onclick="@(() => SelectAsync(i))" @onkeydown="@(e => OnCardKeyAsync(e, i))">
                         <div class="d-flex align-center gap-2 mb-1">
                             <MudIcon Icon="@KindIcon(i.Kind)" Color="@(i.Enabled ? Color.Primary : Color.Default)" />
                             <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@i.Name</MudText>
@@ -176,6 +177,9 @@ else
         _selected = _state?.Integrations.FirstOrDefault(i => i.Id == id);
         _loading = false;
     }
+
+    private Task OnCardKeyAsync(KeyboardEventArgs e, IntegrationDto i) =>
+        e.Key is "Enter" or " " ? SelectAsync(i) : Task.CompletedTask;
 
     private async Task SelectAsync(IntegrationDto i)
     {
