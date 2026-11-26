@@ -89,6 +89,21 @@ does not yet refuse to run in Production with a backup directory that is not on 
 `Backup__Directory` away from `/data/backups`, keep it on a volume. Back up the `backups_data` volume itself only via the
 off-site copy; do not treat a same-host volume as your only copy.
 
+## Manual dump and restore scripts (Linux, macOS, Windows)
+
+`eng/scripts/backup.sh` / `restore.sh` are the Linux/macOS twins of `backup.ps1` / `restore.ps1`: a `pg_dump -Fc` of the
+database plus a copy of the raw archive, verified with `pg_restore -l`, and a restore into a **scratch** database that
+prints row counts (it refuses to touch the live `flowledger` database). With the compose stack running:
+
+```
+./eng/scripts/backup.sh                       # prints the backup dir; OBJECTS_CONTAINER=<api container> copies /data/objects out of compose
+./eng/scripts/restore.sh ~/.flowledger/backups/<timestamp>
+./scripts/dr-drill.sh                         # backup -> restore into scratch -> compare every table's row count
+```
+
+`scripts/dr-drill.sh` exercises only this `pg_dump`/`pg_restore` path (not the in-app export/import, restic, or a wipe of the live
+database), and compares counts taken just before the backup, so run it against an idle stack. It is not yet wired into CI.
+
 ## Migrations
 
 * Aspire/dev: a verified `premigrate-*` snapshot is taken automatically before any pending migration is applied to a database that has data; startup aborts if it fails.
