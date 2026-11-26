@@ -13,7 +13,7 @@ public sealed class DataRetentionTests(IntegrationTestFixture fixture) : IAsyncL
     public async Task InitializeAsync()
     {
         await fixture.ResetAsync();
-        await ExecAsync(DuplicateStore.CreateSqlText + "\n" + NpgsqlUserDirectory.CreateSqlText);
+        await ExecAsync(NpgsqlUserDirectory.CreateSqlText);
         await ExecAsync("DELETE FROM merged_transactions; DELETE FROM app_user_link_codes;");
     }
 

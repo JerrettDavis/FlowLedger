@@ -28,6 +28,8 @@ public sealed class MigrationTests : IAsyncLifetime
     private const string RecurringBillFrequency = "20261115201318_AddRecurringBillFrequency";
     private const string BeforeAccountMode = "20261118040714_AddAccountTypeLock";
     private const string AccountMode = "20261119030000_AddAccountModeAndHiddenTransactions";
+    private const string BeforeCompositeFks = "20261126162838_MoveDuplicatesToEf";
+    private const string CompositeFks = "20261126163503_AddCompositeTenantForeignKeys";
 
     private static readonly Guid Tenant = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
@@ -316,6 +318,76 @@ public sealed class MigrationTests : IAsyncLifetime
         (await ScalarAsync<string>(cs, $"SELECT mode FROM accounts WHERE id = '{investment}'")).Should().Be("Holding");
         (await ScalarAsync<string>(cs, $"SELECT mode FROM accounts WHERE id = '{checking}'")).Should().Be("Standard");
         (await ScalarAsync<bool>(cs, $"SELECT hide_transactions FROM accounts WHERE id = '{investment}'")).Should().BeFalse();
+    }
+
+    // ── #146: composite tenant foreign keys ──────────────────────────────────
+
+    private static readonly Guid OtherTenant = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+    private static async Task<bool> FkValidatedAsync(string cs, string table, string name)
+        => await ScalarAsync<bool>(cs, $"SELECT convalidated FROM pg_constraint WHERE conrelid = '{table}'::regclass AND conname = '{name}'");
+
+    [DockerFact]
+    public async Task Composite_tenant_foreign_keys_validate_on_clean_data_and_reject_cross_tenant_and_dangling_references()
+    {
+        var cs = await NewDatabaseAsync();
+        await MigrateToAsync(cs, BeforeCompositeFks);
+        var account = Guid.NewGuid();
+        var category = Guid.NewGuid();
+        await InsertRowAsync(cs, "accounts", new() { ["id"] = account, ["tenant_id"] = Tenant, ["name"] = "Checking", ["account_type"] = "Checking" });
+        await InsertRowAsync(cs, "categories", new() { ["id"] = category, ["tenant_id"] = Tenant, ["path"] = "Food", ["display_name"] = "Food" });
+        await InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = Tenant, ["account_id"] = account, ["category_id"] = category });
+
+        await MigrateToAsync(cs, CompositeFks);
+
+        (await FkValidatedAsync(cs, "transactions", "fk_transactions_account_tenant")).Should().BeTrue("no orphans, so the constraint is validated");
+        (await FkValidatedAsync(cs, "transactions", "fk_transactions_category_tenant")).Should().BeTrue();
+
+        var crossTenant = () => InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = OtherTenant, ["account_id"] = account });
+        await crossTenant.Should().ThrowAsync<PostgresException>("another tenant cannot reference this tenant's account");
+        var dangling = () => InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = Tenant, ["account_id"] = Guid.NewGuid() });
+        await dangling.Should().ThrowAsync<PostgresException>("a missing account cannot be referenced");
+
+        // Deleting a category clears only the category reference (the transaction survives, tenant_id stays set).
+        await ExecAsync(cs, $"DELETE FROM categories WHERE id = '{category}'");
+        (await ScalarAsync<long>(cs, "SELECT count(*) FROM transactions WHERE category_id IS NULL AND tenant_id IS NOT NULL")).Should().Be(1);
+    }
+
+    [DockerFact]
+    public async Task Composite_tenant_foreign_keys_report_legacy_orphans_without_failing_or_deleting_and_still_block_new_ones()
+    {
+        var cs = await NewDatabaseAsync();
+        await MigrateToAsync(cs, BeforeCompositeFks);
+        var account = Guid.NewGuid();
+        await InsertRowAsync(cs, "accounts", new() { ["id"] = account, ["tenant_id"] = Tenant, ["name"] = "Checking", ["account_type"] = "Checking" });
+        await InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = Tenant, ["account_id"] = account });
+        await InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = Tenant, ["account_id"] = Guid.NewGuid() }); // legacy orphan
+
+        var migrate = () => MigrateToAsync(cs, CompositeFks);
+        await migrate.Should().NotThrowAsync("legacy orphans must not brick the upgrade");
+
+        (await ScalarAsync<long>(cs, "SELECT count(*) FROM transactions")).Should().Be(2, "nothing is deleted automatically");
+        (await FkValidatedAsync(cs, "transactions", "fk_transactions_account_tenant")).Should().BeFalse("left NOT VALID while an orphan exists");
+        var fresh = () => InsertRowAsync(cs, "transactions", new() { ["tenant_id"] = Tenant, ["account_id"] = Guid.NewGuid() });
+        await fresh.Should().ThrowAsync<PostgresException>("NOT VALID still enforces every new write");
+
+        // Once the owner (or an operator) cleans up, re-running the validation step succeeds.
+        await ExecAsync(cs, $"DELETE FROM transactions WHERE account_id <> '{account}'");
+        await ExecAsync(cs, "ALTER TABLE transactions VALIDATE CONSTRAINT fk_transactions_account_tenant");
+        (await FkValidatedAsync(cs, "transactions", "fk_transactions_account_tenant")).Should().BeTrue();
+    }
+
+    [DockerFact]
+    public async Task Composite_tenant_foreign_key_migration_is_idempotent_when_the_constraints_already_exist()
+    {
+        var cs = await NewDatabaseAsync();
+        await MigrateToAsync(cs, null);
+
+        // Roll the history row back without dropping the constraints, then re-apply: every statement must be a no-op.
+        await ExecAsync(cs, $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = '{CompositeFks}'");
+        var again = () => MigrateToAsync(cs, null);
+        await again.Should().NotThrowAsync();
+        (await ScalarAsync<long>(cs, "SELECT count(*) FROM pg_constraint WHERE conname ~ '^fk_.*_tenant$'")).Should().Be(10);
     }
 
     [DockerFact]

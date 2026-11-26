@@ -202,17 +202,11 @@ public static class DependencyInjection
             connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false));
         }
 
-        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountConnectorLinkStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
 
-        services.AddScoped<FlowLedger.Application.Abstractions.IProviderAccountCatalog>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderAccountCatalog(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Abstractions.IProviderAccountCatalog,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfProviderAccountCatalog>();
 
         services.AddScoped<FlowLedger.Integrations.Abstractions.IConnectorRegistry>(sp =>
             new FlowLedger.Infrastructure.Sync.ConnectorRegistry(sp, connectors));
@@ -359,10 +353,10 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.Strategies.IAccountRateStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfAccountRateStore>();
         // -- Home Assistant sharing (per-tenant settings + sent ledger; alerts only by default) --
-        services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlHomeAssistantStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+        services.AddScoped<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(sp =>
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfHomeAssistantStore(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
                 configuration["HomeAssistant:EncryptionKey"]));
         services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
@@ -372,10 +366,10 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
             FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
         // -- Integrations (REST / SOAP / signed webhooks; per-tenant definitions, encrypted secrets, delivery log) --
-        services.AddSingleton<FlowLedger.Application.Features.Integrations.IIntegrationStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlIntegrationStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+        services.AddScoped<FlowLedger.Application.Features.Integrations.IIntegrationStore>(sp =>
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfIntegrationStore(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
                 configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
         foreach (var clientName in new[]
         {
