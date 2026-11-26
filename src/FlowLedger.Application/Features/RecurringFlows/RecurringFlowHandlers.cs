@@ -80,7 +80,8 @@ public sealed class CreateRecurringFlowHandler
             direction,
             pattern,
             request.StartDate,
-            request.EndDate,
+            // The API contract is inclusive (the flow's last day); the domain window is half-open [start, end).
+            request.EndDate?.AddDays(1),
             amountModel,
             categoryId,
             request.Counterparty);
@@ -163,6 +164,10 @@ public sealed class DeactivateRecurringFlowHandler
 
 internal static class RecurringFlowMapper
 {
+    /// <summary>The flow's last active day as shown to users: the domain window is half-open, the API is inclusive.</summary>
+    private static DateOnly? InclusiveEnd(RecurringFlow f) =>
+        f.ActiveWindow.End is { } end ? (end > f.ActiveWindow.Start ? end.AddDays(-1) : f.ActiveWindow.Start) : null;
+
     public static RecurringFlowDto ToDto(RecurringFlow f) => new(
         f.Id,
         f.AccountId.Value,
@@ -177,7 +182,7 @@ internal static class RecurringFlowMapper
         f.Pattern.IntervalWeeks,
         f.Pattern.AnchorDayOfWeek?.ToString(),
         f.ActiveWindow.Start,
-        f.ActiveWindow.End,
+        InclusiveEnd(f),
         f.CategoryId?.Value,
         f.Counterparty,
         f.IsActive,
