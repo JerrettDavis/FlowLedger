@@ -46,14 +46,17 @@ public sealed class ImportTransactionsHandler
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;
     private readonly ITenantContext _tenant;
     private readonly MatchingEngine _matcher;
+    private readonly TimeProvider? _clock;
 
     public ImportTransactionsHandler(
         ITransactionRepository txRepo,
         IAccountRepository accountRepo,
         IPlannedOccurrenceRepository occurrenceRepo,
         ITenantContext tenant,
-        MatchingEngine matcher)
+        MatchingEngine matcher,
+        TimeProvider? clock = null)
     {
+        _clock = clock;
         _txRepo = txRepo;
         _accountRepo = accountRepo;
         _occurrenceRepo = occurrenceRepo;
@@ -113,7 +116,7 @@ public sealed class ImportTransactionsHandler
 
             try
             {
-                var (tx, fp, legacyFp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences, seenProviderIds);
+                var (tx, fp, legacyFp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences, seenProviderIds, _clock);
 
                 uniqueTransactions.Add((tx, fp, legacyFp));
             }
@@ -246,7 +249,8 @@ public sealed class ImportTransactionsHandler
         CsvColumnMapping mapping,
         string[] dateFormats,
         Dictionary<string, int> occurrences,
-        HashSet<string> seenProviderIds)
+        HashSet<string> seenProviderIds,
+        TimeProvider? clock)
     {
         // Date
         bool TryParseDateForCoalesce(string raw, out DateOnly d) =>
@@ -340,7 +344,8 @@ public sealed class ImportTransactionsHandler
             effectiveDate: date,
             postedDate: date,
             source: TransactionSource.CsvImport,
-            fingerprint: fingerprint);
+            fingerprint: fingerprint,
+            time: clock);
 
         if (!string.IsNullOrWhiteSpace(merchant))
         {

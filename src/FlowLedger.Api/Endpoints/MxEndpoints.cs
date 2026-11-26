@@ -142,10 +142,8 @@ internal static class MxEndpoints
             }
 
             // Only events that mean transactions/accounts changed are worth a billable sync (#120); the rest are acknowledged and ignored.
-            var configured = configuration.GetSection(MxWebhookEvents.ConfigKey).Exists()
-                ? configuration.GetSection(MxWebhookEvents.ConfigKey).Get<string[]>() ?? []
-                : null;
-            if (provider is MxFinancialDataProvider && !MxWebhookEvents.IsSyncTrigger(evt.EventType, configured))
+            if (provider is MxFinancialDataProvider
+                && !MxWebhookEvents.IsSyncTrigger(evt.EventType, MxWebhookEvents.FromConfiguration(configuration)))
             {
                 return Results.Accepted(value: new { ignored = evt.EventType });
             }

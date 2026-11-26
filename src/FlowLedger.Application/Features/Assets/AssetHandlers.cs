@@ -83,7 +83,7 @@ internal static class AssetMapper
     /// <param name="inFlight">The asset being changed. Its in-memory state wins over the database list,
     /// which can omit a not-yet-saved asset or still include one just deactivated.</param>
     public static async Task SyncManualAccountsAsync(
-        IAssetRepository assets, IAccountRepository accounts, IEnumerable<Guid?> accountIds, Asset inFlight, CancellationToken ct)
+        IAssetRepository assets, IAccountRepository accounts, IEnumerable<Guid?> accountIds, Asset inFlight, CancellationToken ct, TimeProvider? clock = null)
     {
         var ids = accountIds.Where(i => i.HasValue).Select(i => i!.Value).Distinct().ToList();
         if (ids.Count == 0)
@@ -105,7 +105,7 @@ internal static class AssetMapper
                 .Sum(a => a.CurrentValue.Amount);
             if (total != account.CurrentBalance.Amount)
             {
-                account.UpdateBalance(new Money(total, account.CurrentBalance.Currency));
+                account.UpdateBalance(new Money(total, account.CurrentBalance.Currency), clock);
             }
         }
     }
@@ -148,7 +148,7 @@ public sealed class CreateAssetHandler(IAssetRepository assets, IAccountReposito
         asset.LinkAccount(linked);
 
         await assets.AddAsync(asset, ct);
-        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct, clock);
         await assets.SaveChangesAsync(ct);
 
         var map = await AssetMapper.AccountsByIdAsync(accounts, ct);
@@ -174,7 +174,7 @@ public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountReposito
             r.SerialNumber, r.Notes, r.PurchaseDate, r.PurchasePrice is { } p ? new Money(p, currency) : null, r.Attributes);
         asset.SetValuationModel(AssetMapper.ParseMethod(r.ValuationMethod), r.AnnualRate ?? 0m, r.SalvageValue, r.UsefulLifeYears);
         asset.LinkAccount(linked);
-        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [previousLink, asset.LinkedAccountId], asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [previousLink, asset.LinkedAccountId], asset, ct, clock);
 
         await assets.SaveChangesAsync(ct);
         return AssetMapper.ToDto(asset, AssetClock.Today(clock), await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
@@ -195,14 +195,14 @@ public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccoun
         asset.RecordValuation(
             new Money(r.Amount, asset.CurrentValue.Currency), r.AsOf ?? AssetClock.Today(clock),
             string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note, settings.BlendWindowDays, clock);
-        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct, clock);
 
         await assets.SaveChangesAsync(ct);
         return AssetMapper.ToDto(asset, AssetClock.Today(clock), await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
     }
 }
 
-public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider? clock = null)
 {
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
@@ -213,7 +213,7 @@ public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepo
         }
 
         asset.Deactivate();
-        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct, clock);
         await assets.SaveChangesAsync(ct);
         return true;
     }
@@ -281,7 +281,7 @@ public sealed class RefreshAssetValuationHandler(
         }
 
         asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note, settings.BlendWindowDays, clock);
-        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
+        await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct, clock);
         await assets.SaveChangesAsync(ct);
         map = await AssetMapper.AccountsByIdAsync(accounts, ct);
         return new AssetRefreshResultDto(true, $"Updated from '{feed.Name}'.",

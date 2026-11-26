@@ -139,6 +139,12 @@ POST /api/integrations/mx/webhooks
 
 The `Mx:WebhookSecret` is used to verify the HMAC signature on each webhook payload.
 
+Only events that mean transactions or accounts changed trigger a sync; every other verified event is acknowledged and ignored
+(a sync is a billable provider read, and the scheduled sync stays the backstop). The default allow-list of payload `type` values is
+`aggregation, history, account, accounts, transaction, transactions`. Override it with `Mx:WebhookSyncEventTypes` (comma-separated or a JSON
+array, case-insensitive; `none` disables webhook-triggered syncs). The repository holds no captured MX payloads, so check the list
+against the MX documentation for the products you enabled before relying on it.
+
 ## Sync Cursor
 
 Each connected member's sync position is persisted in the `SyncCursors` table. This ensures:

@@ -43,11 +43,13 @@ public sealed class CreateAccountHandler
 {
     private readonly IAccountRepository _repo;
     private readonly ITenantContext _tenant;
+    private readonly TimeProvider? _clock;
 
-    public CreateAccountHandler(IAccountRepository repo, ITenantContext tenant)
+    public CreateAccountHandler(IAccountRepository repo, ITenantContext tenant, TimeProvider? clock = null)
     {
         _repo = repo;
         _tenant = tenant;
+        _clock = clock;
     }
 
     public async Task<AccountDto> HandleAsync(CreateAccountRequest request, CancellationToken ct = default)
@@ -65,7 +67,8 @@ public sealed class CreateAccountHandler
             accountType,
             balance,
             creditLimit,
-            request.Institution);
+            request.Institution,
+            _clock);
 
         await _repo.AddAsync(account, ct);
         await _repo.SaveChangesAsync(ct);

@@ -25,7 +25,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     private QuilttSession? _session;
     private Task<IReadOnlyList<QAccount>>? _accounts;
     private Task<IReadOnlyList<QConnectionNode>>? _connections;
-    private (DateOnly From, Task<QTransactionsRead> Task)? _transactions;
+    private readonly Dictionary<DateOnly, Task<QTransactionsRead>> _transactions = [];
     private readonly Dictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
     internal QuilttFinancialDataProvider(
@@ -121,7 +121,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             _session = await _client.CreateSessionAsync(profileId, ct).ConfigureAwait(false);
             _accounts = null;
             _connections = null;
-            _transactions = null;
+            _transactions.Clear();
         }
 
         return _session;
@@ -165,13 +165,9 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             ? today.AddDays(-Math.Max(1, _options.InitialHistoryDays))
             : continuing ? c : c.AddDays(-Math.Max(0, _options.OverlapDays));
 
-        // One read serves every account while it is complete; a bounded (truncated) read only serves the window it started at.
-        if (_transactions is not { } cached || from < cached.From || (from > cached.From && cached.Task.IsCompletedSuccessfully && cached.Task.Result.Truncated))
-        {
-            _transactions = (from, _client.ListTransactionsAsync(session.Token, from, cancellationToken));
-        }
-
-        var read = await _transactions.Value.Task.ConfigureAwait(false);
+        // One COMPLETE read serves every account whose window starts at or after it. A bounded (truncated) read is only reusable for the
+        // exact window it started at; keyed by that start, every account walks the same continuation chain on cache hits.
+        var read = await ReadTransactionsAsync(session.Token, from, cancellationToken).ConfigureAwait(false);
         var all = read.Items;
         var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId);
 
@@ -241,6 +237,24 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     }
 
     private const string ContinuationPrefix = "c:";
+
+    private Task<QTransactionsRead> ReadTransactionsAsync(string token, DateOnly from, CancellationToken ct)
+    {
+        if (_transactions.TryGetValue(from, out var exact) && !(exact.IsFaulted || exact.IsCanceled))
+        {
+            return exact;
+        }
+
+        foreach (var (start, task) in _transactions)
+        {
+            if (start <= from && task.IsCompletedSuccessfully && !task.Result.Truncated)
+            {
+                return task;
+            }
+        }
+
+        return _transactions[from] = _client.ListTransactionsAsync(token, from, ct);
+    }
 
     // ── Webhooks ─────────────────────────────────────────────────────────────
 

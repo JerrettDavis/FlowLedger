@@ -47,12 +47,14 @@ public sealed class CreateTransactionHandler
     private readonly ITransactionRepository _repo;
     private readonly ITenantContext _tenant;
     private readonly IReferenceValidator _references;
+    private readonly TimeProvider? _clock;
 
-    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant, IReferenceValidator references)
+    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider? clock = null)
     {
         _repo = repo;
         _tenant = tenant;
         _references = references;
+        _clock = clock;
     }
 
     public async Task<TransactionDto> HandleAsync(CreateTransactionRequest request, CancellationToken ct = default)
@@ -72,7 +74,8 @@ public sealed class CreateTransactionHandler
             request.Description,
             request.EffectiveDate,
             request.PostedDate,
-            TransactionSource.Manual);
+            TransactionSource.Manual,
+            time: _clock);
 
         if (request.CategoryId.HasValue)
         {
