@@ -58,6 +58,27 @@ public sealed class PostgresAdvisoryLock : IAsyncDisposable
         }
     }
 
+    /// <summary>Waits (polling) until the lock is free; throws <see cref="TimeoutException"/> after <paramref name="timeout"/>.</summary>
+    public static async Task<PostgresAdvisoryLock> AcquireAsync(string connectionString, string name, TimeSpan timeout, CancellationToken ct = default)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (true)
+        {
+            var handle = await TryAcquireAsync(connectionString, name, ct);
+            if (handle is not null)
+            {
+                return handle;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"Timed out after {timeout.TotalSeconds:F0}s waiting for the advisory lock '{name}' held by another session.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1)

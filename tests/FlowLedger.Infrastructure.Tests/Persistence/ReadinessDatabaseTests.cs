@@ -13,7 +13,8 @@ public sealed class ReadinessDatabaseTests(IntegrationTestFixture fixture) : IAs
 {
     public Task InitializeAsync() => fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    // backup_runs is created ad hoc (outside Respawn's table list), so leave it empty for the other tests sharing the DB.
+    public Task DisposeAsync() => ExecAsync("DROP TABLE IF EXISTS backup_runs");
 
     private IConfiguration Config() => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:flowledger"] = fixture.ConnectionString })
@@ -33,11 +34,36 @@ public sealed class ReadinessDatabaseTests(IntegrationTestFixture fixture) : IAs
         var check = new PostgresReadinessCheck(Config());
         (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy);
 
-        // Forget the newest applied migration: the schema is now "behind" the code.
-        await ExecAsync("DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = (SELECT max(\"MigrationId\") FROM \"__EFMigrationsHistory\")");
-        var behind = await check.CheckHealthAsync(new HealthCheckContext());
-        behind.Status.Should().Be(HealthStatus.Unhealthy);
-        behind.Description.Should().Contain("pending migration");
+        // Forget the newest applied migration (restored afterwards: the DB is shared with other tests).
+        string? id = null, version = null;
+        await using (var conn = new NpgsqlConnection(fixture.ConnectionString))
+        {
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand(
+                "DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = (SELECT max(\"MigrationId\") FROM \"__EFMigrationsHistory\") RETURNING \"MigrationId\", \"ProductVersion\"", conn);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+            {
+                id = r.GetString(0);
+                version = r.GetString(1);
+            }
+        }
+
+        try
+        {
+            var behind = await check.CheckHealthAsync(new HealthCheckContext());
+            behind.Status.Should().Be(HealthStatus.Unhealthy);
+            behind.Description.Should().Contain("pending migration");
+        }
+        finally
+        {
+            await using var conn = new NpgsqlConnection(fixture.ConnectionString);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES (@i, @v)", conn);
+            cmd.Parameters.AddWithValue("i", id!);
+            cmd.Parameters.AddWithValue("v", version!);
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
 
     [DockerFact]
