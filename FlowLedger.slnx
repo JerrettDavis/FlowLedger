@@ -12,7 +12,6 @@
     <Project Path="src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj" />
     <Project Path="src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj" />
     <Project Path="src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj" />
-    <Project Path="src/FlowLedger.Web.Client/FlowLedger.Web.Client.csproj" />
     <Project Path="src/FlowLedger.Web/FlowLedger.Web.csproj" />
     <Project Path="src/FlowLedger.Worker/FlowLedger.Worker.csproj" />
   </Folder>

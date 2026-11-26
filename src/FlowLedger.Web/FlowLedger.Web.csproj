@@ -8,11 +8,9 @@
   <ItemGroup>
     <PackageReference Include="MudBlazor" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlowLedger.Web.Client\FlowLedger.Web.Client.csproj" />
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
   </ItemGroup>
 

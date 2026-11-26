@@ -26,8 +26,7 @@ AuthSetup.ConfigureDataProtection(builder.Services, oidc, builder.Environment, b
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddInteractiveWebAssemblyComponents();
+    .AddInteractiveServerComponents();
 
 // ── MudBlazor ───────────────────────────────────────────────────────────────
 builder.Services.AddMudServices();
@@ -66,17 +65,13 @@ var app = builder.Build();
 app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-if (app.Environment.IsDevelopment())
-{
-    app.UseWebAssemblyDebugging();
-}
-else
+if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 
-// Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
+// Security headers on every response; full CSP outside Development (hot reload injects scripts).
 app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
 
 app.UseStatusCodePagesWithReExecute("/status/{0}", createScopeForStatusCodePages: true);
@@ -99,9 +94,7 @@ app.MapDefaultEndpoints();
 // ── Static assets + Razor components ─────────────────────────────────────────
 app.MapStaticAssets();
 var razor = app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(FlowLedger.Web.Client._Imports).Assembly);
+    .AddInteractiveServerRenderMode();
 if (oidc.Enabled)
 {
     razor.RequireAuthorization();
