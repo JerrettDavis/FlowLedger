@@ -1,6 +1,4 @@
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -44,16 +42,12 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         }
     }
 
-    private sealed class Tenant(Guid id) : ITenantContext
-    {
-        public Guid TenantId { get; } = id;
-        public Guid UserId { get; } = Guid.NewGuid();
-    }
-
     [DockerFact]
     public async Task Rule_store_enforces_the_per_tenant_cap_in_sql_but_still_allows_replacing()
     {
-        var store = new NpgsqlCategoryRuleStore(_fixture.ConnectionString, new Tenant(NewTenant()));
+        var ctx = new TestTenantContext(NewTenant());
+        await using var db = _fixture.CreateProductionStyleContext(ctx);
+        var store = new FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryRuleStore(db, ctx);
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "Food");
@@ -71,7 +65,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Alias_store_enforces_the_per_tenant_cap_in_sql()
     {
-        var store = new NpgsqlMerchantAliasStore(_fixture.ConnectionString, new Tenant(NewTenant()));
+        var ctx = new TestTenantContext(NewTenant());
+        await using var db = _fixture.CreateProductionStyleContext(ctx);
+        var store = new FlowLedger.Infrastructure.Persistence.Repositories.EfMerchantAliasStore(db, ctx);
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "A");

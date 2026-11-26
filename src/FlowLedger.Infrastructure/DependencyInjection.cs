@@ -332,16 +332,10 @@ public static class DependencyInjection
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
-        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryRuleStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
-        services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlMerchantAliasStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryRuleStore>();
+        services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfMerchantAliasStore>();
 
         services.AddScoped<FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfSuspiciousDismissalStore>();
