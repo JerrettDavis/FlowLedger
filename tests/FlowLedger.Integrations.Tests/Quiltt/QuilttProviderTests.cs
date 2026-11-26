@@ -154,6 +154,22 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
+    public async Task Transactions_AccountWithOnlyPendingRows_AdvancesItsCursor()
+    {
+        var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-4);
+        var stub = new Stub((req, body) =>
+            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            : body.Contains("FlowLedgerAccounts") ? Json(AccountsJson)
+            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day.ToString("yyyy-MM-dd") + "\",\"description\":\"HOLD\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"PENDING\",\"account\":{\"id\":\"acc_1\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
+        var p = Make(stub);
+        await p.GetAccountsAsync("p_1");
+
+        var page = await p.GetTransactionsAsync("acc_1", SyncCursor.Initial);
+
+        page.NextCursor.Value.Should().Be(day.AddDays(-1).ToString("yyyy-MM-dd"));
+    }
+
+    [Fact]
     public async Task Transactions_HittingMaxPages_ContinueInTheSyncLoopInsteadOfFailing()
     {
         // Five days of rows, one per day, two rows per page and a one-page bound: the read is cut every time.

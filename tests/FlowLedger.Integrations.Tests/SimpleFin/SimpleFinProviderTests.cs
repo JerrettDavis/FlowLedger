@@ -52,6 +52,87 @@ public sealed class SimpleFinProviderTests
     }
     """;
 
+    private static SimpleFinFinancialDataProvider MakeWith(StubHandler handler, SimpleFinOptions options)
+    {
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://bridge.example/simplefin/") };
+        return new SimpleFinFinancialDataProvider(http, Options.Create(options), NullLogger<SimpleFinFinancialDataProvider>.Instance);
+    }
+
+    [Fact]
+    public async Task Deep_backfill_runs_once_and_the_cursor_marker_stops_it_on_later_syncs()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, Json(Today));
+        var options = new SimpleFinOptions { Enabled = true, AccessUrl = "https://u:p@bridge.example/simplefin", BackfillDays = 730 };
+
+        var first = MakeWith(handler, options);
+        var accounts = await first.GetAccountsAsync("simplefin");
+        var page = await first.GetTransactionsAsync(accounts[0].ProviderId, SyncCursor.Initial);
+        var callsAfterFirstSync = handler.Calls;
+        callsAfterFirstSync.Should().BeGreaterThan(2, "the first sync walks the backfill windows");
+        page.NextCursor.Value.Should().EndWith("|bf730", "the cursor records that the backfill completed");
+
+        // Next sync (a new scoped provider) with the persisted cursor: only the one base request, no backfill.
+        var second = MakeWith(handler, options);
+        var accounts2 = await second.GetAccountsAsync("simplefin");
+        var page2 = await second.GetTransactionsAsync(accounts2[0].ProviderId, page.NextCursor);
+
+        (handler.Calls - callsAfterFirstSync).Should().Be(1);
+        page2.NextCursor.Value.Should().EndWith("|bf730");
+    }
+
+    private sealed class GatedHandler(string body) : HttpMessageHandler
+    {
+        public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Calls { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Calls++;
+            await Gate.Task.ConfigureAwait(false); // deliberately does not observe ct: the shared fetch must not depend on one caller's token
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
+    public async Task A_cancelled_first_caller_does_not_poison_the_shared_fetch()
+    {
+        var handler = new GatedHandler(Json(Today));
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://bridge.example/simplefin/") };
+        var p = new SimpleFinFinancialDataProvider(http,
+            Options.Create(new SimpleFinOptions { Enabled = true, AccessUrl = "https://u:p@bridge.example/simplefin" }),
+            NullLogger<SimpleFinFinancialDataProvider>.Instance);
+
+        using var cts = new CancellationTokenSource();
+        var first = p.GetAccountsAsync("simplefin", cts.Token);
+        await cts.CancelAsync();
+        var cancelled = async () => await first;
+        await cancelled.Should().ThrowAsync<OperationCanceledException>();
+
+        handler.Gate.SetResult();
+        var accounts = await p.GetAccountsAsync("simplefin");
+        accounts.Should().HaveCount(2);
+        handler.Calls.Should().Be(1, "the one fetch is shared, not repeated or cancelled");
+    }
+
+    [Fact]
+    public async Task An_account_with_only_pending_rows_advances_its_cursor_instead_of_rereading_the_window()
+    {
+        var pendingDay = DateTimeOffset.UtcNow.AddDays(-3);
+        var json = $$"""
+        { "errors": [], "accounts": [
+          { "org": { "id": "arvest", "name": "Arvest Bank" }, "id": "chk1", "name": "Checking", "currency": "USD", "balance": "10",
+            "transactions": [ { "id": "p1", "posted": 0, "transacted_at": {{pendingDay.ToUnixTimeSeconds()}}, "pending": true, "amount": "-5.00", "description": "HOLD" } ] } ] }
+        """;
+        var (p, _) = Make(json);
+        var accounts = await p.GetAccountsAsync("simplefin");
+
+        var page = await p.GetTransactionsAsync(accounts[0].ProviderId, SyncCursor.Initial);
+
+        page.Items.Should().HaveCount(1);
+        page.NextCursor.IsInitial.Should().BeFalse();
+        page.NextCursor.Value.Should().Be(DateOnly.FromDateTime(pendingDay.UtcDateTime).AddDays(-1).ToString("yyyy-MM-dd"));
+    }
+
     [Fact]
     public async Task Maps_accounts_and_flips_liability_sign_to_owed()
     {
