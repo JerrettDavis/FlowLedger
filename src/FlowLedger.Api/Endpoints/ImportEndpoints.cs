@@ -136,7 +136,7 @@ internal static class ImportEndpoints
 
             try
             {
-                var normalized = ImportNormalizer.Normalize(request.Content, request.FormatId);
+                var normalized = ImportNormalizer.Normalize(request.Content, request.FormatId, new ImportHints(request.DateOrder, request.NumberFormat));
                 var summary = await handler.HandleAsync(
                     new ImportTransactionsCommand(request.AccountId, normalized.Csv, NormalizedImport.Mapping), ct);
                 await AfterImportAsync(summary, sheetMarker, duplicates, integrations, logger, ct);
@@ -250,7 +250,7 @@ public sealed record ImportRequest(
 public sealed record ManualMatchRequest(Guid PlannedOccurrenceId);
 
 /// <summary>Request body for POST /api/imports/auto. <paramref name="FormatId"/> overrides detection.</summary>
-public sealed record AutoImportRequest(Guid AccountId, string Content, string? FormatId = null);
+public sealed record AutoImportRequest(Guid AccountId, string Content, string? FormatId = null, string? DateOrder = null, string? NumberFormat = null);
 
 /// <summary>What was detected plus the import summary.</summary>
 public sealed record AutoImportResult(string FormatId, string FormatName, IReadOnlyList<string> Warnings, ImportSummaryDto Summary);

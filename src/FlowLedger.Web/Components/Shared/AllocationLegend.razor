@@ -1,0 +1,14 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@* The text equivalent of the colour-only allocation bar: every group with its share. *@
+<ul class="fl-alloc__legend" aria-label="@Label">
+    @foreach (var i in Items)
+    {
+        <li><span class="fl-dot fl-tone-@i.Tone" aria-hidden="true"></span> @i.Title <span class="fl-num">@i.Percent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%</span></li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AllocationItem> Items { get; set; } = [];
+    [Parameter] public string Label { get; set; } = "Share of balances by account group";
+}

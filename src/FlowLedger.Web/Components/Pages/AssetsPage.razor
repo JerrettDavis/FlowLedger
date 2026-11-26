@@ -1,5 +1,4 @@
 @page "/assets"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -8,7 +7,7 @@
 <PageTitle>Assets — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter">
-    <MudText Typo="Typo.h4">Assets</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Assets</MudText>
     <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
     <DateRangeSelector Label="Value change over" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" Variant="Variant.Filled"
@@ -223,10 +222,8 @@
 
     private async Task Remove(FlowLedger.Web.ApiClient.AssetDto asset)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync("Remove asset",
-            $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.",
-            yesText: "Remove", cancelText: "Cancel");
-        if (confirmed == true)
+        if (await DialogService.ConfirmAsync("Remove asset",
+                $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.", "Remove"))
         {
             await Run("Asset removed", async () => { await ApiClient.DeleteAssetAsync(asset.Id); return (object?)null; });
         }

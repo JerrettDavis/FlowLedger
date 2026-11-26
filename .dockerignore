@@ -22,6 +22,15 @@ tests/
 .env
 .env.*
 **/appsettings.*.local.json
+# Development settings hold the public dev API key; Production never reads them, so keep them out of images.
+**/appsettings.Development.json
+
+# Agent / tooling state and logs (build-context leakage)
+.claude/
+.remember/
+.playwright-mcp/
+*.log
+**/*.log
 
 # Node modules (if any tooling present)
 **/node_modules/

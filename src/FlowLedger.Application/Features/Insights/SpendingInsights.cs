@@ -88,7 +88,7 @@ public static class SpendingInsightsAnalyzer
         }
 
         var counted = all
-            .Where(t => t.Status is not ("Planned" or "Skipped") && t.Direction == wantDirection)
+            .Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) && t.Direction == wantDirection)
             .Where(t => q.AccountIds is not { Count: > 0 } || q.AccountIds.Contains(t.AccountId))
             .ToList();
         var transfersExcluded = counted.Count(t => transferIds.Contains(t.Id));

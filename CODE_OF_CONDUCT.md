@@ -4,4 +4,4 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 In summary: be respectful, inclusive, and constructive. Harassment and discrimination of any kind are not tolerated.
 
-Violations can be reported to the maintainers (contact in the repository profile).
+Violations can be reported privately through [GitHub security advisories](https://github.com/JerrettDavis/FlowLedger/security/advisories/new) or by contacting the repository owner via their GitHub profile.

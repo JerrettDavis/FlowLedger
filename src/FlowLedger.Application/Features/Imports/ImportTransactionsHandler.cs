@@ -94,7 +94,8 @@ public sealed class ImportTransactionsHandler
 
         var rowErrors = new List<RowErrorDto>();
         var uniqueTransactions = new List<(Transaction Tx, string Fp)>();
-        var seenFingerprints = new HashSet<string>(); // within-file dedup
+        // Identical same-day rows are genuine repeats (two transit fares), so each repeat gets an occurrence ordinal.
+        var occurrences = new Dictionary<string, int>();
         int inFileDupCount = 0;
 
         for (int i = startRow; i < rows.Count; i++)
@@ -110,14 +111,7 @@ public sealed class ImportTransactionsHandler
 
             try
             {
-                var (tx, fp) = ParseRow(fields, rowNumber, tenantId, accountId, mapping, dateFormats);
-
-                if (!seenFingerprints.Add(fp))
-                {
-                    // Duplicate within this file
-                    inFileDupCount++;
-                    continue;
-                }
+                var (tx, fp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences);
 
                 uniqueTransactions.Add((tx, fp));
             }
@@ -240,8 +234,10 @@ public sealed class ImportTransactionsHandler
         int rowNumber,
         TenantId tenantId,
         AccountId accountId,
+        Currency currency,
         CsvColumnMapping mapping,
-        string[] dateFormats)
+        string[] dateFormats,
+        Dictionary<string, int> occurrences)
     {
         // Date
         bool TryParseDateForCoalesce(string raw, out DateOnly d) =>
@@ -303,14 +299,19 @@ public sealed class ImportTransactionsHandler
 
         // Direction: negative amount = debit, positive = credit
         var direction = rawAmount < 0m ? TransactionDirection.Debit : TransactionDirection.Credit;
-        var absAmount = new Money(Math.Abs(rawAmount), new Currency("USD"));
+        var absAmount = new Money(Math.Abs(rawAmount), currency);
 
-        // Fingerprint
+        // Fingerprint: the Nth identical row in the file carries ordinal N-1, so a re-import matches
+        // each stored row one-to-one and only a genuine surplus is inserted.
+        var baseKey = TransactionFingerprint.FromRawDescription(accountId, date, absAmount.Amount, description).Value;
+        occurrences.TryGetValue(baseKey, out var occurrence);
+        occurrences[baseKey] = occurrence + 1;
         var fingerprint = TransactionFingerprint.FromRawDescription(
             accountId,
             date,
             absAmount.Amount,
-            description);
+            description,
+            occurrence: occurrence);
 
         var tx = Transaction.RecordActual(
             tenantId,

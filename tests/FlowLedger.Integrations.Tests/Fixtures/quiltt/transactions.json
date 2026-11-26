@@ -1,0 +1,14 @@
+{
+  "data": {
+    "transactions": {
+      "nodes": [
+        { "id": "txn_0001", "date": "2026-11-01", "description": " GROCERY MART #123 ", "amount": -54.12, "currencyCode": "USD", "status": "POSTED", "entryType": "DEBIT", "account": { "id": "acc_0001" } },
+        { "id": "txn_0002", "date": "2026-11-02", "description": "EXAMPLE EMPLOYER PAYROLL", "amount": 3200.00, "currencyCode": "USD", "status": "POSTED", "entryType": "CREDIT", "account": { "id": "acc_0001" } },
+        { "id": "txn_0003", "date": "2026-11-03", "description": "COFFEE SHOP", "amount": 18.40, "status": "PENDING", "entryType": "DEBIT", "account": { "id": "acc_0001" } },
+        { "id": "txn_0101", "date": "2026-11-03", "description": "ONLINE RETAILER ORDER", "amount": 42.00, "currencyCode": "USD", "status": "POSTED", "entryType": "DEBIT", "account": { "id": "acc_0002" } },
+        { "id": "txn_0102", "date": "2026-11-04", "description": "PAYMENT THANK YOU", "amount": 500.00, "currencyCode": "USD", "status": "POSTED", "entryType": "CREDIT", "account": { "id": "acc_0002" } }
+      ],
+      "pageInfo": { "hasNextPage": false }
+    }
+  }
+}

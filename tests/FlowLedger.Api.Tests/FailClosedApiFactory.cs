@@ -14,5 +14,9 @@ public sealed class FailClosedApiFactory : FlowLedgerApiFactory
     {
         base.ConfigureWebHost(builder);
         builder.UseEnvironment("Production");
+
+        // The route sweep fires hundreds of wrong-key requests from one address; the failed-auth throttle is covered by unit tests.
+        builder.UseSetting("RateLimiting:FailedAuthPerIpPerMinute", "100000");
+        builder.UseSetting("RateLimiting:GlobalPerIpPerMinute", "100000");
     }
 }

@@ -28,7 +28,7 @@ internal static class AssetMapper
         decimal? equity = null;
         if (linked is not null && NetWorthCalculator.IsLiability(linked.AccountType))
         {
-            liability = Math.Abs(linked.CurrentBalance.Amount);
+            liability = linked.CurrentBalance.Amount;
             equity = estimate - liability;
         }
 

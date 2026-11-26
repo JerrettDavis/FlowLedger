@@ -58,8 +58,8 @@ internal static class SimpleFinMapper
         // SimpleFIN reports what you HAVE (liabilities negative). FlowLedger (like MX) stores what you OWE as positive.
         if (type is "CREDIT_CARD" or "LOAN" or "MORTGAGE")
         {
-            balance = Math.Abs(balance);
-            available = available is { } av ? Math.Abs(av) : null;
+            balance = -balance;
+            available = available is { } av ? -av : null;
         }
 
         var org = string.IsNullOrWhiteSpace(a.Org?.Name) ? a.Org?.Domain : a.Org!.Name;
@@ -70,6 +70,9 @@ internal static class SimpleFinMapper
             available is { } v ? new Money(v, new Currency(currency)) : null,
             currency);
     }
+
+    /// <summary>True when the row has a real date (posted, or at least transacted_at); otherwise it would move to "now" on every sync.</summary>
+    public static bool HasUsableDate(SfTransaction t) => t.Posted > 0 || t.TransactedAt is > 0;
 
     public static ProviderTransaction ToTransaction(SfAccount a, SfTransaction t)
     {

@@ -26,7 +26,8 @@ public static class SnapshotImport
     private const long MaxUncompressedBytes = 8L * 1024 * 1024 * 1024;
 
     public static async Task<RestoreDrillResult> ImportZipAsync(
-        string targetConnectionString, Stream zip, string workDir, CancellationToken ct = default)
+        string targetConnectionString, Stream zip, string workDir, CancellationToken ct = default,
+        long maxUncompressedBytes = MaxUncompressedBytes)
     {
         var dir = Path.Combine(workDir, "import-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -34,11 +35,14 @@ public static class SnapshotImport
         {
             using (var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true))
             {
-                // Zip-bomb guard: refuse bundles whose declared uncompressed size is implausible.
-                if (archive.Entries.Sum(x => x.Length) > MaxUncompressedBytes)
+                // Zip-bomb guard, part 1: refuse bundles whose DECLARED uncompressed size is implausible. Declared sizes are
+                // attacker-controlled, so part 2 (ExtractBounded) counts the bytes actually written.
+                if (archive.Entries.Sum(x => x.Length) > maxUncompressedBytes)
                 {
-                    return Fail($"Bundle expands to more than {MaxUncompressedBytes / (1024 * 1024 * 1024)} GB; refusing to extract it.");
+                    return Fail($"Bundle expands to more than {maxUncompressedBytes:N0} bytes; refusing to extract it.");
                 }
+
+                long written = 0;
 
                 foreach (var entry in archive.Entries)
                 {
@@ -48,7 +52,14 @@ public static class SnapshotImport
                         return Fail("Bundle contains an unexpected path: " + entry.FullName);
                     }
 
-                    entry.ExtractToFile(Path.Combine(dir, entry.Name), overwrite: false);
+                    try
+                    {
+                        ExtractBounded(entry, dir, ref written, maxUncompressedBytes);
+                    }
+                    catch (InvalidDataException ex)
+                    {
+                        return Fail(ex.Message);
+                    }
                 }
             }
 
@@ -93,6 +104,39 @@ public static class SnapshotImport
         }
 
         static RestoreDrillResult Fail(string why) => new(false, "", false, [], [why]);
+    }
+
+    /// <summary>Extracts one entry, counting the bytes actually written (shared across entries via <paramref name="totalWritten"/>)
+    /// and aborting as soon as <paramref name="maxTotalBytes"/> is exceeded, whatever the archive claims about its sizes.</summary>
+    internal static void ExtractBounded(ZipArchiveEntry entry, string directory, ref long totalWritten, long maxTotalBytes)
+    {
+        // Resolve against the trusted extraction directory and refuse anything that lands outside it (zip-slip).
+        var root = Path.GetFullPath(directory);
+        if (!root.EndsWith(Path.DirectorySeparatorChar))
+        {
+            root += Path.DirectorySeparatorChar;
+        }
+
+        var full = Path.GetFullPath(Path.Combine(root, entry.Name));
+        if (entry.Name.Length == 0 || !full.StartsWith(root, StringComparison.Ordinal) || Path.GetDirectoryName(full) + Path.DirectorySeparatorChar != root)
+        {
+            throw new InvalidDataException("Bundle contains an unexpected entry name.");
+        }
+
+        using var source = entry.Open();
+        using var target = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        var buffer = new byte[81920];
+        int read;
+        while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            totalWritten += read;
+            if (totalWritten > maxTotalBytes)
+            {
+                throw new InvalidDataException($"Bundle expands to more than {maxTotalBytes:N0} bytes while extracting; refusing to continue.");
+            }
+
+            target.Write(buffer, 0, read);
+        }
     }
 
     /// <summary>Rows across every data table (ignoring bookkeeping tables); a freshly migrated database has none.</summary>

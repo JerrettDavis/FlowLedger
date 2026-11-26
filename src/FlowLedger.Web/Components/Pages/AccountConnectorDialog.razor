@@ -1,4 +1,5 @@
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject IDialogService DialogService
 
 <MudDialog aria-labelledby="account-connector-title">
     <TitleContent>
@@ -131,6 +132,11 @@
 
     private async Task RemoveLink()
     {
+        if (!await DialogService.ConfirmAsync("Remove link", "Stop syncing this account from its linked connector?", "Remove"))
+        {
+            return;
+        }
+
         try
         {
             await ApiClient.ClearAccountConnectorAsync(Account.Id);

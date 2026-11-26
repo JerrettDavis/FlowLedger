@@ -29,7 +29,7 @@ public sealed class IntegrationTransport(IHttpClientFactory http) : IIntegration
             message.Options.Set(HomeAssistantWebhookSender.AllowLocalKey, allowLocalNetwork);
             if (request.Body is not null)
             {
-                message.Content = new StringContent(request.Body, Encoding.UTF8);
+                message.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(request.Body));
                 message.Content.Headers.Remove("Content-Type");
                 message.Content.Headers.TryAddWithoutValidation("Content-Type", request.ContentType ?? "application/json");
             }

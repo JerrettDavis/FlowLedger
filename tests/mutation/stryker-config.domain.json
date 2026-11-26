@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/stryker-config.schema.json",
+  "stryker-config": {
+    "project": "FlowLedger.Domain.csproj",
+    "reporters": [ "html", "json", "progress" ],
+    "mutation-level": "Standard",
+    "mutate": [
+      "**/*.cs",
+      "!**/obj/**"
+    ],
+    "thresholds": {
+      "high": 85,
+      "low": 70,
+      "break": 59
+    },
+    "concurrency": 4,
+    "disable-bail": false
+  }
+}

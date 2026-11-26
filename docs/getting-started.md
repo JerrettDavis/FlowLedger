@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (10.0.301 or later)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (10.0.109 or later; see `global.json`)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for integration tests and full-stack mode)
 - (Optional) MX API credentials from [dashboard.mx.com](https://dashboard.mx.com)
 

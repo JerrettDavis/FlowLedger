@@ -1,5 +1,4 @@
 @page "/"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ILogger<Home> Logger
 @inject IDialogService Dialogs
@@ -8,7 +7,7 @@
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-2" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h4">Dashboard</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Dashboard</MudText>
     <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
         <DateRangeSelector Label="History" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo"
                            Presets="@HistoryPresets" Changed="OnRangeChanged" />
@@ -23,16 +22,6 @@
 </div>
 
 <AlertsPanel />
-
-<style>
-    .fl-account-strip { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 4px; }
-    .fl-account-chip { display: flex; flex-direction: column; align-items: center; min-width: 96px; max-width: 120px;
-        padding: 8px; border-radius: 12px; text-decoration: none; color: inherit; border: 1px solid var(--mud-palette-divider); }
-    .fl-account-chip:hover, .fl-account-chip:focus-visible { background: var(--mud-palette-action-default-hover); }
-    .fl-account-chip__name { font-size: 12px; font-weight: 500; margin-top: 6px; text-align: center; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-    .fl-account-chip__bal { font-size: 11px; opacity: .75; }
-</style>
 
 @if (!_loading && _accounts.Count > 0)
 {
@@ -122,12 +111,12 @@ else
             <MudCard Class="fl-card-hover fl-enter fl-enter-3">
                 <MudCardContent>
                     <MudText Typo="Typo.overline" Color="@(_lowWaterMark < 0 ? Color.Error : Color.Warning)">Forecast Low</MudText>
-                    <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_lowWaterMark)" aria-label="Forecast low water mark">@Format.Money(_lowWaterMark)</MudText>
+                    <MudText Typo="Typo.h5" Class="fl-num" Color="@(_forecastUnavailable ? Color.Default : Format.Delta(_lowWaterMark))" aria-label="Forecast low water mark">@(_forecastUnavailable ? "Unavailable" : Format.Money(_lowWaterMark))</MudText>
                     <div class="d-flex align-center gap-1 mt-1">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @(_lowWaterMarkDate.HasValue ? $"on {Format.DayMonth(_lowWaterMarkDate.Value)}" : "3-month horizon")
+                            @(_forecastUnavailable ? "Couldn't load the forecast" : _lowWaterMarkDate.HasValue ? $"on {Format.DayMonth(_lowWaterMarkDate.Value)}" : $"{_horizonMonths}-month horizon")
                         </MudText>
-                        @if (_lowWaterMark < 0)
+                        @if (!_forecastUnavailable && _lowWaterMark < 0)
                         {
                             <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">Below zero</MudChip>
                         }
@@ -142,10 +131,10 @@ else
                 <MudCardContent>
                     <MudText Typo="Typo.overline" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)">Overdraft Risk</MudText>
                     <MudText Typo="Typo.h5" Class="fl-num" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)" aria-label="Overdraft warnings">
-                        @(_overdraftCount > 0 ? $"{_overdraftCount} warning(s)" : "None")
+                        @(_forecastUnavailable ? "Unavailable" : _overdraftCount > 0 ? $"{_overdraftCount} warning(s)" : "None")
                     </MudText>
                     <div class="d-flex align-center gap-1 mt-1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Next 3 months</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(_forecastUnavailable ? "Retry from the projection card" : $"Next {_horizonMonths} months")</MudText>
                         @if (_overdraftCount > 0)
                         {
                             <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">
@@ -158,6 +147,14 @@ else
         </MudItem>
 
     </MudGrid>
+
+    @if (_insightsUnavailable)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true">
+            Couldn't load spending insights.
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit" OnClick="ReloadInsightsAsync">Retry</MudButton>
+        </MudAlert>
+    }
 
     <div class="fl-masonry">
         <!-- Insights: spending by category -->
@@ -172,7 +169,10 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
+                        <ChartFigure Title="Spending by category"
+                                     Summary="@ChartSummary.Categories($"Spending {RangeLabel}", _insights.SpendingByCategory.Select(c => (c.Category, c.Amount)), Format.Money)">
+                            <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
+                        </ChartFigure>
                         <MudSimpleTable Dense="true" Elevation="0">
                             <tbody>
                                 @foreach (var c in _insights.SpendingByCategory)
@@ -198,7 +198,11 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                        <ChartFigure Title="Income vs spending by month"
+                                     Summary="@FlowSummary()"
+                                     Rows="@FlowRows()" LabelHeader="Month" ValueHeader="Income / spending / net">
+                            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                        </ChartFigure>
                         @if (_savingsRate is { } rate)
                         {
                             <div class="d-flex align-center gap-2 mt-2 flex-wrap">
@@ -223,7 +227,7 @@ else
                     <MudCardHeader>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Biggest changes</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last 30 days vs the 30 before (@_insights.PreviousLabel)</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel vs the previous period (@_insights.PreviousLabel)</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
@@ -238,7 +242,8 @@ else
                                     </MudText>
                                 </div>
                                 <MudProgressLinear Value="@(maxChange == 0 ? 0 : Math.Abs((double)m.Change) / maxChange * 100)" Size="Size.Small"
-                                                   Color="@(m.Change > 0 ? Color.Error : Color.Success)" aria-label="@($"{m.Category} change")" />
+                                                   Color="@(m.Change > 0 ? Color.Error : Color.Success)" aria-label="@($"{m.Category} change")"
+                                                   aria-valuetext="@($"{m.Category}: {(m.Change > 0 ? "up" : "down")} {Format.Money(Math.Abs(m.Change))} ({Format.Money(m.Previous)} to {Format.Money(m.Current)})")" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.Money(m.Previous) → @Format.Money(m.Current)</MudText>
                             </div>
                         }
@@ -267,7 +272,8 @@ else
                                     <MudText Typo="Typo.body2">@m.Merchant <span class="fl-muted">· @m.Visits×</span></MudText>
                                     <MudText Typo="Typo.body2" Class="fl-num">@Format.Money(m.Amount)</MudText>
                                 </div>
-                                <MudProgressLinear Value="@(topMerchant == 0 ? 0 : (double)m.Amount / topMerchant * 100)" Size="Size.Small" Color="Color.Primary" aria-label="@($"{m.Merchant} spend")" />
+                                <MudProgressLinear Value="@(topMerchant == 0 ? 0 : (double)m.Amount / topMerchant * 100)" Size="Size.Small" Color="Color.Primary" aria-label="@($"{m.Merchant} spend")"
+                                                   aria-valuetext="@($"{m.Merchant}: {Format.Money(m.Amount)} over {m.Visits} visits")" />
                             </div>
                         }
                     </MudCardContent>
@@ -287,7 +293,12 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
+                        <ChartFigure Title="Net worth trend"
+                                     Summary="@ChartSummary.Trend("Net worth", _insights.NetWorth.TakeLast(60).Select(p => (p.Date, p.Value)).ToList(), Format.Money)"
+                                     Rows="@_insights.NetWorth.TakeLast(60).Select(p => new ChartRow(p.Date, Format.Money(p.Value))).ToList()"
+                                     LabelHeader="Date" ValueHeader="Net worth">
+                            <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
+                        </ChartFigure>
                     </MudCardContent>
                 </MudCard>
             </div>
@@ -305,19 +316,32 @@ else
                 <MudCardContent>
                     @if (_forecastPoints.Count >= 2)
                     {
-                        <div style="height:220px;overflow:hidden" role="img" aria-label="Balance projection chart">
-                            @((MarkupString)SvgChart.BuildBalanceProjection(
-                                _forecastPoints,
-                                zeroLine: 0m,
-                                breaches: _breachDates,
-                                lowWaterMark: _lwmTuple))
-                        </div>
+                        <ChartFigure Title="Balance projection"
+                                     Summary="@ProjectionSummary()">
+                            <div style="height:220px;overflow:hidden">
+                                @((MarkupString)SvgChart.BuildBalanceProjection(
+                                    _forecastPoints,
+                                    zeroLine: 0m,
+                                    breaches: _breachDates,
+                                    lowWaterMark: _lwmTuple))
+                            </div>
+                        </ChartFigure>
+                    }
+                    else if (_forecastUnavailable)
+                    {
+                        <EmptyState Icon="@Icons.Material.Outlined.ErrorOutline"
+                                    Title="Couldn't load the forecast"
+                                    Description="The numbers above are unknown, not zero.">
+                            <Action>
+                                <MudButton Variant="Variant.Outlined" OnClick="@(() => OnHorizonChanged(_horizonMonths))">Retry</MudButton>
+                            </Action>
+                        </EmptyState>
                     }
                     else
                     {
                         <EmptyState Icon="@Icons.Material.Outlined.ShowChart"
                                     Title="No forecast yet"
-                                    Description="Click &quot;Connect &amp; Sync&quot; to load demo data." />
+                                    Description="@OnboardingCopy.LoadData(Status?.Environment)" />
                     }
                 </MudCardContent>
             </MudCard>
@@ -533,6 +557,9 @@ else
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private static string FlagName(FlowLedger.Web.ApiClient.FlaggedTransactionDto f) =>
         string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName;
 
@@ -690,6 +717,7 @@ else
         try
         {
             var forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);
+            _forecastUnavailable = forecast is null;
             if (forecast is not null)
             {
                 _forecastPoints = forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList();
@@ -706,6 +734,7 @@ else
         }
         catch (Exception ex)
         {
+            _forecastUnavailable = true;
             Logger.LogWarning(ex, "Failed to reload forecast");
             Snackbar.Add("Couldn't load the forecast", Severity.Error);
         }
@@ -716,13 +745,50 @@ else
         try
         {
             _insights = await ApiClient.GetDashboardInsightsAsync(_rangeFrom, _rangeTo);
+            _insightsUnavailable = _insights is null;
             ApplyInsights();
         }
         catch (Exception ex)
         {
+            _insightsUnavailable = true;
             Logger.LogWarning(ex, "Failed to reload dashboard insights");
             Snackbar.Add("Couldn't load that date range", Severity.Error);
         }
+    }
+
+    private string FlowSummary()
+    {
+        if (_insights is null || _insights.CashFlow.Count == 0)
+        {
+            return "Income vs spending: no data.";
+        }
+
+        var income = _insights.CashFlow.Sum(m => m.Income);
+        var spending = _insights.CashFlow.Sum(m => m.Spending);
+        return $"Income vs spending over {_insights.CashFlow.Count} months: income {Format.Money(income)}, spending {Format.Money(spending)}, net {Format.Money(income - spending)}.";
+    }
+
+    private IReadOnlyList<ChartRow> FlowRows() =>
+        _insights is null ? [] : _insights.CashFlow
+            .Select(m => new ChartRow(m.Month.Length >= 7 ? m.Month[..7] : m.Month,
+                $"{Format.Money(m.Income)} / {Format.Money(m.Spending)} / {Format.Money(m.Income - m.Spending)}"))
+            .ToList();
+
+    private string ProjectionSummary()
+    {
+        var text = ChartSummary.Trend($"Projected cash balance over {_horizonMonths} months",
+            _forecastPoints.Select(p => (Format.FullDate(p.date), p.balance)).ToList(), Format.Money);
+        if (_lwmTuple is { } low)
+        {
+            text += $" Lowest point {Format.Money(low.balance)} on {Format.FullDate(low.date)}.";
+        }
+
+        if (_breachDates is { Count: > 0 })
+        {
+            text += $" Balance goes below zero on {_breachDates.Count} dates, first {Format.FullDate(_breachDates.Min())}.";
+        }
+
+        return text;
     }
 
     private void ApplyInsights()
@@ -751,6 +817,8 @@ else
 
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
+    private bool _insightsUnavailable;
+    private bool _forecastUnavailable;
     private List<MudBlazor.ChartSeries<double>> _spendSeries = [];
     private string[] _spendLabels = [];
     private List<MudBlazor.ChartSeries<double>> _flowSeries = [];
@@ -826,12 +894,20 @@ else
             try
             {
                 _insights = await insightsTask;
+                _insightsUnavailable = _insights is null;
                 ApplyInsights();
             }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
+            catch (Exception ex)
+            {
+                _insightsUnavailable = true;
+                Logger.LogWarning(ex, "Failed to load dashboard insights");
+            }
 
-            // Forecast
-            var forecast = await forecastTask;
+            // Forecast is best-effort too: a failure shows "Unavailable" on its cards, never a fake zero.
+            FlowLedger.Web.ApiClient.ForecastResultDto? forecast = null;
+            try { forecast = await forecastTask; }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load forecast"); }
+            _forecastUnavailable = forecast is null;
             if (forecast is not null)
             {
                 _forecastSeries = forecast.AggregateSeries;

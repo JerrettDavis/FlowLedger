@@ -1,5 +1,4 @@
 @page "/forecasts"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
 @inject ILogger<Forecasts> Logger
@@ -7,7 +6,7 @@
 <PageTitle>Forecasts — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
-    <MudText Typo="Typo.h4">Forecasts</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Forecasts</MudText>
     <div class="d-flex align-center" style="gap:8px">
         <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_selectedIds" SelectedValuesChanged="OnAccountsChanged"
                    Label="Accounts" Style="width:min(220px,100%)" Clearable="true"
@@ -284,10 +283,13 @@ else
 {
     <EmptyState Icon="@Icons.Material.Outlined.TrendingUp"
                 Title="No forecast yet"
-                Description="Click &quot;Connect &amp; Sync&quot; to load demo data, then run a forecast." />
+                Description="@OnboardingCopy.LoadData(Status?.Environment, "then run a forecast")" />
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private int _horizonMonths = 3;

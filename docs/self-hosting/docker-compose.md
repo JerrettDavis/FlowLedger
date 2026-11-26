@@ -47,8 +47,19 @@ publish the API, PostgreSQL or Redis ports beyond the host.
 
 Health endpoints:
 - `GET http://localhost:5001/alive` — API liveness
-- `GET http://localhost:5001/health` — API readiness
+- `GET http://localhost:5001/ready` — API readiness: 503 when Postgres is unreachable or migrations are pending
+  (also checks Redis when `ConnectionStrings__redis` is set). Backup freshness (`Health__BackupMaxAgeHours`,
+  default 36) is reported as Degraded in the check list but never turns `/ready` 503.
+- `GET http://localhost:5001/health` — every check (liveness + readiness)
+- Worker: `dotnet FlowLedger.Worker.dll --healthcheck` exits 0 while the Quartz scheduler has refreshed its
+  heartbeat file (`Worker__HeartbeatFile`, default `<tmp>/flowledger-worker.heartbeat`) in the last 60 s, else 1.
+  Use it as a compose/k8s exec probe (the image has no shell or curl).
 - `GET http://localhost:5002/alive` — Web liveness
+
+Scheduling: run a single worker replica. The scheduler is in-memory (a worker that is down at a fire time skips
+that run). Each job takes a Postgres advisory lock while it runs, so an overlapping second worker or a rolling
+deploy cannot run the same job twice at once; runs are logged and exported as `flowledger.job.runs`,
+`flowledger.job.duration` and `flowledger.job.last_success_age` (meter `FlowLedger`).
 
 ## Infra-only mode (for Aspire dev loop)
 
@@ -66,6 +77,30 @@ Then run the Aspire dev loop in a separate terminal:
 ```
 
 See [local-dev.md](../development/local-dev.md) for the full Aspire workflow.
+
+## Health, hardening and sizing
+
+* **Healthchecks.** The chiseled runtime images have no shell or curl, so the api and web images carry a static
+  `healthprobe` binary (built from `scripts/healthprobe`). `docker compose ps` shows `healthy`/`unhealthy` for
+  postgres, redis, api (`/health`) and web (`/alive`); web and worker start only after the api is healthy. The worker has
+  no HTTP endpoint, so its healthcheck runs `dotnet FlowLedger.Worker.dll --healthcheck` (scheduler heartbeat file).
+  `/health` includes the Postgres readiness check, so stopping postgres turns the api unhealthy.
+* **Containers.** api, web and worker run with `cap_drop: ALL`, `no-new-privileges`, a read-only root filesystem
+  (writable: the `objects_data` and `backups_data` volumes and a 128 MiB `/tmp` tmpfs), and `pids_limit`. postgres and redis
+  drop all capabilities except those their entrypoints need to chown their data directory and step down to their own user.
+  Because the root filesystem is read-only, ASP.NET Data Protection keys are in-memory only for now (sign-in cookies are
+  invalidated on restart) until persistent key storage is added.
+* **Networks and images.** postgres and redis sit on a `backend` network shared only with api and worker; web shares just a
+  `frontend` network with the api. The postgres and redis images are pinned by tag and digest (Dependabot's docker
+  ecosystem proposes updates). Runtime images run as the non-root `APP_UID` (1654), and `appsettings.Development.json` is
+  excluded from images (it holds the public dev API key), so the images carry no Development-only settings.
+* **Limits.** Defaults: api 1 GiB / 2 CPUs, web 512 MiB / 1 CPU, worker 1 GiB / 2 CPUs, postgres 1 GiB / 2 CPUs
+  (`shared_buffers=256MB`), redis 256 MiB. They suit a single household; raise `mem_limit` (and postgres
+  `shared_buffers`/`effective_cache_size`, about 25%/75% of its limit) on larger hosts or for very large imports.
+* **Shutdown.** The worker gets `stop_grace_period: 120s` so a running sync or backup finishes; api and web get 30s.
+* **Logs** use the `json-file` driver capped at 5 x 10 MiB per container.
+* **Redis** requires a password: set `REDIS_PASSWORD` in `.env` (it falls back to `POSTGRES_PASSWORD` if unset). Use hex
+  only; a comma or semicolon would break the connection string.
 
 ## Profiles summary
 

@@ -1,5 +1,7 @@
 # ADR 0003 — MX Integration Behind Feature Flag
 
+Status: Accepted (MX is now one of several providers; see ADR 0009, 0010 and 0017)
+
 ## Context
 FlowLedger needs a real bank data provider (MX.com) but API calls cost money and require credentials. Development and CI must work without MX credentials.
 

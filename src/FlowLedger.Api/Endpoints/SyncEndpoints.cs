@@ -22,7 +22,7 @@ internal static class SyncEndpoints
             }
 
             var memberId = await syncService.ConnectAsync(ct);
-            return Results.Ok(new { memberId, provider = "Simulated" });
+            return Results.Ok(new { memberId, provider = ConnectorIds.Simulated });
         })
         .WithName("Connect")
         .WithSummary("Begin a provider connection (simulated by default) for the current tenant")
@@ -62,7 +62,7 @@ internal static class SyncEndpoints
                     }
                 }
 
-                var anyReal = connectors.Enabled.Any(c => c.Id != "Simulated");
+                var anyReal = connectors.Enabled.Any(c => c.Id != ConnectorIds.Simulated);
                 var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : (anyReal ? 30 : 0);
                 return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = primary.ProviderName });
             })
@@ -89,18 +89,7 @@ internal static class SyncEndpoints
             {
                 return Results.Problem(title: "Sync already running", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
-            catch (FlowLedger.Integrations.Abstractions.ProviderCallBudgetExceededException ex)
-            {
-                return Results.Problem(title: "Provider call budget reached", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
-            }
-            catch (FlowLedger.Integrations.Abstractions.NeedsUserActionProviderException ex)
-            {
-                // Not a server fault: the user must (re)connect an institution first.
-                return Results.Problem(
-                    title: "Provider connection requires user action",
-                    detail: ex.UserHint ?? ex.Message,
-                    statusCode: StatusCodes.Status409Conflict);
-            }
+            // Provider failures (user action, rate limit, outage, call budget) are mapped centrally by ProviderExceptionHandler.
         })
         .WithName("Sync")
         .WithSummary("Run a full/incremental financial sync for the current tenant")

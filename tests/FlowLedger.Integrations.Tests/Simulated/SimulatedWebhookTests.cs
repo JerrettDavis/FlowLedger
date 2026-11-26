@@ -12,8 +12,10 @@ namespace FlowLedger.Integrations.Tests.Simulated;
 /// </summary>
 public sealed class SimulatedWebhookTests
 {
+    private const string TestSecret = "unit-test-webhook-secret";
+
     private static SimulatedFinancialDataProvider MakeProvider() =>
-        new(Options.Create(new SimulatedProviderOptions()));
+        new(Options.Create(new SimulatedProviderOptions { WebhookSecret = TestSecret }));
 
     // ── VerifyWebhookAsync ────────────────────────────────────────────────────
 
@@ -21,17 +23,30 @@ public sealed class SimulatedWebhookTests
     public async Task VerifyWebhook_accepts_valid_test_signature()
     {
         var provider = MakeProvider();
-        var (body, signature) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent();
+        var (body, signature) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
 
         // Must not throw
         await provider.VerifyWebhookAsync(body, signature);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task VerifyWebhook_fails_closed_when_no_secret_is_configured(string? secret)
+    {
+        var provider = new SimulatedFinancialDataProvider(
+            Options.Create(new SimulatedProviderOptions { WebhookSecret = secret }));
+        var (body, signature) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent("anything");
+
+        Func<Task> act = () => provider.VerifyWebhookAsync(body, signature);
+        await act.Should().ThrowAsync<InvalidWebhookSignatureException>();
     }
 
     [Fact]
     public async Task VerifyWebhook_rejects_tampered_signature()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent();
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
         const string badSignature = "000000000000000000000000000000000000000000000000000000000000dead";
 
         Func<Task> act = () => provider.VerifyWebhookAsync(body, badSignature);
@@ -42,7 +57,7 @@ public sealed class SimulatedWebhookTests
     public async Task VerifyWebhook_rejects_empty_signature()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent();
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
 
         Func<Task> act = () => provider.VerifyWebhookAsync(body, string.Empty);
         await act.Should().ThrowAsync<InvalidWebhookSignatureException>();
@@ -52,7 +67,7 @@ public sealed class SimulatedWebhookTests
     public async Task VerifyWebhook_rejects_signature_for_different_body()
     {
         var provider = MakeProvider();
-        var (_, signature) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent();
+        var (_, signature) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
 
         // Different payload — same signature should be invalid
         var differentBody = Encoding.UTF8.GetBytes("{\"event_type\":\"TAMPERED\"}");
@@ -67,7 +82,7 @@ public sealed class SimulatedWebhookTests
     public async Task ParseWebhook_returns_correct_event_type()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent("SYNC_COMPLETE");
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret, "SYNC_COMPLETE");
 
         var evt = await provider.ParseWebhookAsync(body);
 
@@ -78,7 +93,7 @@ public sealed class SimulatedWebhookTests
     public async Task ParseWebhook_returns_correct_member_id()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret,
             memberId: "sim-member-custom");
 
         var evt = await provider.ParseWebhookAsync(body);
@@ -90,7 +105,7 @@ public sealed class SimulatedWebhookTests
     public async Task ParseWebhook_occurred_at_is_recent()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent();
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
 
         var evt = await provider.ParseWebhookAsync(body);
 
@@ -104,7 +119,7 @@ public sealed class SimulatedWebhookTests
 
         for (var i = 0; i < 5; i++)
         {
-            var (body, sig) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent($"EVENT_{i}");
+            var (body, sig) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret, $"EVENT_{i}");
 
             // Should not throw
             await provider.VerifyWebhookAsync(body, sig);
@@ -114,24 +129,24 @@ public sealed class SimulatedWebhookTests
     // ── BuildTestSignature helper ─────────────────────────────────────────────
 
     [Fact]
-    public void BuildTestSignature_is_deterministic_for_same_input()
+    public void BuildSignature_is_deterministic_for_same_input()
     {
         var body = Encoding.UTF8.GetBytes("{\"test\":\"payload\"}");
 
-        var sig1 = SimulatedFinancialDataProvider.BuildTestSignature(body);
-        var sig2 = SimulatedFinancialDataProvider.BuildTestSignature(body);
+        var sig1 = SimulatedFinancialDataProvider.BuildSignature(body, TestSecret);
+        var sig2 = SimulatedFinancialDataProvider.BuildSignature(body, TestSecret);
 
         sig1.Should().Be(sig2);
     }
 
     [Fact]
-    public void BuildTestSignature_differs_for_different_input()
+    public void BuildSignature_differs_for_different_input()
     {
         var body1 = Encoding.UTF8.GetBytes("{\"event\":\"A\"}");
         var body2 = Encoding.UTF8.GetBytes("{\"event\":\"B\"}");
 
-        var sig1 = SimulatedFinancialDataProvider.BuildTestSignature(body1);
-        var sig2 = SimulatedFinancialDataProvider.BuildTestSignature(body2);
+        var sig1 = SimulatedFinancialDataProvider.BuildSignature(body1, TestSecret);
+        var sig2 = SimulatedFinancialDataProvider.BuildSignature(body2, TestSecret);
 
         sig1.Should().NotBe(sig2);
     }

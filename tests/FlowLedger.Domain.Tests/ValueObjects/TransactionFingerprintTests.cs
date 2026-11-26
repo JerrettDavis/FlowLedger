@@ -43,6 +43,18 @@ public sealed class TransactionFingerprintTests
             .Should().Be("pid:tx-9|11111111-2222-3333-4444-555555555555");
 
     [Fact]
+    public void Occurrence_zero_keeps_legacy_value_and_later_occurrences_are_suffixed()
+    {
+        var date = new DateOnly(2026, 1, 2);
+        var legacy = TransactionFingerprint.FromRawDescription(Account, date, 2.75m, "Transit").Value;
+
+        TransactionFingerprint.FromRawDescription(Account, date, 2.75m, "Transit", occurrence: 0).Value.Should().Be(legacy);
+        TransactionFingerprint.FromRawDescription(Account, date, 2.75m, "Transit", occurrence: 1).Value.Should().Be(legacy + "|1");
+        TransactionFingerprint.FromRawDescription(Account, date, 2.75m, "Transit", "tx-1", occurrence: 3).Value
+            .Should().Be("pid:tx-1|11111111-2222-3333-4444-555555555555");
+    }
+
+    [Fact]
     public void FromRawDescription_equals_Create_with_normalized_description()
         => TransactionFingerprint.FromRawDescription(Account, new DateOnly(2026, 1, 2), 3m, " a  b ")
             .Should().Be(TransactionFingerprint.Create(Account, new DateOnly(2026, 1, 2), 3m, "A B"));

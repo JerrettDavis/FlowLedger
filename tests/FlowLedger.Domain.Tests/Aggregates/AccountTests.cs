@@ -72,6 +72,25 @@ public sealed class AccountTests
     }
 
     [Fact]
+    public void Provider_balance_may_be_negative_on_an_asset_account()
+    {
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd);
+
+        account.ApplyProviderBalance(new Money(-35m, "USD"));
+
+        account.CurrentBalance.Amount.Should().Be(-35m);
+        account.DomainEvents.Should().Contain(e => e is AccountBalanceUpdated);
+    }
+
+    [Fact]
+    public void Provider_balance_in_another_currency_still_throws()
+    {
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd);
+        var act = () => account.ApplyProviderBalance(new Money(1m, "EUR"));
+        act.Should().Throw<CurrencyMismatchException>();
+    }
+
+    [Fact]
     public void Asset_account_with_credit_limit_allows_negative_balance()
     {
         var creditLimit = new Money(5000m, "USD");

@@ -1,13 +1,13 @@
 @page "/strategies"
-@rendermode InteractiveServer
 @using FlowLedger.Web.ApiClient
 @inject FlowLedgerApiClient ApiClient
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Strategies — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Strategies &amp; simulators</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Strategies &amp; simulators</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Suggestions built from your balances and cash flow plus current market rates (savings, CDs, mortgage, car, credit card, personal loan).
     Every suggestion shows its evidence and assumptions. Use the simulators to test what-ifs in the past and the future.
@@ -444,7 +444,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
 
         _loading = false;
@@ -490,6 +490,11 @@ else
 
     private async Task ClearRate(RateRow row)
     {
+        if (!await DialogService.ConfirmAsync("Clear rate", "Clear the saved interest rate for this account? Suggestions will fall back to market averages.", "Clear"))
+        {
+            return;
+        }
+
         await Safe(async () =>
         {
             await ApiClient.RemoveAccountRateAsync(row.Id);
@@ -542,7 +547,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 }

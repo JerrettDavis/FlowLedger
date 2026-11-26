@@ -1,0 +1,39 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@* A chart with a text alternative: a named figure, a generated summary wired via aria-describedby and an optional
+   "View data" table, so colour is never the only way to read it (WCAG 1.1.1 / 1.4.1). *@
+<figure class="fl-figure" aria-labelledby="@_captionId" aria-describedby="@_summaryId">
+    <figcaption id="@_captionId" class="fl-sr-only">@Title</figcaption>
+    <div class="fl-figure__chart" role="img" aria-labelledby="@_captionId" aria-describedby="@_summaryId">
+        @ChildContent
+    </div>
+    <p id="@_summaryId" class="fl-sr-only">@Summary</p>
+    @if (Rows is { Count: > 0 })
+    {
+        <details class="fl-figure__data">
+            <summary>View data</summary>
+            <table class="fl-figure__table">
+                <caption class="fl-sr-only">@Title</caption>
+                <thead><tr><th scope="col">@LabelHeader</th><th scope="col" class="text-right">@ValueHeader</th></tr></thead>
+                <tbody>
+                    @foreach (var r in Rows)
+                    {
+                        <tr><th scope="row">@r.Label</th><td class="text-right fl-num">@r.Value</td></tr>
+                    }
+                </tbody>
+            </table>
+        </details>
+    }
+</figure>
+
+@code {
+    private readonly string _captionId = $"fl-fig-{Guid.NewGuid():N}"[..14];
+    private string _summaryId => _captionId + "-d";
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Summary { get; set; } = "";
+    [Parameter] public IReadOnlyList<ChartRow>? Rows { get; set; }
+    [Parameter] public string LabelHeader { get; set; } = "Item";
+    [Parameter] public string ValueHeader { get; set; } = "Value";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

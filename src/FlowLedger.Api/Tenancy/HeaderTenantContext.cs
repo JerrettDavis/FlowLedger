@@ -22,7 +22,7 @@ public sealed class HeaderTenantContext : ITenantContext
     public Guid TenantId { get; }
     public Guid UserId { get; }
 
-    public HeaderTenantContext(IHttpContextAccessor accessor, IOptions<ApiOptions> apiOptions)
+    public HeaderTenantContext(IHttpContextAccessor accessor, IOptions<ApiOptions> apiOptions, TenantOverride tenantOverride)
     {
         var http = accessor.HttpContext;
 
@@ -30,7 +30,7 @@ public sealed class HeaderTenantContext : ITenantContext
         {
             // Background/job execution — no request to fail closed on. Run against the
             // single configured household tenant.
-            var householdTenant = apiOptions.Value.EffectiveTenantId;
+            var householdTenant = tenantOverride.TenantId ?? apiOptions.Value.EffectiveTenantId;
             TenantId = householdTenant;
             UserId = householdTenant;
             return;

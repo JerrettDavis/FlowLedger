@@ -1,4 +1,5 @@
 using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
@@ -49,12 +50,46 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
+    /// <summary>
+    /// Persists a real account for the tenant and returns its id. Composite tenant foreign keys (#146) mean transactions, flows,
+    /// snapshots, links and rates can only reference an account that exists in the same tenant.
+    /// </summary>
+    public async Task<FlowLedger.Domain.ValueObjects.AccountId> SeedAccountAsync(TestTenantContext tenant, string name = "Seeded account")
+    {
+        await using var ctx = CreateDbContext(tenant);
+        var account = FlowLedger.Domain.Aggregates.Account.Create(
+            FlowLedger.Domain.ValueObjects.TenantId.From(tenant.TenantId),
+            name,
+            FlowLedger.Domain.Aggregates.AccountType.Checking,
+            new FlowLedger.Domain.ValueObjects.Money(0m, FlowLedger.Domain.ValueObjects.Currency.Usd));
+        ctx.Accounts.Add(account);
+        await ctx.SaveChangesAsync();
+        return account.AccountId;
+    }
+
     /// <summary>Resets all data between tests. Call at the start of each test.</summary>
     public async Task ResetAsync()
     {
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
+    }
+
+    /// <summary>
+    /// Builds a context the way production does: the default internal service provider
+    /// (caching ON), so every context shares one cached model. <c>null</c> = unscoped/admin.
+    /// </summary>
+    public FlowLedgerDbContext CreateProductionStyleContext(TestTenantContext? tenantContext)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FlowLedgerDbContext>();
+        optionsBuilder.UseNpgsql(ConnectionString, npgsql =>
+        {
+            npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
+            // Same as AddInfrastructure: a retrying execution strategy forbids bare user transactions (#143).
+            npgsql.EnableRetryOnFailure(maxRetryCount: 5);
+        });
+
+        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), (ITenantContext?)tenantContext ?? UnscopedTenantContext.Instance);
     }
 
     /// <summary>
@@ -68,16 +103,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             .UseNpgsql(ConnectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
-            })
-            // Disable model caching so each context instance gets its own model with
-            // the correct tenant filter compiled from _tenantContext at construction time.
-            // Required because the filter expression captures the injected ITenantContext
-            // reference which differs per context instance.
-            .EnableServiceProviderCaching(false);
+            });
 
         return new FlowLedgerDbContext(
             optionsBuilder.Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext);
+            (ITenantContext?)tenantContext ?? UnscopedTenantContext.Instance);
     }
 }

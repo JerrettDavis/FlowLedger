@@ -1,0 +1,31 @@
+@namespace FlowLedger.Web.Components.Shared
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@* An unhandled exception in a page's lifecycle would otherwise end the whole Blazor circuit ("Rejoining the server..." then a dead app).
+   The boundary keeps the circuit alive, shows an inline error with Retry, and clears itself when the user navigates elsewhere. *@
+<ErrorBoundary @ref="_boundary">
+    <ChildContent>@ChildContent</ChildContent>
+    <ErrorContent>
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="my-4" role="alert">
+            <MudText Typo="Typo.subtitle1" Class="mb-1">This page couldn't load</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">Something went wrong while loading this page. Your data is safe. Try again, or use the menu to go somewhere else.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="Retry">Try again</MudButton>
+        </MudAlert>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    private ErrorBoundary? _boundary;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void Retry() => _boundary?.Recover();
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(() => _boundary?.Recover());
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

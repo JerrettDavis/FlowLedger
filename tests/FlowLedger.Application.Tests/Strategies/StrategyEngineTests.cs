@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Strategies;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Strategies;
@@ -16,7 +17,7 @@ public class StrategyEngineTests
 
     private static StrategyReport Run(IReadOnlyList<AccountSnapshot> accts, IReadOnlyList<MonthFlow> months,
         Dictionary<string, IReadOnlyDictionary<string, decimal>>? cats = null, MarketRates? rates = null) =>
-        StrategyEngine.Analyze(new StrategyInputs(accts, months, cats ?? [], rates ?? Rates, Today), DateTimeOffset.UtcNow);
+        StrategyEngine.Analyze(new StrategyInputs(accts, months, cats ?? [], rates ?? Rates, Today), TestClock.Instant);
 
     [Fact]
     public void Large_checking_balance_yields_idle_cash_suggestion_with_impact()
@@ -73,7 +74,7 @@ public class StrategyEngineTests
     [Fact]
     public void Card_debt_with_ample_cash_suggests_paying_it_off()
     {
-        var r = Run([Acct("Chk", "Checking", 30_000m), Acct("Visa", "CreditCard", -5_000m, liability: true)], Flows(6000, 3000));
+        var r = Run([Acct("Chk", "Checking", 30_000m), Acct("Visa", "CreditCard", 5_000m, liability: true)], Flows(6000, 3000));
         r.Suggestions.Should().Contain(x => x.Id == "pay-off-cards-with-cash");
     }
 
@@ -124,7 +125,7 @@ public class SimulatorTests
     public void Growth_compounds_monthly()
     {
         var pts = Simulators.Grow(10_000m, 0m, 12m, 12);
-        pts[^1].Balance.Should().BeApproximately(11_268.25m, 0.05m); // 1%/month for 12 months
+        pts[^1].Balance.Should().BeApproximately(11_200m, 0.05m); // 12% APY: twelve compounding months equal the quoted effective yield
     }
 
     [Fact]
@@ -195,7 +196,7 @@ public class StrategyEngineRealRateTests
     private static List<MonthFlow> Flows() => Enumerable.Range(1, 6).Select(i => new MonthFlow($"2026-{i:00}", 6000, 3000)).ToList();
 
     private static StrategyReport Run(params AccountSnapshot[] a) =>
-        StrategyEngine.Analyze(new StrategyInputs(a, Flows(), new Dictionary<string, IReadOnlyDictionary<string, decimal>>(), Rates, Today), DateTimeOffset.UtcNow);
+        StrategyEngine.Analyze(new StrategyInputs(a, Flows(), new Dictionary<string, IReadOnlyDictionary<string, decimal>>(), Rates, Today), TestClock.Instant);
 
     [Fact]
     public void Account_already_at_market_yield_is_not_flagged()

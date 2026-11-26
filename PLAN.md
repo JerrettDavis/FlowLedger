@@ -6,9 +6,16 @@
 
 ## 0. Planning Status
 
-This document is intended to be handed to a follow-on planning agent, then decomposed into subagent-led workflow loops.
+> **Historical document.** This is the original planning brief. The product is now implemented and has moved on: it is no longer
+> in a planning stage, the provider roadmap below is MX-centric whereas the implementation supports Simulated, MX, SimpleFIN and
+> Quiltt connectors (see [ADR 0010](docs/adr/0010-connectors-per-instance-accounts-per-connector.md) and
+> [ADR 0017](docs/adr/0017-quiltt-embedded-connector.md)), and several decisions here were superseded (for example raw payload
+> retention, [ADR 0007](docs/adr/0007-raw-payload-retention.md)). For current behaviour read the [README](README.md), the
+> [ADR index](docs/adr/README.md) and `docs/`. Treat the text below as background, not as a specification.
 
-Current stage: product and technical planning.
+This document was originally written to be handed to a follow-on planning agent, then decomposed into subagent-led workflow loops.
+
+Original stage at the time of writing: product and technical planning.
 
 Primary goal: design a GitHub-ready repository that can be implemented incrementally, validated end to end, and later evolved into a SaaS without compromising the self-hosted FOSS experience.
 
@@ -659,7 +666,7 @@ Primary database:
 
 Optional local simple mode later:
 
-- SQLite for single-user lightweight deployments, but not required for v1.
+- SQLite is NOT supported: the code is PostgreSQL-only (jsonb, Npgsql raw SQL, advisory locks, ON CONFLICT, unnest). Supported database: PostgreSQL 15+.
 
 Supporting infrastructure:
 

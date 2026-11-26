@@ -92,24 +92,33 @@ public sealed class ApiSecurityTests(FlowLedgerApiFactory factory) : IAsyncLifet
     }
 
     [Fact]
-    public async Task Webhook_rate_limit_engages_after_threshold()
+    public async Task Webhook_rate_limit_engages_after_threshold_and_sets_retry_after()
     {
-        // The "webhook" policy permits 30 requests/min with no queue. Each request here
-        // fails the HMAC check (401) but still consumes a permit, so firing well past the
-        // limit within the same window deterministically produces at least one 429.
-        // (The webhook limiter is a distinct partition from the "api"/"write" policies,
-        //  so other tests cannot prevent this from triggering.)
+        // The "webhook" policy permits 300 requests/min per (provider, IP) with no queue. Each request here fails the HMAC
+        // check (401) but still consumes a permit, so firing past the limit within the same window deterministically
+        // produces a 429. It is partitioned per provider, so it cannot be affected by the "api"/"write" policies.
         _client.DefaultRequestHeaders.Add("X-MX-Signature", "invalid-hmac-value");
 
         var statuses = new List<HttpStatusCode>();
-        for (var i = 0; i < 45; i++)
+        HttpResponseMessage? rejected = null;
+        for (var i = 0; i < 320; i++)
         {
             using var content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
             var response = await _client.PostAsync("/api/integrations/mx/webhooks", content);
             statuses.Add(response.StatusCode);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                rejected ??= response;
+            }
         }
 
         statuses.Should().Contain(HttpStatusCode.TooManyRequests,
-            "requests beyond the webhook permit limit (30/min) must be rejected with 429");
+            "requests beyond the webhook permit limit (300/min) must be rejected with 429");
+        rejected!.Headers.Contains("Retry-After").Should().BeTrue();
+
+        // A different provider's webhook has its own partition: junk aimed at MX does not starve Quiltt deliveries.
+        using var quiltt = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        var other = await _client.PostAsync("/api/integrations/quiltt/webhooks", quiltt);
+        other.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
     }
 }

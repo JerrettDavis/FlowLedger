@@ -13,8 +13,6 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class QuilttEndpoints
 {
-    internal const int MaxWebhookBodyBytes = 1024 * 1024;
-
     internal static IEndpointRouteBuilder MapQuilttEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/integrations/quiltt").WithTags("Quiltt");
@@ -76,6 +74,7 @@ internal static class QuilttEndpoints
                 IConnectorRegistry connectors,
                 IRawPayloadArchive archive,
                 ISchedulerFactory schedulerFactory,
+                IWebhookTenantResolver tenantResolver,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
@@ -84,18 +83,17 @@ internal static class QuilttEndpoints
                 }
 
                 var provider = connectors.Resolve(QuilttFinancialDataProvider.Name);
-                if (request.ContentLength > MaxWebhookBodyBytes)
-                {
-                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-                }
-
-                var rawBody = await ReadBoundedAsync(request.Body, MaxWebhookBodyBytes, ct);
+                var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
                 if (rawBody is null)
                 {
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
-                var signature = request.Headers.TryGetValue("Quiltt-Signature", out var sig) ? sig.ToString() : string.Empty;
+                // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
+                var signature = request.Headers.TryGetValue("Quiltt-Signature", out var sig)
+                                && request.Headers.TryGetValue("Quiltt-Timestamp", out var ts)
+                    ? $"t={ts},v1={sig}"
+                    : string.Empty;
                 try
                 {
                     await provider.VerifyWebhookAsync(rawBody, signature, ct);
@@ -110,7 +108,7 @@ internal static class QuilttEndpoints
                     return Results.Accepted(value: new { duplicate = true });
                 }
 
-                await archive.ArchiveAsync("Quiltt", "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
 
                 ProviderWebhookEvent evt;
                 try
@@ -122,8 +120,21 @@ internal static class QuilttEndpoints
                     return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "Malformed webhook payload");
                 }
 
+                if (!QuilttFinancialDataProvider.IsSyncTrigger(evt.EventType))
+                {
+                    return Results.Accepted(value: new { ignored = evt.EventType });
+                }
+
+                // The Quiltt profile id maps to exactly one tenant; unknown profiles are acknowledged and ignored (#150).
+                var owner = await tenantResolver.ResolveAsync(QuilttFinancialDataProvider.Name, evt.MemberId, ct);
+                if (owner is null)
+                {
+                    return Results.Accepted(value: new { ignored = "unknown profile", profileId = evt.MemberId });
+                }
+
                 var jobData = new JobDataMap
                 {
+                    [OnDemandSyncJob.TenantIdKey] = owner.Value.ToString(),
                     [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
                     [OnDemandSyncJob.EventTypeKey] = evt.EventType,
                 };
@@ -140,21 +151,4 @@ internal static class QuilttEndpoints
         return app;
     }
 
-    private static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
-    {
-        using var ms = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        int read;
-        while ((read = await body.ReadAsync(buffer, ct)) > 0)
-        {
-            if (ms.Length + read > limit)
-            {
-                return null;
-            }
-
-            ms.Write(buffer, 0, read);
-        }
-
-        return ms.ToArray();
-    }
 }

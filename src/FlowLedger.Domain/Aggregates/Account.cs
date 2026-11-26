@@ -132,6 +132,26 @@ public sealed class Account : AggregateRoot
                 $"Asset account '{Name}' cannot have a negative balance without an explicit credit limit.");
         }
 
+        SetBalance(newBalance);
+    }
+
+    /// <summary>
+    /// Applies a balance reported by a provider. A provider balance is a fact about the real account, so the
+    /// "assets cannot go negative" input guard of <see cref="UpdateBalance"/> does not apply: an overdrawn
+    /// checking account really is negative, and refusing it would leave a stale positive balance behind.
+    /// </summary>
+    public void ApplyProviderBalance(Money newBalance)
+    {
+        if (newBalance.Currency != CurrentBalance.Currency)
+        {
+            throw new CurrencyMismatchException(CurrentBalance.Currency.Code, newBalance.Currency.Code);
+        }
+
+        SetBalance(newBalance);
+    }
+
+    private void SetBalance(Money newBalance)
+    {
         var previous = CurrentBalance;
         CurrentBalance = newBalance;
         LastBalanceConfirmedAt = DateTimeOffset.UtcNow;

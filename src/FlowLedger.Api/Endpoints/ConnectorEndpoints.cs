@@ -18,28 +18,50 @@ internal static class ConnectorEndpoints
 
     private static readonly Descriptor[] Catalog =
     [
-        new("Simulated", "Simulated demo data", "Demo",
+        new(ConnectorIds.Simulated, "Simulated demo data", "Demo",
             "Deterministic fake accounts and transactions. No credentials, no cost. Used when no real connector is enabled.",
             [], _ => true, _ => true),
-        new("SimpleFIN", "SimpleFIN Bridge", "Aggregator (personal)",
+        new(ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)",
             "Personal bank aggregation through a SimpleFIN Bridge access URL. Institutions are linked at the Bridge, not in FlowLedger.",
             ["SimpleFin:Enabled", "SimpleFin:AccessUrl"],
             c => bool.TryParse(c["SimpleFin:Enabled"], out var on) && on,
             c => Has(c, "SimpleFin:AccessUrl")),
-        new("MX", "MX", "Aggregator (widget)",
+        new(ConnectorIds.Mx, "MX", "Aggregator (widget)",
             "MX Platform API with the hosted connect widget. Billable per call; honours daily/monthly budgets and a kill switch.",
             ["Mx:Enabled", "Mx:ApiKey", "Mx:ClientId", "Mx:BaseUrl", "Mx:WebhookSecret"],
             c => bool.TryParse(c["Mx:Enabled"], out var on) && on,
             c => Has(c, "Mx:ApiKey") && Has(c, "Mx:ClientId") && Has(c, "Mx:BaseUrl") && Has(c, "Mx:WebhookSecret")),
-        new("Quiltt", "Quiltt", "Aggregator (embedded)",
+        new(ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)",
             "In-app bank linking: each user links institutions inside FlowLedger through the Quiltt Connector (one Quiltt profile per tenant).",
             ["Quiltt:Enabled", "Quiltt:ApiKeySecret", "Quiltt:ConnectorId", "Quiltt:WebhookSecret"],
             c => bool.TryParse(c["Quiltt:Enabled"], out var on) && on,
-            c => Has(c, "Quiltt:ApiKeySecret") && Has(c, "Quiltt:ConnectorId") && Has(c, "Quiltt:WebhookSecret")),
+            c => Has(c, "Quiltt:ApiKeySecret") && Has(c, "Quiltt:ConnectorId")), // WebhookSecret is optional: without it only webhooks are refused
     ];
+
+    /// <summary>JSON shape of a connection's persisted issue (ADR 0018); the connection's <c>issue</c> is null when healthy.</summary>
+    internal sealed record ConnectionIssueDto(
+        string Kind, string Message, bool Retryable, bool RequiresUserAction,
+        DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures, string? ProviderCode, string? RepairRef)
+    {
+        internal static ConnectionIssueDto From(ConnectionIssueInfo i) =>
+            new(i.Kind, i.Message, i.Retryable, i.RequiresUserAction, i.RetryAfter, i.At, i.ConsecutiveFailures, i.ProviderCode, i.RepairRef);
+    }
 
     internal static IEndpointRouteBuilder MapConnectorEndpoints(this IEndpointRouteBuilder app)
     {
+        // The signed-in tenant's OWN connections and their health (no credentials). Unlike the connectors overview this is not
+        // household-owner-only: a per-user connector (Quiltt) must be repairable by the user whose bank it is.
+        app.MapGet("/api/integrations/connections", async (IProviderConnectionStore connections, CancellationToken ct) =>
+                Results.Ok((await connections.ListAsync(ct)).Select(c => new
+                {
+                    provider = c.ProviderName,
+                    institution = c.Institution,
+                    status = c.Status,
+                    issue = c.Issue is null ? null : ConnectionIssueDto.From(c.Issue),
+                })))
+            .WithName("MyConnections")
+            .WithSummary("The current tenant's provider connections and their health");
+
         app.MapGet("/api/integrations/connectors", async (
                 IConfiguration cfg,
                 IConnectorRegistry registry,
@@ -65,7 +87,7 @@ internal static class ConnectorEndpoints
                     var isPrimary = string.Equals(d.Id, primary.ProviderName, StringComparison.OrdinalIgnoreCase);
                     var usage = await status.GetUsageAsync(d.Id, ct);
                     var lastSync = await status.LastSyncedAtAsync(d.Id, ct);
-                    var isMx = d.Id == "MX";
+                    var isMx = d.Id == ConnectorIds.Mx;
                     items.Add(new
                     {
                         id = d.Id,
@@ -95,7 +117,14 @@ internal static class ConnectorEndpoints
                         },
                         connections = linked
                             .Where(c => string.Equals(c.ProviderName, d.Id, StringComparison.OrdinalIgnoreCase))
-                            .Select(c => new { institution = c.Institution, status = c.Status, linkedAt = c.CreatedAt, updatedAt = c.UpdatedAt })
+                            .Select(c => new
+                            {
+                                institution = c.Institution,
+                                status = c.Status,
+                                linkedAt = c.CreatedAt,
+                                updatedAt = c.UpdatedAt,
+                                issue = c.Issue is null ? null : ConnectionIssueDto.From(c.Issue),
+                            })
                             .ToList(),
                     });
                 }

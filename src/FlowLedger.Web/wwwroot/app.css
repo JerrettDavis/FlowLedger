@@ -1,3 +1,50 @@
+/* Keyboard focus: a visible ring from the theme's primary colour on every interactive control. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+.mud-button-root:focus-visible,
+.mud-nav-link:focus-visible,
+.mud-icon-button:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+#main-content:focus { outline: none; }
+
+/* Skip link: off-screen until focused. */
+.fl-skip-link {
+    position: absolute;
+    left: 8px;
+    top: -48px;
+    z-index: 2000;
+    padding: 8px 16px;
+    border-radius: 4px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-shadow: var(--mud-elevation-4);
+}
+.fl-skip-link:focus { top: 8px; }
+
+/* Pre-paint dark background: the head script sets data-theme before MudBlazor's theme variables exist. */
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+    background-color: #0F172A;
+    color: #F1F5F9;
+}
+
+/* Inter (variable) is self-hosted; see wwwroot/fonts/Inter-LICENSE.txt (SIL OFL 1.1). */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("fonts/InterVariable.woff2") format("woff2");
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    Global typography and font smoothing
    ─────────────────────────────────────────────────────────────────────────── */
@@ -119,17 +166,29 @@ html, body {
     }
 }
 
-/* Tables never show scrollbars. When space runs out we truncate text, then drop low-priority columns. */
+/* When space runs out we truncate text, then drop low-priority columns, and whatever is left scrolls
+   sideways inside the table instead of being clipped (phones, split screens, zoomed browsers). */
 .mud-table-container,
 .mud-simple-table,
 .mud-simple-table .mud-table-container {
-    overflow: hidden !important;
+    overflow-x: auto;
+    overflow-y: hidden;
     max-height: none !important;
 }
 
-@media (max-width: 1919.98px) { .fl-hide-lg { display: none !important; } }
-@media (max-width: 1599.98px) { .fl-hide-md { display: none !important; } }
-@media (max-width: 1279.98px) { .fl-hide-sm { display: none !important; } }
+/* Column hiding starts below laptop widths only: 1366/1440 laptops keep every column. */
+@media (max-width: 1279.98px) { .fl-hide-lg { display: none !important; } }
+@media (max-width: 959.98px) { .fl-hide-md { display: none !important; } }
+@media (max-width: 599.98px) { .fl-hide-sm { display: none !important; } }
+
+/* Touch devices: icon buttons meet the 44px target size. */
+@media (pointer: coarse) {
+    .mud-icon-button,
+    .mud-icon-button.mud-icon-size-small {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
 
 /* Gutters scale with the display: tight on phones, generous on 1440p/4K, content still fills the width. */
 .fl-page { padding-left: 16px; padding-right: 16px; }
@@ -565,7 +624,7 @@ html, body {
 
 /* Shown only while the dedicated Account column is hidden. */
 .fl-md-only { display: none; }
-@media (max-width: 1599.98px) { .fl-md-only { display: block; } }
+@media (max-width: 959.98px) { .fl-md-only { display: block; } }
 
 /* The merchant cell is the flexible column at every width: it shrinks (ellipsis) so Category/Account never get cropped. */
 @media (min-width: 960px) { .mud-table-cell:has(> .fl-merch) { width: 100%; max-width: 0; } }

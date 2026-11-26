@@ -1,0 +1,11 @@
+# Deliberately narrow: no global `* text=auto`, because the repository already contains files
+# with mixed line endings and a blanket normalisation would rewrite them.
+# Only files that break when checked out with CRLF are pinned.
+
+# Shell scripts and Dockerfiles run in Linux containers / shells and must keep LF.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+
+# Windows batch files need CRLF.
+*.cmd       text eol=crlf
+*.bat       text eol=crlf

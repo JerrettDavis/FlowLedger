@@ -1,4 +1,5 @@
 using System.Globalization;
+using FlowLedger.ServiceDefaults;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Auth;
 using FlowLedger.Web.Components;
@@ -15,11 +16,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ── Service defaults (OpenTelemetry, health checks, service discovery) ──────
 builder.AddServiceDefaults();
+builder.Services.AddFlowLedgerDataProtection(builder.Configuration, builder.Environment.EnvironmentName); // persisted key ring (DataProtection:KeysPath)
 
 // ── Authentication (provider-agnostic OIDC; disabled when Auth:Oidc:Authority is empty) ──
 var oidc = builder.AddFlowLedgerAuth();
 AuthSetup.EnsureSignInConfigured(oidc, builder.Environment, builder.Configuration); // refuse to run open outside Development
 builder.Services.AddSingleton(oidc);
+AuthSetup.ConfigureDataProtection(builder.Services, oidc, builder.Environment, builder.Configuration);
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
@@ -32,6 +35,10 @@ builder.Services.AddMudServices();
 // ── Theme ────────────────────────────────────────────────────────────────────
 // Scoped so each circuit (browser tab) gets its own independent theme state.
 builder.Services.AddScoped<ThemeService>();
+
+// ── Connection repair (provider-pluggable Reconnect; add a handler per provider) ──
+builder.Services.AddScoped<FlowLedger.Web.Connections.IConnectionRepairHandler, FlowLedger.Web.Connections.QuilttRepairHandler>();
+builder.Services.AddScoped<FlowLedger.Web.Connections.ConnectionRepairService>();
 
 // ── API auth options (Api:Key + Api:TenantId from config / env vars) ─────────
 builder.Services.Configure<ApiAuthOptions>(
@@ -50,27 +57,13 @@ builder.Services.AddHttpClient<FlowLedgerApiClient>(client =>
 .AddHttpMessageHandler<ApiAuthHeaderHandler>()
 .AddServiceDiscovery();
 
-// Opt-in: behind a TLS-terminating reverse proxy, honour X-Forwarded-Proto/Host so the OIDC redirect_uri is https.
-// Only enable when the Web port is reachable solely through that proxy (otherwise clients could spoof the headers).
-var trustForwardedHeaders = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false);
-if (trustForwardedHeaders)
-{
-    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
-    {
-        o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
-            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
-        o.KnownIPNetworks.Clear();
-        o.KnownProxies.Clear();
-    });
-}
+// Opt-in: behind a TLS-terminating reverse proxy, honour X-Forwarded-Proto/For (and Host when AllowedHosts is restricted) so the OIDC
+// redirect_uri is https. Requires ForwardedHeaders:KnownProxies / KnownNetworks: startup fails if enabled without them.
+var trustForwardedHeaders = builder.AddFlowLedgerForwardedHeaders();
 
 var app = builder.Build();
 
-if (trustForwardedHeaders)
-{
-    app.UseForwardedHeaders();
-}
+app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
@@ -86,7 +79,7 @@ else
 // Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
 app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseStatusCodePagesWithReExecute("/status/{0}", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

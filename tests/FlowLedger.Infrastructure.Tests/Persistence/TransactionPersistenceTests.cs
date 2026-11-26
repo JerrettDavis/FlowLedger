@@ -26,7 +26,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
         var date = new DateOnly(2025, 6, 1);
 
         var tx = Transaction.RecordActual(
@@ -64,7 +64,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         // constraint fires at the PostgreSQL level during the second insert.
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
         var date = new DateOnly(2025, 6, 10);
 
         var fingerprint = TransactionFingerprint.Create(accountId, date, 99.99m, "MERCHANT ABC");
@@ -101,7 +101,8 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         var tenantB = TestTenantContext.New();
         var tidA = TenantId.From(tenantA.TenantId);
         var tidB = TenantId.From(tenantB.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantA);
+        var accountIdB = await _fixture.SeedAccountAsync(tenantB);
         var date = new DateOnly(2025, 7, 1);
 
         var fingerprint = TransactionFingerprint.Create(accountId, date, 50m, "CROSS TENANT STORE");
@@ -109,7 +110,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         var txA = Transaction.RecordActual(tidA, accountId, new Money(50m, Currency.Usd),
             TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, fingerprint);
 
-        var txB = Transaction.RecordActual(tidB, accountId, new Money(50m, Currency.Usd),
+        var txB = Transaction.RecordActual(tidB, accountIdB, new Money(50m, Currency.Usd),
             TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, fingerprint);
 
         await using (var ctx = _fixture.CreateDbContext(tenantA))
@@ -133,12 +134,13 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         var tenantB = TestTenantContext.New();
         var tidA = TenantId.From(tenantA.TenantId);
         var tidB = TenantId.From(tenantB.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantA);
+        var accountIdB = await _fixture.SeedAccountAsync(tenantB);
 
         var txA = Transaction.RecordActual(tidA, accountId, new Money(10m, Currency.Usd),
             TransactionDirection.Debit, "TxA", new DateOnly(2025, 1, 1), null, TransactionSource.Manual);
 
-        var txB = Transaction.RecordActual(tidB, accountId, new Money(20m, Currency.Usd),
+        var txB = Transaction.RecordActual(tidB, accountIdB, new Money(20m, Currency.Usd),
             TransactionDirection.Debit, "TxB", new DateOnly(2025, 1, 2), null, TransactionSource.Manual);
 
         await using (var ctx = _fixture.CreateDbContext(tenantA))
@@ -175,7 +177,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
         var catId = CategoryId.New();
         var date = new DateOnly(2025, 8, 1);
 

@@ -2,7 +2,7 @@
 # Build context: repo root  (docker build -f src/FlowLedger.Web/Dockerfile .)
 
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS restore
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404@sha256:8c6edfb26c85153f236d26efebd9ad349aec403583f343f201ee67838b23658d AS restore
 WORKDIR /src
 
 # Central build / package management files
@@ -41,15 +41,30 @@ RUN dotnet publish src/FlowLedger.Web/FlowLedger.Web.csproj \
         -o /app/publish \
         /p:UseAppHost=false
 
+RUN mkdir -p /keys
+
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-# noble-chiseled-extra adds curl + a minimal shell so Docker healthchecks work
-# while keeping the image hardened (non-root, distroless-like).
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra AS runtime
+# noble-chiseled-extra adds only ICU + tzdata: there is NO shell, curl or wget. Docker healthchecks
+# therefore use scripts/healthprobe (a static Go binary built below and copied in).
+FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS healthprobe
+WORKDIR /src
+COPY scripts/healthprobe/main.go .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /healthprobe main.go
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
 WORKDIR /app
 
+COPY --from=healthprobe /healthprobe /usr/local/bin/healthprobe
 COPY --from=publish /app/publish .
+
+# Data Protection key ring location (mount a volume here). Pre-created and owned by the non-root app user (uid 1654)
+# so a fresh named volume is writable: the chiseled runtime has no shell to mkdir/chown at start-up.
+COPY --from=publish --chown=1654:1654 /keys /keys
 
 # ASP.NET chiseled images listen on 8080 (HTTP) by default.
 EXPOSE 8080
+
+# Explicit non-root user (the base image already sets APP_UID=1654; stated here so it is auditable).
+USER $APP_UID
 
 ENTRYPOINT ["dotnet", "FlowLedger.Web.dll"]

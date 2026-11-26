@@ -1,5 +1,4 @@
 @page "/integrations"
-@rendermode InteractiveServer
 @using FlowLedger.Web.ApiClient
 @inject FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
@@ -8,7 +7,7 @@
 <PageTitle>Integrations — FlowLedger</PageTitle>
 
 <div class="d-flex align-center flex-wrap gap-3 mb-1">
-    <MudText Typo="Typo.h5">Integrations</MudText>
+    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Integrations</MudText>
     <MudSpacer />
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenFormAsync(null))"
                Disabled="@(_state is null || _state.Integrations.Count >= _state.Limit)">Add integration</MudButton>
@@ -230,9 +229,8 @@ else
 
     private async Task DeleteAsync(IntegrationDto i)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Delete integration", $"Delete '{i.Name}' and its activity log? This can't be undone.", yesText: "Delete", cancelText: "Cancel");
-        if (confirmed != true)
+        if (!await DialogService.ConfirmAsync(
+                "Delete integration", $"Delete '{i.Name}' and its activity log? This can't be undone.", "Delete"))
         {
             return;
         }
@@ -250,7 +248,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 
@@ -349,7 +347,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 

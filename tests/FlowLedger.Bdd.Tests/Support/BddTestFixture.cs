@@ -130,7 +130,7 @@ public sealed class BddTestFixture : IAsyncLifetime
         return new FlowLedgerDbContext(
             optionsBuilder.Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext: null);
+            UnscopedTenantContext.Instance);
     }
 
     private sealed class NoOpDomainEventDispatcher : FlowLedger.Application.Abstractions.IDomainEventDispatcher

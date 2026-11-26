@@ -21,7 +21,7 @@ public sealed class DevTenantContext : ITenantContext
     public Guid TenantId { get; }
     public Guid UserId { get; }
 
-    public DevTenantContext(IHttpContextAccessor accessor)
+    public DevTenantContext(IHttpContextAccessor accessor, TenantOverride tenantOverride)
     {
         var http = accessor.HttpContext;
 
@@ -33,7 +33,7 @@ public sealed class DevTenantContext : ITenantContext
         }
         else
         {
-            TenantId = DemoTenantId;
+            TenantId = http is null ? tenantOverride.TenantId ?? DemoTenantId : DemoTenantId;
         }
 
         UserId = DemoUserId;

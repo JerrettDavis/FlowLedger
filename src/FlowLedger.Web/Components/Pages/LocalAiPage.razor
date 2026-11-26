@@ -1,13 +1,13 @@
 @page "/local-ai"
-@rendermode InteractiveServer
 @implements IDisposable
 @using Microsoft.AspNetCore.Components.Authorization
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Local AI — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Local AI</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Local AI</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Small language models that run inside FlowLedger itself — no Ollama, no cloud, no extra service. They suggest categories for merchants
     you haven't labelled and spot merchant names that are really the same business. They only ever <em>suggest</em>; nothing you chose by hand is changed.
@@ -231,7 +231,7 @@ else
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Warning);
+            Snackbar.AddFailure(ex);
         }
 
         if (Downloading)
@@ -304,6 +304,11 @@ else
 
     private async Task RemoveAsync(string id)
     {
+        if (!await DialogService.ConfirmAsync("Remove model", "Remove this downloaded model? You can download it again later.", "Remove"))
+        {
+            return;
+        }
+
         if (await ApiClient.RemoveLocalAiModelAsync(id))
         {
             Snackbar.Add("Model removed.", Severity.Success);
@@ -326,7 +331,7 @@ else
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Warning);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -343,7 +348,7 @@ else
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Warning);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -364,7 +369,7 @@ else
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Warning);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -395,7 +400,7 @@ else
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            Snackbar.Add(ex.Message, Severity.Warning);
+            Snackbar.AddFailure(ex);
         }
         finally
         {

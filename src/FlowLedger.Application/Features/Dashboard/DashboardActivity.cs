@@ -46,7 +46,7 @@ public static class DashboardActivityAnalyzer
         IReadOnlySet<Guid>? dismissedIds = null, IReadOnlyDictionary<Guid, string>? categoryPathById = null)
     {
         // Planned rows are forecast placeholders, never real activity.
-        var real = all.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
+        var real = all.Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status)).ToList();
         var windowStart = today.AddDays(-WindowDays);
 
         bool IsPending(TransactionDto t) => t.Status == "Pending";
@@ -154,7 +154,8 @@ public static class DashboardActivityAnalyzer
 
 /// <summary>Loads recent history and runs the analyzer.</summary>
 public sealed class GetDashboardActivityHandler(
-    ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals, ICategoryRepository categories)
+    ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals, ICategoryRepository categories,
+    TimeProvider? clock = null)
 {
     /// <summary>Anomaly rules (price increases, merchant/category outliers) need months of history; the 30/90-day panels slice from it.</summary>
     private const int LoadDays = 365;
@@ -163,7 +164,7 @@ public sealed class GetDashboardActivityHandler(
 
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime);
         var from = today.AddDays(-LoadDays);
         // Newest first, so hitting the cap only drops the oldest baseline months, never the recent panels.
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, MaxRows, ct);

@@ -33,11 +33,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Docker Buildx for cache-mount support and multi-platform builds
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       # ── Lowercase owner (GHCR requires all-lowercase image names) ────────
       - name: Lowercase owner
@@ -58,7 +58,7 @@ jobs:
       # ── Build (local only) ───────────────────────────────────────────────
       - name: Build image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context:    .
           file:       ${{ matrix.dockerfile }}
@@ -73,7 +73,7 @@ jobs:
 
       # ── Generate SBOM ────────────────────────────────────────────────────
       - name: Generate SBOM (Syft)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image:             ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
           artifact-name:     sbom-${{ matrix.service }}.spdx.json
@@ -81,7 +81,7 @@ jobs:
           format:            spdx-json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name:              sbom-${{ matrix.service }}
           path:              /tmp/sbom-${{ matrix.service }}.spdx.json
@@ -100,12 +100,33 @@ jobs:
           exit-code:         "0"   # Report but don't fail the build (informational)
           ignore-unfixed:    true
 
+      # Release gate: a tagged build fails on any FIXABLE critical vulnerability.
+      - name: Trivy release gate (fixable CRITICAL)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          format:            table
+          severity:          CRITICAL
+          exit-code:         "1"
+          ignore-unfixed:    true
+
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name:              trivy-${{ matrix.service }}
           path:              trivy-${{ matrix.service }}.sarif
           if-no-files-found: warn
+
+      # Gate: fail on fixable CRITICAL vulnerabilities (HIGH stays informational above).
+      - name: Trivy gate (fixable CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          format:            table
+          severity:          CRITICAL
+          exit-code:         "1"
+          ignore-unfixed:    true
 
   # ── Push to GHCR (tagged releases only; the only job with packages: write) ─
   push:
@@ -133,17 +154,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Lowercase owner
         id: owner
         run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -151,7 +172,7 @@ jobs:
 
       # Rebuilds from the gha layer cache warmed by the build job (same scope), then pushes.
       - name: Build and push image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context:    .
           file:       ${{ matrix.dockerfile }}
@@ -167,16 +188,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ci_test_password
-      API__KEY: ci-test-api-key-not-for-production
+      API__KEY: ci-integration-key-not-for-production-0123456789
       # The ephemeral CI stack has no identity provider.
       AUTH__ALLOWANONYMOUS: "true"
     needs: build
-    # Run on push to default branch or on tagged release; skip on PRs to save minutes
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Runs on every trigger including PRs, so a broken Dockerfile or compose stack fails the PR.
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Start full stack
         run: |
@@ -195,12 +215,12 @@ jobs:
         run: |
           # Connect the Simulated provider
           curl -sf -X POST http://localhost:5001/api/connect \
-            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Api-Key: ci-integration-key-not-for-production-0123456789" \
             -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
             -H "Content-Type: application/json" | python3 -m json.tool
           # Run a full sync
           curl -sf -X POST http://localhost:5001/api/sync \
-            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Api-Key: ci-integration-key-not-for-production-0123456789" \
             -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
             -H "Content-Type: application/json" | python3 -m json.tool
 
@@ -212,6 +232,22 @@ jobs:
             echo "ERROR: Expected 200, got $HTTP_STATUS"
             exit 1
           fi
+
+      # Executes the documented backup -> restore -> row-count compare procedure (docs/self-hosting/backups-and-recovery.md).
+      - name: DR drill - backup, restore into scratch DB, compare row counts
+        env:
+          OUT_DIR: ${{ runner.temp }}/flowledger-backups
+          OBJECTS_DIR: ${{ runner.temp }}/no-objects
+        run: |
+          out=$(./eng/scripts/backup.sh)
+          echo "$out"
+          dir=$(echo "$out" | sed -n 's/^Backup OK -> //p')
+          restored=$(./eng/scripts/restore.sh "$dir")
+          echo "$restored"
+          live=$(docker compose exec -T postgres psql -U flowledger -d flowledger -tA -c "SELECT count(*) FROM transactions;" | tr -d '[:space:]')
+          back=$(echo "$restored" | awk '$1=="transactions"{print $2}')
+          echo "live=$live restored=$back"
+          [ "$live" = "$back" ] || { echo "::error::Row count mismatch after restore"; exit 1; }
 
       - name: Show compose logs on failure
         if: failure()

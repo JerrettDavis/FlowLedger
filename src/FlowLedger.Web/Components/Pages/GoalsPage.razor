@@ -1,12 +1,12 @@
 @page "/goals"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Goals — FlowLedger</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5">Savings goals</MudText>
+    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Savings goals</MudText>
     <DateRangeSelector Label="Target date" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
                        From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
 </div>
@@ -57,7 +57,8 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(g))" aria-label="@($"Remove {g.Name}")" />
                         </div>
                     </div>
-                    <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1" />
+                    <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1"
+                                       aria-valuetext="@($"{ChartSummary.ProgressText(g.Name, g.PercentComplete, "complete")}{(g.Complete ? ", goal reached" : "")}")" />
                 </div>
             }
         </MudPaper>
@@ -119,12 +120,17 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 
     private async Task Remove(FlowLedger.Web.ApiClient.GoalDto g)
     {
+        if (!await DialogService.ConfirmAsync("Remove goal", $"Remove the goal \"{g.Name}\"? Its saved progress is discarded.", "Remove"))
+        {
+            return;
+        }
+
         try
         {
             await ApiClient.DeleteGoalAsync(g.Id);
@@ -132,7 +138,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
     }
 }

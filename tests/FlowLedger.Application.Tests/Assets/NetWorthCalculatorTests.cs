@@ -28,6 +28,13 @@ public sealed class NetWorthCalculatorTests
     }
 
     [Fact]
+    public void Overpaid_card_increases_net_worth()
+    {
+        var r = NetWorthCalculator.Compute([Acct(AccountType.Checking, 1000m), Acct(AccountType.CreditCard, -200m)], [], Today);
+        r.NetWorth.Should().Be(1200m);
+    }
+
+    [Fact]
     public void Unlinked_asset_is_added()
         => NetWorthCalculator.Compute([Acct(AccountType.Checking, 100m)], [House(900m)], Today).NetWorth.Should().Be(1000m);
 

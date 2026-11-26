@@ -1,5 +1,4 @@
 @page "/accounts"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -9,7 +8,7 @@
 <PageTitle>Accounts — FlowLedger</PageTitle>
 
 <div class="d-flex align-center justify-space-between mb-4 fl-enter">
-    <MudText Typo="Typo.h4">Accounts</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Accounts</MudText>
     <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
     <DateRangeSelector Label="Change over" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
     <MudButton StartIcon="@Icons.Material.Filled.Add"
@@ -35,7 +34,7 @@
 {
     <EmptyState Icon="@Icons.Material.Outlined.AccountBalance"
                 Title="No accounts yet"
-                Description="Add an account or use Connect &amp; Sync to load demo data.">
+                Description="@($"Add an account manually. {OnboardingCopy.LoadData(Status?.Environment)}")">
         <Action>
             <MudButton StartIcon="@Icons.Material.Filled.Add"
                        Color="Color.Primary"
@@ -53,13 +52,15 @@
     var active = _accounts.Where(x => x.IsActive).ToList();
     var gross = active.Sum(x => Math.Abs(x.BalanceAmount));
     var groups = Groups(active).Where(x => x.Items.Count > 0).ToList();
-    <div class="fl-alloc mb-4" role="img" aria-label="Share of balances by account group">
-        @foreach (var g in groups)
+    var shares = groups.Select(g => new AllocationItem(g.Title, g.Tone,
+        gross == 0 ? 0 : (double)(g.Items.Sum(x => Math.Abs(x.BalanceAmount)) / gross * 100))).ToList();
+    <div class="fl-alloc mb-1" aria-hidden="true">
+        @foreach (var s in shares)
         {
-            var pct = gross == 0 ? 0 : (double)(g.Items.Sum(x => Math.Abs(x.BalanceAmount)) / gross * 100);
-            <div class="fl-alloc__seg fl-tone-@g.Tone" style="width:@(pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%" title="@g.Title"></div>
+            <div class="fl-alloc__seg fl-tone-@s.Tone" style="width:@(s.Percent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%" title="@s.Title"></div>
         }
     </div>
+    <AllocationLegend Items="shares" />
 
     @foreach (var g in groups.Append(new AccountGroup("Disabled", "off", _accounts.Where(x => !x.IsActive).ToList())).Where(x => x.Items.Count > 0))
     {
@@ -104,6 +105,10 @@
                             </div>
                         </div>
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="fl-data-source fl-hide-md">@SourceLabel(acct.Id)</MudChip>
+                        @if (SourceIssue(acct.Id) is { } sourceIssue)
+                        {
+                            <ConnectionHealthBadge Issue="sourceIssue" Compact="true" />
+                        }
                         @if (_household)
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" Class="fl-hide-md"
@@ -114,7 +119,7 @@
                         {
                             <span class="fl-num fl-hide-md @(ch.End - ch.Start >= 0 ? "fl-pos" : "fl-neg")" style="font-size:.8rem" title="Change over @_rangePreset">@Format.SignedWithPercent(ch.End - ch.Start, ch.Start)</span>
                         }
-                        <span class="fl-li__amt fl-num @(acct.BalanceAmount < 0 ? "fl-neg" : "")">@Format.Money(acct.BalanceAmount)</span>
+                        <span class="fl-li__amt fl-num @(acct.BalanceAmount < 0 ? "fl-neg" : "")">@Format.Money(acct.BalanceAmount, acct.BalanceCurrency)</span>
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                        OnClick="() => OpenEditDialog(acct)" aria-label="@($"Edit account {acct.Name}")" />
                     </div>
@@ -125,6 +130,9 @@
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
@@ -192,6 +200,11 @@
         !_links.TryGetValue(accountId, out var l) ? "Not linked"
         : l.ConnectorId == "manual" ? "Manual"
         : _connectors.FirstOrDefault(c => c.Id == l.ConnectorId)?.Name ?? l.ConnectorId;
+
+    private FlowLedger.Web.ApiClient.ConnectionIssueDto? SourceIssue(Guid accountId) =>
+        _links.TryGetValue(accountId, out var l) && _connectors.FirstOrDefault(c => c.Id == l.ConnectorId) is { } c
+            ? FlowLedger.Web.Connections.ConnectionHealth.Worst(c.Connections)
+            : null;
 
     private async Task OpenConnectorDialog(FlowLedger.Web.ApiClient.AccountDto account)
     {

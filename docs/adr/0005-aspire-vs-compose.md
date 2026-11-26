@@ -1,5 +1,7 @@
 # ADR 0005 — Aspire for Dev Inner Loop, Docker Compose for Self-Hosting
 
+Status: Accepted
+
 ## Context
 We need two runtime modes: a fast inner loop for development and a complete stack for self-hosting and E2E tests.
 

@@ -14,17 +14,21 @@ namespace FlowLedger.Integrations.Quiltt;
 /// </summary>
 internal sealed class QuilttApiClient
 {
+    // `accounts` and `connections` are plain lists in the Quiltt schema (no paging args); `kind`, not `type`.
     internal const string AccountsQuery = """
-        query FlowLedgerAccounts($first: Int!, $after: String) {
-          accounts(first: $first, after: $after) {
-            nodes {
-              id name type mask currencyCode
-              balance { current available }
-              institution { name }
-              connection { id status }
-            }
-            pageInfo { hasNextPage endCursor }
+        query FlowLedgerAccounts {
+          accounts {
+            id name kind state mask currencyCode
+            balance { current available }
+            institution { name }
+            connection { id status }
           }
+        }
+        """;
+
+    internal const string ConnectionsQuery = """
+        query FlowLedgerConnections {
+          connections { id status at provider }
         }
         """;
 
@@ -45,18 +49,38 @@ internal sealed class QuilttApiClient
     private readonly HttpClient _http;
     private readonly QuilttOptions _options;
 
-    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options)
+    private readonly QuilttSessionCache _sessions;
+
+    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options, QuilttSessionCache? sessions = null)
     {
         _http = http;
         _options = options.Value;
+        _sessions = sessions ?? new QuilttSessionCache();
     }
 
-    /// <summary>Mints a profile session. With no <paramref name="profileId"/> Quiltt creates a new profile.</summary>
+    /// <summary>
+    /// Returns a session for <paramref name="profileId"/>, reusing a cached one while it is comfortably valid. Quiltt rate-limits session
+    /// minting (10/hour, 20/day per profile) and a health check, a sync and the Connector each need one, so minting per call exhausts the
+    /// quota. With no <paramref name="profileId"/> Quiltt creates a new profile (never cached).
+    /// </summary>
     public async Task<QuilttSession> CreateSessionAsync(string? profileId, CancellationToken ct)
+    {
+        if (profileId is not null && _sessions.TryGet(profileId) is { } cached)
+        {
+            return cached;
+        }
+
+        var session = await MintSessionAsync(profileId, ct).ConfigureAwait(false);
+        _sessions.Put(session);
+        return session;
+    }
+
+    private async Task<QuilttSession> MintSessionAsync(string? profileId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKeySecret))
         {
-            throw new NeedsUserActionProviderException("Quiltt:ApiKeySecret is not set.", "Add the Quiltt API key secret to the server configuration.");
+            // Operator configuration problem, not something the end user can fix.
+            throw new FatalProviderException("Quiltt:ApiKeySecret is not set.", "CONFIG") { Kind = ProviderIssueKind.Internal };
         }
 
         var url = new Uri(new Uri(_options.AuthBaseUrl, UriKind.Absolute), "users/sessions");
@@ -68,8 +92,8 @@ internal sealed class QuilttApiClient
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKeySecret);
 
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        ThrowIfFailed(resp, "session");
+        using var resp = await SendAsync(req, ct).ConfigureAwait(false);
+        ThrowIfFailed(resp, QuilttIssueMapper.Endpoint.Session);
 
         var body = await resp.Content.ReadFromJsonAsync<QSessionResponse>(Json, ct).ConfigureAwait(false);
         var token = body?.Token;
@@ -83,25 +107,17 @@ internal sealed class QuilttApiClient
         return new QuilttSession(token, id, body.ExpiresAt ?? QuilttJwt.Expiry(token));
     }
 
+    /// <summary>Quiltt's <c>accounts</c> root is a plain (unpaginated) list.</summary>
     public async Task<IReadOnlyList<QAccount>> ListAccountsAsync(string sessionToken, CancellationToken ct)
     {
-        var all = new List<QAccount>();
-        string? after = null;
-        for (var page = 0; page < _options.MaxPages; page++)
-        {
-            var data = await QueryAsync<QAccountsData>(sessionToken, AccountsQuery,
-                new { first = _options.PageSize, after }, ct).ConfigureAwait(false);
-            var conn = data?.Accounts;
-            all.AddRange(conn?.Nodes ?? []);
-            if (conn?.PageInfo is not { HasNextPage: true, EndCursor: { Length: > 0 } next })
-            {
-                return all;
-            }
+        var data = await QueryAsync<QAccountsData>(sessionToken, AccountsQuery, new { }, ct).ConfigureAwait(false);
+        return data?.Accounts ?? [];
+    }
 
-            after = next;
-        }
-
-        throw new FatalProviderException($"Quiltt accounts exceeded {_options.MaxPages} pages; refusing to loop.");
+    public async Task<IReadOnlyList<QConnectionNode>> ListConnectionsAsync(string sessionToken, CancellationToken ct)
+    {
+        var data = await QueryAsync<QConnectionsData>(sessionToken, ConnectionsQuery, new { }, ct).ConfigureAwait(false);
+        return data?.Connections ?? [];
     }
 
     public async Task<IReadOnlyList<QTransaction>> ListTransactionsAsync(string sessionToken, DateOnly from, CancellationToken ct)
@@ -131,52 +147,43 @@ internal sealed class QuilttApiClient
         using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(new { query, variables }) };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        ThrowIfFailed(resp, "graphql");
+        using var resp = await SendAsync(req, ct).ConfigureAwait(false);
+        ThrowIfFailed(resp, QuilttIssueMapper.Endpoint.GraphQl);
 
         var body = await resp.Content.ReadFromJsonAsync<QGraphQlResponse<T>>(Json, ct).ConfigureAwait(false)
                    ?? throw new FatalProviderException("Quiltt returned an empty GraphQL body.");
         if (body.Errors is { Count: > 0 } errors)
         {
-            var text = string.Join("; ", errors.Select(e => e.Message));
-            if (errors.Any(e => e.Message?.Contains("unauthor", StringComparison.OrdinalIgnoreCase) == true
-                                || e.Message?.Contains("expired", StringComparison.OrdinalIgnoreCase) == true))
-            {
-                throw new NeedsUserActionProviderException($"Quiltt rejected the session: {text}", "Reconnect the bank.");
-            }
-
-            throw new FatalProviderException($"Quiltt GraphQL error: {text}");
+            throw QuilttIssueMapper.FromGraphQlErrors(errors, _options.RateLimitFallback);
         }
 
         return body.Data;
     }
 
+    /// <summary>Transport failures (DNS, TLS, reset, timeout) surface as a typed transient error instead of leaking HttpRequestException.</summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
+    {
+        try
+        {
+            return await _http.SendAsync(req, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested
+            && (ex is HttpRequestException or OperationCanceledException || ex.GetType().Name == "TimeoutRejectedException"))
+        {
+            throw QuilttIssueMapper.FromTransportFailure(ex);
+        }
+    }
+
     // The response body is never echoed into the message: it can carry identifiers.
-    private static void ThrowIfFailed(HttpResponseMessage resp, string what)
+    private void ThrowIfFailed(HttpResponseMessage resp, QuilttIssueMapper.Endpoint endpoint)
     {
         if (resp.IsSuccessStatusCode)
         {
             return;
         }
 
-        var code = (int)resp.StatusCode;
-        switch (resp.StatusCode)
-        {
-            case HttpStatusCode.Unauthorized:
-            case HttpStatusCode.Forbidden:
-                throw new NeedsUserActionProviderException(
-                    $"Quiltt {what} request was rejected (HTTP {code}).", "Check the Quiltt API key or reconnect the bank.");
-            case HttpStatusCode.TooManyRequests:
-                DateTimeOffset? retry = resp.Headers.RetryAfter?.Delta is { } d ? DateTimeOffset.UtcNow + d : null;
-                throw new RateLimitedProviderException("Quiltt rate limit reached.", retry);
-        }
-
-        if (code >= 500 || resp.StatusCode == HttpStatusCode.RequestTimeout)
-        {
-            throw new TransientProviderException($"Quiltt {what} request failed (HTTP {code}).");
-        }
-
-        throw new FatalProviderException($"Quiltt {what} request failed (HTTP {code}).");
+        var retry = resp.Headers.RetryAfter is { } ra ? ra.Delta ?? (ra.Date is { } d ? d - DateTimeOffset.UtcNow : null) : null;
+        throw QuilttIssueMapper.FromHttpFailure(resp.StatusCode, endpoint, retry, _options.RateLimitFallback);
     }
 
     private static string? FirstNonEmpty(params string?[] values) => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));

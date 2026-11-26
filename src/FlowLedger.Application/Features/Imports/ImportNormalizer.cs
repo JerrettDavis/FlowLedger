@@ -6,6 +6,11 @@ namespace FlowLedger.Application.Features.Imports;
 
 public sealed record ImportFormatInfo(string Id, string Name);
 
+/// <summary>Optional user choices for things a file cannot settle by itself.</summary>
+/// <param name="DateOrder">"mdy" or "dmy"; required for generic files whose dates are all ambiguous (03/04/2025).</param>
+/// <param name="NumberFormat">"us" (1,234.56) or "eu" (1.234,56); required when separators cannot be told apart.</param>
+public sealed record ImportHints(string? DateOrder = null, string? NumberFormat = null);
+
 /// <summary>A file converted to FlowLedger's canonical CSV: <c>Date,Amount,Description,Merchant,Category</c> (ISO dates, negative = money out).</summary>
 public sealed record NormalizedImport(string FormatId, string FormatName, string Csv, int RowCount, IReadOnlyList<string> Warnings)
 {
@@ -36,12 +41,18 @@ public static partial class ImportNormalizer
         new("ofx", "OFX / QFX (bank download)"), new("qif", "QIF (Quicken Interchange)"),
     ];
 
-    private static readonly string[] DateFormats =
+    // Formats whose reading does not depend on day/month order.
+    private static readonly string[] NeutralDateFormats =
     [
-        "yyyy-MM-dd", "M/d/yyyy", "MM/dd/yyyy", "M/d/yy", "yyyy/MM/dd", "M-d-yyyy", "d MMM yyyy", "MMM d, yyyy", "MMM d yyyy",
-        "MMMM d, yyyy", "yyyyMMdd", "M/d/yyyy h:mm:ss tt", "M/d/yyyy H:mm", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-dd HH:mm:ss",
-        "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-ddTHH:mm:ss.fffZ", "dd.MM.yyyy", "d/M/yyyy", "dd/MM/yyyy",
+        "yyyy-MM-dd", "yyyy/MM/dd", "d MMM yyyy", "MMM d, yyyy", "MMM d yyyy", "MMMM d, yyyy", "yyyyMMdd",
+        "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-ddTHH:mm:ss.fffZ",
     ];
+
+    private static readonly string[] MonthFirstDateFormats =
+        ["M/d/yyyy", "MM/dd/yyyy", "M/d/yy", "M-d-yyyy", "M/d/yyyy h:mm:ss tt", "M/d/yyyy H:mm"];
+
+    private static readonly string[] DayFirstDateFormats =
+        ["d/M/yyyy", "dd/MM/yyyy", "dd.MM.yyyy", "d.M.yyyy", "d-M-yyyy", "d/M/yy", "d/M/yyyy H:mm"];
 
     private static readonly string[] DateHeaders =
         ["transaction date", "trans. date", "trans date", "date", "posted date", "posting date", "post date", "settled date", "clearing date"];
@@ -57,7 +68,7 @@ public static partial class ImportNormalizer
 
     private static readonly string[] CreditHeaders = ["credit", "credits", "deposit", "deposits", "inflow", "money in", "paid in", "amount credit"];
 
-    public static NormalizedImport Normalize(string content, string? formatId = null)
+    public static NormalizedImport Normalize(string content, string? formatId = null, ImportHints? hints = null)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -82,12 +93,12 @@ public static partial class ImportNormalizer
             return FromQif(content);
         }
 
-        return FromCsv(content, formatId);
+        return FromCsv(content, formatId, hints ?? new ImportHints());
     }
 
     // ── CSV ──────────────────────────────────────────────────────────────────
 
-    private static NormalizedImport FromCsv(string content, string? requested)
+    private static NormalizedImport FromCsv(string content, string? requested, ImportHints hints)
     {
         var delimiter = DetectDelimiter(content);
         var rows = CsvParser.Parse(content, delimiter).Where(r => r.Any(c => c.Length > 0)).ToList();
@@ -154,22 +165,34 @@ public static partial class ImportNormalizer
         // Card issuers that list purchases as positive numbers.
         var invert = formatId is "amex" or "discover" or "apple-card";
 
-        var skipped = 0;
-        foreach (var r in rows.Skip(1))
-        {
-            string Cell(int i) => i >= 0 && i < r.Count ? r[i].Trim() : "";
+        var dataRows = rows.Skip(1).ToList();
+        static string CellOf(List<string> r, int i) => i >= 0 && i < r.Count ? r[i].Trim() : "";
 
-            if (!TryParseDate(Cell(dateCol), out var date))
+        var dateOrder = ResolveDateOrder(dataRows.Select(r => CellOf(r, dateCol)), formatId, hints, warnings);
+        var decimalMark = ResolveDecimalMark(
+            dataRows.SelectMany(r => new[] { CellOf(r, amountCol), CellOf(r, debitCol), CellOf(r, creditCol) }),
+            delimiter, hints, warnings);
+
+        // The "Transaction Type" column only overrides the sign for Mint-style files (unsigned amounts plus
+        // debit/credit). In any other file it is a free-text label (POS, ACH, Withdrawal ...); trust the sign.
+        var useTypeColumn = typeCol >= 0 && (formatId == "mint" || TypeColumnIsDebitCredit(dataRows, typeCol));
+
+        var skipped = 0;
+        foreach (var r in dataRows)
+        {
+            string Cell(int i) => CellOf(r, i);
+
+            if (!TryParseDate(Cell(dateCol), dateOrder, out var date))
             {
                 skipped++;
                 continue;
             }
 
             decimal amount;
-            if (amountCol >= 0 && TryParseAmount(Cell(amountCol), out var a))
+            if (amountCol >= 0 && TryParseAmount(Cell(amountCol), decimalMark, out var a))
             {
                 amount = a;
-                if (typeCol >= 0)
+                if (useTypeColumn)
                 {
                     // Mint: unsigned amount plus "debit"/"credit".
                     amount = Math.Abs(amount) * (Cell(typeCol).Equals("debit", StringComparison.OrdinalIgnoreCase) ? -1 : 1);
@@ -181,8 +204,8 @@ public static partial class ImportNormalizer
             }
             else
             {
-                var hasDebit = TryParseAmount(Cell(debitCol), out var debit);
-                var hasCredit = TryParseAmount(Cell(creditCol), out var credit);
+                var hasDebit = TryParseAmount(Cell(debitCol), decimalMark, out var debit);
+                var hasCredit = TryParseAmount(Cell(creditCol), decimalMark, out var credit);
                 if (!hasDebit && !hasCredit)
                 {
                     skipped++;
@@ -466,7 +489,181 @@ public static partial class ImportNormalizer
         return v.AsSpan().IndexOfAny(",\"\r\n") >= 0 ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
     }
 
-    public static bool TryParseDate(string raw, out DateOnly date)
+    private static bool TypeColumnIsDebitCredit(List<List<string>> dataRows, int typeCol)
+    {
+        var values = dataRows
+            .Select(r => typeCol < r.Count ? r[typeCol].Trim() : "")
+            .Where(v => v.Length > 0)
+            .Select(v => v.ToLowerInvariant())
+            .Distinct()
+            .ToList();
+        return values.Count > 0 && values.All(v => v is "debit" or "credit");
+    }
+
+    private enum DateOrder { MonthFirst, DayFirst }
+
+    private static DateOrder ResolveDateOrder(IEnumerable<string> cells, string formatId, ImportHints hints, List<string> warnings)
+    {
+        if (hints.DateOrder is { Length: > 0 } hint)
+        {
+            return hint.ToLowerInvariant() switch
+            {
+                "mdy" => DateOrder.MonthFirst,
+                "dmy" => DateOrder.DayFirst,
+                _ => throw new InvalidOperationException("dateOrder must be 'mdy' or 'dmy'."),
+            };
+        }
+
+        var monthFirstFails = false;
+        var dayFirstFails = false;
+        var ambiguous = false;
+        foreach (var raw in cells.Select(c => c.Trim()).Where(c => c.Length > 0))
+        {
+            if (DateTime.TryParseExact(raw, NeutralDateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            {
+                continue;
+            }
+
+            var mdy = TryExact(raw, MonthFirstDateFormats, out var m);
+            var dmy = TryExact(raw, DayFirstDateFormats, out var d);
+            if (!mdy && !dmy)
+            {
+                continue; // unreadable under either order: skipped later as an unreadable row
+            }
+
+            monthFirstFails |= !mdy;
+            dayFirstFails |= !dmy;
+            ambiguous |= mdy && dmy && m != d;
+        }
+
+        if (monthFirstFails && dayFirstFails)
+        {
+            throw new InvalidOperationException(
+                "The dates in this file mix month/day and day/month order. Fix the file or import it in parts.");
+        }
+
+        if (dayFirstFails)
+        {
+            return DateOrder.MonthFirst;
+        }
+
+        if (monthFirstFails)
+        {
+            warnings.Add("Dates were read as day/month/year (some dates have a day above 12).");
+            return DateOrder.DayFirst;
+        }
+
+        if (ambiguous)
+        {
+            // Every date is valid in both orders. US institutions are month-first; for a generic file there is no safe guess.
+            if (formatId == Generic)
+            {
+                throw new InvalidOperationException(
+                    "The dates in this file could be month/day or day/month (for example 03/04/2025). Choose a date format (dateOrder: 'mdy' or 'dmy') and import again.");
+            }
+
+            warnings.Add("Dates were read as month/day/year; every date in the file is valid in both orders.");
+        }
+
+        return DateOrder.MonthFirst;
+    }
+
+    private static bool TryExact(string raw, string[] formats, out DateTime dt) =>
+        DateTime.TryParseExact(raw, formats, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out dt);
+
+    private static char ResolveDecimalMark(IEnumerable<string> cells, char delimiter, ImportHints hints, List<string> warnings)
+    {
+        if (hints.NumberFormat is { Length: > 0 } hint)
+        {
+            return hint.ToLowerInvariant() switch
+            {
+                "us" => '.',
+                "eu" => ',',
+                _ => throw new InvalidOperationException("numberFormat must be 'us' or 'eu'."),
+            };
+        }
+
+        var dotVotes = 0;
+        var commaVotes = 0;
+        var ambiguous = false;
+        foreach (var raw in cells)
+        {
+            var token = AmountToken(raw);
+            var lastDot = token.LastIndexOf('.');
+            var lastComma = token.LastIndexOf(',');
+            if (lastDot < 0 && lastComma < 0)
+            {
+                continue;
+            }
+
+            if (lastDot >= 0 && lastComma >= 0)
+            {
+                if (lastComma > lastDot) { commaVotes++; } else { dotVotes++; }
+                continue;
+            }
+
+            var mark = lastDot >= 0 ? '.' : ',';
+            var count = token.Count(c => c == mark);
+            var digitsAfter = token.Length - token.LastIndexOf(mark) - 1;
+            if (count > 1)
+            {
+                // 1.234.567 or 1,234,567: the repeated mark groups thousands, so the other one is the decimal mark.
+                if (mark == '.') { commaVotes++; } else { dotVotes++; }
+            }
+            else if (digitsAfter == 3)
+            {
+                ambiguous = true; // 1,234 or 1.234
+            }
+            else if (mark == '.')
+            {
+                dotVotes++;
+            }
+            else
+            {
+                commaVotes++;
+            }
+        }
+
+        if (dotVotes > 0 && commaVotes > 0)
+        {
+            throw new InvalidOperationException(
+                "The amounts in this file mix decimal comma and decimal point formats. Fix the file or choose a number format (numberFormat: 'us' or 'eu').");
+        }
+
+        if (commaVotes > 0)
+        {
+            warnings.Add("Amounts were read with a decimal comma (for example 1.234,56).");
+            return ',';
+        }
+
+        if (dotVotes == 0 && ambiguous && delimiter == ';')
+        {
+            // A semicolon-delimited export is the European case, where "1,234" may be 1.234. No safe guess.
+            throw new InvalidOperationException(
+                "The amounts in this file could use a decimal comma or a decimal point (for example 1,234). Choose a number format (numberFormat: 'us' or 'eu') and import again.");
+        }
+
+        return '.';
+    }
+
+    private static string AmountToken(string raw)
+    {
+        var sb = new StringBuilder(raw.Length);
+        foreach (var c in raw)
+        {
+            if (char.IsDigit(c) || c is '.' or ',')
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString().Trim('.', ',');
+    }
+
+    /// <summary>Parses a date, reading ambiguous numeric dates month-first (US). Imports use the per-file order instead.</summary>
+    public static bool TryParseDate(string raw, out DateOnly date) => TryParseDate(raw, DateOrder.MonthFirst, out date);
+
+    private static bool TryParseDate(string raw, DateOrder order, out DateOnly date)
     {
         date = default;
         raw = raw.Trim();
@@ -475,7 +672,10 @@ public static partial class ImportNormalizer
             return false;
         }
 
-        if (DateTime.TryParseExact(raw, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt))
+        const DateTimeStyles styles = DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal;
+        var numeric = order == DateOrder.MonthFirst ? MonthFirstDateFormats : DayFirstDateFormats;
+        if (DateTime.TryParseExact(raw, NeutralDateFormats, CultureInfo.InvariantCulture, styles, out var dt)
+            || DateTime.TryParseExact(raw, numeric, CultureInfo.InvariantCulture, styles, out dt))
         {
             date = DateOnly.FromDateTime(dt);
             return true;
@@ -484,7 +684,10 @@ public static partial class ImportNormalizer
         return false;
     }
 
-    public static bool TryParseAmount(string raw, out decimal amount)
+    public static bool TryParseAmount(string raw, out decimal amount) => TryParseAmount(raw, '.', out amount);
+
+    /// <summary>Parses an amount whose decimal separator is <paramref name="decimalMark"/> ('.' or ',').</summary>
+    public static bool TryParseAmount(string raw, char decimalMark, out decimal amount)
     {
         amount = 0m;
         var s = raw.Trim();
@@ -516,7 +719,14 @@ public static partial class ImportNormalizer
             s = s[..^2];
         }
 
-        s = s.Replace("$", "").Replace("€", "").Replace("£", "").Replace(",", "").Replace(" ", "").Replace(" ", "");
+        var grouping = decimalMark == ',' ? "." : ",";
+        s = s.Replace("$", "").Replace("€", "").Replace("£", "").Replace(grouping, "")
+            .Replace(" ", "").Replace(" ", "").Replace("'", "");
+        if (decimalMark == ',')
+        {
+            s = s.Replace(',', '.');
+        }
+
         if (s.StartsWith('+'))
         {
             s = s[1..];

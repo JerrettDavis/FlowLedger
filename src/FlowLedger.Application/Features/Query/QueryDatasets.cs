@@ -123,7 +123,7 @@ public sealed class QueryDatasetProvider(
                 continue;
             }
 
-            if (t.Status is "Planned" or "Skipped")
+            if (!FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status))
             {
                 continue;
             }

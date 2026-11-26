@@ -26,7 +26,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
         var startDate = new DateOnly(2025, 1, 1);
 
         var flow = RecurringFlow.Create(
@@ -63,7 +63,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
         var start = new DateOnly(2025, 1, 1);
 
         var flow = RecurringFlow.Create(
@@ -107,7 +107,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
         // Test that all RecurrencePattern fields survive the round-trip
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantCtx);
 
         var flow = RecurringFlow.Create(
             tenantId, accountId, "Biweekly",
@@ -137,13 +137,14 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
         var tenantB = TestTenantContext.New();
         var tidA = TenantId.From(tenantA.TenantId);
         var tidB = TenantId.From(tenantB.TenantId);
-        var accountId = AccountId.New();
+        var accountId = await _fixture.SeedAccountAsync(tenantA);
+        var accountIdB = await _fixture.SeedAccountAsync(tenantB);
 
         var flowA = RecurringFlow.Create(tidA, accountId, "Flow A",
             new Money(100m, Currency.Usd), TransactionDirection.Debit,
             RecurrencePattern.Monthly(1), new DateOnly(2025, 1, 1));
 
-        var flowB = RecurringFlow.Create(tidB, accountId, "Flow B",
+        var flowB = RecurringFlow.Create(tidB, accountIdB, "Flow B",
             new Money(200m, Currency.Usd), TransactionDirection.Credit,
             RecurrencePattern.Monthly(15), new DateOnly(2025, 1, 1));
 

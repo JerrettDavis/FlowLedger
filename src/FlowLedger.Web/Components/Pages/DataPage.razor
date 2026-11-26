@@ -1,5 +1,4 @@
 @page "/data"
-@rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
@@ -7,7 +6,7 @@
 
 <PageTitle>Data &amp; Backups — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Data &amp; Backups</MudText>
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Data &amp; Backups</MudText>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">Where your data lives, how safe it is, and what the bank connection costs.</MudText>
 
 @if (!_household)
@@ -167,7 +166,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -224,7 +223,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {
@@ -247,7 +246,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddFailure(ex);
         }
         finally
         {

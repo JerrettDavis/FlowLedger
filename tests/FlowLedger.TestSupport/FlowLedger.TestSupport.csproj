@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared, non-test helpers for the test projects: property-test harness (CsCheck) and test data builders. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="xunit.extensibility.core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

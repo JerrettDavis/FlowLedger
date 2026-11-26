@@ -54,15 +54,19 @@ public sealed class CreateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly ITenantContext _tenant;
+    private readonly IReferenceValidator _references;
 
-    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant)
+    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references)
     {
         _repo = repo;
         _tenant = tenant;
+        _references = references;
     }
 
     public async Task<RecurringFlowDto> HandleAsync(CreateRecurringFlowRequest request, CancellationToken ct = default)
     {
+        await _references.EnsureAccountAsync(request.AccountId, ct);
+        await _references.EnsureCategoryAsync(request.CategoryId, ct);
         var direction = Enum.Parse<TransactionDirection>(request.Direction, ignoreCase: true);
         var amountModel = Enum.Parse<AmountModel>(request.AmountModel, ignoreCase: true);
         var currency = new Currency(request.Currency.ToUpperInvariant());
@@ -80,7 +84,8 @@ public sealed class CreateRecurringFlowHandler
             direction,
             pattern,
             request.StartDate,
-            request.EndDate,
+            // The API contract is inclusive (the flow's last day); the domain window is half-open [start, end).
+            request.EndDate?.AddDays(1),
             amountModel,
             categoryId,
             request.Counterparty);
@@ -163,6 +168,10 @@ public sealed class DeactivateRecurringFlowHandler
 
 internal static class RecurringFlowMapper
 {
+    /// <summary>The flow's last active day as shown to users: the domain window is half-open, the API is inclusive.</summary>
+    private static DateOnly? InclusiveEnd(RecurringFlow f) =>
+        f.ActiveWindow.End is { } end ? (end > f.ActiveWindow.Start ? end.AddDays(-1) : f.ActiveWindow.Start) : null;
+
     public static RecurringFlowDto ToDto(RecurringFlow f) => new(
         f.Id,
         f.AccountId.Value,
@@ -177,10 +186,10 @@ internal static class RecurringFlowMapper
         f.Pattern.IntervalWeeks,
         f.Pattern.AnchorDayOfWeek?.ToString(),
         f.ActiveWindow.Start,
-        f.ActiveWindow.End,
+        InclusiveEnd(f),
         f.CategoryId?.Value,
         f.Counterparty,
         f.IsActive,
         f.CreatedAt,
-        Math.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
+        MoneyRounding.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
 }
