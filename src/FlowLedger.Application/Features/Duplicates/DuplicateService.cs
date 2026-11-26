@@ -135,10 +135,20 @@ public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions opt
         var drop = p.Duplicate;
         var snapshot = JsonSerializer.Serialize(new
         {
-            drop.Id, AccountId = drop.AccountId.Value, Amount = drop.Amount.Amount, Direction = drop.Direction.ToString(),
-            drop.Description, drop.MerchantName, Status = drop.Status.ToString(), drop.EffectiveDate, drop.PostedDate,
-            CategoryId = drop.CategoryId?.Value, CategorySource = drop.CategorySource.ToString(), drop.Notes,
-            Fingerprint = drop.Fingerprint?.Value, Splits = drop.Splits.Select(s => new { s.Amount.Amount, CategoryId = s.CategoryId?.Value, s.Notes }),
+            drop.Id,
+            AccountId = drop.AccountId.Value,
+            Amount = drop.Amount.Amount,
+            Direction = drop.Direction.ToString(),
+            drop.Description,
+            drop.MerchantName,
+            Status = drop.Status.ToString(),
+            drop.EffectiveDate,
+            drop.PostedDate,
+            CategoryId = drop.CategoryId?.Value,
+            CategorySource = drop.CategorySource.ToString(),
+            drop.Notes,
+            Fingerprint = drop.Fingerprint?.Value,
+            Splits = drop.Splits.Select(s => new { s.Amount.Amount, CategoryId = s.CategoryId?.Value, s.Notes }),
         });
 
         // Fold what the user or the bank knew into the survivor.

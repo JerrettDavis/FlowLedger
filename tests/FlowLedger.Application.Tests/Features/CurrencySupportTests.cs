@@ -65,8 +65,13 @@ public sealed class CurrencySupportTests
         var asOf = new DateOnly(2026, 1, 1);
         var flow = new ForecastFlowInput
         {
-            FlowId = RecurringFlowId.New(), AccountId = usd, Amount = new Money(10m, "USD"),
-            Direction = TransactionDirection.Debit, Pattern = RecurrencePattern.Monthly(5), FlowStart = asOf, Name = "Sub"
+            FlowId = RecurringFlowId.New(),
+            AccountId = usd,
+            Amount = new Money(10m, "USD"),
+            Direction = TransactionDirection.Debit,
+            Pattern = RecurrencePattern.Monthly(5),
+            FlowStart = asOf,
+            Name = "Sub"
         };
 
         var result = new ForecastEngine().Run(new ForecastRequest

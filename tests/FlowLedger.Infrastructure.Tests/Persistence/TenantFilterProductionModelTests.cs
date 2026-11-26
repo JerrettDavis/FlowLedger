@@ -1,8 +1,8 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.Application.Abstractions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

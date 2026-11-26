@@ -18,8 +18,19 @@ public static class Format
 
     private static readonly Dictionary<string, string> CurrencySymbols = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["USD"] = "$", ["EUR"] = "€", ["GBP"] = "£", ["JPY"] = "¥", ["CNY"] = "CN¥", ["INR"] = "₹", ["KRW"] = "₩",
-        ["CAD"] = "CA$", ["AUD"] = "A$", ["NZD"] = "NZ$", ["MXN"] = "MX$", ["BRL"] = "R$", ["CHF"] = "CHF",
+        ["USD"] = "$",
+        ["EUR"] = "€",
+        ["GBP"] = "£",
+        ["JPY"] = "¥",
+        ["CNY"] = "CN¥",
+        ["INR"] = "₹",
+        ["KRW"] = "₩",
+        ["CAD"] = "CA$",
+        ["AUD"] = "A$",
+        ["NZD"] = "NZ$",
+        ["MXN"] = "MX$",
+        ["BRL"] = "R$",
+        ["CHF"] = "CHF",
     };
 
     private static readonly HashSet<string> ZeroDecimalCurrencies = new(StringComparer.OrdinalIgnoreCase) { "JPY", "KRW" };

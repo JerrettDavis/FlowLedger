@@ -187,7 +187,8 @@ internal static class QuilttIssueMapper
         if (haystack.Contains("FORBIDDEN") || haystack.Contains("REPAIRABLE") || haystack.Contains("REAUTH"))
         {
             return new NeedsUserActionProviderException("Quiltt refused the query; the bank connection needs to be re-authenticated.",
-                "Reconnect the bank.", joined) { Kind = ProviderIssueKind.ReauthRequired };
+                "Reconnect the bank.", joined)
+            { Kind = ProviderIssueKind.ReauthRequired };
         }
 
         if (haystack.Contains("NOT AUTHENTICATED") || haystack.Contains("UNAUTHENTICATED") || haystack.Contains("UNAUTHORIZED") || haystack.Contains("EXPIRED"))

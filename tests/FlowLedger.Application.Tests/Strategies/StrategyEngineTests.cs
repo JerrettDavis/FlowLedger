@@ -1,6 +1,6 @@
 using FlowLedger.Application.Features.Strategies;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Strategies;
 

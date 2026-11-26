@@ -35,38 +35,38 @@ public static class NaiveRecurrence
             case RecurrenceFrequency.Weekly:
                 return day.DayOfWeek == p.AnchorDayOfWeek && day >= flowStart;
             case RecurrenceFrequency.EveryNWeeks:
-            {
-                var first = flowStart;
-                while (first.DayOfWeek != p.AnchorDayOfWeek)
                 {
-                    first = first.AddDays(1);
-                }
+                    var first = flowStart;
+                    while (first.DayOfWeek != p.AnchorDayOfWeek)
+                    {
+                        first = first.AddDays(1);
+                    }
 
-                return day >= first && (day.DayNumber - first.DayNumber) % (7 * p.IntervalWeeks!.Value) == 0;
-            }
+                    return day >= first && (day.DayNumber - first.DayNumber) % (7 * p.IntervalWeeks!.Value) == 0;
+                }
 
             case RecurrenceFrequency.Monthly:
                 return day.Day == Math.Min(p.DayOfMonth!.Value, dim);
             case RecurrenceFrequency.TwiceMonthly:
                 return day.Day == Math.Min(p.DayOfMonth!.Value, dim) || day.Day == Math.Min(p.SecondDayOfMonth!.Value, dim);
             case RecurrenceFrequency.LastBusinessDay:
-            {
-                if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 {
-                    return false;
-                }
-
-                // Last business day: no later weekday remains in this month.
-                for (var later = day.AddDays(1); later.Month == day.Month; later = later.AddDays(1))
-                {
-                    if (later.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+                    if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                     {
                         return false;
                     }
-                }
 
-                return true;
-            }
+                    // Last business day: no later weekday remains in this month.
+                    for (var later = day.AddDays(1); later.Month == day.Month; later = later.AddDays(1))
+                    {
+                        if (later.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(p));

@@ -2,8 +2,8 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.Events;
 using FlowLedger.Domain.Exceptions;
 using FlowLedger.Domain.ValueObjects;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Domain.Tests.Aggregates;
 
