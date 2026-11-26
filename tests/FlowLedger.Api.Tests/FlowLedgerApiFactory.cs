@@ -37,6 +37,9 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     /// Production startup guard is satisfied in <see cref="FailClosedApiFactory"/>.</summary>
     public const string DevApiKey = "integration-test-key-not-for-production";
 
+    /// <summary>Explicit Simulated webhook secret; the provider has no default (#133).</summary>
+    public const string WebhookSecret = "api-test-webhook-secret";
+
     /// <summary>The demo tenant ID used when tests need a valid tenant header.</summary>
     // Static ctor: env vars outrank user-secrets and are read when the host builder is created
     // (unlike ConfigureAppConfiguration, which Program's eager config reads can miss). Without
@@ -110,6 +113,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 ["ConnectionStrings:flowledger"] = _postgres.GetConnectionString(),
                 ["Api:Key"] = DevApiKey,
                 ["Mx:Enabled"] = "false",
+                ["SimulatedProvider:WebhookSecret"] = WebhookSecret,
                 ["ObjectStorage:RootPath"] = _objectStoragePath,
                 ["HomeAssistant:EncryptionKey"] = Convert.ToBase64String(new byte[32].Select((_, i) => (byte)(i + 7)).ToArray()),
             });

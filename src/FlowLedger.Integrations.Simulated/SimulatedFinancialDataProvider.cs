@@ -21,13 +21,6 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
 {
     // ── Constants ─────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The fixed webhook secret used by the Simulated provider.
-    /// Tests should use <see cref="BuildTestSignature"/> to generate valid signatures.
-    /// This value must NEVER appear in non-test code paths.
-    /// </summary>
-    internal const string TestWebhookSecret = "sim-test-webhook-secret-do-not-use-in-production";
-
     private const string SimMemberId = "sim-member-001";
 
     // ── Fields ────────────────────────────────────────────────────────────────
@@ -114,14 +107,22 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
     {
         await Task.CompletedTask.ConfigureAwait(false);
 
-        var expected = BuildTestSignature(rawBody.Span);
+        // Fail closed: with no explicitly configured secret nothing can be verified, so an
+        // anonymous caller can never forge a webhook against the default configuration (#133).
+        if (string.IsNullOrEmpty(_options.WebhookSecret))
+        {
+            throw new InvalidWebhookSignatureException(
+                "Simulated webhook verification is disabled: SimulatedProvider:WebhookSecret is not configured.");
+        }
+
+        var expected = BuildSignature(rawBody.Span, _options.WebhookSecret);
         if (!CryptographicOperations.FixedTimeEquals(
             Encoding.UTF8.GetBytes(expected),
             Encoding.UTF8.GetBytes(signatureHeader)))
         {
             throw new InvalidWebhookSignatureException(
                 "Simulated webhook signature verification failed. " +
-                $"Use {nameof(BuildTestSignature)} to generate a valid signature in tests.");
+                $"Use {nameof(BuildSignature)} with the configured secret to generate a valid signature in tests.");
         }
     }
 
@@ -174,9 +175,9 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
     /// Generates the HMAC-SHA256 signature string that <see cref="VerifyWebhookAsync"/>
     /// expects.  Use this in tests to produce a valid signature for a test payload.
     /// </summary>
-    public static string BuildTestSignature(ReadOnlySpan<byte> rawBody)
+    public static string BuildSignature(ReadOnlySpan<byte> rawBody, string secret)
     {
-        var keyBytes = Encoding.UTF8.GetBytes(TestWebhookSecret);
+        var keyBytes = Encoding.UTF8.GetBytes(secret);
         var hash = HMACSHA256.HashData(keyBytes, rawBody);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
@@ -186,6 +187,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
     /// in integration tests.
     /// </summary>
     public static (byte[] Body, string Signature) BuildSyntheticWebhookEvent(
+        string secret,
         string eventType = "SYNC_COMPLETE",
         string memberId = SimMemberId)
     {
@@ -198,7 +200,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         };
 
         var body = JsonSerializer.SerializeToUtf8Bytes(payload);
-        var sig = BuildTestSignature(body);
+        var sig = BuildSignature(body, secret);
         return (body, sig);
     }
 
