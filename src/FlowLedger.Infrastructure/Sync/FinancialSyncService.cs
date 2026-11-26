@@ -454,7 +454,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                          && t.Source == TransactionSource.MxAggregation)
                      .ToListAsync(ct))
         {
-            AddSettleCandidate(settleCandidates, p);
+            PendingSettlement.AddSettleCandidate(settleCandidates, p);
         }
 
         // Rows added earlier in this sync are not in the database yet, so a later page repeating one of them would
@@ -570,7 +570,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         {
                             // Posted total differs from the authorization (a tip): absorb one unambiguous pending row
                             // of the same merchant whose amount is within tolerance below the posted total (#104).
-                            var tolerant = FindTipSettleCandidate(settleCandidates, direction, amount, x.ProviderTx, seenPending);
+                            var tolerant = PendingSettlement.FindTipSettleCandidate(settleCandidates, direction, amount, x.ProviderTx, seenPending);
                             if (tolerant is not null)
                             {
                                 pending = tolerant;
@@ -580,7 +580,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
                         if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount))
                         {
-                            RemoveSettleCandidate(settleCandidates, pending);
+                            PendingSettlement.RemoveSettleCandidate(settleCandidates, pending);
                             settled++;
                             continue;
                         }
@@ -598,7 +598,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
                                  && t.Status == TransactionStatus.Pending && t.Source == TransactionSource.MxAggregation))
                     {
-                        AddSettleCandidate(settleCandidates, inserted);
+                        PendingSettlement.AddSettleCandidate(settleCandidates, inserted);
                     }
                 }
                 if (settled > 0)
@@ -618,7 +618,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         // Authorizations the provider never settled or re-reported (cancelled holds, fuel pre-auths) must not count as
         // spend forever. Anything still pending after the TTL that this sync did not just receive is retired.
-        var staleBefore = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-StalePendingDays);
+        var staleBefore = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-PendingSettlement.StalePendingDays);
         foreach (var list in settleCandidates.Values)
         {
             foreach (var stale in list.Where(t => t.Status == TransactionStatus.Pending && t.EffectiveDate < staleBefore
@@ -632,59 +632,6 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
 
         return (added, skipped);
-    }
-
-    /// <summary>Largest amount a posted total may exceed its authorization by (restaurant/ride-share tips).</summary>
-    internal const decimal TipTolerance = 0.30m;
-
-    /// <summary>Pending authorizations older than this that the provider never settled are retired (#104).</summary>
-    internal const int StalePendingDays = 14;
-
-    private static Transaction? FindTipSettleCandidate(
-        Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup,
-        TransactionDirection direction, decimal postedAmount, ProviderTransaction posted, HashSet<string> stillPending)
-    {
-        var found = lookup
-            .Where(kv => kv.Key.Item1 == direction && kv.Key.Item2 < postedAmount && postedAmount <= kv.Key.Item2 * (1m + TipTolerance))
-            .SelectMany(kv => kv.Value)
-            .Where(t => t.Status == TransactionStatus.Pending
-                && (t.Fingerprint is null || !stillPending.Contains(t.Fingerprint.Value))
-                && t.Amount.Currency == posted.Amount.Currency
-                && t.EffectiveDate <= posted.PostedDate
-                && t.EffectiveDate >= posted.PostedDate.AddDays(-7)
-                && SharesMerchantToken(t.Description, posted.RawDescription))
-            .Take(2)
-            .ToList();
-        return found.Count == 1 ? found[0] : null;
-    }
-
-    private static bool SharesMerchantToken(string a, string b)
-    {
-        static HashSet<string> Tokens(string s) => s
-            .Split([' ', '*', '#', '-', '/', '.', ','], StringSplitOptions.RemoveEmptyEntries)
-            .Where(w => w.Length >= 3 && !w.All(char.IsDigit))
-            .Select(w => w.ToUpperInvariant())
-            .ToHashSet();
-        return Tokens(a ?? string.Empty).Overlaps(Tokens(b ?? string.Empty));
-    }
-
-    private static void RemoveSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)
-    {
-        foreach (var list in lookup.Values)
-        {
-            list.Remove(t);
-        }
-    }
-
-    private static void AddSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)
-    {
-        var key = (t.Direction, t.Amount.Amount);
-        if (!lookup.TryGetValue(key, out var list))
-        {
-            lookup[key] = list = [];
-        }
-
-        list.Add(t);
     }
 
     private static TransactionFingerprint BuildFingerprint(AccountId accountId, ProviderTransaction pt)
