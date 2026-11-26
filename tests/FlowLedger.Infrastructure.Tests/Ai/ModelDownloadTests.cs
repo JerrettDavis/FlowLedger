@@ -1,7 +1,6 @@
 using System.Net;
 using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Infrastructure.Ai.Local;
-using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -35,16 +34,14 @@ public class ModelDownloadTests : IDisposable
         public HttpClient CreateClient(string name) => new(new H(respond));
     }
 
+    /// <summary>Upper bound for a download to finish; a guard against a hang, never a pacing delay.</summary>
+    private static readonly TimeSpan Guard = TimeSpan.FromSeconds(30);
+
     private async Task<(LocalModelManager Manager, Func<Task> Wait)> RunAsync(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
         var manager = new LocalModelManager(new LocalAiOptions { ModelDirectory = _dir }, new Factory(respond), NullLogger<LocalModelManager>.Instance);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
-        async Task Wait()
-        {
-            // LocalModelManager runs the download fire-and-forget and exposes no completion signal, so poll its state.
-            await Eventually.WaitAsync(() => manager.Download?.State != "Downloading", "the model download to leave the Downloading state");
-        }
-
+        Task Wait() => manager.DownloadCompletion.WaitAsync(Guard);
         await Wait();
         return (manager, Wait);
     }
@@ -172,10 +169,7 @@ public class ModelDownloadTests : IDisposable
             NullLogger<LocalModelManager>.Instance);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
 
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
 
         manager.Download!.State.Should().Be("Failed");
         manager.Download.Error.Should().Contain("stalled");
@@ -183,11 +177,7 @@ public class ModelDownloadTests : IDisposable
         manager.TryStartDownload(ModelCatalog.MiniLm, out _).Should().BeTrue("the stalled download must release the single-download gate");
 
         // Let the second (also stalled) attempt finish so its file handle is released before the temp dir is removed.
-        await Task.Delay(50);
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
     }
 
     [Fact]
@@ -200,14 +190,10 @@ public class ModelDownloadTests : IDisposable
             NullLogger<LocalModelManager>.Instance,
             lifetime);
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
-        await Task.Delay(100);
 
         lifetime.Stop();
 
-        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-        {
-            await Task.Delay(25);
-        }
+        await manager.DownloadCompletion.WaitAsync(Guard);
 
         manager.Download!.State.Should().Be("Failed");
         manager.Download.Error.Should().Contain("cancel");
