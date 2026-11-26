@@ -87,3 +87,23 @@ is a real paged connection and its query was already correct.
 ## Operational notes
 * Quiltt limits **sessions per profile per hour**; ~10 sessions in 8 minutes triggered HTTP 429 for ~60 minutes. Mint sessions sparingly
   (cache per profile until expiry); health check, sync and webhook-triggered syncs each mint their own today.
+
+## What the user sees in FlowLedger, per Mock Sandbox Bank login
+FlowLedger only learns of a failure through (a) the Connector's exit event, normalised by `quiltt-interop.js` to `success | cancelled | error` and turned into
+one message by `ConnectExit` (Web), or (b) a persisted connection issue (`ProviderIssue`) after a sync. Failures that happen entirely inside the hosted Connector
+leave no server state, so (a) is the only signal and always says: nothing was linked, existing accounts are unchanged, try again later or pick another bank.
+
+| Login | Exit event | Persisted issue | What the user sees / what FlowLedger does |
+|---|---|---|---|
+| (base) | success | none | "Bank linked. Syncing..." then accounts appear |
+| Aggregator Down | error | none | "didn't complete... nothing was linked... try again in a few minutes" |
+| Invalid Credentials | error | none | same message (the bank rejected the login inside the Connector) |
+| Timeout (Pre-Widget) | error | none | same message |
+| Timeout (Post-Widget) | error | none (a `SYNCED` connection exists) | same message; any connection that did form syncs normally |
+| Internal Error | error | none (a `SYNCED` connection exists) | same message |
+| Multi Errors (Failure) | error | none | same message |
+| Multi Errors (Successful) | success (after a retry inside the Connector) | none; two connections | normal link + sync of both |
+| Error Institution / Provider / Service | success | none (connection stays `SYNCED`) | normal link; the real statuses `ERROR_INSTITUTION/PROVIDER/SERVICE` would show "Temporarily unavailable - retrying automatically" (schema-derived, never produced by the sandbox) |
+| (any) after `connectionSimulateError` | n/a | `ReauthRequired`, `RepairRef` = connection id, informational while reads succeed | badge "needs attention" with **Reconnect** (Connector reconnect mode); a successful reconnect triggers a sync that clears it |
+| (any) after `connectionDisconnect` | n/a | `Disconnected` | badge with **Reconnect**; accounts stay with stale balances |
+| Cancel in the Connector | cancelled | none | "Bank linking was cancelled. Nothing was changed." |

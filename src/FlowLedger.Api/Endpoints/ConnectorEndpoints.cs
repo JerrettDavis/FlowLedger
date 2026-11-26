@@ -41,10 +41,10 @@ internal static class ConnectorEndpoints
     /// <summary>JSON shape of a connection's persisted issue (ADR 0018); the connection's <c>issue</c> is null when healthy.</summary>
     internal sealed record ConnectionIssueDto(
         string Kind, string Message, bool Retryable, bool RequiresUserAction,
-        DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures)
+        DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures, string? ProviderCode, string? RepairRef)
     {
         internal static ConnectionIssueDto From(ConnectionIssueInfo i) =>
-            new(i.Kind, i.Message, i.Retryable, i.RequiresUserAction, i.RetryAfter, i.At, i.ConsecutiveFailures);
+            new(i.Kind, i.Message, i.Retryable, i.RequiresUserAction, i.RetryAfter, i.At, i.ConsecutiveFailures, i.ProviderCode, i.RepairRef);
     }
 
     internal static IEndpointRouteBuilder MapConnectorEndpoints(this IEndpointRouteBuilder app)

@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
 
         services.Configure<QuilttOptions>(configuration.GetSection(QuilttOptions.SectionName));
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<QuilttSessionCache>();
 
         // The session POST can create a profile, so unsafe methods (all Quiltt calls are POSTs) are never auto-retried.
         services.AddHttpClient<QuilttApiClient>()

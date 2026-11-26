@@ -345,14 +345,15 @@
 
             var result = await JS.InvokeAsync<QuilttConnectResult>(
                 "flowledgerQuiltt.open", session.ScriptUrl, session.ConnectorId, session.Token);
-            if (result.Status == "success")
+            var outcome = ConnectExit.Parse(result.Status);
+            if (ConnectExit.Message(outcome) is var (message, severity))
             {
-                Snackbar.Add("Bank linked. Syncing your accounts…", Severity.Success);
-                await SyncNow();
+                Snackbar.Add(message, severity);
             }
-            else if (result.Status == "error")
+
+            if (outcome == ConnectOutcome.Success)
             {
-                Snackbar.Add("The bank connection did not complete. Please try again.", Severity.Warning);
+                await SyncNow();
             }
         }
         catch (Exception ex)

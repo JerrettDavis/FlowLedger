@@ -8,10 +8,13 @@ public sealed record ProviderConnectionInfo(
 /// <summary>
 /// Persisted, connector-neutral description of what is wrong with a connection (mirrors Integrations.Abstractions.ProviderIssue,
 /// kept as plain strings so Application stays independent of any connector). <see cref="Kind"/> is a ProviderIssueKind name.
+/// <see cref="Informational"/> marks an issue observed while reads still SUCCEED (e.g. one of several connections needs repair): it is shown
+/// to the user but never counts as a failure and never blocks unattended syncs of the healthy remainder.
 /// </summary>
 public sealed record ConnectionIssueInfo(
     string Kind, string Message, bool Retryable, bool RequiresUserAction,
-    DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures);
+    DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures,
+    string? ProviderCode = null, string? RepairRef = null, bool Informational = false);
 
 /// <summary>
 /// Durable per-tenant record of the provider member created at the provider. Callers must

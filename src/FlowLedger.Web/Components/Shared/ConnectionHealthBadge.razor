@@ -64,7 +64,7 @@ else
         _busy = true;
         try
         {
-            var result = await Repair.RepairAsync(new ConnectionRef(Provider, Issue?.ProviderCode, Institution));
+            var result = await Repair.RepairAsync(new ConnectionRef(Provider, Issue?.RepairRef, Institution));
             switch (result.Status)
             {
                 case RepairStatus.Repaired:

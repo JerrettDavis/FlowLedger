@@ -108,8 +108,9 @@ public sealed class SyncRetryPolicy
     /// <summary>May an unattended sync of a connection with this persisted issue (null = healthy) run right now?</summary>
     public SyncAttemptDecision ShouldAttempt(ConnectionIssueInfo? issue, SyncTrigger trigger = SyncTrigger.Scheduled)
     {
-        if (issue is null)
+        if (issue is null or { Informational: true })
         {
+            // Healthy, or an issue seen while reads still succeed: never a reason to hold back unattended syncs.
             return SyncAttemptDecision.Proceed;
         }
 
@@ -167,12 +168,13 @@ public sealed class SyncRetryPolicy
 /// <summary>Converts between the persisted/Application issue shape and the connector-neutral <see cref="ProviderIssue"/>.</summary>
 public static class ProviderIssueMapping
 {
-    public static ConnectionIssueInfo ToInfo(ProviderIssue issue, DateTimeOffset at, int consecutiveFailures = 0)
-        => new(issue.Kind.ToString(), issue.Message, issue.Retryable, issue.RequiresUserAction, issue.RetryAfter, at, consecutiveFailures);
+    public static ConnectionIssueInfo ToInfo(ProviderIssue issue, DateTimeOffset at, int consecutiveFailures = 0, bool informational = false)
+        => new(issue.Kind.ToString(), issue.Message, issue.Retryable, issue.RequiresUserAction, issue.RetryAfter, at, consecutiveFailures,
+            issue.ProviderCode, issue.RepairRef, informational);
 
     public static ProviderIssue ToIssue(ConnectionIssueInfo info)
         => new(Enum.TryParse<ProviderIssueKind>(info.Kind, out var kind) ? kind : ProviderIssueKind.Unknown,
-            info.Message, info.Retryable, info.RequiresUserAction, info.RetryAfter);
+            info.Message, info.Retryable, info.RequiresUserAction, info.RetryAfter, info.ProviderCode, info.RepairRef);
 }
 
 /// <summary>Reads the tenant's persisted connection health and applies <see cref="SyncRetryPolicy"/>; the one call jobs make before an unattended sync.</summary>

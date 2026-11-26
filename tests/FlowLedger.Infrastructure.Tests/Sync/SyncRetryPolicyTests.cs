@@ -23,6 +23,26 @@ public sealed class SyncRetryPolicyTests
     private static readonly ProviderIssueKind[] UserActionKinds =
         [ProviderIssueKind.ReauthRequired, ProviderIssueKind.InvalidCredentials, ProviderIssueKind.Disconnected];
 
+    [Theory]
+    [InlineData(ProviderIssueKind.ReauthRequired)]
+    [InlineData(ProviderIssueKind.Disconnected)]
+    [InlineData(ProviderIssueKind.Unknown)]
+    [InlineData(ProviderIssueKind.Internal)]
+    public void An_informational_issue_never_blocks_an_unattended_sync_however_bad_or_old_it_is(ProviderIssueKind kind)
+    {
+        // Seen while reads still succeed (e.g. one of several connections needs repair): shown to the user, never a gate input.
+        var informational = ProviderIssueMapping.ToInfo(ProviderIssue.Of(kind, "m"), Now.AddDays(-30), consecutiveFailures: 99, informational: true);
+
+        foreach (var trigger in Enum.GetValues<SyncTrigger>())
+        {
+            Policy().ShouldAttempt(informational, trigger).Allowed.Should().BeTrue($"{kind}/{trigger}");
+        }
+
+        // ...whereas the same issue recorded from a FAILED sync does block.
+        var failed = ProviderIssueMapping.ToInfo(ProviderIssue.Of(ProviderIssueKind.ReauthRequired, "m"), Now, 1);
+        Policy().ShouldAttempt(failed, SyncTrigger.Scheduled).Allowed.Should().BeFalse();
+    }
+
     [Fact]
     public void User_action_kinds_are_skipped_until_the_user_acts_whatever_the_failure_count()
     {

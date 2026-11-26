@@ -21,7 +21,7 @@ internal sealed class EfProviderConnectionStore(FlowLedgerDbContext db, ITenantC
                 ? null
                 : new ConnectionIssueInfo(
                     c.IssueKind, c.IssueMessage ?? string.Empty, c.IssueRetryable, c.IssueRequiresUserAction,
-                    c.IssueRetryAfter, c.IssueAt ?? c.UpdatedAt, c.ConsecutiveFailures))).ToList();
+                    c.IssueRetryAfter, c.IssueAt ?? c.UpdatedAt, c.ConsecutiveFailures, c.IssueProviderCode, c.IssueRepairRef, c.IssueInformational))).ToList();
     }
 
     public async Task<string?> GetMemberProviderIdAsync(string providerName, CancellationToken ct = default)
@@ -44,6 +44,9 @@ internal sealed class EfProviderConnectionStore(FlowLedgerDbContext db, ITenantC
                 .SetProperty(c => c.IssueRequiresUserAction, false)
                 .SetProperty(c => c.IssueRetryAfter, (DateTimeOffset?)null)
                 .SetProperty(c => c.IssueAt, (DateTimeOffset?)null)
+                .SetProperty(c => c.IssueProviderCode, (string?)null)
+                .SetProperty(c => c.IssueRepairRef, (string?)null)
+                .SetProperty(c => c.IssueInformational, false)
                 .SetProperty(c => c.ConsecutiveFailures, 0), ct);
             return;
         }
@@ -56,7 +59,11 @@ internal sealed class EfProviderConnectionStore(FlowLedgerDbContext db, ITenantC
             .SetProperty(c => c.IssueRequiresUserAction, issue.RequiresUserAction)
             .SetProperty(c => c.IssueRetryAfter, issue.RetryAfter)
             .SetProperty(c => c.IssueAt, issue.At)
-            .SetProperty(c => c.ConsecutiveFailures, c => c.ConsecutiveFailures + 1), ct);
+            .SetProperty(c => c.IssueProviderCode, issue.ProviderCode)
+            .SetProperty(c => c.IssueRepairRef, issue.RepairRef)
+            .SetProperty(c => c.IssueInformational, issue.Informational)
+            // An informational issue (reads still succeed) is not a failed attempt, so it never advances the give-up counter.
+            .SetProperty(c => c.ConsecutiveFailures, c => issue.Informational ? 0 : c.ConsecutiveFailures + 1), ct);
     }
 
     public async Task SaveAsync(string providerName, string memberProviderId, string institution, string status, CancellationToken ct = default)
