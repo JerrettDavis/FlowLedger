@@ -117,8 +117,17 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             new CreateTransactionRequest(account, 50m, "USD", "Debit", $"{Secret} Coffee", new DateOnly(2026, 1, 15), null, null, null, null));
         var integrationResponse = await a.PostAsJsonAsync("/api/integrations", new
         {
-            name = $"{Secret} Hook", kind = "Rest", enabled = true, url = "https://nonexistent.invalid/v1", auth = "None",
-            authUser = (string?)null, credential = (string?)null, clearCredential = false, headers = (object?)null, events = (string[]?)null, soapEndpoint = (string?)null,
+            name = $"{Secret} Hook",
+            kind = "Rest",
+            enabled = true,
+            url = "https://nonexistent.invalid/v1",
+            auth = "None",
+            authUser = (string?)null,
+            credential = (string?)null,
+            clearCredential = false,
+            headers = (object?)null,
+            events = (string[]?)null,
+            soapEndpoint = (string?)null,
         });
         integrationResponse.IsSuccessStatusCode.Should().BeTrue("seeding the integration failed");
         var integration = JsonDocument.Parse(await integrationResponse.Content.ReadAsStringAsync()).RootElement.GetProperty("integration").GetProperty("id").GetGuid();
