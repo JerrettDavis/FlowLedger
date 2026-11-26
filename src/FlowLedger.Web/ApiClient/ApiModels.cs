@@ -161,32 +161,8 @@ public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 // Query & reports -------------------------------------------------------------
 
-public sealed record QueryColumnDto(string Name, string Type);
-
-public sealed record QueryResultDto(List<QueryColumnDto> Columns, List<List<System.Text.Json.JsonElement>> Rows, bool Truncated, long ElapsedMs);
-
-public sealed record VizSpecDto(string Kind, string? X = null, List<string>? Y = null, string? SeriesBy = null, bool Stacked = false);
-
-public sealed record ReportPanelDto(string Title, string Query, VizSpecDto Viz);
-
-public sealed record SavedReportDto(
-    string Id, string Name, string? Description, string Kind, bool IsPreset,
-    List<ReportPanelDto> Panels, DateTimeOffset? CreatedAt, DateTimeOffset? UpdatedAt);
-
-public sealed record SaveReportRequest(string Name, string? Description, string Kind, List<ReportPanelDto> Panels);
-
-public sealed record PanelResultDto(string Title, string Query, VizSpecDto Viz, QueryResultDto? Result, string? Error);
-
-public sealed record RunReportResultDto(string Id, string Name, string? Description, string Kind, List<PanelResultDto> Panels);
-
-public sealed record DatasetColumnInfoDto(string Name, string Type, string Description);
-
-public sealed record DatasetInfoDto(string Name, string Description, List<DatasetColumnInfoDto> Columns);
-
-public sealed record QuerySchemaDto(List<DatasetInfoDto> Datasets, List<string> Functions, List<string> Aggregates, List<string> Operators);
-
 /// <summary>Outcome of running a query: a result, or a user-readable error with its character offset.</summary>
-public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int Position);
+public sealed record QueryRunOutcome(QueryResult? Result, string? Error, int Position);
 
 // Bill sheet (spreadsheet mode) ------------------------------------------------
 

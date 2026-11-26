@@ -50,8 +50,8 @@
 </div>
 
 @code {
-    [Parameter] public QueryResultDto? Result { get; set; }
-    [Parameter] public VizSpecDto Viz { get; set; } = new("table");
+    [Parameter] public QueryResult? Result { get; set; }
+    [Parameter] public VizSpec Viz { get; set; } = new("table");
 
     private ChartModel _model = new([], [], false, null);
     private bool _showTable;

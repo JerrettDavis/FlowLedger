@@ -6,10 +6,6 @@ using FlowLedger.Application.Features.Transactions;
 
 namespace FlowLedger.Application.Features.Query;
 
-public sealed record DatasetColumnInfo(string Name, string Type, string Description);
-
-public sealed record DatasetInfo(string Name, string Description, IReadOnlyList<DatasetColumnInfo> Columns);
-
 /// <summary>Static description of the datasets the query language exposes (also drives editor autocomplete).</summary>
 public static class QueryCatalog
 {
