@@ -76,6 +76,7 @@ internal static class QuilttEndpoints
                 IConnectorRegistry connectors,
                 IRawPayloadArchive archive,
                 ISchedulerFactory schedulerFactory,
+                IWebhookTenantResolver tenantResolver,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
@@ -131,8 +132,16 @@ internal static class QuilttEndpoints
                     return Results.Accepted(value: new { ignored = evt.EventType });
                 }
 
+                // The Quiltt profile id maps to exactly one tenant; unknown profiles are acknowledged and ignored (#150).
+                var owner = await tenantResolver.ResolveAsync(QuilttFinancialDataProvider.Name, evt.MemberId, ct);
+                if (owner is null)
+                {
+                    return Results.Accepted(value: new { ignored = "unknown profile", profileId = evt.MemberId });
+                }
+
                 var jobData = new JobDataMap
                 {
+                    [OnDemandSyncJob.TenantIdKey] = owner.Value.ToString(),
                     [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
                     [OnDemandSyncJob.EventTypeKey] = evt.EventType,
                 };

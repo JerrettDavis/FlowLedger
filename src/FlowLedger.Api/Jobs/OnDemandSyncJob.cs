@@ -28,6 +28,9 @@ public sealed class OnDemandSyncJob : IJob
     /// <summary>JobDataMap key carrying the MX member id that triggered the webhook.</summary>
     public const string MemberIdKey = "memberId";
 
+    /// <summary>JobDataMap key carrying the owning tenant id resolved by the webhook endpoint (#150). Required.</summary>
+    public const string TenantIdKey = "tenantId";
+
     /// <summary>JobDataMap key carrying the MX webhook event type (e.g. "MEMBER_STATUS_UPDATED").</summary>
     public const string EventTypeKey = "eventType";
 
@@ -50,7 +53,16 @@ public sealed class OnDemandSyncJob : IJob
             "OnDemandSyncJob: starting webhook-triggered sync (memberId={MemberId}, eventType={EventType}).",
             memberId, eventType);
 
+        // The webhook endpoint resolved the owning tenant from the verified member id. Never fall back to the
+        // household tenant: without a tenant there is nothing safe to sync.
+        if (!data.ContainsKey(TenantIdKey) || !Guid.TryParse(data.GetString(TenantIdKey), out var tenantId))
+        {
+            _logger.LogWarning("OnDemandSyncJob: no tenant in the job data; refusing to sync (memberId={MemberId}).", memberId);
+            return;
+        }
+
         await using var scope = _services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<FlowLedger.Api.Tenancy.TenantOverride>().Use(tenantId);
         // ADR 0018: honour any back-off window shared with the scheduler. A webhook is itself evidence that a connection waiting
         // for the user (or given up on) may have changed, so those states get one attempt (SyncTrigger.ProviderEvent).
         var gate = scope.ServiceProvider.GetService<SyncAttemptGate>();

@@ -80,6 +80,7 @@ internal static class MxEndpoints
             IConnectorRegistry connectors,
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
+            IWebhookTenantResolver tenantResolver,
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
@@ -150,8 +151,16 @@ internal static class MxEndpoints
             // to the specific member when targeted per-member sync is supported.
             // Note: webhook-triggered syncs intentionally bypass the manual-refresh cooldown
             // (they are platform-initiated events, not user-initiated refreshes).
+            // The webhook is per member: sync the tenant that owns it, and nobody if it is unknown (#150).
+            var owner = await tenantResolver.ResolveAsync(provider.ProviderName, evt.MemberId, ct);
+            if (owner is null)
+            {
+                return Results.Accepted(value: new { ignored = "unknown member", memberId = evt.MemberId });
+            }
+
             var jobData = new JobDataMap
             {
+                [OnDemandSyncJob.TenantIdKey] = owner.Value.ToString(),
                 [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
                 [OnDemandSyncJob.EventTypeKey] = evt.EventType,
             };
