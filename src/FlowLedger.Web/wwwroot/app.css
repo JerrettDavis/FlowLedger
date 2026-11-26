@@ -1,3 +1,10 @@
+/* Pre-paint dark background: the head script sets data-theme before MudBlazor's theme variables exist. */
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+    background-color: #0F172A;
+    color: #F1F5F9;
+}
+
 /* Inter (variable) is self-hosted; see wwwroot/fonts/Inter-LICENSE.txt (SIL OFL 1.1). */
 @font-face {
     font-family: "Inter";

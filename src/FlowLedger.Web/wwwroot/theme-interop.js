@@ -32,6 +32,15 @@ window.FlowLedgerTheme = {
     },
 
     /**
+     * Keeps the <html data-theme> attribute (set pre-paint by the head script) in step with the live theme.
+     */
+    applyScheme: function (isDark) {
+        var root = document.documentElement;
+        root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        root.style.colorScheme = isDark ? 'dark' : 'light';
+    },
+
+    /**
      * Removes the explicit preference so the system preference takes over.
      * Never throws.
      */
