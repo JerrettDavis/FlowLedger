@@ -15,7 +15,8 @@ public sealed record AccountDto(
     DateTimeOffset? LastBalanceConfirmedAt,
     bool TypeLockedByUser = false,
     string Mode = "Standard",
-    bool HideTransactions = false);
+    bool HideTransactions = false,
+    uint Version = 0);
 
 public sealed record AccountSettingsRequest(bool IsActive, string Mode, bool HideTransactions);
 

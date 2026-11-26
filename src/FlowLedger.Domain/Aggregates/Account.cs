@@ -41,6 +41,12 @@ public sealed class Account : AggregateRoot
     /// <summary>True once the user set the type by hand; provider sync must then leave the type alone.</summary>
     public bool TypeLockedByUser { get; private set; }
 
+    /// <summary>
+    /// Optimistic-concurrency token (Postgres <c>xmin</c>, maintained by the database, no schema column). An update made against
+    /// a stale copy of the row fails instead of silently overwriting a newer edit or sync write (#157).
+    /// </summary>
+    public uint RowVersion { get; private set; }
+
     private Account()
     {
         // EF Core constructor — not for direct use. Fields initialised by EF.

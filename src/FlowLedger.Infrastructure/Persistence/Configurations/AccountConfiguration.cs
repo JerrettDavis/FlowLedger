@@ -107,6 +107,13 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasColumnName("type_locked_by_user")
             .IsRequired();
 
+        // Optimistic concurrency (#157): Postgres' own xmin system column, so no schema change is needed.
+        builder.Property(a => a.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         // Indexes per PLAN §23
         builder.HasIndex("TenantId").HasDatabaseName("ix_accounts_tenant_id");
     }

@@ -282,19 +282,24 @@
         {
             try
             {
+                // Each write sends the version the user last saw (If-Match); a 409 means the account changed elsewhere.
+                // Every write bumps the version, so chain the one each response returns into the next call.
+                uint? version = account.Version == 0 ? null : account.Version;
                 if (edit.NewName is not null)
                 {
-                    await ApiClient.UpdateAccountAsync(account.Id, new FlowLedger.Web.ApiClient.UpdateAccountRequest(edit.NewName));
+                    var updated = await ApiClient.UpdateAccountAsync(account.Id, new FlowLedger.Web.ApiClient.UpdateAccountRequest(edit.NewName), version);
+                    version = updated?.Version ?? version;
                 }
 
                 if (edit.NewType is not null)
                 {
-                    await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Web.ApiClient.ChangeAccountTypeRequest(edit.NewType));
+                    var updated = await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Web.ApiClient.ChangeAccountTypeRequest(edit.NewType), version);
+                    version = updated?.Version ?? version;
                 }
 
                 if (edit.Settings is not null)
                 {
-                    await ApiClient.UpdateAccountSettingsAsync(account.Id, edit.Settings);
+                    await ApiClient.UpdateAccountSettingsAsync(account.Id, edit.Settings, version);
                 }
 
                 Snackbar.Add(edit.NewType is not null ? "Account updated - type pinned" : "Account updated", Severity.Success);

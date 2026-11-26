@@ -29,6 +29,43 @@ public sealed class FlowLedgerApiClientTests
         return new FlowLedgerApiClient(http, logger);
     }
 
+    // ── Account updates: optimistic concurrency (#157) ────────────────────────
+
+    [Fact]
+    public async Task UpdateAccountAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
+
+        var act = () => client.UpdateAccountAsync(Guid.NewGuid(), new UpdateAccountRequest("New"), expectedVersion: 7);
+
+        var thrown = (await act.Should().ThrowAsync<ApiClientException>()).Which;
+        thrown.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        FlowLedger.Web.Shared.SnackbarExtensions.ProblemText(thrown).Should().Contain("changed elsewhere").And.Contain("Reload");
+    }
+
+    [Fact]
+    public async Task UpdateAccountAsync_SendsTheVersionAsIfMatch()
+    {
+        string? sent = null;
+        var handler = new CapturingHandler(r => sent = r.Headers.TryGetValues("If-Match", out var v) ? v.Single() : null);
+        var client = new FlowLedgerApiClient(
+            new HttpClient(handler) { BaseAddress = new Uri("http://localhost") },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
+
+        await client.UpdateAccountAsync(Guid.NewGuid(), new UpdateAccountRequest("New"), expectedVersion: 42);
+
+        sent.Should().Be("\"42\"");
+    }
+
+    private sealed class CapturingHandler(Action<HttpRequestMessage> capture) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            capture(request);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
     // ── Account connector calls: failures surface, bodies are not echoed ──────
 
     [Fact]
