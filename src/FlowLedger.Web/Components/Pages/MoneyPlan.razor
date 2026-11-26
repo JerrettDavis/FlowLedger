@@ -54,7 +54,7 @@
 {
     <EmptyState Icon="@Icons.Material.Outlined.TableChart"
                 Title="No plan data yet"
-                Description="Use Connect &amp; Sync to load demo data, then refresh." />
+                Description="@OnboardingCopy.LoadData(Status?.Environment, "then refresh")" />
 }
 
 <MudDataGrid T="MoneyPlanRow"
@@ -120,6 +120,9 @@
 </MudDataGrid>
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private int _horizonMonths = 3;

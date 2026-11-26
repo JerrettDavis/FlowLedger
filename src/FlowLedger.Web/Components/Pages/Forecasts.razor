@@ -284,10 +284,13 @@ else
 {
     <EmptyState Icon="@Icons.Material.Outlined.TrendingUp"
                 Title="No forecast yet"
-                Description="Click &quot;Connect &amp; Sync&quot; to load demo data, then run a forecast." />
+                Description="@OnboardingCopy.LoadData(Status?.Environment, "then run a forecast")" />
 }
 
 @code {
+    /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
+    [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private int _horizonMonths = 3;
