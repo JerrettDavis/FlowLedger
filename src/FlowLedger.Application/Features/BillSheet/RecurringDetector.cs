@@ -5,7 +5,7 @@ using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.BillSheet;
 
 /// <summary>A monthly-repeating expense found in the transactions, ready to become a sheet row.</summary>
-public sealed record DetectedBill(string Name, string MatchText, int? DueDay, decimal Estimated, decimal Actual);
+internal sealed record DetectedBill(string Name, string MatchText, int? DueDay, decimal Estimated, decimal Actual);
 
 /// <summary>
 /// Pure detector: finds merchants that charge roughly once a month. A merchant qualifies when it
@@ -13,7 +13,7 @@ public sealed record DetectedBill(string Name, string MatchText, int? DueDay, de
 /// and either the amount or the day of month is consistent (utilities vary in amount, not in day).
 /// Frequent-purchase merchants (groceries, fuel, cafes) fail the per-month or consistency rules.
 /// </summary>
-public static class RecurringDetector
+internal static class RecurringDetector
 {
     public const int MinMonths = 3;
     private const decimal AmountTolerance = 0.35m;

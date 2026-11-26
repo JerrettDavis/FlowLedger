@@ -17,7 +17,7 @@ public sealed record AskQueryRequest(string Question);
 public sealed record AskQueryResult(string Question, string? Query, string? Error, int Attempts, string? Note = null);
 
 /// <summary>Builds the model prompt and cleans the model's reply. Pure, so it is unit-tested without a model.</summary>
-public static class QueryPrompt
+internal static class QueryPrompt
 {
     public const string DataBlockStart = "<<<FLOWLEDGER_DATA";
     public const string DataBlockEnd = "FLOWLEDGER_DATA>>>";

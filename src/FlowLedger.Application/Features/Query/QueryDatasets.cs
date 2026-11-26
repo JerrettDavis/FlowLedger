@@ -11,7 +11,7 @@ public sealed record DatasetColumnInfo(string Name, string Type, string Descript
 public sealed record DatasetInfo(string Name, string Description, IReadOnlyList<DatasetColumnInfo> Columns);
 
 /// <summary>Static description of the datasets the query language exposes (also drives editor autocomplete).</summary>
-public static class QueryCatalog
+internal static class QueryCatalog
 {
     public static IReadOnlyList<DatasetInfo> Datasets { get; } =
     [

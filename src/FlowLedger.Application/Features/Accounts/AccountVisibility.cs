@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Accounts;
 /// Disabled accounts are always out. Hidden accounts (holdings or "hide transactions") are out unless the caller names them.
 /// Consumers filter AFTER transfer detection so a transfer into a hidden account still pairs and is not counted as spending.
 /// </summary>
-public static class AccountVisibility
+internal static class AccountVisibility
 {
     public static async Task<HashSet<Guid>> ExcludedIdsAsync(
         IAccountRepository accounts, IReadOnlySet<Guid>? explicitlySelected = null, CancellationToken ct = default)

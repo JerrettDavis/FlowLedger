@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Transactions;
 /// Deterministic, side-effect-free tag rules for newly ingested transactions. Tags are lower-case kebab labels.
 /// Only tags in <see cref="Vocabulary"/> are ever managed automatically; anything else a user adds is left alone.
 /// </summary>
-public static class AutoTagger
+internal static class AutoTagger
 {
     public const decimal LargeThreshold = 500m;
 

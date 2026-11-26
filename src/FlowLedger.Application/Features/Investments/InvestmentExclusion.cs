@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.Investments;
 /// Investments are assets (they count toward net worth), not bills or income. Their contributions, trades and dividends
 /// must stay out of recurring flows and the bill sheet.
 /// </summary>
-public static class InvestmentExclusion
+internal static class InvestmentExclusion
 {
     /// <summary>True for the top-level "Investments" / "Investment" category and anything beneath it.</summary>
     public static bool IsInvestmentCategory(string? path)

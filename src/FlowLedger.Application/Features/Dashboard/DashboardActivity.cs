@@ -16,7 +16,7 @@ public interface ISuspiciousDismissalStore
 /// Pure heuristics that turn raw transactions into dashboard insights. No I/O so it is trivially testable.
 /// "Suspicious" means "worth a second look", not proven fraud.
 /// </summary>
-public static class DashboardActivityAnalyzer
+internal static class DashboardActivityAnalyzer
 {
     public const int WindowDays = 30;
     public const int HistoryDays = 90;

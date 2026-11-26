@@ -1,0 +1,308 @@
+enum FlowLedger.Application.Abstractions.EmbedKind
+enum FlowLedger.Application.Features.BillSheet.SheetPaymentSource
+enum FlowLedger.Application.Features.Forecasting.ForecastItemSource
+enum FlowLedger.Application.Features.HomeAssistant.HomeAssistantWebhookUrl+NetworkKind
+enum FlowLedger.Application.Features.Insights.BreakdownGroupBy
+enum FlowLedger.Application.Features.Integrations.IntegrationAuth
+enum FlowLedger.Application.Features.Integrations.IntegrationKind
+enum FlowLedger.Application.Features.Strategies.PickSource
+enum FlowLedger.Application.Features.Strategies.SuggestionKind
+enum FlowLedger.Application.Features.Strategies.SuggestionSeverity
+enum FlowLedger.Application.Features.Users.LinkOutcome
+enum FlowLedger.Application.Features.Users.TenantStatus
+interface FlowLedger.Application.Abstractions.IAccountConnectorLinkStore
+interface FlowLedger.Application.Abstractions.IAccountRepository
+interface FlowLedger.Application.Abstractions.IAssetRepository
+interface FlowLedger.Application.Abstractions.IAssetValuationFeed
+interface FlowLedger.Application.Abstractions.IBalanceHistoryReader
+interface FlowLedger.Application.Abstractions.IBillSheetStore
+interface FlowLedger.Application.Abstractions.ICategoryRepository
+interface FlowLedger.Application.Abstractions.IConnectorStatusReader
+interface FlowLedger.Application.Abstractions.IDomainEventDispatcher
+interface FlowLedger.Application.Abstractions.IDomainEventHandler`1
+interface FlowLedger.Application.Abstractions.IFinancialSyncService
+interface FlowLedger.Application.Abstractions.ILocalAiModels
+interface FlowLedger.Application.Abstractions.ILocalAiRuntime
+interface FlowLedger.Application.Abstractions.ILocalLlm
+interface FlowLedger.Application.Abstractions.IPlannedOccurrenceRepository
+interface FlowLedger.Application.Abstractions.IProviderAccountCatalog
+interface FlowLedger.Application.Abstractions.IProviderConnectionStore
+interface FlowLedger.Application.Abstractions.IRecurringFlowRepository
+interface FlowLedger.Application.Abstractions.IReferenceValidator
+interface FlowLedger.Application.Abstractions.ISavedReportStore
+interface FlowLedger.Application.Abstractions.ISheetAutoMarker
+interface FlowLedger.Application.Abstractions.ISyncCursorStore
+interface FlowLedger.Application.Abstractions.ITextEmbedder
+interface FlowLedger.Application.Abstractions.ITransactionRepository
+interface FlowLedger.Application.Abstractions.IWebhookReplayStore
+interface FlowLedger.Application.Abstractions.IWebhookTenantResolver
+interface FlowLedger.Application.Features.Budgets.IBudgetStore
+interface FlowLedger.Application.Features.Categories.ICategorizationStore
+interface FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore
+interface FlowLedger.Application.Features.Categories.ICategoryRuleStore
+interface FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore
+interface FlowLedger.Application.Features.Duplicates.IDuplicateStore
+interface FlowLedger.Application.Features.Forecasting.IForecastEngine
+interface FlowLedger.Application.Features.Goals.IGoalStore
+interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantNetworkPolicy
+interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender
+interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore
+interface FlowLedger.Application.Features.Integrations.IIntegrationStore
+interface FlowLedger.Application.Features.Integrations.IIntegrationTransport
+interface FlowLedger.Application.Features.Query.IQueryTranslator
+interface FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore
+interface FlowLedger.Application.Features.Strategies.IAccountRateStore
+interface FlowLedger.Application.Features.Strategies.IMarketRateProvider
+interface FlowLedger.Application.Features.Transactions.IMerchantAliasStore
+interface FlowLedger.Application.Features.Users.ITenantErasure
+interface FlowLedger.Application.Features.Users.ITenantFileEraser
+interface FlowLedger.Application.Features.Users.ITenantRegistry
+interface FlowLedger.Application.Features.Users.IUserDirectory
+sealed class FlowLedger.Application.Abstractions.AccountConnectorLink
+sealed class FlowLedger.Application.Abstractions.AssetFeedQuote
+sealed class FlowLedger.Application.Abstractions.BalancePoint
+sealed class FlowLedger.Application.Abstractions.ConcurrencyConflictException
+sealed class FlowLedger.Application.Abstractions.ConnectionIssueInfo
+sealed class FlowLedger.Application.Abstractions.ConnectorUsage
+sealed class FlowLedger.Application.Abstractions.DiscoveredProviderAccount
+sealed class FlowLedger.Application.Abstractions.LocalAiDownload
+sealed class FlowLedger.Application.Abstractions.LocalAiModelInfo
+sealed class FlowLedger.Application.Abstractions.LocalAiRuntimeStatus
+sealed class FlowLedger.Application.Abstractions.LocalLlmState
+sealed class FlowLedger.Application.Abstractions.PlannedFlowOccurrenceView
+sealed class FlowLedger.Application.Abstractions.ProviderConnectionInfo
+sealed class FlowLedger.Application.Abstractions.ReferencedEntityNotFoundException
+sealed class FlowLedger.Application.Abstractions.SyncAlreadyRunningException
+sealed class FlowLedger.Application.Abstractions.SyncThrottledException
+sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeHandler
+sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeRequestValidator
+sealed class FlowLedger.Application.Features.Accounts.CreateAccountHandler
+sealed class FlowLedger.Application.Features.Accounts.CreateAccountRequestValidator
+sealed class FlowLedger.Application.Features.Accounts.DeactivateAccountHandler
+sealed class FlowLedger.Application.Features.Accounts.GetAccountHandler
+sealed class FlowLedger.Application.Features.Accounts.ListAccountsHandler
+sealed class FlowLedger.Application.Features.Accounts.UpdateAccountHandler
+sealed class FlowLedger.Application.Features.Accounts.UpdateAccountRequestValidator
+sealed class FlowLedger.Application.Features.Accounts.UpdateAccountSettingsHandler
+sealed class FlowLedger.Application.Features.Alerts.Alert
+sealed class FlowLedger.Application.Features.Alerts.GetAlertsHandler
+sealed class FlowLedger.Application.Features.Assets.AssetOperationException
+sealed class FlowLedger.Application.Features.Assets.AssetValuationSettings
+sealed class FlowLedger.Application.Features.Assets.CreateAssetHandler
+sealed class FlowLedger.Application.Features.Assets.CreateAssetRequestValidator
+sealed class FlowLedger.Application.Features.Assets.DeactivateAssetHandler
+sealed class FlowLedger.Application.Features.Assets.GetAssetHandler
+sealed class FlowLedger.Application.Features.Assets.GetAssetSummaryHandler
+sealed class FlowLedger.Application.Features.Assets.ListAssetsHandler
+sealed class FlowLedger.Application.Features.Assets.RecordAssetValuationHandler
+sealed class FlowLedger.Application.Features.Assets.RecordValuationRequestValidator
+sealed class FlowLedger.Application.Features.Assets.RefreshAssetValuationHandler
+sealed class FlowLedger.Application.Features.Assets.UpdateAssetHandler
+sealed class FlowLedger.Application.Features.Assets.UpdateAssetRequestValidator
+sealed class FlowLedger.Application.Features.BillSheet.BillSheetService
+sealed class FlowLedger.Application.Features.BillSheet.SheetBillData
+sealed class FlowLedger.Application.Features.BillSheet.SheetOperationException
+sealed class FlowLedger.Application.Features.BillSheet.SheetPaymentData
+sealed class FlowLedger.Application.Features.Budgets.BudgetOverview
+sealed class FlowLedger.Application.Features.Budgets.BudgetRow
+sealed class FlowLedger.Application.Features.Budgets.BudgetStatus
+sealed class FlowLedger.Application.Features.Budgets.GetMonthlySpendByCategoryHandler
+sealed class FlowLedger.Application.Features.Budgets.ListBudgetsHandler
+sealed class FlowLedger.Application.Features.Budgets.SetBudgetRequest
+sealed class FlowLedger.Application.Features.Budgets.SetBudgetRequestValidator
+sealed class FlowLedger.Application.Features.Categories.CategorizationOptions
+sealed class FlowLedger.Application.Features.Categories.CategorizationResult
+sealed class FlowLedger.Application.Features.Categories.CategorizationService
+sealed class FlowLedger.Application.Features.Categories.CategoryMerge
+sealed class FlowLedger.Application.Features.Categories.CategoryMove
+sealed class FlowLedger.Application.Features.Categories.CategoryRestructurePlan
+sealed class FlowLedger.Application.Features.Categories.CategoryRestructureResult
+sealed class FlowLedger.Application.Features.Categories.CategoryRestructureService
+sealed class FlowLedger.Application.Features.Categories.CategoryRuleService
+sealed class FlowLedger.Application.Features.Categories.CreateCategoryHandler
+sealed class FlowLedger.Application.Features.Categories.CreateCategoryRequestValidator
+sealed class FlowLedger.Application.Features.Categories.DeleteCategoryHandler
+sealed class FlowLedger.Application.Features.Categories.GetCategoryHandler
+sealed class FlowLedger.Application.Features.Categories.ListCategoriesHandler
+sealed class FlowLedger.Application.Features.Categories.RestoreDefaultCategoriesHandler
+sealed class FlowLedger.Application.Features.Categories.UpdateCategoryHandler
+sealed class FlowLedger.Application.Features.Categories.UpdateCategoryRequestValidator
+sealed class FlowLedger.Application.Features.Dashboard.DismissSuspiciousHandler
+sealed class FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler
+sealed class FlowLedger.Application.Features.Debt.DebtInput
+sealed class FlowLedger.Application.Features.Debt.DebtPayoffResult
+sealed class FlowLedger.Application.Features.Debt.PayoffPlan
+sealed class FlowLedger.Application.Features.Duplicates.AutoMergeResult
+sealed class FlowLedger.Application.Features.Duplicates.DuplicateOptions
+sealed class FlowLedger.Application.Features.Duplicates.DuplicateScanResult
+sealed class FlowLedger.Application.Features.Duplicates.DuplicateService
+sealed class FlowLedger.Application.Features.Duplicates.MergeLogEntry
+sealed class FlowLedger.Application.Features.Forecasting.AccountForecastSeries
+sealed class FlowLedger.Application.Features.Forecasting.AccountLowWaterMark
+sealed class FlowLedger.Application.Features.Forecasting.AggregateForecastPoint
+sealed class FlowLedger.Application.Features.Forecasting.AggregateLowWaterMark
+sealed class FlowLedger.Application.Features.Forecasting.ForecastBandPoint
+sealed class FlowLedger.Application.Features.Forecasting.ForecastEngine
+sealed class FlowLedger.Application.Features.Forecasting.ForecastFlowInput
+sealed class FlowLedger.Application.Features.Forecasting.ForecastInputException
+sealed class FlowLedger.Application.Features.Forecasting.ForecastLineItem
+sealed class FlowLedger.Application.Features.Forecasting.ForecastOccurrenceInput
+sealed class FlowLedger.Application.Features.Forecasting.ForecastPoint
+sealed class FlowLedger.Application.Features.Forecasting.ForecastRequest
+sealed class FlowLedger.Application.Features.Forecasting.ForecastResult
+sealed class FlowLedger.Application.Features.Forecasting.ForecastTransactionInput
+sealed class FlowLedger.Application.Features.Forecasting.GetForecastHandler
+sealed class FlowLedger.Application.Features.Forecasting.GetForecastQuery
+sealed class FlowLedger.Application.Features.Forecasting.GoalAffordabilityInput
+sealed class FlowLedger.Application.Features.Forecasting.GoalAffordabilityResult
+sealed class FlowLedger.Application.Features.Forecasting.OverdraftWarning
+sealed class FlowLedger.Application.Features.Forecasting.SpendingProfile
+sealed class FlowLedger.Application.Features.Goals.GoalRow
+sealed class FlowLedger.Application.Features.Goals.SaveGoalRequest
+sealed class FlowLedger.Application.Features.Goals.SaveGoalRequestValidator
+sealed class FlowLedger.Application.Features.HomeAssistant.HaEvent
+sealed class FlowLedger.Application.Features.HomeAssistant.HaRunResult
+sealed class FlowLedger.Application.Features.HomeAssistant.HomeAssistantService
+sealed class FlowLedger.Application.Features.HomeAssistant.HomeAssistantSettings
+sealed class FlowLedger.Application.Features.Imports.CsvColumnMapping
+sealed class FlowLedger.Application.Features.Imports.ImportFormatInfo
+sealed class FlowLedger.Application.Features.Imports.ImportHints
+sealed class FlowLedger.Application.Features.Imports.ImportTransactionsCommand
+sealed class FlowLedger.Application.Features.Imports.ImportTransactionsHandler
+sealed class FlowLedger.Application.Features.Imports.ListMatchSuggestionsHandler
+sealed class FlowLedger.Application.Features.Imports.MatchCandidate
+sealed class FlowLedger.Application.Features.Imports.MatchResultDto
+sealed class FlowLedger.Application.Features.Imports.MatchSuggestionDto
+sealed class FlowLedger.Application.Features.Imports.MatchTransactionCommand
+sealed class FlowLedger.Application.Features.Imports.MatchTransactionHandler
+sealed class FlowLedger.Application.Features.Imports.MatchingEngine
+sealed class FlowLedger.Application.Features.Imports.NormalizedImport
+sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionCommand
+sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionHandler
+sealed class FlowLedger.Application.Features.Insights.BreakdownGroup
+sealed class FlowLedger.Application.Features.Insights.BreakdownQuery
+sealed class FlowLedger.Application.Features.Insights.BreakdownResult
+sealed class FlowLedger.Application.Features.Insights.BreakdownTransaction
+sealed class FlowLedger.Application.Features.Insights.GetSpendingBreakdownHandler
+sealed class FlowLedger.Application.Features.Insights.TrendPoint
+sealed class FlowLedger.Application.Features.Integrations.Integration
+sealed class FlowLedger.Application.Features.Integrations.IntegrationCallResult
+sealed class FlowLedger.Application.Features.Integrations.IntegrationConfig
+sealed class FlowLedger.Application.Features.Integrations.IntegrationDelivery
+sealed class FlowLedger.Application.Features.Integrations.IntegrationSaveRequest
+sealed class FlowLedger.Application.Features.Integrations.IntegrationSaveResult
+sealed class FlowLedger.Application.Features.Integrations.IntegrationSecrets
+sealed class FlowLedger.Application.Features.Integrations.IntegrationService
+sealed class FlowLedger.Application.Features.Integrations.RestCallRequest
+sealed class FlowLedger.Application.Features.Integrations.SoapInvokeRequest
+sealed class FlowLedger.Application.Features.Integrations.SoapOperationsResult
+sealed class FlowLedger.Application.Features.Integrations.TransportRequest
+sealed class FlowLedger.Application.Features.Integrations.TransportResponse
+sealed class FlowLedger.Application.Features.Integrations.WsdlOperation
+sealed class FlowLedger.Application.Features.Investments.AccountPerformance
+sealed class FlowLedger.Application.Features.Investments.InvestmentPerformanceService
+sealed class FlowLedger.Application.Features.Investments.PeriodPerformance
+sealed class FlowLedger.Application.Features.LocalAi.CachingTextEmbedder
+sealed class FlowLedger.Application.Features.LocalAi.EvalMethod
+sealed class FlowLedger.Application.Features.LocalAi.EvalPoint
+sealed class FlowLedger.Application.Features.LocalAi.EvaluationResult
+sealed class FlowLedger.Application.Features.LocalAi.HashingTextEmbedder
+sealed class FlowLedger.Application.Features.LocalAi.LocalAiOptions
+sealed class FlowLedger.Application.Features.LocalAi.LocalAiOptions+LlmOptions
+sealed class FlowLedger.Application.Features.LocalAi.LocalAiService
+sealed class FlowLedger.Application.Features.LocalAi.MerchantGroupsResult
+sealed class FlowLedger.Application.Features.Query.AskQueryHandler
+sealed class FlowLedger.Application.Features.Query.AskQueryRequest
+sealed class FlowLedger.Application.Features.Query.AskQueryResult
+sealed class FlowLedger.Application.Features.Query.DatasetColumnInfo
+sealed class FlowLedger.Application.Features.Query.DatasetInfo
+sealed class FlowLedger.Application.Features.Query.GetQuerySchemaHandler
+sealed class FlowLedger.Application.Features.Query.GetReportHandler
+sealed class FlowLedger.Application.Features.Query.ListReportsHandler
+sealed class FlowLedger.Application.Features.Query.PanelResultDto
+sealed class FlowLedger.Application.Features.Query.QueryColumn
+sealed class FlowLedger.Application.Features.Query.QueryDatasetProvider
+sealed class FlowLedger.Application.Features.Query.QueryException
+sealed class FlowLedger.Application.Features.Query.QueryResult
+sealed class FlowLedger.Application.Features.Query.QuerySchemaDto
+sealed class FlowLedger.Application.Features.Query.QueryTable
+sealed class FlowLedger.Application.Features.Query.ReportPanel
+sealed class FlowLedger.Application.Features.Query.RunQueryHandler
+sealed class FlowLedger.Application.Features.Query.RunQueryRequest
+sealed class FlowLedger.Application.Features.Query.RunReportHandler
+sealed class FlowLedger.Application.Features.Query.RunReportResultDto
+sealed class FlowLedger.Application.Features.Query.SaveReportHandler
+sealed class FlowLedger.Application.Features.Query.SaveReportRequest
+sealed class FlowLedger.Application.Features.Query.SaveReportRequestValidator
+sealed class FlowLedger.Application.Features.Query.SavedReportDto
+sealed class FlowLedger.Application.Features.Query.VizSpec
+sealed class FlowLedger.Application.Features.RecurringFlows.AutoAddResult
+sealed class FlowLedger.Application.Features.RecurringFlows.CreateRecurringFlowHandler
+sealed class FlowLedger.Application.Features.RecurringFlows.CreateRecurringFlowRequestValidator
+sealed class FlowLedger.Application.Features.RecurringFlows.DeactivateRecurringFlowHandler
+sealed class FlowLedger.Application.Features.RecurringFlows.DetectedFlow
+sealed class FlowLedger.Application.Features.RecurringFlows.GetRecurringFlowHandler
+sealed class FlowLedger.Application.Features.RecurringFlows.ListRecurringFlowsHandler
+sealed class FlowLedger.Application.Features.RecurringFlows.RecurringSuggestionService
+sealed class FlowLedger.Application.Features.RecurringFlows.UpdateRecurringFlowHandler
+sealed class FlowLedger.Application.Features.RecurringFlows.UpdateRecurringFlowRequestValidator
+sealed class FlowLedger.Application.Features.Strategies.AccountRate
+sealed class FlowLedger.Application.Features.Strategies.CashTrajectory
+sealed class FlowLedger.Application.Features.Strategies.CoachPlan
+sealed class FlowLedger.Application.Features.Strategies.FireResult
+sealed class FlowLedger.Application.Features.Strategies.GoalLever
+sealed class FlowLedger.Application.Features.Strategies.GoalPlan
+sealed class FlowLedger.Application.Features.Strategies.GoalRequest
+sealed class FlowLedger.Application.Features.Strategies.GrowthComparison
+sealed class FlowLedger.Application.Features.Strategies.GrowthPoint
+sealed class FlowLedger.Application.Features.Strategies.LadderPlan
+sealed class FlowLedger.Application.Features.Strategies.LadderRung
+sealed class FlowLedger.Application.Features.Strategies.MarketRates
+sealed class FlowLedger.Application.Features.Strategies.PastPoint
+sealed class FlowLedger.Application.Features.Strategies.PastWhatIfRequest
+sealed class FlowLedger.Application.Features.Strategies.PastWhatIfResult
+sealed class FlowLedger.Application.Features.Strategies.RefinanceResult
+sealed class FlowLedger.Application.Features.Strategies.StrategyReport
+sealed class FlowLedger.Application.Features.Strategies.StrategyService
+sealed class FlowLedger.Application.Features.Strategies.Suggestion
+sealed class FlowLedger.Application.Features.Strategies.TrajectoryPoint
+sealed class FlowLedger.Application.Features.Transactions.CreateTransactionHandler
+sealed class FlowLedger.Application.Features.Transactions.CreateTransactionRequestValidator
+sealed class FlowLedger.Application.Features.Transactions.EnrichmentResult
+sealed class FlowLedger.Application.Features.Transactions.GetTransactionHandler
+sealed class FlowLedger.Application.Features.Transactions.ListTransactionsHandler
+sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQuery
+sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQueryValidator
+sealed class FlowLedger.Application.Features.Transactions.MerchantAliasDto
+sealed class FlowLedger.Application.Features.Transactions.MerchantAliasService
+sealed class FlowLedger.Application.Features.Transactions.SplitInput
+sealed class FlowLedger.Application.Features.Transactions.TransactionAnnotationService
+sealed class FlowLedger.Application.Features.Transactions.TransactionEnrichmentService
+sealed class FlowLedger.Application.Features.Transactions.TransactionQuotaExceededException
+sealed class FlowLedger.Application.Features.Users.ExternalIdentity
+sealed class FlowLedger.Application.Features.Users.LegacyTenantClaim
+sealed class FlowLedger.Application.Features.Users.LinkCode
+sealed class FlowLedger.Application.Features.Users.LinkedIdentity
+sealed class FlowLedger.Application.Features.Users.ResolvedUser
+sealed class FlowLedger.Application.Features.Users.TenantErasureRefusedException
+sealed class FlowLedger.Application.Features.Users.TenantErasureResult
+sealed class FlowLedger.Application.Features.Users.TenantInfo
+static class FlowLedger.Application.Abstractions.AccountConnectorLinks
+static class FlowLedger.Application.DependencyInjection
+static class FlowLedger.Application.Features.Assets.AssetCategoryTemplates
+static class FlowLedger.Application.Features.Budgets.MonthlySpend
+static class FlowLedger.Application.Features.Debt.DebtPayoffPlanner
+static class FlowLedger.Application.Features.Goals.GoalMath
+static class FlowLedger.Application.Features.HomeAssistant.HaEventKinds
+static class FlowLedger.Application.Features.HomeAssistant.HomeAssistantWebhookUrl
+static class FlowLedger.Application.Features.Imports.CsvParser
+static class FlowLedger.Application.Features.Imports.ImportNormalizer
+static class FlowLedger.Application.Features.Integrations.IntegrationEvents
+static class FlowLedger.Application.Features.LocalAi.VectorMath
+static class FlowLedger.Application.Features.Strategies.AccountRateRules
+static class FlowLedger.Application.Features.Strategies.FirePlanner
+static class FlowLedger.Application.Features.Strategies.LadderPlanner
+static class FlowLedger.Application.Features.Strategies.Simulators
+static class FlowLedger.Application.Features.Transactions.TransactionCsv
+static class FlowLedger.Application.Features.Transactions.TransactionQuota
+static class FlowLedger.Application.Features.Transactions.TransferDetector
