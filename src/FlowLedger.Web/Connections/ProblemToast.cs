@@ -27,7 +27,7 @@ public static class ProblemToast
                 return new(message, Severity.Info, false);
 
             default:
-                return new($"{action} failed: {ex.Message}", Severity.Error, false);
+                return new($"{action} failed: {FlowLedger.Web.Shared.SnackbarExtensions.ProblemText(ex)}", Severity.Error, false);
         }
     }
 }
