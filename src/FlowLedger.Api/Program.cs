@@ -148,25 +148,17 @@ if (!app.Environment.IsDevelopment())
 {
     var apiOptions = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
 
-    if (string.IsNullOrWhiteSpace(apiOptions.Key))
+    // Strength (>= 32 chars, no well-known placeholder) for Api:Key and, during rotation, Api:PreviousKey.
+    if (ApiKeyPolicy.ValidateOptions(apiOptions) is { } keyError)
     {
         throw new InvalidOperationException(
-            "Api:Key must be set to a non-empty value outside Development. " +
-            "Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
+            keyError + " Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
     }
 
     if (ConfigGuards.LooksLikePlaceholder(apiOptions.Key))
     {
         throw new InvalidOperationException(
             "Api:Key still contains a template placeholder (e.g. from .env.example). Generate a strong random key (`openssl rand -hex 32`).");
-    }
-
-    const string devDefault = "dev-local-key-not-for-production";
-    if (apiOptions.Key.Equals(devDefault, StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException(
-            "Api:Key is the development default in a non-Development environment. " +
-            "Generate a strong random key (e.g. `openssl rand -hex 32`) and set Api__Key.");
     }
 }
 

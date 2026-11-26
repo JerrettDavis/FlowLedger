@@ -71,7 +71,7 @@ produces zero failures rather than errors when the stack is not up.
 |----------|----------|---------|-------------|
 | `E2E_BASE_URL` | Yes | _(none)_ | Base URL of the Web UI that Playwright navigates. Example: `http://localhost:5002`. When unset, all E2E tests are skipped cleanly — no browser is launched. |
 | `E2E_API_URL` | No | `http://localhost:5001` | Base URL of the API service. Used by `AccountsDataTests` and `ScreenshotCaptureTests` to POST `/api/connect` and `/api/sync` for data seeding before assertions. |
-| `E2E_API_KEY` | No | `dev-local-key-not-for-production` | API key sent as `X-Api-Key` in seeding requests. Must match `Api__Key` on the running API service. In CI this is `ci-test-api-key-not-for-production`, matching the `API__KEY` value passed to `docker compose`. |
+| `E2E_API_KEY` | No | `dev-local-key-not-for-production` | API key sent as `X-Api-Key` in seeding requests. Must match `Api__Key` on the running API service. In CI this is `ci-integration-key-not-for-production-0123456789`, matching the `API__KEY` value passed to `docker compose`. |
 | `E2E_TENANT_ID` | No | `00000000-0000-0000-0000-000000000001` | Tenant ID sent as `X-Tenant-Id` in seeding requests. Must match `Api__TenantId` on the running API service. |
 
 All four variables are supplied explicitly in CI so the seeding requests use the same
@@ -89,7 +89,7 @@ The E2E workflow runs on every push and pull request to `main`/`master`:
    docker compose --profile full up --build -d
    ```
    The workflow provides `POSTGRES_PASSWORD=ci_test_password` and
-   `API__KEY=ci-test-api-key-not-for-production` directly to the compose call.
+   `API__KEY=ci-integration-key-not-for-production-0123456789` directly to the compose call.
 4. Polls `http://localhost:5001/alive` (up to 120 s) and `http://localhost:5002/` (up to
    90 s) until both services are healthy.
 5. Installs Chromium via the Playwright install script bundled with the test output.
@@ -103,7 +103,7 @@ The E2E workflow runs on every push and pull request to `main`/`master`:
    with the following env vars set for the test runner:
    - `E2E_BASE_URL=http://localhost:5002`
    - `E2E_API_URL=http://localhost:5001`
-   - `E2E_API_KEY=ci-test-api-key-not-for-production` (matches `API__KEY` supplied to compose)
+   - `E2E_API_KEY=ci-integration-key-not-for-production-0123456789` (matches `API__KEY` supplied to compose)
    - `E2E_TENANT_ID=00000000-0000-0000-0000-000000000001` (matches `Api__TenantId` in compose)
 7. Publishes a `.trx` test report via `dorny/test-reporter`.
 8. On failure: uploads Playwright traces and screenshots, and dumps the last 100 compose
