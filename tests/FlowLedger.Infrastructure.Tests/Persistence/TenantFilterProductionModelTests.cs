@@ -3,6 +3,7 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Application.Abstractions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -76,6 +77,22 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
                 .ToList();
             Assert.True(unfiltered.Count == 0, $"Entity types without a tenant query filter: {string.Join(", ", unfiltered)}");
         }
+    }
+
+    [DockerFact]
+    public async Task WriteGuard_rejects_cross_tenant_writes_for_every_tenant_owned_type_not_just_aggregates()
+    {
+        // #172: the guard used to cover 5 aggregate types only; ad-hoc records (reports, snapshots, connections...) were unchecked.
+        var a = TestTenantContext.New();
+        var otherTenant = Guid.NewGuid();
+
+        await using var db = _fixture.CreateProductionStyleContext(a);
+        db.SavedReports.Add(FlowLedger.Infrastructure.Persistence.Entities.SavedReportRecord.Create(
+            otherTenant, "sneaky", null, "View", "[]", DateTimeOffset.UtcNow));
+
+        var act = () => db.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Cross-tenant*");
     }
 
     [Fact]
