@@ -72,18 +72,58 @@ public class ModelDownloadTests : IDisposable
         m.Download.Error.Should().Contain("larger");
     }
 
-    [Fact]
-    public async Task Redirect_to_an_unexpected_host_is_refused()
+    private static HttpResponseMessage Redirect(string location) =>
+        new(HttpStatusCode.Redirect) { Headers = { Location = new Uri(location) } };
+
+    [Theory]
+    [InlineData("http://169.254.169.254/latest/meta-data/")]
+    [InlineData("https://evil.example/model.onnx")]
+    [InlineData("https://evil.hf.co/model.onnx")] // wildcard .hf.co is no longer trusted
+    [InlineData("http://cdn-lfs.huggingface.co/model.onnx")] // allowed host but not https
+    public async Task Redirect_to_a_disallowed_target_is_refused_before_the_second_request_is_sent(string target)
     {
+        var requested = new List<Uri>();
         var (m, _) = await RunAsync(req =>
-            new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent([1, 2, 3]),
-                RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://evil.example/model.onnx"),
-            });
+        {
+            requested.Add(req.RequestUri!);
+            return Redirect(target);
+        });
 
         m.Download!.State.Should().Be("Failed");
-        m.Download.Error.Should().Contain("unexpected host");
+        m.Download.Error.Should().Contain("redirect");
+        requested.Should().HaveCount(1, "the redirect target must be validated before it is requested");
+    }
+
+    [Fact]
+    public async Task Redirect_to_an_allowed_cdn_host_is_followed_and_checksum_still_applies()
+    {
+        var size = (int)ModelCatalog.Find(ModelCatalog.MiniLm)!.Files[0].SizeBytes;
+        var requested = new List<Uri>();
+        var (m, _) = await RunAsync(req =>
+        {
+            requested.Add(req.RequestUri!);
+            return requested.Count == 1
+                ? Redirect("https://cas-bridge.xethub.hf.co/blob")
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[size]) };
+        });
+
+        requested.Should().HaveCountGreaterThan(1);
+        requested[1].Host.Should().Be("cas-bridge.xethub.hf.co");
+        m.Download!.Error.Should().Contain("Checksum");
+    }
+
+    [Fact]
+    public async Task Redirect_loops_are_capped()
+    {
+        var count = 0;
+        var (m, _) = await RunAsync(_ =>
+        {
+            count++;
+            return Redirect("https://cdn-lfs.huggingface.co/loop");
+        });
+
+        m.Download!.State.Should().Be("Failed");
+        count.Should().BeLessThanOrEqualTo(5);
     }
 
     [Fact]
