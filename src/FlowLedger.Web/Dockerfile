@@ -42,11 +42,17 @@ RUN dotnet publish src/FlowLedger.Web/FlowLedger.Web.csproj \
         /p:UseAppHost=false
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-# noble-chiseled-extra adds curl + a minimal shell so Docker healthchecks work
-# while keeping the image hardened (non-root, distroless-like).
+# noble-chiseled-extra adds only ICU + tzdata: there is NO shell, curl or wget. Docker healthchecks
+# therefore use scripts/healthprobe (a static Go binary built below and copied in).
+FROM golang:1.24-alpine AS healthprobe
+WORKDIR /src
+COPY scripts/healthprobe/main.go .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /healthprobe main.go
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
 WORKDIR /app
 
+COPY --from=healthprobe /healthprobe /usr/local/bin/healthprobe
 COPY --from=publish /app/publish .
 
 # ASP.NET chiseled images listen on 8080 (HTTP) by default.
