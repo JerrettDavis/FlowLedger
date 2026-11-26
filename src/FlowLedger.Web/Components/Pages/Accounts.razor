@@ -104,6 +104,10 @@
                             </div>
                         </div>
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="fl-data-source fl-hide-md">@SourceLabel(acct.Id)</MudChip>
+                        @if (SourceIssue(acct.Id) is { } sourceIssue)
+                        {
+                            <ConnectionHealthBadge Issue="sourceIssue" Compact="true" />
+                        }
                         @if (_household)
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" Class="fl-hide-md"
@@ -192,6 +196,11 @@
         !_links.TryGetValue(accountId, out var l) ? "Not linked"
         : l.ConnectorId == "manual" ? "Manual"
         : _connectors.FirstOrDefault(c => c.Id == l.ConnectorId)?.Name ?? l.ConnectorId;
+
+    private FlowLedger.Web.ApiClient.ConnectionIssueDto? SourceIssue(Guid accountId) =>
+        _links.TryGetValue(accountId, out var l) && _connectors.FirstOrDefault(c => c.Id == l.ConnectorId) is { } c
+            ? FlowLedger.Web.Connections.ConnectionHealth.Worst(c.Connections)
+            : null;
 
     private async Task OpenConnectorDialog(FlowLedger.Web.ApiClient.AccountDto account)
     {

@@ -4,6 +4,8 @@
 @inject ILogger<MainLayout> Logger
 @inject IJSRuntime JS
 @inject IDialogService DialogService
+@inject NavigationManager Nav
+@using FlowLedger.Web.Connections
 @inject ThemeService ThemeService
 @implements IDisposable
 
@@ -144,6 +146,7 @@
     private readonly CancellationTokenSource _autoCts = new();
     private DateTimeOffset? _lastSyncedAt;
     private DateTimeOffset _autoBackoffUntil = DateTimeOffset.MinValue;
+    private bool _autoStopped;   // a connection needs the user (reconnect); auto-sync stays off until a manual sync succeeds
     private TimeSpan _serverMinInterval = TimeSpan.FromMinutes(30);
 
     // True once the user has made an explicit choice that we've persisted;
@@ -323,9 +326,11 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect bank failed");
-            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Connect", GoToConnectors);
         }
     }
+
+    private void GoToConnectors() => Nav.NavigateTo("connectors");
 
     private async Task ConnectViaQuiltt()
     {
@@ -353,7 +358,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Quiltt connect failed");
-            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Connect", GoToConnectors);
         }
     }
 
@@ -378,7 +383,7 @@
 
     private async Task AutoSyncIfDueAsync()
     {
-        if (_syncing || DateTimeOffset.UtcNow < _autoBackoffUntil)
+        if (_syncing || _autoStopped || DateTimeOffset.UtcNow < _autoBackoffUntil)
         {
             return;
         }
@@ -424,6 +429,7 @@
         try
         {
             var result = await ApiClient.SyncAsync();
+            _autoStopped = false;
             if (auto)
             {
                 if (result is { TransactionsAdded: > 0 })
@@ -442,12 +448,18 @@
             Logger.LogError(ex, "Sync failed");
             if (auto)
             {
-                // Throttled / budget / needs-reauth / provider outage: stay quiet and back off.
-                _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
+                // Throttled / outage: back off (honouring Retry-After); needs-reauth: stop until the user acts.
+                var decision = AutoSyncPolicy.AfterFailure(ex, DateTimeOffset.UtcNow, AutoSyncBackoff);
+                _autoBackoffUntil = decision.BackoffUntil;
+                if (decision.StopUntilUserActs && !_autoStopped)
+                {
+                    _autoStopped = true;
+                    Snackbar.AddProblem(ex, "Sync", GoToConnectors); // tell the user once, not every tick
+                }
             }
             else
             {
-                Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+                Snackbar.AddProblem(ex, "Sync", GoToConnectors);
             }
         }
         finally
@@ -468,11 +480,12 @@
                 ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
                 : "Sync complete";
             Snackbar.Add(msg, Severity.Success);
+            _autoStopped = false;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect & Sync failed");
-            Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Sync", GoToConnectors);
         }
         finally
         {

@@ -1,0 +1,92 @@
+@using FlowLedger.Web.Connections
+@inject ConnectionRepairService Repair
+@inject ISnackbar Snackbar
+
+@* Renders any connection's state from its connector-neutral issue (ADR 0018). No connector names or native statuses here. *@
+@if (_view.Category == ConnectionIssueCategory.Healthy)
+{
+    @if (!Compact)
+    {
+        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Healthy</MudChip>
+    }
+}
+else
+{
+    <span class="d-inline-flex align-center" style="gap:6px; flex-wrap:wrap">
+        <MudTooltip Text="@(Issue?.Message is { Length: > 0 } m ? m : _view.Detail)">
+            <MudChip T="string" Size="Size.Small" Color="@ToColor(_view.Tone)">@(Compact && _view.Category == ConnectionIssueCategory.Transient ? "Retrying" : _view.Label)</MudChip>
+        </MudTooltip>
+        @if (!Compact)
+        {
+            @if (_view.Detail is { Length: > 0 })
+            {
+                <MudText Typo="Typo.caption" Class="fl-muted">@_view.Detail</MudText>
+            }
+            @if (_view.CanReconnect)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning" Disabled="_busy"
+                           OnClick="ReconnectAsync" aria-label="@($"Reconnect {Institution}")">Reconnect</MudButton>
+            }
+        }
+    </span>
+}
+
+@code {
+    [Parameter] public ConnectionIssueDto? Issue { get; set; }
+
+    /// <summary>Connector id, used only to pick a repair handler.</summary>
+    [Parameter] public string Provider { get; set; } = string.Empty;
+
+    [Parameter] public string? Institution { get; set; }
+
+    /// <summary>Chip only (no detail text or button) for dense lists.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Raised after a successful reconnect so the host can reload.</summary>
+    [Parameter] public EventCallback OnRepaired { get; set; }
+
+    private ConnectionHealthView _view = ConnectionHealth.Describe((ConnectionIssueDto?)null, DateTimeOffset.UtcNow);
+    private bool _busy;
+
+    protected override void OnParametersSet() => _view = ConnectionHealth.Describe(Issue, DateTimeOffset.UtcNow);
+
+    private static Color ToColor(HealthTone tone) => tone switch
+    {
+        HealthTone.Success => Color.Success,
+        HealthTone.Info => Color.Info,
+        HealthTone.Warning => Color.Warning,
+        _ => Color.Error,
+    };
+
+    private async Task ReconnectAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await Repair.RepairAsync(new ConnectionRef(Provider, Issue?.ProviderCode, Institution));
+            switch (result.Status)
+            {
+                case RepairStatus.Repaired:
+                    Snackbar.Add("Reconnected. Press Sync now to refresh your accounts.", Severity.Success);
+                    await OnRepaired.InvokeAsync();
+                    break;
+                case RepairStatus.Cancelled:
+                    break;
+                case RepairStatus.NotSupported:
+                    Snackbar.Add(result.Message ?? ConnectionRepairService.FallbackMessage(new ConnectionRef(Provider, null, Institution)), Severity.Info);
+                    break;
+                default:
+                    Snackbar.Add(result.Message ?? "The reconnect did not complete.", Severity.Warning);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.AddProblem(ex, "Reconnect");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
