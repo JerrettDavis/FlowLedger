@@ -11,13 +11,13 @@ public sealed record ImportFormatInfo(string Id, string Name);
 /// <param name="NumberFormat">"us" (1,234.56) or "eu" (1.234,56); required when separators cannot be told apart.</param>
 public sealed record ImportHints(string? DateOrder = null, string? NumberFormat = null);
 
-/// <summary>A file converted to FlowLedger's canonical CSV: <c>Date,Amount,Description,Merchant,Category</c> (ISO dates, negative = money out).</summary>
+/// <summary>A file converted to FlowLedger's canonical CSV: <c>Date,Amount,Description,Merchant,Category,ProviderId</c> (ISO dates, negative = money out).</summary>
 public sealed record NormalizedImport(string FormatId, string FormatName, string Csv, int RowCount, IReadOnlyList<string> Warnings)
 {
     /// <summary>Column mapping that matches <see cref="Csv"/>.</summary>
     public static CsvColumnMapping Mapping { get; } = new(
         DateColumnIndex: 0, AmountColumnIndex: 1, DescriptionColumnIndex: 2,
-        MerchantColumnIndex: 3, CategoryColumnIndex: 4, Delimiter: ',',
+        MerchantColumnIndex: 3, CategoryColumnIndex: 4, ProviderIdColumnIndex: 5, Delimiter: ',',
         DateFormats: ["yyyy-MM-dd"], HasHeaderRow: true);
 }
 
@@ -363,7 +363,7 @@ public static partial class ImportNormalizer
                 continue;
             }
 
-            rows.Add(new Row(date, amount, description, null, null));
+            rows.Add(new Row(date, amount, description, null, null, Tag("FITID")));
         }
 
         return Finish("ofx", rows, [], skipped);
@@ -445,7 +445,7 @@ public static partial class ImportNormalizer
 
     // ── Shared ───────────────────────────────────────────────────────────────
 
-    private sealed record Row(DateOnly Date, decimal Amount, string Description, string? Merchant, string? Category);
+    private sealed record Row(DateOnly Date, decimal Amount, string Description, string? Merchant, string? Category, string? ProviderId = null);
 
     private static NormalizedImport Finish(string formatId, List<Row> rows, List<string> warnings, int skipped)
     {
