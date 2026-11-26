@@ -114,7 +114,6 @@ src/
   FlowLedger.ServiceDefaults/  # Shared OpenTelemetry, health checks, service discovery
   FlowLedger.Api/              # ASP.NET Core Minimal API (vertical slices)
   FlowLedger.Web/              # Blazor Web App (server)
-  FlowLedger.Web.Client/       # Blazor WebAssembly (auto interactivity client)
   FlowLedger.Worker/           # Background worker host (Quartz jobs)
   FlowLedger.Application/      # Vertical slice handlers, validators
   FlowLedger.Domain/           # Domain model, aggregates, value objects, events

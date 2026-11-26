@@ -22,4 +22,12 @@ public sealed class RenderModeTests
 
         offenders.Should().BeEmpty("Routes.razor already makes the whole router interactive");
     }
+
+    [Fact]
+    public void Program_does_not_register_the_unused_WebAssembly_render_mode()
+    {
+        var program = RepoFiles.Read("Program.cs");
+        program.Should().NotContain("WebAssembly");
+        program.Should().Contain("AddInteractiveServerRenderMode");
+    }
 }
