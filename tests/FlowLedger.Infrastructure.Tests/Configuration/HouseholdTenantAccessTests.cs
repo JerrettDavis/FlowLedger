@@ -1,5 +1,5 @@
-using FluentAssertions;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 
 namespace FlowLedger.Infrastructure.Tests.Configuration;
