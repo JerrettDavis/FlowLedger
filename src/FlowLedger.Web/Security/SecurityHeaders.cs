@@ -3,12 +3,12 @@ using System.Security.Cryptography;
 namespace FlowLedger.Web.Security;
 
 /// <summary>
-/// Browser security headers for the Blazor Web App (Server + WebAssembly interactivity, MudBlazor).
+/// Browser security headers for the Blazor Web App (Interactive Server, MudBlazor).
 /// <list type="bullet">
 /// <item>No framing (clickjacking): <c>frame-ancestors 'none'</c> + <c>X-Frame-Options: DENY</c>.</item>
 /// <item><c>nosniff</c>, a strict referrer policy, and a restrictive Permissions-Policy.</item>
 /// <item>CSP (outside Development: hot reload / the WASM debugger inject scripts): scripts only from self, plus
-///   <c>'wasm-unsafe-eval'</c> for the WebAssembly runtime and a per-request nonce for the inline
+///   a per-request nonce for the inline
 ///   <c>&lt;ImportMap&gt;</c>. MudBlazor sets inline styles, so <c>style-src</c> needs <c>'unsafe-inline'</c>;
 ///   the Inter font is self-hosted from wwwroot/fonts. <c>form-action</c> is deliberately NOT set: the OIDC sign-out POST
 ///   redirects to the identity provider, which Chrome would block.</item>
@@ -23,7 +23,7 @@ public static class SecurityHeaders
 
     public static string BuildCsp(string nonce) => string.Join("; ",
         "default-src 'self'",
-        $"script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'",
+        $"script-src 'self' 'nonce-{nonce}'",
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self' data:",
         "img-src 'self' data: blob:",

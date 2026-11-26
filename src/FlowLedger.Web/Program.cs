@@ -7,7 +7,8 @@ using FlowLedger.Web.Security;
 using FlowLedger.Web.Services;
 using MudBlazor.Services;
 
-// Ensure monetary formatting always uses en-US ($ symbol) regardless of host culture.
+// Fallback culture for threads outside a request/circuit. Display currency and locale come from the per-user
+// DisplaySettings cookie (default USD / en-US) via UseFlowLedgerDisplayCulture and DisplayCultureCircuitHandler.
 var usCulture = CultureInfo.GetCultureInfo("en-US");
 CultureInfo.DefaultThreadCurrentCulture = usCulture;
 CultureInfo.DefaultThreadCurrentUICulture = usCulture;
@@ -26,8 +27,7 @@ AuthSetup.ConfigureDataProtection(builder.Services, oidc, builder.Environment, b
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddInteractiveWebAssemblyComponents();
+    .AddInteractiveServerComponents();
 
 // ── MudBlazor ───────────────────────────────────────────────────────────────
 builder.Services.AddMudServices();
@@ -35,6 +35,10 @@ builder.Services.AddMudServices();
 // ── Theme ────────────────────────────────────────────────────────────────────
 // Scoped so each circuit (browser tab) gets its own independent theme state.
 builder.Services.AddScoped<ThemeService>();
+
+// -- Display currency + locale (display-only, no FX) --
+builder.Services.AddScoped<DisplaySettingsService>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, DisplayCultureCircuitHandler>();
 
 // ── Connection repair (provider-pluggable Reconnect; add a handler per provider) ──
 builder.Services.AddScoped<FlowLedger.Web.Connections.IConnectionRepairHandler, FlowLedger.Web.Connections.QuilttRepairHandler>();
@@ -66,18 +70,15 @@ var app = builder.Build();
 app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-if (app.Environment.IsDevelopment())
-{
-    app.UseWebAssemblyDebugging();
-}
-else
+if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 
-// Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
+// Security headers on every response; full CSP outside Development (hot reload injects scripts).
 app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
+app.UseFlowLedgerDisplayCulture();
 
 app.UseStatusCodePagesWithReExecute("/status/{0}", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
@@ -99,9 +100,7 @@ app.MapDefaultEndpoints();
 // ── Static assets + Razor components ─────────────────────────────────────────
 app.MapStaticAssets();
 var razor = app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(FlowLedger.Web.Client._Imports).Assembly);
+    .AddInteractiveServerRenderMode();
 if (oidc.Enabled)
 {
     razor.RequireAuthorization();

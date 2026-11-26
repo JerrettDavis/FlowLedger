@@ -12,7 +12,6 @@ COPY Directory.Packages.props     Directory.Packages.props
 
 # Project files for the Web server + its dependencies
 COPY src/FlowLedger.Web/FlowLedger.Web.csproj                                         src/FlowLedger.Web/
-COPY src/FlowLedger.Web.Client/FlowLedger.Web.Client.csproj                           src/FlowLedger.Web.Client/
 COPY src/FlowLedger.Application/FlowLedger.Application.csproj                         src/FlowLedger.Application/
 COPY src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj                   src/FlowLedger.Infrastructure/
 COPY src/FlowLedger.Contracts/FlowLedger.Contracts.csproj                                 src/FlowLedger.Contracts/
