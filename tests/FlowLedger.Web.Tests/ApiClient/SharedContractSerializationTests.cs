@@ -28,7 +28,7 @@ public sealed class SharedContractSerializationTests
         var names = doc.RootElement.EnumerateObject().Select(p => p.Name).ToArray();
         Assert.Equal(
             ["id", "name", "accountType", "balanceAmount", "balanceCurrency", "institution", "externalAccountRef", "isActive",
-             "createdAt", "lastBalanceConfirmedAt", "typeLockedByUser", "mode", "hideTransactions"],
+             "createdAt", "lastBalanceConfirmedAt", "typeLockedByUser", "mode", "hideTransactions", "version"],
             names);
         Assert.Equal(Account, JsonSerializer.Deserialize<AccountDto>(json, WebOptions));
     }
