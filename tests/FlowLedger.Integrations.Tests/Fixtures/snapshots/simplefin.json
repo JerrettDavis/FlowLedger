@@ -50,7 +50,7 @@
     "Name": "Example Card Services - Rewards Visa",
     "AccountType": "CREDIT_CARD",
     "Balance": 350.25,
-    "Available": 4649.75,
+    "Available": -4649.75,
     "CurrencyCode": "USD",
     "Transactions": [
       {

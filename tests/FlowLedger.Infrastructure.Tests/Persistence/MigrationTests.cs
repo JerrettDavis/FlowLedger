@@ -57,7 +57,7 @@ public sealed class MigrationTests : IAsyncLifetime
                     n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
                 .Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext: null);
+            tenantContext: FlowLedger.Infrastructure.Persistence.UnscopedTenantContext.Instance);
 
     [Fact]
     public void Model_snapshot_matches_the_current_model_so_no_migration_is_missing()
@@ -141,7 +141,7 @@ public sealed class MigrationTests : IAsyncLifetime
                 .UseNpgsql(connectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
                 .Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext: null);
+            tenantContext: FlowLedger.Infrastructure.Persistence.UnscopedTenantContext.Instance);
 
     private static async Task MigrateToAsync(string connectionString, string? target)
     {

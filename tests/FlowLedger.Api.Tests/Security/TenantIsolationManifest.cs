@@ -40,6 +40,7 @@ internal static class TenantIsolationManifest
     {
         ["ANY /alive"] = Global("liveness probe"),
         ["ANY /health"] = Global("health probe"),
+        ["ANY /ready"] = Global("readiness probe"),
         ["DELETE /api/accounts/{id:guid}"] = ById("Account"),
         ["DELETE /api/accounts/{id:guid}/connector"] = ById("Account"),
         ["DELETE /api/assets/{id:guid}"] = ById("Asset"),
@@ -57,6 +58,7 @@ internal static class TenantIsolationManifest
         ["DELETE /api/strategies/account-rates/{accountId:guid}"] = ById("Account"),
         ["DELETE /api/users/identities/{userId:guid}"] = Gap("needs seeded linked identity"),
         ["GET /api/accounts"] = List(),
+        ["GET /api/integrations/connections"] = List(),
         ["GET /api/accounts/connectors"] = List(),
         ["GET /api/accounts/{id:guid}"] = ById("Account"),
         ["GET /api/alerts"] = List(),
