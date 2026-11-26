@@ -47,7 +47,7 @@ RUN dotnet publish src/FlowLedger.Worker/FlowLedger.Worker.csproj \
 # from the official image. The same stage pre-creates the data directories owned by the image's
 # non-root user (APP_UID 1654 in the .NET 8+ images): Docker seeds a new named volume from the image
 # path, so the volumes mounted at /data/objects and /data/backups come up writable.
-FROM restic/restic:0.18.0@sha256:4cf4a61ef9786f4de53e9de8c8f5c040f33830eb0a10bf3d614410ee2fcb6120 AS data-dirs
+FROM restic/restic:0.20.0@sha256:93999df80d4ac6cb148e82d2ef1fe6a81996f17ff535e772723538211b31555a AS data-dirs
 RUN mkdir -p /data/objects /data/backups && chown 1654:1654 /data/objects /data/backups
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
