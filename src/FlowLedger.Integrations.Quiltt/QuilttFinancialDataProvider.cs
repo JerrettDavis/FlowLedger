@@ -206,7 +206,11 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         }
 
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
-        var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
+        // Only pending rows so far: everything older than the earliest has been seen, so do not re-read the whole window every sync.
+        // A truly empty account keeps its initial cursor so history that arrives later is not skipped.
+        var next = settled != default ? new SyncCursor(settled.ToString("yyyy-MM-dd"))
+            : cursor.IsInitial && items.Count > 0 ? new SyncCursor(items.Min(t => t.PostedDate).AddDays(-1).ToString("yyyy-MM-dd"))
+            : cursor;
         _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
         return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
