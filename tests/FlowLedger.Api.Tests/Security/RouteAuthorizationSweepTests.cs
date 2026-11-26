@@ -116,6 +116,11 @@ public sealed class RouteAuthorizationSweepTests(FailClosedApiFactory factory)
         ["GET /api/integrations/quiltt/config"] = "public connector config",
         ["GET /api/query/schema"] = "static dataset schema",
         ["GET /api/status"] = "host status",
+        ["POST /api/users/resolve"] = "login bootstrap: maps an external identity to its tenant, so it cannot require one",
+        ["POST /api/debt/plan"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/fire"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/growth"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/refinance"] = "pure calculation on the request body, reads no stored data",
         // Keyed deletes: the required key is a query-string value, so the bare probe is rejected by parameter binding (400) before any
         // handler runs. With the key present the request goes through the tenant-scoped store (see TenantIsolationMatrixTests).
         ["DELETE /api/budgets/"] = "binding rejects the missing key before the handler",
