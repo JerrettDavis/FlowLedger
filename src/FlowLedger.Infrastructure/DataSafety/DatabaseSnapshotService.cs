@@ -15,7 +15,8 @@ public sealed record SnapshotManifest(
     string Database,
     string Reason,
     IReadOnlyList<string> AppliedMigrations,
-    IReadOnlyList<SnapshotTable> Tables);
+    IReadOnlyList<SnapshotTable> Tables,
+    Guid? TenantId = null);
 
 public sealed record SnapshotVerification(bool Ok, IReadOnlyList<string> Problems);
 
@@ -38,8 +39,11 @@ public sealed class DatabaseSnapshotService
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".flowledger", "backups");
 
     /// <summary>Creates <c>{backupRoot}/{prefix}-{yyyyMMdd-HHmmss}/</c>, writes it, verifies it, and returns its path. Throws on any failure.</summary>
+    /// <param name="tenantId">When set (#139), exports ONLY that tenant's rows: every table with a <c>tenant_id</c> column filtered to it, plus
+    /// child tables reached through a foreign key (for example transaction splits). Tables with no tenant data are skipped. The manifest records the
+    /// tenant, and <see cref="SnapshotImport"/> refuses such a bundle (it is for portability and review, not restore).</param>
     public async Task<(string Directory, SnapshotManifest Manifest)> CreateAsync(
-        string backupRoot, string reason, string prefix = "snapshot", CancellationToken ct = default)
+        string backupRoot, string reason, string prefix = "snapshot", CancellationToken ct = default, Guid? tenantId = null)
     {
         var dir = Path.Combine(backupRoot, $"{prefix}-{DateTime.UtcNow:yyyyMMdd-HHmmss}");
         var attempt = 1;
@@ -73,12 +77,31 @@ public sealed class DatabaseSnapshotService
             }
         }
 
+        // Table name -> the SELECT that yields the rows to export (whole table, or only the tenant's rows).
+        var selects = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (tenantId is { } scope)
+        {
+            foreach (var (table, select) in await TenantSelectsAsync(conn, tx, tables, scope, ct))
+            {
+                selects[table] = select;
+            }
+
+            tables = [.. tables.Where(selects.ContainsKey)];
+        }
+        else
+        {
+            foreach (var table in tables)
+            {
+                selects[table] = $"SELECT * FROM {Quote(table)}";
+            }
+        }
+
         var entries = new List<SnapshotTable>();
         foreach (var table in tables)
         {
             var file = Path.Combine(dir, table + ".csv");
             await using (var export = await conn.BeginTextExportAsync(
-                $"COPY {Quote(table)} TO STDOUT (FORMAT csv, HEADER true)", ct))
+                $"COPY ({selects[table]}) TO STDOUT (FORMAT csv, HEADER true)", ct))
             await using (var fs = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             await using (var w = new StreamWriter(fs, new UTF8Encoding(false)))
             {
@@ -97,7 +120,7 @@ public sealed class DatabaseSnapshotService
         // Cross-check against the database itself, inside the same snapshot.
         foreach (var e in entries)
         {
-            await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM {Quote(e.Table)}", conn, tx);
+            await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM ({selects[e.Table]}) AS q", conn, tx);
             var live = (long)(await cmd.ExecuteScalarAsync(ct))!;
             if (live != e.Rows)
             {
@@ -106,7 +129,7 @@ public sealed class DatabaseSnapshotService
         }
         await tx.CommitAsync(ct);
 
-        var manifest = new SnapshotManifest(1, DateTimeOffset.UtcNow, conn.Database ?? "", reason, applied, entries);
+        var manifest = new SnapshotManifest(1, DateTimeOffset.UtcNow, conn.Database ?? "", reason, applied, entries, tenantId);
         await File.WriteAllTextAsync(Path.Combine(dir, ManifestFileName), JsonSerializer.Serialize(manifest, Json), ct);
 
         var check = await VerifyAsync(dir, ct);
@@ -115,6 +138,67 @@ public sealed class DatabaseSnapshotService
             throw new InvalidOperationException("Snapshot failed verification: " + string.Join("; ", check.Problems));
         }
         return (dir, manifest);
+    }
+
+    /// <summary>
+    /// The per-table SELECTs of a tenant-scoped export. Table and column names come from the database catalog and are validated and quoted;
+    /// the tenant id is a <see cref="Guid"/> rendered in its fixed hex form, so no caller text reaches the SQL.
+    /// </summary>
+    private static async Task<List<(string Table, string Select)>> TenantSelectsAsync(
+        NpgsqlConnection conn, NpgsqlTransaction tx, List<string> tables, Guid tenant, CancellationToken ct)
+    {
+        var literal = "'" + tenant.ToString("D") + "'::uuid";
+        var scoped = new List<string>();
+        await using (var cmd = new NpgsqlCommand(
+            "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'tenant_id'", conn, tx))
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                scoped.Add(r.GetString(0));
+            }
+        }
+
+        var result = new List<(string, string)>();
+        foreach (var t in tables.Where(scoped.Contains))
+        {
+            result.Add((t, $"SELECT * FROM {Quote(t)} WHERE tenant_id = {literal}"));
+        }
+
+        // Child tables with no tenant column of their own (owned collections): rows whose parent belongs to the tenant.
+        await using (var cmd = new NpgsqlCommand(
+            @"SELECT c.relname, p.relname,
+                     (SELECT string_agg(quote_ident(a.attname), ',' ORDER BY k.ord) FROM unnest(con.conkey) WITH ORDINALITY k(attnum, ord)
+                        JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum),
+                     (SELECT string_agg(quote_ident(a.attname), ',' ORDER BY k.ord) FROM unnest(con.confkey) WITH ORDINALITY k(attnum, ord)
+                        JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum)
+              FROM pg_constraint con
+              JOIN pg_class c ON c.oid = con.conrelid JOIN pg_class p ON p.oid = con.confrelid
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE con.contype = 'f' AND n.nspname = 'public'", conn, tx))
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        {
+            var childSelects = new Dictionary<string, string>(StringComparer.Ordinal);
+            while (await r.ReadAsync(ct))
+            {
+                var child = r.GetString(0);
+                var parent = r.GetString(1);
+                if (scoped.Contains(child) || !scoped.Contains(parent) || !tables.Contains(child) || childSelects.ContainsKey(child))
+                {
+                    continue;
+                }
+
+                var childCols = r.GetString(2).Split(',').Select(c => "t." + c);
+                var parentCols = r.GetString(3).Split(',').Select(c => "p." + c);
+                childSelects[child] =
+                    $"SELECT t.* FROM {Quote(child)} t WHERE EXISTS (SELECT 1 FROM {Quote(parent)} p " +
+                    $"WHERE ({string.Join(", ", parentCols)}) = ({string.Join(", ", childCols)}) AND p.tenant_id = {literal})";
+            }
+
+            result.AddRange(childSelects.Select(kv => (kv.Key, kv.Value)));
+        }
+
+        return result;
     }
 
     /// <summary>Re-reads every file and compares hash, size and record count with the manifest.</summary>

@@ -69,6 +69,8 @@ public sealed class TenantScopeGuardTests
         ["provider_api_calls"] = "provider API call accounting for the whole host (cost control)",
         ["backup_runs"] = "host backup history",
         ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
+        ["tenants"] = "the tenant registry itself (#169), keyed by id; erasure keeps its row as the audit record",
+        ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
     };
 
     [Fact]
@@ -99,6 +101,9 @@ public sealed class TenantScopeGuardTests
         ["NpgsqlJobRunStore.cs"] = "host-wide background job run history, no tenant column",
         ["NpgsqlProviderCallLedger.cs"] = "provider API call accounting for the whole host (cost control), no tenant column",
         ["DataEnvironmentGuard.cs"] = "host-wide environment fingerprint in system_settings",
+        ["EfTenantErasure.cs"] = "tenant erasure (#169): every DELETE is keyed by the tenant column; the other statements read schema metadata or the tenant registry",
+        ["NpgsqlTenantRegistry.cs"] = "the tenant registry (#169) is keyed by id, not tenant_id",
+        ["NpgsqlWebhookReplayStore.cs"] = "webhook replay hashes (#152): no tenant data",
         ["DataRetention.cs"] = "host-wide maintenance: blanks old merge snapshots and deletes expired link codes across all tenants (#181)",
         ["ReadinessChecks.cs"] = "host-wide readiness probes (migration history, backup freshness); no tenant data is returned",
     };
@@ -106,6 +111,7 @@ public sealed class TenantScopeGuardTests
     /// <summary>Literal fragments that are not complete statements: (file, text in the literal, reason).</summary>
     private static readonly (string File, string Contains, string Why)[] FragmentAllowlist =
     [
+        ("NpgsqlUserDirectory.cs", "INSERT INTO tenants", "registers a tenant in the registry (#169), which is keyed by id"),
     ];
 
     private static string InfrastructureRoot()

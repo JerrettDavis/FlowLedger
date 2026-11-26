@@ -75,6 +75,8 @@ internal static class QuilttEndpoints
                 IRawPayloadArchive archive,
                 ISchedulerFactory schedulerFactory,
                 IWebhookTenantResolver tenantResolver,
+                IWebhookReplayStore? replayStore,
+                ILoggerFactory loggers,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
@@ -105,13 +107,14 @@ internal static class QuilttEndpoints
                     return Results.Unauthorized();
                 }
 
-                if (WebhookReplayGuard.SeenRecently(rawBody))
+                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
                     return Results.Accepted(value: new { duplicate = true });
                 }
 
-                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+                var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
+                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
 
                 ProviderWebhookEvent evt;
                 try

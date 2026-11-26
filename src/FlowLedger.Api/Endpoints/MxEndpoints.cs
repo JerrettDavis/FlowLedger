@@ -81,6 +81,8 @@ internal static class MxEndpoints
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
             IWebhookTenantResolver tenantResolver,
+            IWebhookReplayStore? replayStore,
+            ILoggerFactory loggers,
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
@@ -108,7 +110,7 @@ internal static class MxEndpoints
             }
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
-            if (WebhookReplayGuard.SeenRecently(rawBody))
+            if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
             {
                 FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "duplicate");
                 return Results.Accepted(value: new { duplicate = true });
@@ -117,7 +119,8 @@ internal static class MxEndpoints
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
-            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+            var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
+            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
 
             ProviderWebhookEvent evt;
             try
