@@ -1,0 +1,44 @@
+name: Mutation testing
+
+# Weekly Stryker.NET run (tool pinned in .config/dotnet-tools.json, configs in tests/mutation).
+# Domain has a recorded baseline (thresholds.break = baseline - 5) so a regression fails the job.
+# Application has no baseline yet, so its break threshold is 0 and the job only publishes the report.
+
+on:
+  schedule:
+    - cron: '23 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stryker:
+    name: Stryker (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [Domain, Application]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet tool restore
+      - name: Run Stryker
+        working-directory: tests/FlowLedger.${{ matrix.target }}.Tests
+        run: dotnet tool run dotnet-stryker --config-file ../mutation/stryker-config.${{ matrix.target == 'Domain' && 'domain' || 'application' }}.json
+      - name: Publish mutation score to the job summary
+        if: always()
+        run: |
+          echo "### Mutation report (${{ matrix.target }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "HTML report is attached as the stryker-${{ matrix.target }} artifact." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: stryker-${{ matrix.target }}
+          path: tests/FlowLedger.${{ matrix.target }}.Tests/StrykerOutput/**/reports/*
+          if-no-files-found: ignore

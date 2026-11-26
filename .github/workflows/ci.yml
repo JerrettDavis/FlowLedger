@@ -30,6 +30,9 @@ jobs:
       - name: Restore packages
         run: dotnet restore
 
+      - name: Check every invariant has a tagged test
+        run: python3 eng/check-invariants.py
+
       - name: Check formatting
         run: dotnet format --verify-no-changes --no-restore
 

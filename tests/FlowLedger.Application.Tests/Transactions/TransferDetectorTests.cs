@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
 
+[Trait("Invariant", "INV-03")]
 public sealed class TransferDetectorTests
 {
     private static readonly Guid Checking = Guid.NewGuid();

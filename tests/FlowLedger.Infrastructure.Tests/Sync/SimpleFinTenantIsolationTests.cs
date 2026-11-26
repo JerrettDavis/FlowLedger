@@ -18,6 +18,7 @@ namespace FlowLedger.Infrastructure.Tests.Sync;
 /// trigger a SimpleFIN call, never get a connection provisioned, and never receive the household's bank data.
 /// No database is needed: every refusal happens before the DbContext is touched.
 /// </summary>
+[Trait("Invariant", "INV-01")]
 public sealed class SimpleFinTenantIsolationTests
 {
     private static readonly Guid Household = TenancySettings.DefaultLegacyTenantId;

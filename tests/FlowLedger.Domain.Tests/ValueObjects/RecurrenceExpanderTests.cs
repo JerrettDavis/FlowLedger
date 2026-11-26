@@ -7,6 +7,7 @@ namespace FlowLedger.Domain.Tests.ValueObjects;
 /// Unit tests for <see cref="RecurrenceExpander"/> — all recurrence pattern variants,
 /// edge cases, leap years, and month-end clamping.
 /// </summary>
+[Trait("Invariant", "INV-06")]
 public sealed class RecurrenceExpanderTests
 {
     private static DateOnlyRange Horizon(DateOnly start, DateOnly end) =>

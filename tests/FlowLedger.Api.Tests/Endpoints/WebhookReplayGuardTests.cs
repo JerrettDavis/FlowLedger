@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
 
+[Trait("Invariant", "INV-10")]
 public sealed class WebhookReplayGuardTests
 {
     [Fact]
