@@ -1,6 +1,7 @@
 @using FlowLedger.Web.Connections
 @inject ConnectionRepairService Repair
 @inject ISnackbar Snackbar
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient Api
 
 @* Renders any connection's state from its connector-neutral issue (ADR 0018). No connector names or native statuses here. *@
 @if (_view.Category == ConnectionIssueCategory.Healthy)
@@ -67,7 +68,17 @@ else
             switch (result.Status)
             {
                 case RepairStatus.Repaired:
-                    Snackbar.Add("Reconnected. Press Sync now to refresh your accounts.", Severity.Success);
+                    // A successful sync is what clears the stored issue (and lets scheduled syncs resume), so run one now.
+                    Snackbar.Add("Reconnected. Syncing your accounts…", Severity.Success);
+                    try
+                    {
+                        await Api.SyncAsync();
+                    }
+                    catch (Exception syncEx)
+                    {
+                        Snackbar.AddProblem(syncEx, "Sync");
+                    }
+
                     await OnRepaired.InvokeAsync();
                     break;
                 case RepairStatus.Cancelled:
