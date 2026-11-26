@@ -23,7 +23,6 @@ public static class AdHocSchema
         NpgsqlAccountRateStore.CreateSqlText,
         NpgsqlCategoryRuleStore.CreateSqlText,
         NpgsqlMerchantAliasStore.CreateSqlText,
-        NpgsqlSuspiciousDismissalStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
         NpgsqlAccountConnectorLinkStore.CreateSqlText,
         NpgsqlProviderAccountCatalog.CreateSqlText,
