@@ -17,7 +17,7 @@ public sealed class SnackbarProblemTests : BunitContext, IAsyncLifetime
         Services.AddMudServices();
         var snackbar = Services.GetRequiredService<ISnackbar>();
 
-        snackbar.AddProblem(new ApiClientException("The linked account was not found.", HttpStatusCode.BadRequest));
+        snackbar.AddFailure(new ApiClientException("The linked account was not found.", HttpStatusCode.BadRequest));
 
         var shown = snackbar.ShownSnackbars.Should().ContainSingle().Subject;
         shown.Message.Should().Be("The linked account was not found.");
@@ -49,7 +49,7 @@ public sealed class SnackbarProblemTests : BunitContext, IAsyncLifetime
         Services.AddMudServices();
         var snackbar = Services.GetRequiredService<ISnackbar>();
 
-        snackbar.AddProblem(new HttpRequestException("boom"), "Sync failed");
+        snackbar.AddFailure(new HttpRequestException("boom"), "Sync failed");
 
         snackbar.ShownSnackbars.Single().Message.Should().Be($"Sync failed: {SnackbarExtensions.GenericFailure}");
     }

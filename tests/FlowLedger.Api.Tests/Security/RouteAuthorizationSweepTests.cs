@@ -23,6 +23,7 @@ public sealed class RouteAuthorizationSweepTests(FailClosedApiFactory factory)
     {
         "GET /health",
         "GET /alive",
+        "GET /ready", // readiness probe (#184): deliberately anonymous, reveals only healthy/unhealthy
         "POST /api/integrations/mx/webhooks",
         "POST /api/integrations/quiltt/webhooks",
     };

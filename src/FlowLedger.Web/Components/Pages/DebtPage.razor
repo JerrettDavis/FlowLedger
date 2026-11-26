@@ -95,7 +95,7 @@ else
         catch (Exception ex)
         {
             // The planner still works with hand-entered debts; say why the pre-fill is missing.
-            Snackbar.AddProblem(ex, "Couldn't pre-fill debts from your accounts");
+            Snackbar.AddFailure(ex, "Couldn't pre-fill debts from your accounts");
         }
         finally
         {
@@ -114,7 +114,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.AddProblem(ex);
+            Snackbar.AddFailure(ex);
         }
     }
 }
