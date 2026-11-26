@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
 
@@ -102,7 +103,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
             {
                 // What POST /api/integrations/quiltt/session persists when the user opens the Connector.
                 await seed.ProviderConnections.AddAsync(ProviderConnectionRecord.Create(
-                    tenant.TenantId, "Quiltt", "p_mock", "Quiltt", "ConnectionPending", DateTimeOffset.UtcNow));
+                    tenant.TenantId, "Quiltt", "p_mock", "Quiltt", "ConnectionPending", TestClock.Instant));
                 await seed.SaveChangesAsync();
             }
 
@@ -171,7 +172,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
         await using (var seed = _fixture.CreateDbContext(tenant))
         {
             await seed.ProviderConnections.AddAsync(ProviderConnectionRecord.Create(
-                tenant.TenantId, "Quiltt", profile, "Quiltt", "ConnectionPending", DateTimeOffset.UtcNow));
+                tenant.TenantId, "Quiltt", profile, "Quiltt", "ConnectionPending", TestClock.Instant));
             await seed.SaveChangesAsync();
         }
 

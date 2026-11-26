@@ -6,6 +6,7 @@ using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 
@@ -88,7 +89,7 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
 
         await using var db = _fixture.CreateProductionStyleContext(a);
         db.SavedReports.Add(FlowLedger.Infrastructure.Persistence.Entities.SavedReportRecord.Create(
-            otherTenant, "sneaky", null, "View", "[]", DateTimeOffset.UtcNow));
+            otherTenant, "sneaky", null, "View", "[]", TestClock.Instant));
 
         var act = () => db.SaveChangesAsync();
 

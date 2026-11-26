@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Quartz;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Worker.Tests;
 
@@ -75,7 +76,7 @@ public sealed class SchedulingTests
 
         var history = new JobRunHistory();
         var recorder = new JobRunRecorder(history, NullLogger<JobRunRecorder>.Instance);
-        var t0 = DateTimeOffset.UtcNow;
+        var t0 = TestClock.Instant;
 
         recorder.Finished("sched-test-job", t0, t0.AddSeconds(2), new JobExecutionException("boom"));
         recorder.Finished("sched-test-job", t0, t0.AddSeconds(1), null);
