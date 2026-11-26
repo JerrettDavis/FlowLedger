@@ -177,7 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ci_test_password
-      API__KEY: ci-test-api-key-not-for-production
+      API__KEY: ci-integration-key-not-for-production-0123456789
       # The ephemeral CI stack has no identity provider.
       AUTH__ALLOWANONYMOUS: "true"
     needs: build
@@ -204,12 +204,12 @@ jobs:
         run: |
           # Connect the Simulated provider
           curl -sf -X POST http://localhost:5001/api/connect \
-            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Api-Key: ci-integration-key-not-for-production-0123456789" \
             -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
             -H "Content-Type: application/json" | python3 -m json.tool
           # Run a full sync
           curl -sf -X POST http://localhost:5001/api/sync \
-            -H "X-Api-Key: ci-test-api-key-not-for-production" \
+            -H "X-Api-Key: ci-integration-key-not-for-production-0123456789" \
             -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
             -H "Content-Type: application/json" | python3 -m json.tool
 

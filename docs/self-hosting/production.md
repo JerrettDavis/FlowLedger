@@ -152,22 +152,24 @@ Ensure the proxy:
 
 ## Rotating `API__KEY` without downtime
 
-`API__KEY` is the bearer token shared between the Web frontend and the API. To rotate it:
+`API__KEY` is the bearer token shared between the Web frontend, the Worker and the API. Outside
+Development the API refuses to start unless the key is at least 32 characters and is not a
+well-known placeholder (`changeme...`, `password...`, `dev-local-key...`, `ci-test-api-key...`).
+Generate one with `openssl rand -hex 32`.
 
-1. Generate a new key: `openssl rand -hex 32`
-2. Update the secret in your secrets manager / deployment platform.
-3. Perform a rolling restart of the `api` and `web` containers so both pick up the new
-   value simultaneously. (They must match — a Web container with the old key will get
-   401 errors from an API container with the new key.)
+The API also accepts an optional `API__PREVIOUSKEY` (`Api:PreviousKey`) so rotation does not need
+every service restarted at the same instant:
 
-   With compose:
-   ```bash
-   docker compose --profile full up --build -d --no-deps api web
-   ```
+1. Generate the new key: `openssl rand -hex 32`
+2. On the **API**: set `API__PREVIOUSKEY` to the *old* key and `API__KEY` to the *new* key, restart it.
+   Callers still sending the old key keep working; each such request logs a Warning
+   ("authenticated with Api:PreviousKey").
+3. Roll `web` (and `worker`) with `API__KEY` set to the new key.
+4. When the Warnings stop, remove `API__PREVIOUSKEY` from the API and restart it. The old key is
+   rejected from then on. The previous key must also meet the strength rules and differ from the new key.
 
-   With Kubernetes: update the Secret, then roll the Deployments.
-
-4. Verify the Web UI loads correctly after the restart.
+Rejected keys are logged at Warning (method, path, remote IP, never the key) and counted in the
+`flowledger.api.auth.failures` metric (meter `FlowLedger.Api`).
 
 ## Rotating `Mx__ApiKey` / `Mx__ClientId` / `Mx__WebhookSecret`
 

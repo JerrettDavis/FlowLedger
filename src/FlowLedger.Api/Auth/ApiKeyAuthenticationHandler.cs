@@ -1,6 +1,5 @@
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -25,6 +24,14 @@ public sealed class ApiKeyAuthenticationHandler(
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     public const string SchemeName = "ApiKey";
+
+    /// <summary>Meter name for API auth metrics; export it via OpenTelemetry <c>AddMeter</c>.</summary>
+    public const string MeterName = "FlowLedger.Api";
+    public const string FailureCounterName = "flowledger.api.auth.failures";
+
+    private static readonly Meter AuthMeter = new(MeterName);
+    private static readonly Counter<long> FailureCounter =
+        AuthMeter.CreateCounter<long>(FailureCounterName, description: "Requests rejected for presenting an invalid API key.");
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -55,13 +62,21 @@ public sealed class ApiKeyAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        // Fixed-time comparison of byte representations to prevent timing attacks.
-        var suppliedBytes = Encoding.UTF8.GetBytes(suppliedKey);
-        var configuredBytes = Encoding.UTF8.GetBytes(configuredKey);
-
-        if (!CryptographicOperations.FixedTimeEquals(suppliedBytes, configuredBytes))
+        var match = ApiKeyPolicy.Match(suppliedKey, apiOptions.Value);
+        if (match == ApiKeyMatch.None)
         {
+            FailureCounter.Add(1);
+            Logger.LogWarning(
+                "API key authentication failed for {Method} {Path} from {RemoteIp}",
+                Request.Method, Request.Path.Value, Context.Connection.RemoteIpAddress);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
+        }
+
+        if (match == ApiKeyMatch.Previous)
+        {
+            Logger.LogWarning(
+                "API request authenticated with Api:PreviousKey (rotation in progress) from {RemoteIp}; update the caller to the current key and remove Api:PreviousKey.",
+                Context.Connection.RemoteIpAddress);
         }
 
         var claims = new[] { new Claim(ClaimTypes.Name, "api-client") };
