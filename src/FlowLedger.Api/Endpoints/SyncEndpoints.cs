@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Integrations.Abstractions;
@@ -82,7 +83,7 @@ internal static class SyncEndpoints
             }
             catch (SyncThrottledException ex)
             {
-                httpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(ex.RetryAfter.TotalSeconds)).ToString();
+                httpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(ex.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
                 return Results.Problem(title: "Synced recently", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
             }
             catch (SyncAlreadyRunningException ex)

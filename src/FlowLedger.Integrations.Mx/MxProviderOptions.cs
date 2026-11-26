@@ -32,7 +32,7 @@ public sealed class MxProviderOptions
     /// Optional per-tenant monthly aggregation budget (number of allowed manual refreshes).
     /// Zero or negative means "no budget cap". Reserved for future enforcement.
     /// </summary>
-    public int MonthlyManualRefreshBudget { get; set; } = 0;
+    public int MonthlyManualRefreshBudget { get; set; }
 
     /// <summary>
     /// Safety cap on the number of pages fetched in a single <c>GetAccountsAsync</c> call.

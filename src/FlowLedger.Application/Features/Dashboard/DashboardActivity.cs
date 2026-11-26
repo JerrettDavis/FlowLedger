@@ -123,7 +123,7 @@ public static class DashboardActivityAnalyzer
             {
                 // The legacy "× the usual amount" rule already covers a merchant outlier; don't double-report it.
                 var hasOutlier = reasons.Any(r => r.Contains("the usual amount"));
-                reasons.AddRange(extra.Where(r => !(hasOutlier && r.StartsWith(AnomalyDetector.MerchantOutlierPrefix))));
+                reasons.AddRange(extra.Where(r => !(hasOutlier && r.StartsWith(AnomalyDetector.MerchantOutlierPrefix, StringComparison.Ordinal))));
             }
 
             if (reasons.Count > 0)

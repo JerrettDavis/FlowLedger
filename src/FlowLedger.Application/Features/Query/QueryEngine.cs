@@ -538,7 +538,7 @@ internal sealed class EvalContext(DateOnly today)
         {
             if (c.Args.Count < min || c.Args.Count > max)
             {
-                throw new QueryException($"{c.Name}() takes {(min == max ? min.ToString() : $"{min}-{max}")} argument(s).", c.Pos);
+                throw new QueryException($"{c.Name}() takes {(min == max ? min.ToString(CultureInfo.InvariantCulture) : $"{min}-{max}")} argument(s).", c.Pos);
             }
         }
 

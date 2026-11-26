@@ -188,7 +188,7 @@ public sealed class QuilttIssueMappingTests
         $"\"connection\":{{\"id\":\"{connId}\",\"status\":\"{status}\"}}}}]}}}}";
 
     private static Func<HttpRequestMessage, string, HttpResponseMessage> Wire(string connectionsJson, string accountsJson) => (req, body) =>
-        req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+        req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal) ? Json("""{"token":"tok","userId":"p_1"}""")
         : body.Contains("FlowLedgerConnections") ? Json(connectionsJson)
         : body.Contains("FlowLedgerAccounts") ? Json(accountsJson)
         : Json("""{"data":{"transactions":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}""");

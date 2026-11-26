@@ -1,5 +1,6 @@
 namespace FlowLedger.E2E.Tests;
 
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -27,7 +28,7 @@ public class MlFeaturesTests : E2ETestBase
         return http;
     }
 
-    private static string Today(int daysAgo = 0) => DateOnly.FromDateTime(DateTime.Now).AddDays(-daysAgo).ToString("yyyy-MM-dd");
+    private static string Today(int daysAgo = 0) => DateOnly.FromDateTime(DateTime.Now).AddDays(-daysAgo).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static async Task<Guid> CreateAccountAsync(HttpClient http, string name)
     {

@@ -64,7 +64,7 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
         var cut = RenderPage(handler);
         cut.WaitForState(() => handler.TransactionCalls >= 1);
 
-        var field = cut.FindComponents<MudTextField<string>>().Single(f => f.Instance.Label?.StartsWith("Search") == true);
+        var field = cut.FindComponents<MudTextField<string>>().Single(f => f.Instance.Label?.StartsWith("Search", StringComparison.Ordinal) == true);
         await cut.InvokeAsync(() => field.Instance.ValueChanged.InvokeAsync("coffee shop"));
 
         handler.Queries.Last().Should().Contain("search=coffee%20shop");

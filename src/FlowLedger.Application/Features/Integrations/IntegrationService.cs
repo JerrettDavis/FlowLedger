@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -418,7 +419,7 @@ public sealed partial class IntegrationService(
         }, Json);
 
         var headers = BuildHeaders(integration.Config, secrets, new Dictionary<string, string>());
-        var timestamp = _clock.GetUtcNow().ToUnixTimeSeconds().ToString();
+        var timestamp = _clock.GetUtcNow().ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
         headers.Add(new(EventHeader, eventKind));
         headers.Add(new(DeliveryHeader, deliveryId));
         headers.Add(new(TimestampHeader, timestamp));

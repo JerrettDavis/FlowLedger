@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.SharedKernel;
 using FluentValidation;
 
@@ -38,6 +39,6 @@ public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCate
             return new BudgetStatus(b.Category, b.MonthlyLimit, spent, b.MonthlyLimit - spent, pct, spent > b.MonthlyLimit);
         }).ToList();
 
-        return new BudgetOverview((month ?? DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)).ToString("yyyy-MM"), rows, spentByCategory);
+        return new BudgetOverview((month ?? DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)).ToString("yyyy-MM", CultureInfo.InvariantCulture), rows, spentByCategory);
     }
 }

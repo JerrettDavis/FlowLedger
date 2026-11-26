@@ -224,8 +224,8 @@ public static class QueryChartSvg
         {
             var v = min + (max - min) * g / 4;
             var gy = y(v);
-            sb.Append($"<line x1='{PadL}' y1='{gy:F1}' x2='{right}' y2='{gy:F1}' stroke='var(--fl-grid)' stroke-width='1'/>");
-            sb.Append($"<text x='{PadL - 6}' y='{gy + 4:F1}' text-anchor='end' font-size='11' fill='var(--fl-muted)'>{Esc(ChartModel.Compact(v))}</text>");
+            sb.Append(CultureInfo.InvariantCulture, $"<line x1='{PadL}' y1='{gy:F1}' x2='{right}' y2='{gy:F1}' stroke='var(--fl-grid)' stroke-width='1'/>");
+            sb.Append(CultureInfo.InvariantCulture, $"<text x='{PadL - 6}' y='{gy + 4:F1}' text-anchor='end' font-size='11' fill='var(--fl-muted)'>{Esc(ChartModel.Compact(v))}</text>");
         }
     }
 
@@ -292,12 +292,12 @@ public static class QueryChartSvg
                 if (area && r.Count > 1)
                 {
                     var back = string.Join(" ", Enumerable.Reverse(r).Select(i => $"{X(i):F1},{Y(bases[i]):F1}"));
-                    sb.Append($"<polygon points='{pts} {back}' fill='{color}' fill-opacity='0.28' stroke='var(--fl-surface)' stroke-width='1'/>");
+                    sb.Append(CultureInfo.InvariantCulture, $"<polygon points='{pts} {back}' fill='{color}' fill-opacity='0.28' stroke='var(--fl-surface)' stroke-width='1'/>");
                 }
 
                 if (r.Count > 1)
                 {
-                    sb.Append($"<polyline points='{pts}' fill='none' stroke='{color}' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>");
+                    sb.Append(CultureInfo.InvariantCulture, $"<polyline points='{pts}' fill='none' stroke='{color}' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>");
                 }
             }
 
@@ -305,7 +305,7 @@ public static class QueryChartSvg
             {
                 if (tops[i] is { } t)
                 {
-                    sb.Append($"<circle cx='{X(i):F1}' cy='{Y(t):F1}' r='{(n > 40 ? 2 : 3.5)}' fill='{color}' stroke='var(--fl-surface)' stroke-width='2'>" +
+                    sb.Append(CultureInfo.InvariantCulture, $"<circle cx='{X(i):F1}' cy='{Y(t):F1}' r='{(n > 40 ? 2 : 3.5)}' fill='{color}' stroke='var(--fl-surface)' stroke-width='2'>" +
                               $"<title>{Esc(s.Name)} · {Esc(m.Categories[i])}: {Esc(s.Values[i]!.Value.ToString("N2", CultureInfo.InvariantCulture))}</title></circle>");
                 }
             }
@@ -319,7 +319,7 @@ public static class QueryChartSvg
         for (var i = 0; i < cats.Count; i += step)
         {
             var label = cats[i].Length > 12 ? cats[i][..11] + "…" : cats[i];
-            sb.Append($"<text x='{x(i):F1}' y='{y}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>{Esc(label)}</text>");
+            sb.Append(CultureInfo.InvariantCulture, $"<text x='{x(i):F1}' y='{y}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>{Esc(label)}</text>");
         }
     }
 
@@ -341,15 +341,15 @@ public static class QueryChartSvg
             for (var g = 0; g <= 4; g++)
             {
                 var v = min + (max - min) * g / 4;
-                sb.Append($"<line x1='{X(v):F1}' y1='8' x2='{X(v):F1}' y2='{h - 24}' stroke='var(--fl-grid)'/>");
-                sb.Append($"<text x='{X(v):F1}' y='{h - 8}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>{Esc(ChartModel.Compact(v))}</text>");
+                sb.Append(CultureInfo.InvariantCulture, $"<line x1='{X(v):F1}' y1='8' x2='{X(v):F1}' y2='{h - 24}' stroke='var(--fl-grid)'/>");
+                sb.Append(CultureInfo.InvariantCulture, $"<text x='{X(v):F1}' y='{h - 8}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>{Esc(ChartModel.Compact(v))}</text>");
             }
 
             for (var i = 0; i < n; i++)
             {
                 var top = 8 + i * rowH;
                 var label = m.Categories[i].Length > 17 ? m.Categories[i][..16] + "…" : m.Categories[i];
-                sb.Append($"<text x='{labelW - 8}' y='{top + rowH / 2 + 4:F1}' text-anchor='end' font-size='12' fill='var(--fl-text)'>{Esc(label)}</text>");
+                sb.Append(CultureInfo.InvariantCulture, $"<text x='{labelW - 8}' y='{top + rowH / 2 + 4:F1}' text-anchor='end' font-size='12' fill='var(--fl-text)'>{Esc(label)}</text>");
                 double pos = 0, neg = 0;
                 var barH = Math.Max(4, (rowH - 4) / (stacked ? 1 : sc) - 2);
                 for (var si = 0; si < sc; si++)
@@ -365,12 +365,12 @@ public static class QueryChartSvg
                     var y = stacked ? top + 2 : top + 2 + si * (barH + 2);
                     var x0 = X(Math.Min(a, b));
                     var w = Math.Max(1, Math.Abs(X(b) - X(a)) - (stacked ? 2 : 0));
-                    sb.Append($"<rect x='{x0:F1}' y='{y:F1}' width='{w:F1}' height='{barH:F1}' rx='3' fill='{SeriesVar(si)}'>" +
+                    sb.Append(CultureInfo.InvariantCulture, $"<rect x='{x0:F1}' y='{y:F1}' width='{w:F1}' height='{barH:F1}' rx='3' fill='{SeriesVar(si)}'>" +
                               $"<title>{Esc(m.Series[si].Name)} · {Esc(m.Categories[i])}: {v:N2}</title></rect>");
                 }
             }
 
-            sb.Append($"<line x1='{zero:F1}' y1='8' x2='{zero:F1}' y2='{h - 24}' stroke='var(--fl-axis)'/>");
+            sb.Append(CultureInfo.InvariantCulture, $"<line x1='{zero:F1}' y1='8' x2='{zero:F1}' y2='{h - 24}' stroke='var(--fl-axis)'/>");
             return $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} {h}' role='img' aria-label='Bar chart' class='fl-viz-svg'>{sb}</svg>";
         }
 
@@ -399,12 +399,12 @@ public static class QueryChartSvg
                 var x = stacked ? left : left + si * (barW + 2);
                 var yTop = Y(Math.Max(a, b));
                 var hgt = Math.Max(1, Math.Abs(Y(a) - Y(b)) - (stacked ? 2 : 0));
-                sb.Append($"<rect x='{x:F1}' y='{yTop:F1}' width='{barW:F1}' height='{hgt:F1}' rx='3' fill='{SeriesVar(si)}'>" +
+                sb.Append(CultureInfo.InvariantCulture, $"<rect x='{x:F1}' y='{yTop:F1}' width='{barW:F1}' height='{hgt:F1}' rx='3' fill='{SeriesVar(si)}'>" +
                           $"<title>{Esc(m.Series[si].Name)} · {Esc(m.Categories[i])}: {v:N2}</title></rect>");
             }
         }
 
-        sb.Append($"<line x1='{PadL}' y1='{Y(0):F1}' x2='{W - PadR}' y2='{Y(0):F1}' stroke='var(--fl-axis)'/>");
+        sb.Append(CultureInfo.InvariantCulture, $"<line x1='{PadL}' y1='{Y(0):F1}' x2='{W - PadR}' y2='{Y(0):F1}' stroke='var(--fl-axis)'/>");
         XLabels(sb, m.Categories, i => PadL + i * slot + slot / 2, H - 10, Math.Max(1, (int)Math.Ceiling(n / 10.0)));
         return Svg(sb.ToString(), "Column chart");
     }
@@ -437,22 +437,22 @@ public static class QueryChartSvg
             var end = angle + Math.Min(sweep, 2 * Math.PI - 1e-4);
             var large = sweep > Math.PI ? 1 : 0;
             string P(double rad, double ang) => $"{cx + rad * Math.Cos(ang):F2},{cy + rad * Math.Sin(ang):F2}";
-            sb.Append($"<path d='M {P(r, angle)} A {r} {r} 0 {large} 1 {P(r, end)} L {P(inner, end)} A {inner} {inner} 0 {large} 0 {P(inner, angle)} Z' " +
+            sb.Append(CultureInfo.InvariantCulture, $"<path d='M {P(r, angle)} A {r} {r} 0 {large} 1 {P(r, end)} L {P(inner, end)} A {inner} {inner} 0 {large} 0 {P(inner, angle)} Z' " +
                       $"fill='{SeriesVar(i)}' stroke='var(--fl-surface)' stroke-width='2'><title>{Esc(items[i].Name)}: {items[i].Value:N2} ({frac:P1})</title></path>");
             angle += sweep;
         }
 
-        sb.Append($"<text x='{cx}' y='{cy - 2}' text-anchor='middle' font-size='20' font-weight='600' fill='var(--fl-text)'>{Esc(ChartModel.Compact(total))}</text>");
-        sb.Append($"<text x='{cx}' y='{cy + 16}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>total</text>");
+        sb.Append(CultureInfo.InvariantCulture, $"<text x='{cx}' y='{cy - 2}' text-anchor='middle' font-size='20' font-weight='600' fill='var(--fl-text)'>{Esc(ChartModel.Compact(total))}</text>");
+        sb.Append(CultureInfo.InvariantCulture, $"<text x='{cx}' y='{cy + 16}' text-anchor='middle' font-size='11' fill='var(--fl-muted)'>total</text>");
 
         // Legend lives inside the SVG so slices and names stay together at any width.
         for (var i = 0; i < items.Count; i++)
         {
             var y = 36 + i * 26;
             var name = items[i].Name.Length > 22 ? items[i].Name[..21] + "…" : items[i].Name;
-            sb.Append($"<rect x='330' y='{y - 10}' width='12' height='12' rx='3' fill='{SeriesVar(i)}'/>");
-            sb.Append($"<text x='350' y='{y}' font-size='12' fill='var(--fl-text)'>{Esc(name)}</text>");
-            sb.Append($"<text x='640' y='{y}' text-anchor='end' font-size='12' fill='var(--fl-muted)'>{items[i].Value / total:P0}</text>");
+            sb.Append(CultureInfo.InvariantCulture, $"<rect x='330' y='{y - 10}' width='12' height='12' rx='3' fill='{SeriesVar(i)}'/>");
+            sb.Append(CultureInfo.InvariantCulture, $"<text x='350' y='{y}' font-size='12' fill='var(--fl-text)'>{Esc(name)}</text>");
+            sb.Append(CultureInfo.InvariantCulture, $"<text x='640' y='{y}' text-anchor='end' font-size='12' fill='var(--fl-muted)'>{items[i].Value / total:P0}</text>");
         }
 
         return $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} 300' role='img' aria-label='Donut chart' class='fl-viz-svg'>{sb}</svg>";
