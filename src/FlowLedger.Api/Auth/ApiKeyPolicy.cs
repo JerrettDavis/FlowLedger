@@ -39,6 +39,12 @@ public static class ApiKeyPolicy
             return $"{settingName} must be set to a non-empty value.";
         }
 
+        if (Microsoft.Extensions.Hosting.ConfigGuards.LooksLikePlaceholder(key))
+        {
+            return $"{settingName} still contains a template placeholder (e.g. from .env.example). " +
+                   "Generate a strong random key (e.g. `openssl rand -hex 32`).";
+        }
+
         if (key.Length < MinimumLength)
         {
             return $"{settingName} must be at least {MinimumLength} characters (e.g. `openssl rand -hex 32`).";

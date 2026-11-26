@@ -18,7 +18,7 @@ public static class SnackbarExtensions
     /// Shows a failure as an error that stays until dismissed (errors must not vanish before they can be read).
     /// An optional <paramref name="prefix"/> names the action, e.g. "Sync failed".
     /// </summary>
-    public static Snackbar? AddProblem(this ISnackbar snackbar, Exception ex, string? prefix = null, string? fallback = null)
+    public static Snackbar? AddFailure(this ISnackbar snackbar, Exception ex, string? prefix = null, string? fallback = null)
     {
         var text = ProblemText(ex, fallback);
         return snackbar.Add(prefix is null ? text : $"{prefix}: {text}", Severity.Error, ConfigureProblem);

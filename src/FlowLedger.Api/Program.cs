@@ -144,7 +144,9 @@ var app = builder.Build();
 {
     var apiOpts = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
     if (!string.IsNullOrEmpty(apiOpts.TenantSigningKey)
-        && (apiOpts.TenantSigningKey.Length < 32 || string.Equals(apiOpts.TenantSigningKey, apiOpts.Key, StringComparison.Ordinal)))
+        && (apiOpts.TenantSigningKey.Length < 32
+            || string.Equals(apiOpts.TenantSigningKey, apiOpts.Key, StringComparison.Ordinal)
+            || string.Equals(apiOpts.TenantSigningKey, apiOpts.PreviousKey, StringComparison.Ordinal)))
     {
         throw new InvalidOperationException(
             "Api:TenantSigningKey must be at least 32 characters and different from Api:Key (e.g. `openssl rand -hex 32`).");

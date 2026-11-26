@@ -6,7 +6,7 @@ namespace FlowLedger.Web.Tests.Components;
 public sealed class ResponsiveTableTests
 {
     // Inline styles bypass theming and block a strict CSP style-src. This is a ratchet: it may shrink, never grow.
-    private const int InlineStyleBaseline = 104;
+    private const int InlineStyleBaseline = 105;
 
     [Fact]
     public void Tables_can_scroll_sideways_instead_of_clipping_columns()

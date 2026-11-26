@@ -81,14 +81,14 @@ else
     {
         _loading = true;
         try { _logins = (await ApiClient.GetLinkedLoginsAsync()).ToList(); }
-        catch (Exception ex) { Snackbar.AddProblem(ex); }
+        catch (Exception ex) { Snackbar.AddFailure(ex); }
         _loading = false;
     }
 
     private async Task MakeCode()
     {
         try { _code = await ApiClient.CreateLinkCodeAsync(); }
-        catch (Exception ex) { Snackbar.AddProblem(ex); }
+        catch (Exception ex) { Snackbar.AddFailure(ex); }
     }
 
     private async Task Redeem()
@@ -105,7 +105,7 @@ else
 
             Snackbar.Add("That code is invalid or has expired.", Severity.Warning);
         }
-        catch (Exception ex) { Snackbar.AddProblem(ex); }
+        catch (Exception ex) { Snackbar.AddFailure(ex); }
     }
 
     private async Task Unlink(FlowLedger.Web.ApiClient.FlowLedgerApiClient.LinkedLoginDto l)
@@ -115,6 +115,6 @@ else
             if (await ApiClient.UnlinkLoginAsync(l.UserId)) { await Load(); }
             else { Snackbar.Add("Could not unlink that login.", Severity.Warning); }
         }
-        catch (Exception ex) { Snackbar.AddProblem(ex); }
+        catch (Exception ex) { Snackbar.AddFailure(ex); }
     }
 }
