@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ── Service defaults (OpenTelemetry, health checks, service discovery) ──────
 builder.AddServiceDefaults();
+builder.Services.AddFlowLedgerDataProtection(builder.Configuration, builder.Environment.EnvironmentName); // persisted key ring (DataProtection:KeysPath)
 
 // ── Authentication (provider-agnostic OIDC; disabled when Auth:Oidc:Authority is empty) ──
 var oidc = builder.AddFlowLedgerAuth();
