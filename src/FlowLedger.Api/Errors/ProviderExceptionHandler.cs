@@ -25,6 +25,19 @@ internal sealed class ProviderExceptionHandler(IProblemDetailsService problems) 
             });
         }
 
+        if (exception is FlowLedger.Domain.Exceptions.DomainException domain)
+        {
+            // Invariant violations are client errors: 409 when the entity is in the wrong state, otherwise 400 (#90).
+            var conflict = domain is FlowLedger.Domain.Exceptions.InvalidStatusTransitionException
+                or FlowLedger.Domain.Exceptions.OccurrenceAlreadyMatchedException;
+            return await WriteAsync(httpContext, exception, new ProblemDetails
+            {
+                Status = conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest,
+                Title = conflict ? "Conflict with the current state" : "Request violates a business rule",
+                Detail = domain.Message,
+            });
+        }
+
         if (exception is not ProviderException pe)
         {
             return false;
