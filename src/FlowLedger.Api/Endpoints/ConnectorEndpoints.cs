@@ -38,6 +38,15 @@ internal static class ConnectorEndpoints
             c => Has(c, "Quiltt:ApiKeySecret") && Has(c, "Quiltt:ConnectorId")), // WebhookSecret is optional: without it only webhooks are refused
     ];
 
+    /// <summary>JSON shape of a connection's persisted issue (ADR 0018); the connection's <c>issue</c> is null when healthy.</summary>
+    internal sealed record ConnectionIssueDto(
+        string Kind, string Message, bool Retryable, bool RequiresUserAction,
+        DateTimeOffset? RetryAfter, DateTimeOffset At, int ConsecutiveFailures)
+    {
+        internal static ConnectionIssueDto From(ConnectionIssueInfo i) =>
+            new(i.Kind, i.Message, i.Retryable, i.RequiresUserAction, i.RetryAfter, i.At, i.ConsecutiveFailures);
+    }
+
     internal static IEndpointRouteBuilder MapConnectorEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/integrations/connectors", async (
@@ -95,7 +104,14 @@ internal static class ConnectorEndpoints
                         },
                         connections = linked
                             .Where(c => string.Equals(c.ProviderName, d.Id, StringComparison.OrdinalIgnoreCase))
-                            .Select(c => new { institution = c.Institution, status = c.Status, linkedAt = c.CreatedAt, updatedAt = c.UpdatedAt })
+                            .Select(c => new
+                            {
+                                institution = c.Institution,
+                                status = c.Status,
+                                linkedAt = c.CreatedAt,
+                                updatedAt = c.UpdatedAt,
+                                issue = c.Issue is null ? null : ConnectionIssueDto.From(c.Issue),
+                            })
                             .ToList(),
                     });
                 }
