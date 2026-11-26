@@ -25,7 +25,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.15" />
-    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.15" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -44,14 +43,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.4" />
-  </ItemGroup>
-
-  <!-- ============================================================
-       Identity / Auth (OpenIddict — full impl in later milestone)
-  ============================================================ -->
-  <ItemGroup>
-    <PackageVersion Include="OpenIddict.AspNetCore" Version="7.5.0" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.5.0" />
   </ItemGroup>
 
   <!-- ============================================================

@@ -9,8 +9,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <!-- Identity EF stores: not referenced by code yet; keep only if user accounts land here -->
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <!-- In-process sentence embeddings (ONNX) for local categorization / similarity: no external model server -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="LLamaSharp" />
