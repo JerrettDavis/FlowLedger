@@ -66,7 +66,7 @@ public sealed class HomeAssistantStoreTests : IAsyncLifetime
         await using var cmd = new NpgsqlCommand("SELECT webhook FROM home_assistant_settings WHERE tenant_id = @t", conn);
         cmd.Parameters.AddWithValue("t", t.TenantId);
         var raw = (string)(await cmd.ExecuteScalarAsync())!;
-        raw.Should().StartWith("v1:").And.NotContain("AbCdEf0123456789XyZ").And.NotContain("ha.example.com");
+        raw.Should().StartWith("v2:").And.NotContain("AbCdEf0123456789XyZ").And.NotContain("ha.example.com");
 
         // A store without the key cannot open it (fails closed instead of leaking or throwing).
         (await Store(t).GetWebhookUrlAsync(t.TenantId)).Should().BeNull();

@@ -102,9 +102,12 @@ public static class WorkerConfigValidator
                 }
             }
 
-            if (ConfigGuards.LooksLikePlaceholder(config["HomeAssistant:EncryptionKey"]))
+            foreach (var secretKey in new[] { "HomeAssistant:EncryptionKey", "Integrations:EncryptionKey", "Secrets:EncryptionKey", "Secrets:EncryptionKeyPrevious" })
             {
-                errors.Add("HomeAssistant:EncryptionKey still contains a template placeholder.");
+                if (ConfigGuards.LooksLikePlaceholder(config[secretKey]))
+                {
+                    errors.Add($"{secretKey} still contains a template placeholder.");
+                }
             }
         }
 

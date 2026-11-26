@@ -359,7 +359,7 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.Persistence.Repositories.EfHomeAssistantStore(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
-                configuration["HomeAssistant:EncryptionKey"]));
+                ring: SecretsKeyRing(configuration, "HomeAssistant:EncryptionKey")));
         services.AddHttpClient(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler)
             .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(10));
@@ -372,7 +372,7 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.Persistence.Repositories.EfIntegrationStore(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
-                configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
+                ring: SecretsKeyRing(configuration, "Integrations:EncryptionKey", "HomeAssistant:EncryptionKey")));
         foreach (var clientName in new[]
         {
             FlowLedger.Infrastructure.DataSafety.IntegrationTransport.HttpClientName,
@@ -401,6 +401,23 @@ public static class DependencyInjection
             FlowLedger.Infrastructure.DataSafety.RetentionSettings.From(configuration)));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
+    }
+
+    /// <summary>
+    /// Key ring for secrets stored at rest (#156). Seals with <c>Secrets:EncryptionKey</c>, else the first configured legacy key;
+    /// opens with that key plus <c>Secrets:EncryptionKeyPrevious</c> (comma separated) plus every legacy key, so rows written
+    /// before the v2 envelope (or before a rotation) stay readable.
+    /// </summary>
+    internal static FlowLedger.Infrastructure.DataSafety.SecretKeyRing SecretsKeyRing(IConfiguration configuration, params string[] legacyKeys)
+    {
+        var legacy = legacyKeys.Select(k => configuration[k]).ToArray();
+        var current = configuration["Secrets:EncryptionKey"];
+        if (string.IsNullOrWhiteSpace(current))
+        {
+            current = legacy.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        }
+
+        return FlowLedger.Infrastructure.DataSafety.SecretKeyRing.From(current, [configuration["Secrets:EncryptionKeyPrevious"], .. legacy]);
     }
 
     /// <summary>Object storage, raw payload archive and readiness checks.</summary>

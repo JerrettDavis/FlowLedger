@@ -81,6 +81,8 @@ x-app-common-env: &app-common-env
   Mx__Enabled: "false"
   # Encrypts the Home Assistant webhook URL at rest (api and worker both read it). Optional; see .env.example.
   HomeAssistant__EncryptionKey: ${HomeAssistant__EncryptionKey:-}
+  Secrets__EncryptionKey: ${Secrets__EncryptionKey:-}
+  Secrets__EncryptionKeyPrevious: ${Secrets__EncryptionKeyPrevious:-}
 
 services:
   # ── Infrastructure ────────────────────────────────────────────────────────
