@@ -241,7 +241,7 @@
         }
         catch (ApiClientException ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
     }
 
@@ -328,7 +328,7 @@
         }
         catch (ApiClientException ex)
         {
-            _askNote = ex.Message;
+            _askNote = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {
@@ -405,7 +405,7 @@
         }
         catch (ApiClientException ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
             return null;
         }
     }
@@ -489,7 +489,7 @@
         }
         catch (ApiClientException ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {

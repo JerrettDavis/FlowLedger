@@ -108,7 +108,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
             _options = [];
         }
         finally
@@ -126,7 +126,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
     }
 
@@ -144,7 +144,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
     }
 

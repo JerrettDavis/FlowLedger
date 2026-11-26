@@ -42,6 +42,25 @@ public static class ChartSummary
         return $"{subject}: from {first.Label} {format(first.Value)} to {last.Label} {format(last.Value)}, {direction} (high {format(high)}, low {format(low)}).";
     }
 
+    /// <summary>Describes multi-series line charts: for each series, start, end, high and low.</summary>
+    public static string Series(string subject, IReadOnlyList<string> labels, IEnumerable<(string Name, double[] Data)> series, Func<double, string> format)
+    {
+        var parts = new List<string>();
+        foreach (var (name, data) in series)
+        {
+            if (data.Length == 0)
+            {
+                continue;
+            }
+
+            var first = labels.Count > 0 ? labels[0] : "start";
+            var last = labels.Count > 0 ? labels[Math.Min(labels.Count, data.Length) - 1] : "end";
+            parts.Add($"{name} goes from {format(data[0])} at {first} to {format(data[^1])} at {last} (high {format(data.Max())}, low {format(data.Min())})");
+        }
+
+        return parts.Count == 0 ? $"{subject}: no data." : $"{subject}: {string.Join("; ", parts)}.";
+    }
+
     /// <summary>The aria-valuetext of a progress bar, e.g. "Groceries: 82% of budget used".</summary>
     public static string ProgressText(string name, double percent, string suffix) =>
         $"{name}: {Math.Round(percent, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture)}% {suffix}";

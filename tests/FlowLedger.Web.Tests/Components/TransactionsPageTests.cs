@@ -19,6 +19,8 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     private sealed class Handler : HttpMessageHandler
     {
         public int TransactionCalls;
+        public readonly List<string> Queries = [];
+        public int PageRows;
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -27,7 +29,8 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
             if (path == "/api/transactions")
             {
                 Interlocked.Increment(ref TransactionCalls);
-                json = "[]";
+                Queries.Add(request.RequestUri.Query);
+                json = PageRows == 0 ? "[]" : "[" + string.Join(",", Enumerable.Range(0, PageRows).Select(_ => TxJson())) + "]";
             }
             else if (path == "/api/accounts")
             {
@@ -40,6 +43,53 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
         }
+    }
+
+    private static string TxJson() =>
+        $$"""{"id":"{{Guid.NewGuid()}}","accountId":"{{AccountId}}","amount":5,"currency":"USD","direction":"Debit","description":"ROW","status":"Posted","source":"x","effectiveDate":"2026-01-01","createdAt":"1970-01-01T00:00:00Z"}""";
+
+    private IRenderedComponent<Transactions> RenderPage(Handler handler)
+    {
+        Services.AddMudServices();
+        Services.AddSingleton(new FlowLedgerApiClient(
+            new HttpClient(handler) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        return Render<Transactions>();
+    }
+
+    [Fact]
+    public async Task Search_is_sent_to_the_server_instead_of_filtering_loaded_rows()
+    {
+        var handler = new Handler();
+        var cut = RenderPage(handler);
+        cut.WaitForState(() => handler.TransactionCalls >= 1);
+
+        var field = cut.FindComponents<MudTextField<string>>().Single(f => f.Instance.Label?.StartsWith("Search") == true);
+        await cut.InvokeAsync(() => field.Instance.ValueChanged.InvokeAsync("coffee shop"));
+
+        handler.Queries.Last().Should().Contain("search=coffee%20shop");
+    }
+
+    [Fact]
+    public async Task A_full_page_offers_older_transactions_and_loading_them_skips_what_is_loaded()
+    {
+        var handler = new Handler { PageRows = 500 };
+        var cut = RenderPage(handler);
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Load older transactions"));
+
+        await cut.Find("button[aria-label='Load older transactions']").ClickAsync();
+
+        handler.Queries.Last().Should().Contain("skip=500");
+    }
+
+    [Fact]
+    public void A_short_page_has_no_load_older_button()
+    {
+        var handler = new Handler { PageRows = 3 };
+        var cut = RenderPage(handler);
+        cut.WaitForState(() => handler.TransactionCalls >= 1);
+
+        cut.Markup.Should().NotContain("Load older transactions");
     }
 
     private static TransactionDto Tx(string merchant, Guid? id = null) =>

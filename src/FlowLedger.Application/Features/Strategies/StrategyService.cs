@@ -18,7 +18,7 @@ public sealed class StrategyService(
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    private const int MaxTransactions = 50_000;
+    private const int MaxTransactions = TransactionQuota.ProcessingCap;
     private const int TransferPadDays = 14;
 
     public async Task<StrategyReport> GetReportAsync(CancellationToken ct = default)

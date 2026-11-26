@@ -123,4 +123,17 @@ public sealed class TransactionHandlersTests
         results.Should().HaveCount(2);
         results.Should().OnlyContain(t => t.AccountId == acctA);
     }
+
+    [Fact]
+    public async Task ListTransactions_Search_FiltersByDescriptionCaseInsensitivelyBeforePaging()
+    {
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Shop" });
+        await createHandler.HandleAsync(ValidRequest() with { Description = "Rent" });
+
+        var listHandler = new ListTransactionsHandler(_repo);
+        var results = await listHandler.HandleAsync(new ListTransactionsQuery(Search: "coffee", Take: 1));
+
+        results.Should().ContainSingle().Which.Description.Should().Be("Coffee Shop");
+    }
 }

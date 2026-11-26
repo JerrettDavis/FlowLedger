@@ -21,7 +21,7 @@ public interface IMerchantAliasStore
 /// </summary>
 public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizationStore transactions)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
     public const int MaxLength = 200;
     public const int MaxAliases = 1000;
 
@@ -127,19 +127,21 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
         }
 
         var changed = 0;
-        foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
+        var changedRows = new List<FlowLedger.Domain.Aggregates.Transaction>();
+        foreach (var t in await transactions.LoadAsync(Max, ct))
         {
             var description = NormalizePattern(t.Description);
             var rule = rules.FirstOrDefault(r => description.Contains(r.Pattern, StringComparison.Ordinal));
             if (rule is not null && t.SetMerchantName(rule.Alias))
             {
+                changedRows.Add(t);
                 changed++;
             }
         }
 
         if (changed > 0)
         {
-            await transactions.SaveAsync(ct);
+            await transactions.SaveChangedAsync(changedRows, ct);
         }
 
         return changed;

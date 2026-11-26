@@ -40,7 +40,8 @@ public sealed record ProblemExtensions(
 }
 
 /// <summary>Parsed RFC 7807 problem response: safe text plus the typed issue extensions.</summary>
-public sealed record ProblemDocument(string? Title, string? Detail, string? ValidationMessage, ProblemExtensions? Extensions)
+public sealed record ProblemDocument(string? Title, string? Detail, string? ValidationMessage, ProblemExtensions? Extensions,
+    IReadOnlyDictionary<string, string>? FieldErrors = null)
 {
     public static readonly ProblemDocument Empty = new(null, null, null, null);
 
@@ -62,6 +63,7 @@ public sealed record ProblemDocument(string? Title, string? Detail, string? Vali
             }
 
             string? validation = null;
+            Dictionary<string, string>? fields = null;
             if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
             {
                 var joined = string.Join(" ", errors.EnumerateObject()
@@ -70,13 +72,19 @@ public sealed record ProblemDocument(string? Title, string? Detail, string? Vali
                     .Where(e => e.ValueKind == JsonValueKind.String)
                     .Select(e => e.GetString()));
                 validation = joined.Length == 0 ? null : joined;
+                fields = errors.EnumerateObject()
+                    .Where(p => p.Value.ValueKind == JsonValueKind.Array)
+                    .Select(p => (p.Name, Text: p.Value.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString()).FirstOrDefault()))
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Text))
+                    .ToDictionary(x => x.Name, x => x.Text!, StringComparer.OrdinalIgnoreCase);
             }
 
             return new ProblemDocument(
                 root.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null,
                 root.TryGetProperty("detail", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null,
                 validation,
-                ProblemExtensions.From(root));
+                ProblemExtensions.From(root),
+                fields is { Count: > 0 } ? fields : null);
         }
         catch (JsonException)
         {
