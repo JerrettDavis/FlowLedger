@@ -402,8 +402,26 @@
                 applyToMerchant = choice == true;
             }
 
+            var previous = tx.CategoryId;
             var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, applyToMerchant);
-            Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
+            if (changed == 1 && previous is { } before)
+            {
+                // A single-row change can be reverted exactly; bulk changes were already confirmed with their count.
+                Snackbar.AddWithUndo($"Set to {category.Path}", async () =>
+                {
+                    await ApiClient.SetTransactionCategoryAsync(tx.Id, before, applyToMerchant: false);
+                    await InvokeAsync(() =>
+                    {
+                        PatchRow(tx.Id, t => t with { CategoryId = before });
+                        StateHasChanged();
+                    });
+                });
+            }
+            else
+            {
+                Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
+            }
+
             if (changed > 1)
             {
                 await LoadAsync();

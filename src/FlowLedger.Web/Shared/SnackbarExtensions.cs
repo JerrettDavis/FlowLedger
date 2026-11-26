@@ -24,6 +24,37 @@ public static class SnackbarExtensions
         return snackbar.Add(prefix is null ? text : $"{prefix}: {text}", Severity.Error, ConfigureProblem);
     }
 
+    /// <summary>How long an Undo offer stays on screen (long enough to notice and reach it by keyboard).</summary>
+    public const int UndoVisibleMilliseconds = 10_000;
+
+    /// <summary>
+    /// Confirms a reversible action and offers Undo on the same toast. A failed undo is reported as a persistent error,
+    /// never swallowed.
+    /// </summary>
+    public static Snackbar? AddWithUndo(this ISnackbar snackbar, string message, Func<Task> undo, string actionText = "Undo")
+        => snackbar.Add(message, Severity.Success, o => ConfigureUndo(o, snackbar, undo, actionText));
+
+    /// <summary>Wires the Undo action button onto a toast's options.</summary>
+    public static void ConfigureUndo(SnackbarOptions o, ISnackbar snackbar, Func<Task> undo, string actionText = "Undo")
+    {
+        o.Action = actionText;
+        o.ActionVariant = Variant.Text;
+        o.ShowCloseIcon = true;
+        o.VisibleStateDuration = UndoVisibleMilliseconds;
+        o.OnClick = async _ =>
+        {
+            try
+            {
+                await undo();
+                snackbar.Add("Change undone", Severity.Info);
+            }
+            catch (Exception ex)
+            {
+                snackbar.AddFailure(ex, "Couldn't undo");
+            }
+        };
+    }
+
     /// <summary>Errors stay on screen with a close button instead of auto-dismissing.</summary>
     public static void ConfigureProblem(SnackbarOptions o)
     {
