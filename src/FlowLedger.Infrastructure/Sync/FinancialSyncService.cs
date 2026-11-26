@@ -149,6 +149,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(ProviderIssue.FromException(ex), DateTimeOffset.UtcNow), CancellationToken.None);
             throw; // never swallow: callers (UI, jobs) still see the original failure
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // An unexpected failure (a database constraint, a bug) must still leave a trail: record it as Internal so the
+            // retry policy bounds the attempts (MaxBoundedFailures) instead of repeating it forever with no UI issue.
+            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(
+                ProviderIssue.Of(ProviderIssueKind.Internal, $"Unexpected {ex.GetType().Name} during sync."), DateTimeOffset.UtcNow), CancellationToken.None);
+            throw;
+        }
 
         await RecordHealthSafelyAsync(await ReadProviderHealthAsync(ct), ct);
         return result;
@@ -449,6 +457,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             AddSettleCandidate(settleCandidates, p);
         }
 
+        // Rows added earlier in this sync are not in the database yet, so a later page repeating one of them would
+        // otherwise be inserted again and hit the unique (tenant, fingerprint) index.
+        var insertedByFingerprint = new Dictionary<string, Transaction>();
+
         bool hasMore = true;
         while (hasMore)
         {
@@ -473,6 +485,15 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         Fingerprint: BuildFingerprint(account.AccountId, pt)))
                     .ToList();
 
+                // One page can repeat a transaction (overlapping backfill windows, a bank listing it twice). Keep a single
+                // copy per fingerprint, preferring the posted version over the pending one.
+                var distinct = fingerprintMap
+                    .GroupBy(x => x.Fingerprint.Value)
+                    .Select(g => g.FirstOrDefault(x => !x.ProviderTx.IsPending) is { ProviderTx: not null } posted ? posted : g.First())
+                    .ToList();
+                var repeatedInPage = fingerprintMap.Count - distinct.Count;
+                fingerprintMap = distinct;
+
                 var candidateFingerprints = fingerprintMap
                     .Select(x => x.Fingerprint.Value)
                     .ToList();
@@ -491,6 +512,16 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 {
                     if (mergedAway.Contains(x.Fingerprint.Value))
                     {
+                        continue;
+                    }
+
+                    if (insertedByFingerprint.TryGetValue(x.Fingerprint.Value, out var insertedRow))
+                    {
+                        // Already added earlier in this sync (not saved yet): settle it in place, never insert a second copy.
+                        if (!x.ProviderTx.IsPending && insertedRow.Settle(x.ProviderTx.PostedDate))
+                        {
+                            settled++;
+                        }
                         continue;
                     }
 
@@ -530,7 +561,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                         }
                     }
 
-                    toInsert.Add(MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint));
+                    var mapped = MapToTransaction(x.ProviderTx, account.AccountId, tenantId, x.Fingerprint);
+                    toInsert.Add(mapped);
+                    insertedByFingerprint[x.Fingerprint.Value] = mapped;
                 }
 
                 if (toInsert.Count > 0)
@@ -547,7 +580,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 {
                     _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
                 }
-                skipped += fingerprintMap.Count - toInsert.Count - settled;
+                skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
             }
 
             cursor = page.NextCursor;
