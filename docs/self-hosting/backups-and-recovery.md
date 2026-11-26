@@ -114,7 +114,13 @@ database), and compares counts taken just before the backup, so run it against a
 
 ## Data administration endpoints
 
-`GET /api/data/export`, `POST /api/data/import` and `POST /api/data/backup-now` act on the whole database, so they only accept requests from the host itself (loopback). Set `DataAdmin__AllowRemote=true` to allow other addresses (for example Docker bridge networking). The export zip is deleted from the server as soon as it has been sent.
+`GET /api/data/export`, `POST /api/data/import` and `POST /api/data/backup-now` act on the whole database (every tenant), so on top of the household-tenant check they are gated as follows:
+
+* **Recommended: set `DataAdmin__Key`** (>= 32 random characters, `openssl rand -hex 32`) on the API and the Web app. Callers must then send it as the `X-Admin-Token` header (the Web app does this automatically for `/api/data/*`), from any address. Add `DataAdmin__RequireLoopback=true` to also require a direct loopback caller.
+* **Without a key** only a *direct* loopback caller is accepted. Requests that arrive through a reverse proxy are refused even when the proxy runs on the same host (they carry `X-Forwarded-*` headers), and `X-Forwarded-For` can never make a caller look local. `DataAdmin__AllowRemote=true` still disables the check entirely (not recommended; use the key instead).
+* Import accepts at most 256 MB and stops extracting as soon as the real uncompressed byte count exceeds the cap.
+
+The export zip is deleted from the server as soon as it has been sent.
 
 ## Disaster recovery (new machine, empty database)
 

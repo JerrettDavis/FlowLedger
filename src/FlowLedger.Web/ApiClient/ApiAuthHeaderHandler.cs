@@ -10,7 +10,7 @@ namespace FlowLedger.Web.ApiClient;
 /// Registered on the FlowLedgerApiClient typed HttpClient in Program.cs.
 /// Values are read from the "Api" configuration section (bound to <see cref="ApiAuthOptions"/>).
 /// </summary>
-internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options, FlowLedger.Web.Auth.OidcOptions oidc) : DelegatingHandler
+internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options, FlowLedger.Web.Auth.OidcOptions oidc, IConfiguration configuration) : DelegatingHandler
 {
     private readonly ApiAuthOptions _options = options.Value;
 
@@ -23,6 +23,14 @@ internal sealed class ApiAuthHeaderHandler(IOptions<ApiAuthOptions> options, Flo
             // Overwrite, never append: a resilience retry re-sends the same request object, and a doubled key fails auth (401).
             request.Headers.Remove("X-Api-Key");
             request.Headers.TryAddWithoutValidation("X-Api-Key", _options.Key);
+        }
+
+        // Whole-database admin endpoints additionally require DataAdmin:Key (same value on API and Web) when the operator set one.
+        if (configuration["DataAdmin:Key"] is { Length: > 0 } adminKey
+            && request.RequestUri?.AbsolutePath.StartsWith("/api/data/", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            request.Headers.Remove("X-Admin-Token");
+            request.Headers.TryAddWithoutValidation("X-Admin-Token", adminKey);
         }
 
         // Single-household mode (no OIDC): the configured tenant is authoritative. With OIDC the signed-in user's own

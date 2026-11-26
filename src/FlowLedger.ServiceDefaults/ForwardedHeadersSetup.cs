@@ -19,6 +19,34 @@ public static class ForwardedHeadersSetup
 {
     public const string Section = "ForwardedHeaders";
 
+    /// <summary>HttpContext.Items key: the socket peer address as it was BEFORE forwarded headers could rewrite it.</summary>
+    public const string PeerAddressItem = "flowledger.peer-address";
+
+    /// <summary>HttpContext.Items key: true when the request arrived carrying any forwarding header (it came through a proxy).</summary>
+    public const string ForwardedItem = "flowledger.forwarded";
+
+    private static readonly string[] ForwardingHeaders = ["X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded"];
+
+    /// <summary>
+    /// Records the real socket peer and whether forwarding headers were present, before <c>UseForwardedHeaders</c> rewrites
+    /// <c>Connection.RemoteIpAddress</c>. Security gates that must not trust a rewritable address (loopback-only endpoints) read these.
+    /// </summary>
+    public static IApplicationBuilder UseFlowLedgerPeerCapture(this IApplicationBuilder app) =>
+        app.Use((ctx, next) =>
+        {
+            ctx.Items[PeerAddressItem] = ctx.Connection.RemoteIpAddress;
+            ctx.Items[ForwardedItem] = ForwardingHeaders.Any(h => ctx.Request.Headers.ContainsKey(h));
+            return next();
+        });
+
+    /// <summary>The socket peer before forwarded-headers processing (falls back to the current address when not captured).</summary>
+    public static IPAddress? PeerAddress(Microsoft.AspNetCore.Http.HttpContext http) =>
+        http.Items.TryGetValue(PeerAddressItem, out var v) ? v as IPAddress : http.Connection.RemoteIpAddress;
+
+    /// <summary>True when the request carried forwarding headers, i.e. went through a reverse proxy.</summary>
+    public static bool WasForwarded(Microsoft.AspNetCore.Http.HttpContext http) =>
+        (http.Items.TryGetValue(ForwardedItem, out var v) && v is true) || ForwardingHeaders.Any(h => http.Request.Headers.ContainsKey(h));
+
     public static bool IsEnabled(IConfiguration config) => config.GetValue($"{Section}:Enabled", false);
 
     /// <summary>True when AllowedHosts is unset or a bare "*" (Host header not restricted).</summary>
@@ -81,6 +109,10 @@ public static class ForwardedHeadersSetup
     public static void Configure(ForwardedHeadersOptions options, IConfiguration config)
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+        // Only the entry the trusted proxy itself appended (rightmost) is used; anything a client put further left is ignored.
+        // The proxy must append (or overwrite) X-Forwarded-For, never pass a client-supplied value through untouched.
+        options.ForwardLimit = 1;
         if (!AllowsAnyHost(config))
         {
             // Host is only taken from the proxy when the app itself restricts which hosts it answers to.
@@ -124,6 +156,7 @@ public static class ForwardedHeadersSetup
                 "Set AllowedHosts to your public host name(s) (e.g. AllowedHosts=flowledger.example.com;localhost).");
         }
 
+        app.UseFlowLedgerPeerCapture();
         if (enabled)
         {
             app.UseForwardedHeaders();

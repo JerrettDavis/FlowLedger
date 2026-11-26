@@ -1,4 +1,3 @@
-using System.Net;
 using FlowLedger.Infrastructure.DataSafety;
 
 namespace FlowLedger.Api.Endpoints;
@@ -94,6 +93,10 @@ internal static class DataEndpoints
             return result.Ok ? Results.Ok(result) : Results.Problem(title: "Import refused or failed", detail: string.Join("; ", result.Problems), statusCode: 409);
         })
         .DisableAntiforgery()
+        // Anonymous-sized bodies are never buffered: cap the request and the multipart form (default form limit is 128 MB).
+        .WithMetadata(
+            new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(MaxImportBytes),
+            new Microsoft.AspNetCore.Mvc.RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxImportBytes })
         .WithName("ImportData")
         .AddEndpointFilter(LoopbackOnlyAsync)
         .WithSummary("Import an export zip into an EMPTY database (disaster recovery / moving machines)")
@@ -103,6 +106,9 @@ internal static class DataEndpoints
     }
 
     private const string MxProvider = "MX";
+
+    /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
+    internal const long MaxImportBytes = 256L * 1024 * 1024;
 
     /// <summary>True when the current tenant is the household (operator) tenant that owns the provider credentials.</summary>
     internal static bool IsHouseholdTenant(IServiceProvider services) =>
@@ -130,20 +136,16 @@ internal static class DataEndpoints
     }
 
     /// <summary>
-    /// Export, import and backup-now act on the WHOLE database (every tenant). They are therefore reachable only from
-    /// the machine itself unless <c>DataAdmin:AllowRemote=true</c> is set deliberately (e.g. Docker bridge networking).
+    /// Export, import and backup-now act on the WHOLE database (every tenant). See <see cref="DataAdminGate"/>: an explicit
+    /// <c>DataAdmin:Key</c> / <c>X-Admin-Token</c> when configured, otherwise a direct-loopback check that forwarded headers cannot defeat.
     /// </summary>
     private static async ValueTask<object?> LoopbackOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
         var http = ctx.HttpContext;
-        var allowRemote = http.RequestServices.GetRequiredService<IConfiguration>().GetValue("DataAdmin:AllowRemote", false);
-        var remote = http.Connection.RemoteIpAddress;
-        if (!allowRemote && remote is not null && !IPAddress.IsLoopback(remote))
+        var verdict = DataAdminGate.Evaluate(http.RequestServices.GetRequiredService<IConfiguration>(), http);
+        if (!verdict.Allowed)
         {
-            return Results.Problem(
-                title: "Data administration is only available from the host itself",
-                detail: "Set DataAdmin:AllowRemote=true to allow it from other addresses.",
-                statusCode: StatusCodes.Status403Forbidden);
+            return Results.Problem(title: verdict.Title, detail: verdict.Detail, statusCode: StatusCodes.Status403Forbidden);
         }
 
         return await next(ctx);
