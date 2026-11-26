@@ -5,6 +5,8 @@ using Bunit;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components.Pages;
 using FlowLedger.Web.Components.Shared;
+using FlowLedger.Web.Shared;
+using Microsoft.AspNetCore.Components;
 using FlowLedger.Web.Tests.ApiClient;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -203,6 +205,56 @@ public sealed class SharedComponentTests : IAsyncDisposable
             cut.Find("[role=region]").GetAttribute("aria-label").Should().Be("Alerts");
             cut.Markup.Should().Contain("Low balance").And.Contain("Checking is under $100");
         });
+    }
+
+    [Fact]
+    public void AlertsPanel_failure_shows_an_announced_retry_instead_of_silence()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        _ctx.Services.AddSingleton(new FlowLedgerApiClient(
+            new HttpClient(new StubHttpMessageHandler(response)) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
+
+        var cut = _ctx.Render<AlertsPanel>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role=alert]").TextContent.Should().Contain("Couldn't load alerts");
+            cut.Find("button").TextContent.Should().Contain("Retry");
+        });
+    }
+
+    [Fact]
+    public void DashboardCard_loading_state_shows_a_skeleton_and_marks_the_card_busy()
+    {
+        var cut = _ctx.Render<DashboardCard>(p => p.Add(c => c.Title, "Spending").Add(c => c.State, DashboardCardState.Loading)
+            .AddChildContent("<p id=\"body\">ready</p>"));
+
+        cut.Find(".fl-skeleton").Should().NotBeNull();
+        cut.Find("[aria-busy=true]").Should().NotBeNull();
+        cut.FindAll("#body").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DashboardCard_error_state_is_an_alert_and_retry_invokes_the_callback()
+    {
+        var retried = 0;
+        var cut = _ctx.Render<DashboardCard>(p => p.Add(c => c.Title, "Spending").Add(c => c.State, DashboardCardState.Error)
+            .Add(c => c.OnRetry, EventCallback.Factory.Create(this, () => retried++)));
+
+        cut.Find("[role=alert]").TextContent.Should().Contain("Couldn't load spending");
+        cut.Find("button").Click();
+
+        retried.Should().Be(1);
+    }
+
+    [Fact]
+    public void DashboardCard_empty_state_shows_its_message_and_ready_shows_content()
+    {
+        var empty = _ctx.Render<DashboardCard>(p => p.Add(c => c.Title, "Spending").Add(c => c.State, DashboardCardState.Empty).Add(c => c.EmptyText, "No spending yet."));
+        empty.Markup.Should().Contain("No spending yet.");
+
+        var ready = _ctx.Render<DashboardCard>(p => p.Add(c => c.Title, "Spending").AddChildContent("<p id=\"body\">ready</p>"));
+        ready.Find("#body").TextContent.Should().Be("ready");
     }
 
     private static FlowLedgerApiClient Client(string json)

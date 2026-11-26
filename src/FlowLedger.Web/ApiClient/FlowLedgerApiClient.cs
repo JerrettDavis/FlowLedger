@@ -1162,7 +1162,8 @@ public sealed class FlowLedgerApiClient
         return await ExecuteAsync("read alerts", async () =>
         {
             var response = await _http.GetAsync("/api/alerts", ct);
-            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<AlertDto>>(JsonOptions, ct) : null;
+            await ThrowIfFailedAsync(response, "read alerts", ct);
+            return await response.Content.ReadFromJsonAsync<List<AlertDto>>(JsonOptions, ct);
         });
     }
 
