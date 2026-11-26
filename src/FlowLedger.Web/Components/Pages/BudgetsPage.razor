@@ -43,8 +43,9 @@ else
                 }
             </MudSelect>
             <MudNumericField T="decimal" @bind-Value="_limit" Label="Monthly limit" Min="0" Style="max-width:180px" Margin="Margin.Dense" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(string.IsNullOrWhiteSpace(_category))">Save budget</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Budget(_category) is not null)" aria-describedby="budget-reason">Save budget</MudButton>
         </div>
+        <SubmitReason Id="budget-reason" Reason="@FormRules.Budget(_category)" />
     </MudPaper>
 
     @if (_data.Budgets.Count == 0)

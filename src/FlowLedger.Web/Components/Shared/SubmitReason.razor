@@ -1,0 +1,16 @@
+@namespace FlowLedger.Web.Components.Shared
+
+@* Tells the user why a submit button is disabled, as visible text. Point the button's aria-describedby at <see cref="Id"/> so
+   assistive technology reads the same reason. Renders nothing when the form can be submitted. *@
+@if (!string.IsNullOrEmpty(Reason))
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary" id="@Id" Class="fl-submit-reason" data-testid="submit-reason">@Reason</MudText>
+}
+
+@code {
+    /// <summary>Why the form cannot be submitted yet; null or empty when it can.</summary>
+    [Parameter] public string? Reason { get; set; }
+
+    /// <summary>Element id the submit button references with aria-describedby.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+}

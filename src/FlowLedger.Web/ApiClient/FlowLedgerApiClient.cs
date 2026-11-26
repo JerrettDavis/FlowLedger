@@ -164,13 +164,7 @@ public sealed class FlowLedgerApiClient
         return await ExecuteAsync("create account", async () =>
         {
             var response = await _http.PostAsJsonAsync("/api/accounts", request, JsonOptions, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("Non-success status {StatusCode} creating account", (int)response.StatusCode);
-                throw new ApiClientException(
-                    $"Couldn't create account (server returned {(int)response.StatusCode}).",
-                    response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "create account", ct);
 
             return await response.Content.ReadFromJsonAsync<AccountDto>(JsonOptions, ct);
         });
