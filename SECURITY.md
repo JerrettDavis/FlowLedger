@@ -40,4 +40,6 @@ Not implemented (do not rely on these):
 
 - **No log redaction pipeline.** `SensitivePropertyMaskingEnricher` (`src/FlowLedger.Api/Logging/`) is an unwired Serilog enricher: the app logs through the default Microsoft logger and OpenTelemetry, neither of which uses it. It is covered only by direct unit tests. Do not assume amounts, account numbers or names are kept out of logs or telemetry. Known examples: SimpleFIN provider error strings can contain institution names, and a malformed MX webhook body is logged as an exception. Treat logs and any OTLP backend as sensitive.
 - **No encryption at rest in the application.** The PostgreSQL database, backups/exports and the raw provider payload archive hold financial data and PII in plaintext. Raw provider payloads are retained indefinitely (ADR 0007) and there is no tenant offboarding or purge path. Protect volumes, backups and the archive directory with disk/volume encryption and access controls.
-- **No documented threat model, data inventory or incident runbooks yet** (tracked in the production-readiness backlog).
+- **No tenant offboarding or data deletion path.** See [docs/privacy/data-inventory-and-retention.md](docs/privacy/data-inventory-and-retention.md) and the deletion exception in [ADR 0007](docs/adr/0007-raw-payload-retention.md).
+
+Further reading: [threat model](docs/security/threat-model.md), [runbooks](docs/runbooks/incident-response.md).

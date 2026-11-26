@@ -167,6 +167,10 @@ Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping
 
 - Docker Compose setup: [docs/self-hosting/docker-compose.md](docs/self-hosting/docker-compose.md)
 - Production hardening, TLS, and secret rotation: [docs/self-hosting/production.md](docs/self-hosting/production.md)
+- Database operations (TLS, pooling, RPO/RTO, Postgres major upgrade): [docs/self-hosting/database.md](docs/self-hosting/database.md)
+- Backups and recovery: [docs/self-hosting/backups-and-recovery.md](docs/self-hosting/backups-and-recovery.md)
+- Runbooks (incident, key rotation, restore, provider outage, SLO notes): [docs/runbooks/](docs/runbooks/incident-response.md)
+- Architecture decisions: [docs/adr/](docs/adr/README.md)
 
 ## Contributing
 
@@ -182,6 +186,7 @@ See [Secret Scanning Setup](docs/development/secret-scanning.md) for how to inst
 
 ## Security
 
-See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy.
+See [SECURITY.md](./SECURITY.md) for the vulnerability disclosure policy, the [threat model](docs/security/threat-model.md) and the
+[data inventory and retention](docs/privacy/data-inventory-and-retention.md) (including what cannot yet be deleted).
 
 Secret-leak prevention (pre-commit hooks + CI scanning) is documented in [docs/development/secret-scanning.md](docs/development/secret-scanning.md).
