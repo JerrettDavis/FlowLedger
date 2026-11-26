@@ -1,3 +1,4 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Observability;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -9,8 +10,26 @@ namespace FlowLedger.Worker.Scheduling;
 /// <see cref="JobRunHistory"/> and the <c>flowledger.job.*</c> metrics. A job that logs an error but returns normally is
 /// recorded as a success; jobs that must show up as failed throw.
 /// </summary>
-public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger)
+public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger, IJobRunStore? store = null)
 {
+    /// <summary>Persists the run to <c>job_runs</c> (Data page history). A storage failure is logged, never thrown into the scheduler.</summary>
+    public async Task PersistAsync(JobRunRecord record, int attempt, CancellationToken ct = default)
+    {
+        if (store is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await store.AppendAsync(new JobRunEntry(record.Job, record.StartedUtc, record.StartedUtc + record.Duration, record.Success, record.Error, attempt), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Job {Job}: run history could not be persisted.", record.Job);
+        }
+    }
+
     public void Started(string job, DateTimeOffset scheduledUtc)
         => logger.LogInformation("Job {Job} starting (scheduled {Scheduled:o}).", job, scheduledUtc);
 
@@ -38,7 +57,7 @@ public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder
 }
 
 /// <summary>Quartz adapter for <see cref="JobRunRecorder"/>.</summary>
-public sealed class JobRunListener(JobRunRecorder recorder, TimeProvider clock) : IJobListener
+public sealed class JobRunListener(JobRunRecorder recorder, TimeProvider clock, JobRetryScheduler? retries = null) : IJobListener
 {
     public string Name => nameof(JobRunListener);
 
@@ -54,12 +73,16 @@ public sealed class JobRunListener(JobRunRecorder recorder, TimeProvider clock) 
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask JobWasExecuted(IJobExecutionContext context, JobExecutionException? jobException, CancellationToken cancellationToken = default)
+    public async ValueTask JobWasExecuted(IJobExecutionContext context, JobExecutionException? jobException, CancellationToken cancellationToken = default)
     {
         var finished = clock.GetUtcNow();
         var started = context.FireTimeUtc;
-        recorder.Finished(context.JobDetail.Key.Name, started, finished, jobException);
-        return ValueTask.CompletedTask;
+        var record = recorder.Finished(context.JobDetail.Key.Name, started, finished, jobException);
+        await recorder.PersistAsync(record, JobRetryScheduler.AttemptOf(context), cancellationToken);
+        if (jobException is not null && retries is not null)
+        {
+            await retries.TryScheduleAsync(context, cancellationToken);
+        }
     }
 
     public ValueTask JobProgressChanged(IJobExecutionContext context, Quartz.Extensibility.FireInstanceProgress progress, CancellationToken cancellationToken = default)

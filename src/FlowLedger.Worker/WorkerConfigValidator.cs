@@ -61,6 +61,14 @@ public static class WorkerConfigValidator
             errors.Add($"Worker:TenantId ('{tenant}') is not a valid GUID.");
         }
 
+        foreach (var key in new[] { "Worker:JobRetry:MaxAttempts", "Worker:JobRetry:BaseDelaySeconds", "Worker:JobRetry:MaxDelaySeconds" })
+        {
+            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, out var v) || v < 1))
+            {
+                errors.Add($"{key} must be a positive integer but is '{raw}'.");
+            }
+        }
+
         if (config["Backup:KeepLocalSnapshots"] is { Length: > 0 } keep && (!int.TryParse(keep, out var n) || n < 1))
         {
             errors.Add($"Backup:KeepLocalSnapshots must be a positive integer but is '{keep}'.");

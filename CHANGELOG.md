@@ -17,6 +17,8 @@ the first tag is cut; until then everything is "Unreleased".
 - Threat model, data inventory/retention, runbooks, SLO/capacity, observability and upgrade documentation.
 - Issue/PR templates, CODEOWNERS, third-party notices, licence and repository metadata.
 
+- Durable `job_runs` history (shown in `/api/data/status`) and bounded retry with jitter for failed backup/valuation/Home Assistant jobs.
+
 ### Changed
 - GitHub Actions are pinned by commit SHA; Dependabot auto-merge skips major updates.
 - Compose smoke test also runs on pull requests; tagged builds gate on fixable CRITICAL vulnerabilities.

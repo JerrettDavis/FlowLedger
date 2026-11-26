@@ -15,6 +15,7 @@ internal static class DataEndpoints
             BackupRunStore store,
             BackupSettings settings,
             NpgsqlProviderCallLedger ledger,
+            IJobRunStore jobRuns,
             DataEnvironmentState env,
             IConfiguration cfg,
             CancellationToken ct) =>
@@ -25,6 +26,7 @@ internal static class DataEndpoints
             // Healthy = last run succeeded, was < 36h ago, and (if configured) reached off-site.
             var stale = last is null || !last.Ok || DateTimeOffset.UtcNow - last.FinishedUtc > TimeSpan.FromHours(36);
             var usage = await ledger.GetUsageAsync(MxProvider, DateTimeOffset.UtcNow, ct);
+            var recentJobRuns = await jobRuns.RecentAsync(20, ct);
             return Results.Ok(new
             {
                 environment = env.Current?.ToString().ToLowerInvariant() ?? "unknown",
@@ -37,6 +39,17 @@ internal static class DataEndpoints
                     lastRun = last is null ? null : Public(last),
                     runs = runs.Select(Public).ToList(),
                 },
+                // Durable history of scheduled job runs (worker-written, survives restarts), newest first.
+                jobRuns = recentJobRuns.Select(r => new
+                {
+                    r.Job,
+                    r.StartedUtc,
+                    r.FinishedUtc,
+                    durationSeconds = Math.Round((r.FinishedUtc - r.StartedUtc).TotalSeconds, 1),
+                    r.Success,
+                    r.Error,
+                    r.Attempt,
+                }).ToList(),
                 providerUsage = new
                 {
                     provider = MxProvider,

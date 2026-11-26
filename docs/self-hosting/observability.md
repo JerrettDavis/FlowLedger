@@ -20,6 +20,7 @@ Meter `FlowLedger`, exported when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 | `flowledger.job.runs` | `job`, `outcome` (success, failure, vetoed) | Background job runs. `vetoed` means another process held the job lock. |
 | `flowledger.job.duration` (s) | `job`, `outcome` | Run duration. |
 | `flowledger.job.last_success_age` (s) | `job` | Seconds since the last successful run (absent until the first success after a restart). |
+| `flowledger.job.retries` | `job` | Retries scheduled after a failed job run (see below). |
 | `flowledger.provider.calls` | `provider`, `status` (2xx, 4xx, 5xx, error) | Outbound provider API calls. |
 | `flowledger.sync.runs` | `outcome` (success, failure, throttled, already_running) | Financial syncs. |
 | `flowledger.sync.duration` (s) | `outcome` | Duration of syncs that actually ran. |
@@ -28,6 +29,19 @@ Meter `FlowLedger`, exported when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 | `flowledger.audit.events` | `action` | Audit events written. |
 
 The `Npgsql` meter (connection pool and command metrics) and the `Npgsql` trace source are exported too.
+
+## Job history and retries
+
+Every scheduled job run is also written to the `job_runs` table (`job, started_utc, finished_utc, success, error, attempt`;
+90 days kept), so history survives a worker restart. `GET /api/data/status` returns the 20 newest as `jobRuns`.
+
+A failed backup, asset-valuation or Home Assistant run is retried with exponential back-off and +/-50% jitter:
+`Worker:JobRetry:MaxAttempts` (total runs, default 3, 1 disables), `BaseDelaySeconds` (300) and `MaxDelaySeconds` (3600).
+The sync job is not retried here on purpose (every retry is a billable provider call; it applies its own per-connection
+back-off). A retry is a one-off trigger carrying `retryAttempt`; the per-job advisory lock still prevents overlap.
+
+Still not done (#187): a persistent Quartz job store (needs the QRTZ_ tables, so a missed fire time is still lost if the worker
+is down at that moment) and exactly-once-per-fire-time across replicas.
 
 ## JSON logs
 
