@@ -39,14 +39,14 @@ dotnet test tests/FlowLedger.Architecture.Tests
 
 ### Performance Tests
 
-Tagged `[Trait("Category","Perf")]`. Fast enough to run in the normal suite but filterable.
+Tagged `[Trait("Category","Perf")]`. Wall-clock smoke tests; filterable.
 
 Run all perf tests:
 ```bash
 dotnet test --filter Category=Perf
 ```
 
-Included in the default sweep (they complete in well under a second).
+Excluded from the PR gate (`Category!=Perf`) because absolute-time assertions flake on shared runners; they run in `.github/workflows/nightly.yml`. They still run in a plain local `dotnet test`.
 
 ### E2E Tests (CI-only)
 
@@ -63,6 +63,12 @@ running.
 method exits immediately and is recorded as Passed (0 failures) by xUnit. No browser is
 launched. This means the E2E suite is safe to include in a solution-wide test run — it
 produces zero failures rather than errors when the stack is not up.
+
+#### Failing instead of passing vacuously
+
+Set `E2E_REQUIRED=true` (done in `e2e.yml`) and a missing `E2E_BASE_URL` throws in `InitializeAsync`
+instead of letting every test return early as Passed. Similarly `FLOWLEDGER_REQUIRE_DOCKER=true` (set in
+`ci.yml`) stops `[DockerFact]` tests from skipping when no daemon is reachable, so they fail loudly.
 
 #### Environment variables
 

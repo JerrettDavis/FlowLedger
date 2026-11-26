@@ -64,6 +64,7 @@ jobs:
           --logger "trx;LogFileName=e2e-results.trx"
           --results-directory ./artifacts/tests
         env:
+          E2E_REQUIRED: "true"
           E2E_BASE_URL: http://localhost:5002
           E2E_API_URL: http://localhost:5001
           E2E_API_KEY: ci-test-api-key-not-for-production

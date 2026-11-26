@@ -75,6 +75,12 @@ public class E2ETestBase : IAsyncLifetime
         var baseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
+            if (string.Equals(Environment.GetEnvironmentVariable("E2E_REQUIRED"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "E2E_REQUIRED=true but E2E_BASE_URL is not set; refusing to pass vacuously.");
+            }
+
             // E2E_BASE_URL not set — record skip flag, do NOT launch browser.
             // Tests guard with `if (ShouldSkip) return;` to exit cleanly (0 failures).
             ShouldSkip = true;

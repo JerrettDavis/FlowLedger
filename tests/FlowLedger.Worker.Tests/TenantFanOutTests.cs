@@ -73,7 +73,7 @@ public sealed class TenantFanOutTests
 
         await TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, async (scope, t) =>
         {
-            await Task.Delay(20);
+            await Task.Yield();
             seen.Add((t, scope.GetRequiredService<ConfiguredTenantContext>().TenantId));
             if (t == B)
             {
@@ -83,6 +83,50 @@ public sealed class TenantFanOutTests
 
         seen.Should().HaveCount(3);
         seen.Should().OnlyContain(x => x.Asked == x.Active, "each tenant gets its own scope with that tenant active");
+    }
+
+    [Fact]
+    public async Task Parallel_mode_never_exceeds_MaxParallelTenants_and_does_reach_it()
+    {
+        var cfg = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = "2" }).Build();
+        var tenants = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray();
+        var services = new ServiceCollection();
+        services.AddSingleton<IUserDirectory>(new FakeDirectory(tenants));
+        services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
+        services.AddScoped(_ => new ConfiguredTenantContext(Guid.Empty));
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<ConfiguredTenantContext>());
+        await using var sp = services.BuildServiceProvider();
+
+        // Deterministic gate: the first two bodies park until both have entered, which proves two ran
+        // concurrently; the running-count high-water mark proves a third never did.
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var running = 0;
+        var max = 0;
+        var done = 0;
+
+        await TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, async (_, _) =>
+        {
+            var now = Interlocked.Increment(ref running);
+            int seenMax;
+            do
+            {
+                seenMax = Volatile.Read(ref max);
+            }
+            while (now > seenMax && Interlocked.CompareExchange(ref max, now, seenMax) != seenMax);
+
+            if (now == 2)
+            {
+                release.TrySetResult();
+            }
+
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Interlocked.Decrement(ref running);
+            Interlocked.Increment(ref done);
+        }, CancellationToken.None);
+
+        done.Should().Be(5);
+        max.Should().Be(2);
     }
 
     [Fact]
