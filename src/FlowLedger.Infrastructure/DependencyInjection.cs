@@ -400,7 +400,10 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
         // ── Object storage ──────────────────────────────────────────────────────
-        services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
+        services.AddOptions<ObjectStorageOptions>()
+            .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath), "ObjectStorage:RootPath must not be empty.")
+            .ValidateOnStart();
         services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
         services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
 
