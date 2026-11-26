@@ -16,6 +16,9 @@ jobs:
   build:
     name: Build & Scan (${{ matrix.service }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # upload Trivy SARIF to code scanning
 
     strategy:
       fail-fast: false
@@ -117,6 +120,14 @@ jobs:
           name:              trivy-${{ matrix.service }}
           path:              trivy-${{ matrix.service }}.sarif
           if-no-files-found: warn
+
+      # Findings show up under Security > Code scanning (one category per image). Forked PRs get a read-only token, so skip there.
+      - name: Upload Trivy SARIF to code scanning
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category:   trivy-${{ matrix.service }}
 
       # Gate: fail on fixable CRITICAL vulnerabilities (HIGH stays informational above).
       - name: Trivy gate (fixable CRITICAL)
