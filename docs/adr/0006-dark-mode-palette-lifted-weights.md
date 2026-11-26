@@ -1,5 +1,7 @@
 # ADR 0006 — Dark-Mode Palette Uses Lifted 400-Weight Variants
 
+Status: Accepted
+
 ## Context
 The FlowLedger UI redesign introduced a light and dark MudBlazor theme. The light palette uses navy/red semantic colors (Primary #1E40AF, Success #047857, Error #B91C1C, Warning #B45309). The original light values (Success #059669 at 3.77:1, Warning #D97706 at 3.19:1, secondary text #64748B at 4.34:1 on #F1F5F9) failed WCAG AA for text and were darkened (issue #200); every text-role colour now meets 4.5:1 on all three light surfaces. However, applying those same hues on the dark surface (#192134) fails WCAG AA contrast requirements: #1E40AF and #DC2626 both fall below the 4.5:1 ratio needed for normal text and below 3:1 for large/graphic elements when rendered on #192134.
 

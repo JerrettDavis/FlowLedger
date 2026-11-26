@@ -8,7 +8,7 @@ should not run simultaneously.
 Aspire orchestrates all services with hot-reload, the Aspire dashboard, and automatic
 service discovery wiring.
 
-**Prerequisites:** .NET 10 SDK (10.0.301+), Docker Desktop
+**Prerequisites:** .NET 10 SDK (10.0.109 or later; see `global.json`), Docker Desktop
 
 ```bash
 # Start everything
