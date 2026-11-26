@@ -154,6 +154,24 @@ public sealed class ImportHandlerTests
     }
 
     [Fact]
+    public async Task Import_OfxWithTwoIdenticalRowsAndDistinctFitids_ImportsTwoAndReimportsZero()
+    {
+        var (handler, txRepo, _, _, account) = BuildSut();
+        var ofx = "OFXHEADER:100\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>\n"
+            + "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20240110<TRNAMT>-2.75<FITID>A1<NAME>Transit</STMTTRN>\n"
+            + "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20240110<TRNAMT>-2.75<FITID>A2<NAME>Transit</STMTTRN>\n"
+            + "</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>";
+        var normalized = ImportNormalizer.Normalize(ofx);
+
+        var first = await handler.HandleAsync(new ImportTransactionsCommand(account.Id, normalized.Csv, NormalizedImport.Mapping));
+        var second = await handler.HandleAsync(new ImportTransactionsCommand(account.Id, normalized.Csv, NormalizedImport.Mapping));
+
+        first.ImportedCount.Should().Be(2);
+        second.ImportedCount.Should().Be(0);
+        txRepo.All.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task Import_ThreeIdenticalRowsOnTopOfExistingTwo_AddsOnlyTheSurplus()
     {
         var (handler, txRepo, _, _, account) = BuildSut();

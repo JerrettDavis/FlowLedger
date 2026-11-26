@@ -156,8 +156,19 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
         var all = await _transactions.Value.Task.ConfigureAwait(false);
         var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId, "USD");
-        var items = all
+        var forAccount = all
             .Where(t => string.Equals(t.Account?.Id, providerAccountId, StringComparison.Ordinal))
+            .ToList();
+
+        // PROJECTED rows are forecast items, not ledger entries; rows without a date cannot be placed on the ledger.
+        var ingestible = forAccount.Where(QuilttMapper.IsIngestible).ToList();
+        var skipped = forAccount.Count - ingestible.Count;
+        foreach (var bad in forAccount.Except(ingestible))
+        {
+            _logger.LogWarning("Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.", bad.Id);
+        }
+
+        var items = ingestible
             .Select(t => QuilttMapper.ToTransaction(t, fallback))
             .Where(t => t.PostedDate >= from)
             .OrderBy(t => t.PostedDate)
@@ -166,7 +177,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
         var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
         _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
-        return new TransactionPage(items, next, HasMore: false);
+        return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
 
     // ── Webhooks ─────────────────────────────────────────────────────────────
