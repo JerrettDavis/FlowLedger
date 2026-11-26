@@ -15,9 +15,8 @@ CONTAINER="${POSTGRES_CONTAINER:-$(docker ps --format '{{.Names}}' | grep -i pos
 [ -n "$CONTAINER" ] || { echo "No running postgres container found." >&2; exit 1; }
 
 PG_USER="${PG_USER:-$(docker exec "$CONTAINER" printenv POSTGRES_USER 2>/dev/null || echo postgres)}"
-PW="$(docker exec "$CONTAINER" printenv POSTGRES_PASSWORD)"
-[ -n "$PW" ] || { echo "Could not read POSTGRES_PASSWORD from the container." >&2; exit 1; }
-pg() { docker exec -e "PGPASSWORD=$PW" "$CONTAINER" "$@"; }
+# The password is read inside the container and never appears in host process arguments.
+pg() { docker exec "$CONTAINER" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec "$@"' sh "$@"; }
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DEST="$OUT_DIR/$STAMP"
