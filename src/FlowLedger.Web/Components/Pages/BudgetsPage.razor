@@ -143,7 +143,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
     }
 
@@ -161,7 +161,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
     }
 }

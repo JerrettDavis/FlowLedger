@@ -361,7 +361,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect bank failed");
-            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Connect failed");
         }
     }
 
@@ -391,7 +391,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Quiltt connect failed");
-            Snackbar.Add($"Connect failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Connect failed");
         }
     }
 
@@ -497,7 +497,7 @@
             else
             {
                 _syncAnnouncement = "Sync failed";
-                Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+                Snackbar.AddProblem(ex, "Sync failed");
             }
         }
         finally
@@ -522,7 +522,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect & Sync failed");
-            Snackbar.Add($"Sync failed: {ex.Message}", Severity.Error);
+            Snackbar.AddProblem(ex, "Sync failed");
         }
         finally
         {
