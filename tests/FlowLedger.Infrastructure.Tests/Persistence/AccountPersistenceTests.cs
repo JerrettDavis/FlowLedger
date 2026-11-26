@@ -150,4 +150,46 @@ public sealed class AccountPersistenceTests : IAsyncLifetime
             Assert.Equal("USD", loadedWithLimit.CreditLimit.Currency.Code);
         }
     }
+
+    // ── Optimistic concurrency (#157) ─────────────────────────────────────────
+
+    [DockerFact]
+    public async Task Concurrent_edit_of_the_same_account_conflicts_instead_of_overwriting()
+    {
+        var tenantCtx = TestTenantContext.New();
+        var accountId = (await _fixture.SeedAccountAsync(tenantCtx, "Original")).Value;
+
+        // Two writers load the same row (a user's browser tab and the sync pipeline, say).
+        await using var user = _fixture.CreateDbContext(tenantCtx);
+        await using var sync = _fixture.CreateDbContext(tenantCtx);
+        var userCopy = await user.Accounts.SingleAsync(a => a.Id == accountId);
+        var syncCopy = await sync.Accounts.SingleAsync(a => a.Id == accountId);
+        Assert.Equal(userCopy.RowVersion, syncCopy.RowVersion);
+
+        userCopy.Rename("Renamed by user");
+        await user.SaveChangesAsync();
+        Assert.NotEqual(syncCopy.RowVersion, userCopy.RowVersion);
+
+        // The second writer is working from a stale copy: it must fail, not silently win.
+        syncCopy.Rename("Overwritten by sync");
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => sync.SaveChangesAsync());
+
+        await using var verify = _fixture.CreateDbContext(tenantCtx);
+        Assert.Equal("Renamed by user", (await verify.Accounts.SingleAsync(a => a.Id == accountId)).Name);
+    }
+
+    [DockerFact]
+    public async Task Update_with_the_current_version_succeeds_and_advances_the_version()
+    {
+        var tenantCtx = TestTenantContext.New();
+        var accountId = (await _fixture.SeedAccountAsync(tenantCtx)).Value;
+
+        await using var ctx = _fixture.CreateDbContext(tenantCtx);
+        var account = await ctx.Accounts.SingleAsync(a => a.Id == accountId);
+        var before = account.RowVersion;
+        account.Rename("Second name");
+        await ctx.SaveChangesAsync();
+
+        Assert.NotEqual(before, account.RowVersion);
+    }
 }

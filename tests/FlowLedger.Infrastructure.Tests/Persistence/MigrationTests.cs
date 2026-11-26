@@ -91,7 +91,11 @@ public sealed class MigrationTests : IAsyncLifetime
     {
         // Down must at least be implemented (not the base no-op that silently leaves the schema changed). A migration that
         // intentionally cannot be reversed must throw NotSupportedException/InvalidOperationException from Down and be listed here.
-        var irreversible = new HashSet<string>(StringComparer.Ordinal);
+        var irreversible = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Snapshot-only: maps accounts.RowVersion onto Postgres' xmin system column, so Up and Down have nothing to change (#157).
+            "20261126184928_AccountOptimisticConcurrency",
+        };
         using var ctx = OfflineContext();
         var offenders = new List<string>();
         foreach (var (id, type) in ctx.GetService<IMigrationsAssembly>().Migrations)

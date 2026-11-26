@@ -103,6 +103,96 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // ── Optimistic concurrency (#157) ─────────────────────────────────────────
+
+    private Task<HttpResponseMessage> PutRename(Guid id, string name, string? ifMatch)
+    {
+        var message = new HttpRequestMessage(HttpMethod.Put, $"/api/accounts/{id}") { Content = JsonContent.Create(new UpdateAccountRequest(name)) };
+        if (ifMatch is not null)
+        {
+            message.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return _client.SendAsync(message);
+    }
+
+    [Fact]
+    public async Task Get_returns_an_etag_matching_the_dto_version()
+    {
+        var created = await CreateAccount();
+
+        var response = await _client.GetAsync($"/api/accounts/{created.Id}");
+
+        var dto = await response.Content.ReadFromJsonAsync<AccountDto>();
+        dto!.Version.Should().NotBe(0u);
+        response.Headers.ETag!.Tag.Should().Be($"\"{dto.Version}\"");
+    }
+
+    [Fact]
+    public async Task Put_with_current_if_match_succeeds_and_returns_a_new_etag()
+    {
+        var created = await CreateAccount();
+
+        var response = await PutRename(created.Id, "Renamed", $"\"{created.Version}\"");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await response.Content.ReadFromJsonAsync<AccountDto>();
+        dto!.Version.Should().NotBe(created.Version);
+        response.Headers.ETag!.Tag.Should().Be($"\"{dto.Version}\"");
+    }
+
+    [Fact]
+    public async Task Put_with_stale_if_match_returns_409_problem_and_does_not_overwrite()
+    {
+        var created = await CreateAccount();
+        (await PutRename(created.Id, "First writer", $"\"{created.Version}\"")).EnsureSuccessStatusCode();
+
+        // A second writer still holding the original version loses.
+        var response = await PutRename(created.Id, "Second writer", $"\"{created.Version}\"");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        var fetched = await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{created.Id}");
+        fetched!.Name.Should().Be("First writer");
+    }
+
+    [Fact]
+    public async Task Put_without_if_match_stays_last_write_wins()
+    {
+        var created = await CreateAccount();
+        (await PutRename(created.Id, "First", $"\"{created.Version}\"")).EnsureSuccessStatusCode();
+
+        var response = await PutRename(created.Id, "Second", ifMatch: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Put_with_malformed_if_match_returns_400()
+    {
+        var created = await CreateAccount();
+
+        var response = await PutRename(created.Id, "Renamed", "\"not-a-version\"");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Put_settings_with_stale_if_match_returns_409()
+    {
+        var created = await CreateAccount();
+        (await PutRename(created.Id, "Moves the version", null)).EnsureSuccessStatusCode();
+
+        var message = new HttpRequestMessage(HttpMethod.Put, $"/api/accounts/{created.Id}/settings")
+        {
+            Content = JsonContent.Create(new AccountSettingsRequest(false, "Standard", false)),
+        };
+        message.Headers.TryAddWithoutValidation("If-Match", $"\"{created.Version}\"");
+        var response = await _client.SendAsync(message);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     // ── Change type (manual override) ─────────────────────────────────────────
 
     [Fact]

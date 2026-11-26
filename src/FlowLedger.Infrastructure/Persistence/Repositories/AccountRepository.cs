@@ -24,6 +24,23 @@ internal sealed class AccountRepository : IAccountRepository
     public async Task AddAsync(Account account, CancellationToken ct = default)
         => await _db.Accounts.AddAsync(account, ct);
 
-    public Task SaveChangesAsync(CancellationToken ct = default)
-        => _db.SaveChangesAsync(ct);
+    public void ExpectVersion(Account account, uint? expectedVersion)
+    {
+        if (expectedVersion is { } version)
+        {
+            _db.Entry(account).Property(a => a.RowVersion).OriginalValue = version;
+        }
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException("This account was changed elsewhere. Reload it and try again.", ex);
+        }
+    }
 }
