@@ -608,6 +608,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
             }
 
+            if (page.SkippedCount > 0)
+            {
+                skipped += page.SkippedCount;
+                _logger.LogInformation("The provider dropped {Count} row(s) without a usable date on one account.", page.SkippedCount);
+            }
+
             cursor = page.NextCursor;
             hasMore = page.HasMore;
 
