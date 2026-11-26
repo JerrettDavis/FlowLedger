@@ -25,7 +25,7 @@ public static class TransferDetector
     {
         var result = new HashSet<Guid>();
         var real = transactions
-            .Where(t => t.Status is not ("Planned" or "Skipped"))
+            .Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status))
             .OrderBy(t => t.PostedDate ?? t.EffectiveDate)
             .ToList();
 

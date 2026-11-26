@@ -46,7 +46,7 @@ public static class DashboardActivityAnalyzer
         IReadOnlySet<Guid>? dismissedIds = null, IReadOnlyDictionary<Guid, string>? categoryPathById = null)
     {
         // Planned rows are forecast placeholders, never real activity.
-        var real = all.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
+        var real = all.Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status)).ToList();
         var windowStart = today.AddDays(-WindowDays);
 
         bool IsPending(TransactionDto t) => t.Status == "Pending";
