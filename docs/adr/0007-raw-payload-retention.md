@@ -51,3 +51,12 @@ Decision 2 above ("nothing in the codebase deletes or overwrites archive objects
 - Cursor persisted as a date watermark (page 1, from today-30d). 31 raw payloads + sidecars archived; sandbox tenant isolated from the simulated demo tenant.
 - Widget member matched the single MX member; the saved connection resolves PENDING to it on each sync.
 - Resolved: `IMemberIdResolver` lets the sync persist the real member id once, so later syncs skip ListMembers.
+
+## Amendment: tenant partition, optional sealing, opt-in retention (#142, #189)
+- New objects are keyed `raw/{provider}/{tenant|_unattributed}/{yyyy}/{MM}/{dd}/...`. Webhooks are attributed to a tenant through the same member lookup as sync
+  (best effort; an unknown member stays `_unattributed`). Objects written before this change keep their old key and are read exactly as before
+  (the replay handler accepts both layouts). The `.meta.json` sidecar now also records the tenant.
+- **Optional sealing, off by default.** `Storage:EncryptionKey` (base64, 32 bytes; `Storage:EncryptionKeyPrevious` for rotation) seals new payloads as
+  `FLRAWv2:` plus a SecretBox v2 envelope bound to tenant and provider. Plaintext objects stay readable (the header tells them apart); the sidecar holds request metadata only and stays plaintext. Replay of sealed objects needs the same key configured on the replaying host, otherwise it fails loudly.
+- **Opt-in retention, off by default.** `Storage:RawArchiveRetentionDays` > 0 makes the scheduled backup job delete archive objects older than that. Decision 2 above is unchanged for the default configuration.
+- **Offboarding** (`POST /api/data/tenants/{id}/offboard`) deletes the tenant's database rows and every archive object under its tenant folder. Objects written before the tenant folder existed carry no tenant and are not removed by it.

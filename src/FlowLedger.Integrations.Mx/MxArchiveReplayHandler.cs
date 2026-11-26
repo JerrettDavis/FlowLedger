@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using FlowLedger.Integrations.Abstractions;
 
 namespace FlowLedger.Integrations.Mx;
 
@@ -12,11 +13,14 @@ namespace FlowLedger.Integrations.Mx;
 /// </summary>
 public sealed class MxArchiveReplayHandler : HttpMessageHandler
 {
-    private readonly Dictionary<(string Method, string Path), string> _index = new();
+    private readonly Dictionary<(string Method, string Path), (string File, string TenantSegment)> _index = new();
+    private readonly IRawPayloadDecryptor? _decryptor;
 
     /// <param name="mxArchiveRoot">Directory containing the archived MX files, e.g. <c>{objects}/raw/MX</c>.</param>
-    public MxArchiveReplayHandler(string mxArchiveRoot)
+    /// <param name="decryptor">Needed only when the archive was written with encryption on (#142); plaintext objects never use it.</param>
+    public MxArchiveReplayHandler(string mxArchiveRoot, IRawPayloadDecryptor? decryptor = null)
     {
+        _decryptor = decryptor;
         foreach (var meta in Directory.EnumerateFiles(mxArchiveRoot, "*.meta.json", SearchOption.AllDirectories)
                      .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)) // ticks-prefixed → chronological
         {
@@ -30,7 +34,10 @@ public sealed class MxArchiveReplayHandler : HttpMessageHandler
             var payload = meta[..^".meta.json".Length] + ".json";
             if (File.Exists(payload))
             {
-                _index[(root.GetProperty("method").GetString()!, root.GetProperty("pathAndQuery").GetString()!)] = payload;
+                // Layout: {root}/[{tenant}/]yyyy/MM/dd/file. The tenant folder is absent in archives written before #142.
+                var relative = Path.GetRelativePath(mxArchiveRoot, payload).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var tenantSegment = relative.Length > 4 ? relative[0] : string.Empty;
+                _index[(root.GetProperty("method").GetString()!, root.GetProperty("pathAndQuery").GetString()!)] = (payload, tenantSegment);
             }
         }
     }
@@ -41,12 +48,18 @@ public sealed class MxArchiveReplayHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var key = (request.Method.Method, request.RequestUri!.PathAndQuery);
-        if (!_index.TryGetValue(key, out var file))
+        if (!_index.TryGetValue(key, out var entry))
         {
             return new HttpResponseMessage(HttpStatusCode.NotFound) { RequestMessage = request };
         }
 
-        var bytes = await File.ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false);
+        var bytes = await File.ReadAllBytesAsync(entry.File, cancellationToken).ConfigureAwait(false);
+        if (IRawPayloadDecryptor.IsEncrypted(bytes))
+        {
+            bytes = _decryptor?.TryDecrypt("MX", entry.TenantSegment, bytes)
+                ?? throw new InvalidOperationException("An archived MX payload is encrypted and no usable Storage:EncryptionKey is configured to replay it.");
+        }
+
         var response = new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = request, Content = new ByteArrayContent(bytes) };
         response.Content.Headers.ContentType = new("application/json");
         return response;

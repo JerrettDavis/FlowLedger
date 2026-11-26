@@ -36,8 +36,12 @@ Check each provider's own terms for their retention and deletion commitments; th
 
 ## Deletion and data-subject requests: current state
 
-- **Tenant or account deletion: not implemented.** There is no code that removes a tenant's rows, raw archive objects or provider
-  link on request. The raw archive is immutable by design (ADR 0007), which conflicts with a deletion right.
+- **Tenant offboarding: implemented (hard delete, no retention window).** The household admin calls `POST /api/data/tenants/{id}/offboard`
+  (see `GET /api/data/tenants?status=orphaned` for tenants left without a login after a link-code re-point). It deletes the tenant's
+  rows from every tenant-scoped table (including the outbox and the ad-hoc tables), the tenant's logins and link codes, and its
+  raw archive objects (`raw/{provider}/{tenant}/...`); the `tenants` registry row stays, marked deleted, as the audit record. The household
+  tenant is refused. Archive objects written before the tenant folder existed carry no tenant and are not removed by it. Provider
+  revocation and existing backups are outside this path (see below).
 - **Provider revocation is manual.** Remove the connection in the provider's dashboard (MX, Quiltt, SimpleFIN Bridge); FlowLedger
   does not call a revoke endpoint.
 - **Backups.** Deleting data from the live database does not remove it from existing local or off-site backups. Off-site backups are

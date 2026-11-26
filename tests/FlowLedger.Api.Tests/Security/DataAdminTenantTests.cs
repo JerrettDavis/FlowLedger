@@ -63,4 +63,21 @@ public sealed class DataAdminTenantTests(FlowLedgerApiFactory factory) : IAsyncL
 
         resp.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task Export_scope_is_validated_and_a_tenant_scoped_export_is_a_zip_for_that_tenant_only()
+    {
+        var household = factory.CreateAuthenticatedClient(FlowLedgerApiFactory.DemoTenantId);
+
+        (await household.GetAsync("/api/data/export?scope=bogus")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var scoped = await household.GetAsync("/api/data/export?scope=tenant");
+        scoped.StatusCode.Should().Be(HttpStatusCode.OK);
+        scoped.Content.Headers.ContentType!.MediaType.Should().Be("application/zip");
+        scoped.Content.Headers.ContentDisposition!.FileName.Should().Contain("tenant");
+
+        // A non-household tenant cannot reach the export, scoped or not.
+        var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        (await other.GetAsync($"/api/data/export?tenantId={Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }

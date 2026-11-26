@@ -46,3 +46,13 @@ public interface IObjectStorage
     Task<Stream> DownloadAsync(string key, CancellationToken ct = default);
     Task DeleteAsync(string key, CancellationToken ct = default);
 }
+
+/// <summary>An object found by <see cref="IObjectStorageBrowser"/>.</summary>
+public sealed record StoredObject(string Key, DateTimeOffset LastWriteUtc);
+
+/// <summary>Optional listing capability of an object store, used by retention and tenant erasure (#142).</summary>
+public interface IObjectStorageBrowser
+{
+    /// <summary>Every object whose key starts with <paramref name="prefix"/> (forward-slash keys, recursive).</summary>
+    IAsyncEnumerable<StoredObject> ListAsync(string prefix, CancellationToken ct = default);
+}

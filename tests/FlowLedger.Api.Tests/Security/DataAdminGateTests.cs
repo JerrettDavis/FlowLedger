@@ -92,6 +92,41 @@ public sealed class DataAdminGateTests
         DataAdminGate.Evaluate(Config(), Http("127.0.0.1", xff: "203.0.113.5")).Allowed.Should().BeFalse();
     }
 
+    private static DefaultHttpContext HttpIn(string environment, string? ip, string? token = null)
+    {
+        var http = Http(ip, token);
+        http.RequestServices = new ServiceCollection()
+            .AddSingleton<IHostEnvironment>(new Microsoft.Extensions.Hosting.Internal.HostingEnvironment { EnvironmentName = environment })
+            .BuildServiceProvider();
+        return http;
+    }
+
+    [Fact]
+    public void Outside_Development_a_loopback_address_is_not_a_credential_and_the_admin_key_is_required()
+    {
+        // #139: no key => refused in Production even from a direct loopback caller, with a message that says what to set.
+        var denied = DataAdminGate.Evaluate(Config(), HttpIn("Production", "127.0.0.1"));
+        denied.Allowed.Should().BeFalse();
+        denied.Detail.Should().Contain("DataAdmin:Key");
+
+        var cfg = Config(("DataAdmin:Key", AdminKey));
+        DataAdminGate.Evaluate(cfg, HttpIn("Production", "172.18.0.1", token: AdminKey)).Allowed.Should().BeTrue();
+        DataAdminGate.Evaluate(cfg, HttpIn("Production", "127.0.0.1", token: "wrong")).Allowed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void In_Development_the_direct_loopback_shortcut_remains_for_local_work()
+    {
+        DataAdminGate.Evaluate(Config(), HttpIn("Development", "127.0.0.1")).Allowed.Should().BeTrue();
+        DataAdminGate.Evaluate(Config(), HttpIn("Development", "172.18.0.1")).Allowed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AllowRemote_still_opens_the_gate_in_Production_as_an_explicit_operator_opt_out()
+    {
+        DataAdminGate.Evaluate(Config(("DataAdmin:AllowRemote", "true")), HttpIn("Production", "172.18.0.1")).Allowed.Should().BeTrue();
+    }
+
     [Fact]
     public void AllowRemote_still_opens_the_gate_for_back_compat()
     {
