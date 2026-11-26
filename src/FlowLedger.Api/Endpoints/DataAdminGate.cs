@@ -69,7 +69,7 @@ internal static class DataAdminGate
 
     private static bool TokenMatches(string key, string supplied) =>
         supplied.Length > 0
-        && CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(supplied)), SHA256.HashData(Encoding.UTF8.GetBytes(key)));
+        && FlowLedger.SharedKernel.ConstantTime.SecretEquals(supplied, key);
 
     private static Result Deny(string title, string detail) => new(false, title, detail);
 }

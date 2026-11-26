@@ -189,4 +189,29 @@ public sealed class SourceRuleTests
 
         Assert.True(offenders.Count == 0, $"Use ConnectorIds instead of bare names in: {string.Join(", ", offenders)}");
     }
+
+    // ── 7. One constant-time string comparison (#100) ────────────────────────
+
+    /// <summary>Byte-level HMAC comparisons that legitimately use FixedTimeEquals directly.</summary>
+    private static readonly HashSet<string> FixedTimeAllowlist =
+    [
+        "src/FlowLedger.SharedKernel/ConstantTime.cs",
+        "src/FlowLedger.Integrations.Mx/MxWebhookVerifier.cs",
+        "src/FlowLedger.Integrations.Quiltt/QuilttWebhookVerifier.cs",
+        "src/FlowLedger.Integrations.Simulated/SimulatedFinancialDataProvider.cs",
+        "src/FlowLedger.Api/Tenancy/TenantAssertion.cs",
+    ];
+
+    [Fact]
+    public void String_secrets_are_compared_with_ConstantTime_not_ad_hoc_FixedTimeEquals()
+    {
+        var offenders = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+            .SelectMany(d => SourceFiles(Path.GetFileName(d)))
+            .Where(f => File.ReadAllText(f).Contains("FixedTimeEquals(", StringComparison.Ordinal))
+            .Select(Rel)
+            .Where(f => !FixedTimeAllowlist.Contains(f))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Use ConstantTime.SecretEquals (or add a reasoned allow-list entry) in: {string.Join(", ", offenders)}");
+    }
 }
