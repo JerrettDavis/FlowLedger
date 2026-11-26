@@ -3,6 +3,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Contracts;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Sync;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Observability;
@@ -48,8 +49,13 @@ public sealed class SyncMetricsTests
         public void Dispose() => _listener.Dispose();
     }
 
+    private sealed class FixedTime : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => TestClock.Instant;
+    }
+
     private static GuardedSyncService Service(Func<Task<SyncResult>> run, TimeSpan minInterval, DateTimeOffset? last = null)
-        => new(new StubSync(run), Guid.NewGuid(), minInterval, _ => Task.FromResult(last));
+        => new(new StubSync(run), Guid.NewGuid(), minInterval, _ => Task.FromResult(last), new FixedTime());
 
     [Fact]
     public async Task Successful_sync_is_counted_as_success()
@@ -72,7 +78,7 @@ public sealed class SyncMetricsTests
     public async Task Throttled_sync_is_counted_as_throttled()
     {
         using var capture = new Capture();
-        var act = () => Service(() => Task.FromResult(new SyncResult(0, 0, 0, 0)), TimeSpan.FromHours(1), DateTimeOffset.UtcNow).SyncAsync();
+        var act = () => Service(() => Task.FromResult(new SyncResult(0, 0, 0, 0)), TimeSpan.FromHours(1), TestClock.Instant.AddMinutes(-1)).SyncAsync();
         await act.Should().ThrowAsync<SyncThrottledException>();
         capture.Outcomes.Should().Contain("throttled");
     }

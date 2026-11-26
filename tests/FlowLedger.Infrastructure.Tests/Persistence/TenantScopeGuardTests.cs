@@ -68,6 +68,7 @@ public sealed class TenantScopeGuardTests
         ["system_settings"] = "host-wide key/value settings",
         ["provider_api_calls"] = "provider API call accounting for the whole host (cost control)",
         ["backup_runs"] = "host backup history",
+        ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
     };
 
     [Fact]
@@ -95,6 +96,7 @@ public sealed class TenantScopeGuardTests
         ["DatabaseSnapshotService.cs"] = "whole-database snapshot/restore, never per tenant",
         ["SnapshotImport.cs"] = "whole-database restore, never per tenant",
         ["SnapshotRestoreDrill.cs"] = "whole-database restore drill, never per tenant",
+        ["NpgsqlJobRunStore.cs"] = "host-wide background job run history, no tenant column",
         ["NpgsqlProviderCallLedger.cs"] = "provider API call accounting for the whole host (cost control), no tenant column",
         ["DataEnvironmentGuard.cs"] = "host-wide environment fingerprint in system_settings",
         ["DataRetention.cs"] = "host-wide maintenance: blanks old merge snapshots and deletes expired link codes across all tenants (#181)",
