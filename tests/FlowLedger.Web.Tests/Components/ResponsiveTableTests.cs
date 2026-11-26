@@ -6,7 +6,7 @@ namespace FlowLedger.Web.Tests.Components;
 public sealed class ResponsiveTableTests
 {
     // Inline styles bypass theming and block a strict CSP style-src. This is a ratchet: it may shrink, never grow.
-    private const int InlineStyleBaseline = 101;
+    private const int InlineStyleBaseline = 85;
 
     [Fact]
     public void Tables_can_scroll_sideways_instead_of_clipping_columns()
@@ -30,12 +30,13 @@ public sealed class ResponsiveTableTests
 
     // !important fights the cascade; the remaining uses are the reduced-motion override, MudTable's inline max-height and
     // a few helpers. This is a ratchet: it may shrink, never grow.
-    private const int ImportantBaseline = 12;
+    private const int ImportantBaseline = 19;
 
     [Fact]
     public void Important_declarations_in_app_css_do_not_grow()
     {
-        var count = Regex.Matches(RepoFiles.Read("wwwroot/app.css"), "!important").Count;
+        var count = Regex.Matches(RepoFiles.Read("wwwroot/app.css"), "!important").Count
+            + Regex.Matches(RepoFiles.Read("wwwroot/finance-ui.css"), "!important").Count;
 
         count.Should().BeLessThanOrEqualTo(ImportantBaseline);
     }

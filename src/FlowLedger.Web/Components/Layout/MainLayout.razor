@@ -1,9 +1,8 @@
 @inherits LayoutComponentBase
 @inject FlowLedgerApiClient ApiClient
-@inject ISnackbar Snackbar
+@inject SyncCoordinator Sync
 @inject ILogger<MainLayout> Logger
 @inject IJSRuntime JS
-@inject IDialogService DialogService
 @inject ThemeService ThemeService
 @inject DisplaySettingsService DisplayService
 @inject PersistentComponentState Persisted
@@ -25,107 +24,7 @@
 <a class="fl-skip-link" href="#main-content">Skip to main content</a>
 
 <MudLayout>
-    <MudAppBar Color="Color.Surface" Elevation="0" Class="fl-appbar" aria-label="FlowLedger application bar">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu"
-                       Color="Color.Inherit"
-                       Edge="Edge.Start"
-                       OnClick="ToggleDrawer"
-                       aria-label="Toggle navigation drawer" />
-        <MudText Typo="Typo.h6" Class="ml-2">FlowLedger</MudText>
-        <MudSpacer />
-        @* Always rendered so assistive tech registers the live region before it changes. *@
-        <span data-testid="sync-status" role="status" aria-live="polite" class="d-inline-flex align-center">
-            @if (_syncing)
-            {
-                <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-hidden="true" />
-            }
-            <span class="fl-sr-only">@_syncAnnouncement</span>
-        </span>
-        @if (_backupAlert is not null && _backupAlert != _dismissedBackupAlert && _environment == "production")
-        {
-            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Error" Variant="Variant.Filled" Href="data"
-                     aria-label="Backup warning">@_backupAlert</MudChip>
-            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Inherit"
-                           OnClick="DismissBackupAlert" aria-label="Dismiss backup warning" Class="mr-1" />
-        }
-        @if (_environment is "demo" or "sandbox")
-        {
-            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="@(_environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
-                     aria-label="@($"Data environment {_environment}")">@_environment.ToUpperInvariant() DATA</MudChip>
-        }
-        @if (_environment == "production")
-        {
-            @if (_isOwner)
-            {
-                <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
-                    <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
-                               Color="Color.Inherit"
-                               Variant="Variant.Text"
-                               OnClick="ConnectBank"
-                               Disabled="_syncing"
-                               aria-label="Connect bank">
-                        <span class="fl-bar-label">Connect bank</span>
-                    </MudButton>
-                </MudTooltip>
-            }
-            <MudTooltip Text="Fetch new data from your connected institutions">
-                <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
-                           Color="Color.Inherit"
-                           Variant="Variant.Text"
-                           OnClick="SyncNow"
-                           Disabled="_syncing"
-                           aria-label="Sync now">
-                    <span class="fl-bar-label">Sync now</span>
-                </MudButton>
-            </MudTooltip>
-        }
-        else if (!_status.IsKnown)
-        {
-            @* Environment not known yet: reserve the space instead of flashing the wrong action. *@
-            <MudSkeleton Width="120px" Height="36px" Class="mx-2" aria-hidden="true" />
-        }
-        else
-        {
-            <MudTooltip Text="Connect simulated provider and sync demo data">
-                <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
-                           Color="Color.Inherit"
-                           Variant="Variant.Text"
-                           OnClick="ConnectAndSync"
-                           Disabled="_syncing"
-                           aria-label="Connect and sync demo data">
-                    <span class="fl-bar-label">Connect &amp; Sync</span>
-                </MudButton>
-            </MudTooltip>
-        }
-        <AuthorizeView>
-            <Authorized>
-                @if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst("fl_tenant") is not null)
-                {
-                    <MudText Typo="Typo.body2" Class="mx-2 fl-user-name" aria-label="Signed in user">@(context.User.FindFirst("name")?.Value ?? context.User.FindFirst("preferred_username")?.Value ?? context.User.FindFirst("email")?.Value)</MudText>
-                    <form method="post" action="/auth/logout" style="display:inline">
-                        <AntiforgeryToken />
-                        <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Logout" aria-label="Sign out"><span class="fl-bar-label">Sign out</span></MudButton>
-                    </form>
-                }
-            </Authorized>
-        </AuthorizeView>
-        @if (_share)
-        {
-            <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Info" Variant="Variant.Filled" aria-label="Share mode is on">SHARE MODE</MudChip>
-        }
-        <MudTooltip Text="@(_share ? "Share mode on: amounts hidden. Click to show them again" : "Share mode: hide all amounts, keep charts and categories (safe to screenshot)")">
-            <MudIconButton Icon="@(_share ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.IosShare)"
-                           Color="@(_share ? Color.Info : Color.Inherit)"
-                           OnClick="ToggleShare"
-                           aria-label="Toggle share mode" />
-        </MudTooltip>
-        <MudTooltip Text="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
-            <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                           Color="Color.Inherit"
-                           OnClick="ToggleTheme"
-                           aria-label="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")" />
-        </MudTooltip>
-    </MudAppBar>
+    <AppBar Status="_status" IsOwner="_isOwner" OnToggleDrawer="ToggleDrawer" OnToggleTheme="ToggleTheme" />
 
     <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0" Width="256px" Class="fl-drawer" aria-label="Sidebar">
         <MudDrawerHeader>
@@ -147,30 +46,10 @@
 
 @code {
     private bool _drawerOpen = true;
-    private bool _syncing = false;
-    private string _syncAnnouncement = "";
-    private bool _share;
     private LayoutStatus _status = LayoutStatus.Unknown;
-    private string _environment => _status.Environment;
-    private string? _backupAlert => _status.BackupAlert;
     private const string StatusStateKey = "fl-layout-status";
     private const string DisplayStateKey = "fl-display-settings";
     private PersistingComponentStateSubscription _persistSubscription;
-    private string? _dismissedBackupAlert;
-    private const string DismissKey = "fl-backup-alert-dismissed";
-
-    // ── Auto-sync ─────────────────────────────────────────────────────────────
-    // While the app is on screen: sync on load if the last sync is > 1h old, then re-check every few
-    // minutes and sync hourly. Hidden tabs never sync (the Worker covers that daily). The server still
-    // enforces single-flight, its minimum interval and the provider call budget; any failure or
-    // throttle backs the browser off so it never hammers a limited API.
-    private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromHours(1);
-    private static readonly TimeSpan AutoSyncTick = TimeSpan.FromMinutes(3);
-    private static readonly TimeSpan AutoSyncBackoff = TimeSpan.FromHours(2);
-    private readonly CancellationTokenSource _autoCts = new();
-    private DateTimeOffset? _lastSyncedAt;
-    private DateTimeOffset _autoBackoffUntil = DateTimeOffset.MinValue;
-    private TimeSpan _serverMinInterval = TimeSpan.FromMinutes(30);
 
     // True once the user has made an explicit choice that we've persisted;
     // while false, runtime OS-preference changes are applied.
@@ -218,23 +97,15 @@
                 "Could not read system color-scheme preference; defaulting to light mode");
         }
 
-        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.get"); StateHasChanged(); }
-        catch (Exception ex) { Logger.LogWarning(ex, "Could not read share-mode preference"); }
-
-        try { _dismissedBackupAlert = await JS.InvokeAsync<string?>("localStorage.getItem", DismissKey); StateHasChanged(); }
-        catch (Exception ex) { Logger.LogWarning(ex, "Could not read dismissed backup alert"); }
-
         _hasUserOverride = persisted.HasValue;
         ThemeService.Initialize(persisted, systemPrefersDark);
 
-        _ = RunAutoSyncLoopAsync(_autoCts.Token);
+        Sync.StartAutoSync();
         // StateHasChanged is called by the ThemeChanged event that Initialize fires.
     }
 
     public void Dispose()
     {
-        _autoCts.Cancel();
-        _autoCts.Dispose();
         _persistSubscription.Dispose();
         ThemeService.ThemeChanged -= OnThemeChanged;
     }
@@ -279,27 +150,11 @@
         }
     }
 
-    // ── Share mode ───────────────────────────────────────────────────────────
-
-    private async Task ToggleShare()
-    {
-        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.set", !_share); }
-        catch (Exception ex) { Logger.LogWarning(ex, "Could not toggle share mode"); }
-    }
-
-    // Dismissal is remembered per alert text, so a different warning (e.g. stale backup) still shows.
-    private async Task DismissBackupAlert()
-    {
-        _dismissedBackupAlert = _backupAlert;
-        try { await JS.InvokeVoidAsync("localStorage.setItem", DismissKey, _backupAlert); }
-        catch (Exception ex) { Logger.LogWarning(ex, "Could not persist backup alert dismissal"); }
-    }
-
     // ── Drawer ───────────────────────────────────────────────────────────────
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
-    // ── Connect & Sync ───────────────────────────────────────────────────────
+    // ── Identity and status ──────────────────────────────────────────────────
 
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
@@ -347,220 +202,5 @@
         }
 
         _status = await LayoutStatusLoader.LoadAsync(ApiClient);
-    }
-
-    private async Task ConnectBank()
-    {
-        // In-app flow first: when Quiltt is enabled the user links a bank in the Connector without leaving FlowLedger.
-        var quiltt = await ApiClient.GetQuilttConfigAsync();
-        if (quiltt.Enabled)
-        {
-            await ConnectViaQuiltt();
-            return;
-        }
-
-        var info = await ApiClient.GetProviderInfoAsync();
-        if (info is { UsesWidget: false, ManageUrl: { Length: > 0 } manage })
-        {
-            // SimpleFIN Bridge: institutions are linked on the Bridge site; the access URL is already configured here.
-            await JS.InvokeVoidAsync("open", manage, "_blank");
-            Snackbar.Add($"{info.Provider}: link or re-authenticate institutions on the Bridge page, then press Sync now.", Severity.Info);
-            return;
-        }
-
-        var ok = await DialogService.ShowMessageBoxAsync(
-            "Connect a bank",
-            "This opens your provider's secure connection widget. Creating the connection is a billable provider call, and it is only made once. Continue?",
-            yesText: "Continue", cancelText: "Cancel");
-        if (ok != true)
-        {
-            return;
-        }
-
-        try
-        {
-            var url = await ApiClient.BeginBankConnectionAsync();
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                Snackbar.Add("The provider did not return a connection link.", Severity.Warning);
-                return;
-            }
-
-            await JS.InvokeVoidAsync("open", url, "_blank");
-            Snackbar.Add("Finish linking in the new tab, then press Sync now.", Severity.Info);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Connect bank failed");
-            Snackbar.AddFailure(ex, "Connect failed");
-        }
-    }
-
-    private async Task ConnectViaQuiltt()
-    {
-        try
-        {
-            var session = await ApiClient.StartQuilttSessionAsync();
-            if (session is null)
-            {
-                Snackbar.Add("Could not start the bank connection.", Severity.Warning);
-                return;
-            }
-
-            var result = await JS.InvokeAsync<QuilttConnectResult>(
-                "flowledgerQuiltt.open", session.ScriptUrl, session.ConnectorId, session.Token);
-            if (result.Status == "success")
-            {
-                Snackbar.Add("Bank linked. Syncing your accounts…", Severity.Success);
-                await SyncNow();
-            }
-            else if (result.Status == "error")
-            {
-                Snackbar.Add("The bank connection did not complete. Please try again.", Severity.Warning);
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Quiltt connect failed");
-            Snackbar.AddFailure(ex, "Connect failed");
-        }
-    }
-
-    private async Task RunAutoSyncLoopAsync(CancellationToken ct)
-    {
-        try
-        {
-            await AutoSyncIfDueAsync();
-            using var timer = new PeriodicTimer(AutoSyncTick);
-            while (await timer.WaitForNextTickAsync(ct))
-            {
-                await AutoSyncIfDueAsync();
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (ObjectDisposedException) { }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Auto-sync loop stopped");
-        }
-    }
-
-    private async Task AutoSyncIfDueAsync()
-    {
-        if (_syncing || DateTimeOffset.UtcNow < _autoBackoffUntil)
-        {
-            return;
-        }
-
-        try
-        {
-            if (!await JS.InvokeAsync<bool>("FlowLedgerPage.isVisible"))
-            {
-                return; // not on display: leave it to the daily Worker sync
-            }
-
-            // Source of truth is the server (survives reloads and covers syncs from other processes).
-            var status = await ApiClient.GetSyncStatusAsync();
-            if (status is null)
-            {
-                return;
-            }
-
-            _lastSyncedAt = status.LastSyncedAt;
-            _serverMinInterval = TimeSpan.FromMinutes(Math.Max(0, status.MinIntervalMinutes));
-            var wait = (status.LastSyncedAt is { } last ? last + AutoSyncInterval : DateTimeOffset.MinValue)
-                       - DateTimeOffset.UtcNow;
-            if (wait > TimeSpan.Zero || status.Provider == "Simulated")
-            {
-                return;
-            }
-
-            await InvokeAsync(() => RunSyncAsync(auto: true));
-        }
-        catch (Exception ex)
-        {
-            _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
-            Logger.LogWarning(ex, "Auto-sync check failed; backing off for {Backoff}", AutoSyncBackoff);
-        }
-    }
-
-    private Task SyncNow() => RunSyncAsync(auto: false);
-
-    private async Task RunSyncAsync(bool auto)
-    {
-        _syncing = true;
-        _syncAnnouncement = "Syncing";
-        if (auto) StateHasChanged();
-        try
-        {
-            var result = await ApiClient.SyncAsync();
-            if (auto)
-            {
-                if (result is { TransactionsAdded: > 0 })
-                {
-                    Snackbar.Add($"Auto-sync: {result.TransactionsAdded} new transactions", Severity.Info);
-                    _syncAnnouncement = $"Sync finished: {result.TransactionsAdded} new transactions";
-                }
-                else
-                {
-                    _syncAnnouncement = "Sync finished";
-                }
-
-                return;
-            }
-
-            _syncAnnouncement = result is not null
-                ? $"Sync complete: {result.TransactionsAdded} new transactions"
-                : "Sync complete";
-            Snackbar.Add(result is not null
-                ? $"Sync complete — {result.TransactionsAdded} new transactions"
-                : "Sync complete", Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Sync failed");
-            if (auto)
-            {
-                // Throttled / budget / needs-reauth / provider outage: stay quiet and back off.
-                _autoBackoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
-                _syncAnnouncement = "";
-            }
-            else
-            {
-                _syncAnnouncement = "Sync failed";
-                Snackbar.AddFailure(ex, "Sync failed");
-            }
-        }
-        finally
-        {
-            _syncing = false;
-            if (auto) StateHasChanged();
-        }
-    }
-
-    private async Task ConnectAndSync()
-    {
-        _syncing = true;
-        _syncAnnouncement = "Syncing";
-        try
-        {
-            await ApiClient.ConnectAsync();
-            var result = await ApiClient.SyncAsync();
-            var msg = result is not null
-                ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
-                : "Sync complete";
-            _syncAnnouncement = msg;
-            Snackbar.Add(msg, Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Connect & Sync failed");
-            _syncAnnouncement = "Sync failed";
-            Snackbar.AddFailure(ex, "Sync failed");
-        }
-        finally
-        {
-            _syncing = false;
-        }
     }
 }
