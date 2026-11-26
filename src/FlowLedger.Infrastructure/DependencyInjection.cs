@@ -367,10 +367,8 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
         // -- Account rates (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton<FlowLedger.Application.Features.Strategies.IAccountRateStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountRateStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddScoped<FlowLedger.Application.Features.Strategies.IAccountRateStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfAccountRateStore>();
         // -- Home Assistant sharing (per-tenant settings + sent ledger; alerts only by default) --
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore>(_ =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlHomeAssistantStore(

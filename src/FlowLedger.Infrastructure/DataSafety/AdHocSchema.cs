@@ -20,7 +20,6 @@ public static class AdHocSchema
         BackupRunStore.CreateSqlText,
         NpgsqlBudgetStore.CreateSqlText,
         NpgsqlGoalStore.CreateSqlText,
-        NpgsqlAccountRateStore.CreateSqlText,
         NpgsqlCategoryRuleStore.CreateSqlText,
         NpgsqlMerchantAliasStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
