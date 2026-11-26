@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         AddPersistence(services, configuration);
         AddProvidersAndSync(services, configuration);
         AddStorageAndHealth(services, configuration);
+        services.AddPostgresVersionGuard();
 
         return services;
     }
