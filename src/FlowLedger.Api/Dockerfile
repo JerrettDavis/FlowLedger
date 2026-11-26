@@ -43,7 +43,7 @@ RUN dotnet publish src/FlowLedger.Api/FlowLedger.Api.csproj \
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds only ICU + tzdata: there is NO shell, curl or wget. Docker healthchecks
 # therefore use scripts/healthprobe (a static Go binary built below and copied in).
-FROM golang:1.24-alpine AS healthprobe
+FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS healthprobe
 WORKDIR /src
 COPY scripts/healthprobe/main.go .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /healthprobe main.go
@@ -51,7 +51,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /healthprobe main.go
 # restic (static Go binary) is copied in for "Back up now" off-site copies; the same stage pre-creates
 # the data directories owned by the image's non-root user (APP_UID 1654 in the .NET 8+ images) so
 # named volumes mounted there come up writable.
-FROM restic/restic:0.18.0 AS data-dirs
+FROM restic/restic:0.18.0@sha256:4cf4a61ef9786f4de53e9de8c8f5c040f33830eb0a10bf3d614410ee2fcb6120 AS data-dirs
 RUN mkdir -p /data/objects /data/backups && chown 1654:1654 /data/objects /data/backups
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
@@ -67,5 +67,8 @@ COPY --from=publish /app/publish .
 # ASP.NET chiseled images listen on 8080 (HTTP) by default; TLS is terminated
 # by the reverse proxy / compose network layer.
 EXPOSE 8080
+
+# Explicit non-root user (the base image already sets APP_UID=1654; stated here so it is auditable).
+USER $APP_UID
 
 ENTRYPOINT ["dotnet", "FlowLedger.Api.dll"]
