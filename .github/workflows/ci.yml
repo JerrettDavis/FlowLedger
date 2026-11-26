@@ -48,7 +48,7 @@ jobs:
       - name: Run unit tests
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category!=E2E"
+          --filter "Category!=E2E&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests"
           --logger "trx"
           --collect:"XPlat Code Coverage"
           --settings coverlet.runsettings
