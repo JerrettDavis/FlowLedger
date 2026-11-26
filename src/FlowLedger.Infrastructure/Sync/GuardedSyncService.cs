@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Observability;
 
 namespace FlowLedger.Infrastructure.Sync;
 
@@ -42,6 +43,7 @@ public sealed class GuardedSyncService : IFinancialSyncService
         var gate = Locks.GetOrAdd(_tenant, _ => new SemaphoreSlim(1, 1));
         if (!await gate.WaitAsync(0, ct))
         {
+            FlowLedgerTelemetry.RecordSync("already_running");
             throw new SyncAlreadyRunningException();
         }
 
@@ -52,7 +54,12 @@ public sealed class GuardedSyncService : IFinancialSyncService
             // separate processes, so a database advisory lock is held for the whole sync (null = someone else has it).
             if (_crossProcessLock is not null)
             {
-                lease = await _crossProcessLock(ct) ?? throw new SyncAlreadyRunningException();
+                lease = await _crossProcessLock(ct);
+                if (lease is null)
+                {
+                    FlowLedgerTelemetry.RecordSync("already_running");
+                    throw new SyncAlreadyRunningException();
+                }
             }
 
             if (_minInterval > TimeSpan.Zero)
@@ -63,12 +70,24 @@ public sealed class GuardedSyncService : IFinancialSyncService
                     var remaining = l + _minInterval - _time.GetUtcNow();
                     if (remaining > TimeSpan.Zero)
                     {
+                        FlowLedgerTelemetry.RecordSync("throttled");
                         throw new SyncThrottledException(remaining, l);
                     }
                 }
             }
 
-            return await _inner.SyncAsync(ct);
+            var started = _time.GetTimestamp();
+            try
+            {
+                var result = await _inner.SyncAsync(ct);
+                FlowLedgerTelemetry.RecordSync("success", _time.GetElapsedTime(started));
+                return result;
+            }
+            catch (Exception)
+            {
+                FlowLedgerTelemetry.RecordSync("failure", _time.GetElapsedTime(started));
+                throw;
+            }
         }
         finally
         {

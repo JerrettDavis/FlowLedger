@@ -89,6 +89,7 @@ internal static class MxEndpoints
             var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
             if (rawBody is null)
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "too_large");
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
             }
 
@@ -102,12 +103,14 @@ internal static class MxEndpoints
             }
             catch (InvalidWebhookSignatureException)
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "invalid_signature");
                 return Results.Unauthorized();
             }
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
             if (WebhookReplayGuard.SeenRecently(rawBody))
             {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "duplicate");
                 return Results.Accepted(value: new { duplicate = true });
             }
 
@@ -162,6 +165,7 @@ internal static class MxEndpoints
             var scheduler = await schedulerFactory.GetScheduler(ct);
             await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
 
+            FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "accepted");
             return Results.Accepted(value: new { received = evt.EventType, memberId = evt.MemberId });
         })
         .WithName("MxWebhook")

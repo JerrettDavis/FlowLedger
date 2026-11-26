@@ -23,6 +23,7 @@ public static class Extensions
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.ConfigureOpenTelemetry();
+        builder.ConfigureStructuredLogging();
 
         builder.AddDefaultHealthChecks();
 
@@ -56,6 +57,25 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// <c>Logging:Format=json</c> (env <c>Logging__Format=json</c>) switches the console to one JSON object per line, with scopes
+    /// (correlation id, trace id) included, for log shippers. Any other value keeps the default human-readable console.
+    /// </summary>
+    public static TBuilder ConfigureStructuredLogging<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        if (string.Equals(builder.Configuration["Logging:Format"], "json", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Logging.AddJsonConsole(o =>
+            {
+                o.IncludeScopes = true;
+                o.UseUtcTimestamp = true;
+                o.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z' ";
+            });
+        }
+
+        return builder;
+    }
+
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Logging.AddOpenTelemetry(logging =>
@@ -71,11 +91,13 @@ public static class Extensions
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddMeter("FlowLedger"); // custom metrics (FlowLedgerTelemetry in Infrastructure)
+                    .AddMeter("FlowLedger") // custom metrics (FlowLedgerTelemetry in Infrastructure)
+                    .AddMeter("Npgsql");    // Npgsql's built-in connection pool / command metrics (no extra package)
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddSource("Npgsql") // Npgsql's built-in command spans (no extra package)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

@@ -86,7 +86,8 @@ internal static class QuilttEndpoints
                 var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
                 if (rawBody is null)
                 {
-                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "too_large");
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
                 // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
@@ -100,12 +101,14 @@ internal static class QuilttEndpoints
                 }
                 catch (InvalidWebhookSignatureException)
                 {
-                    return Results.Unauthorized();
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "invalid_signature");
+                return Results.Unauthorized();
                 }
 
                 if (WebhookReplayGuard.SeenRecently(rawBody))
                 {
-                    return Results.Accepted(value: new { duplicate = true });
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
+                return Results.Accepted(value: new { duplicate = true });
                 }
 
                 await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
@@ -141,6 +144,7 @@ internal static class QuilttEndpoints
                 var scheduler = await schedulerFactory.GetScheduler(ct);
                 await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
 
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "accepted");
                 return Results.Accepted(value: new { received = evt.EventType, profileId = evt.MemberId });
             })
             .WithName("QuilttWebhook")

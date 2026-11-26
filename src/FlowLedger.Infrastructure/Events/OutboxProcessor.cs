@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -159,12 +160,14 @@ public sealed class OutboxProcessor
                 .SetProperty(m => m.LastError, (string?)null)
                 .SetProperty(m => m.LockToken, (Guid?)null)
                 .SetProperty(m => m.LockedUntilUtc, (DateTimeOffset?)null), ct);
+            FlowLedgerTelemetry.RecordOutbox("delivered");
             return;
         }
 
         var attempts = message.Attempts + 1;
         if (attempts >= _options.MaxAttempts)
         {
+            FlowLedgerTelemetry.RecordOutbox("dead_lettered");
             _logger.LogError("Outbox message {MessageId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}",
                 message.Id, message.EventType, attempts, error);
             await scoped.ExecuteUpdateAsync(s => s
@@ -180,6 +183,7 @@ public sealed class OutboxProcessor
             _options.MaxBackoff.Ticks,
             (long)(_options.BaseBackoff.Ticks * Math.Pow(2, attempts - 1))));
         var next = now + delay;
+        FlowLedgerTelemetry.RecordOutbox("retried");
         await scoped.ExecuteUpdateAsync(s => s
             .SetProperty(m => m.Attempts, attempts)
             .SetProperty(m => m.NextAttemptUtc, next)
