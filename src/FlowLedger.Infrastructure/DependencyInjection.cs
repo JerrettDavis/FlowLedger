@@ -133,6 +133,7 @@ public static class DependencyInjection
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System); // one injectable clock for handlers and sync (#127); tests replace it
         services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
         services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
@@ -287,7 +288,7 @@ public static class DependencyInjection
                 TimeSpan.FromMinutes(Math.Max(0, minutes)),
                 async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                     db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
-                    c => (DateTimeOffset?)c.LastSyncedAt, ct),
+                    c => c.LastSuccessfulSyncAt, ct),
                 crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 

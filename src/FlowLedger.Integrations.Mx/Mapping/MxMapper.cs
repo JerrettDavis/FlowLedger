@@ -19,7 +19,6 @@ namespace FlowLedger.Integrations.Mx.Mapping;
 /// </summary>
 internal static class MxMapper
 {
-    private const string DefaultCurrency = "USD";
 
     // ── Connection-status mapping (PatternKit Strategy) ───────────────────────────
     //
@@ -87,7 +86,8 @@ internal static class MxMapper
     {
         ArgumentNullException.ThrowIfNull(a);
 
-        var currency = NormalizeCurrency(a.CurrencyCode);
+        var currency = ProviderCurrency.Normalize(a.CurrencyCode)
+            ?? throw new UnknownCurrencyException($"MX account {a.Guid} reports no usable currency_code.");
         var balance = new Money(a.Balance ?? 0m, new Currency(currency));
         Money? available = a.AvailableBalance is { } av
             ? new Money(av, new Currency(currency))
@@ -115,11 +115,12 @@ internal static class MxMapper
 
     // ── Transactions ──────────────────────────────────────────────────────────
 
-    public static ProviderTransaction ToProviderTransaction(MxTransaction t, ILogger? logger = null)
+    public static ProviderTransaction ToProviderTransaction(MxTransaction t, ILogger? logger = null, string? accountCurrency = null)
     {
         ArgumentNullException.ThrowIfNull(t);
 
-        var currency = NormalizeCurrency(t.CurrencyCode);
+        var currency = ProviderCurrency.Normalize(t.CurrencyCode) ?? ProviderCurrency.Normalize(accountCurrency)
+            ?? throw new UnknownCurrencyException($"MX transaction {t.Guid} has no currency_code and its account currency is unknown.");
         var postedDate = ParsePostedDate(t, logger);
         var isPending = string.Equals(t.Status, "PENDING", StringComparison.OrdinalIgnoreCase);
 
@@ -229,17 +230,6 @@ internal static class MxMapper
 
         result = default;
         return false;
-    }
-
-    private static string NormalizeCurrency(string? code)
-    {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return DefaultCurrency;
-        }
-
-        var trimmed = code.Trim().ToUpperInvariant();
-        return trimmed.Length == 3 && trimmed.All(char.IsLetter) ? trimmed : DefaultCurrency;
     }
 
     private static string? FirstNonEmpty(string? a, string? b)

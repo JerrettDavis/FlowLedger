@@ -96,4 +96,51 @@ public sealed class MathNitsTests
         MoneyRounding.Round(-0.125m).Should().Be(-0.13m);
         MoneyRounding.Round(2.5m, 0).Should().Be(3m);
     }
+
+    [Theory]
+    [InlineData(200_000, 6, 360, 1199.10)]   // textbook 30-year mortgage
+    [InlineData(10_000, 5, 12, 856.07)]
+    [InlineData(1_200, 0, 12, 100.00)]       // zero rate amortises linearly
+    public void LoanPayment_matches_the_amortisation_formula_to_the_cent(decimal balance, decimal rate, int months, decimal expected)
+        => LoanMath.Payment(balance, rate, months).Should().Be(expected);
+
+    [Fact]
+    public void LoanPayment_survives_extreme_terms_and_rates_without_overflowing()
+    {
+        // (1 + r)^n would overflow decimal here; the discounted form shrinks toward zero instead.
+        var payment = LoanMath.Payment(1_000_000m, 900m, 1_200);
+
+        payment.Should().BeApproximately(750_000m, 1m, "interest-only at 75% a month");
+    }
+
+    [Theory]
+    [InlineData(10_000, 0, 5, 12)]
+    [InlineData(1_000_000, 0, 7, 720)]
+    [InlineData(5_000, 2_000, 4, 24)]
+    public void RequiredMonthly_deposits_reach_the_target(decimal target, decimal start, decimal apy, int months)
+    {
+        var deposit = GoalPlanner.RequiredMonthly(target, start, apy, months);
+
+        var balance = start;
+        var rate = Simulators.MonthlyRate(apy);
+        for (var m = 0; m < months; m++)
+        {
+            balance += balance * rate + deposit;
+        }
+
+        // Within the rounding of the deposit to the cent over the whole term.
+        balance.Should().BeInRange(target - 0.01m * months, target + 0.01m * months * 2);
+    }
+
+    [Fact]
+    public void RequiredMonthly_is_zero_when_the_start_already_grows_to_the_target_and_never_overflows()
+    {
+        GoalPlanner.RequiredMonthly(1_000m, 5_000m, 7m, 12).Should().Be(0m);
+        var act = () => GoalPlanner.RequiredMonthly(1_000_000m, 1m, 900m, 720);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void RequiredMonthly_with_a_zero_rate_is_linear()
+        => GoalPlanner.RequiredMonthly(1_200m, 0m, 0m, 12).Should().Be(100m);
 }

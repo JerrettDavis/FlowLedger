@@ -20,6 +20,12 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     private readonly SimpleFinOptions _options;
     private readonly ILogger<SimpleFinFinancialDataProvider> _logger;
     private Task<SfResponse>? _cached;
+    private Task<bool>? _backfill;
+    private DateTimeOffset _fetchedAt;
+    private int _fetchedDays;
+
+    // The cursor carries "<date>|bf<days>" once a deep backfill of that many days completed, so it never runs again (#128).
+    private const string BackfillMarker = "|bf";
 
     public SimpleFinFinancialDataProvider(
         HttpClient http, IOptions<SimpleFinOptions> options, ILogger<SimpleFinFinancialDataProvider> logger)
@@ -49,22 +55,31 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     public async Task<IReadOnlyList<ProviderAccount>> GetAccountsAsync(string memberProviderId, CancellationToken cancellationToken = default)
     {
         var res = await FetchAsync(cancellationToken).ConfigureAwait(false);
-        return res.Accounts!.Select(SimpleFinMapper.ToAccount).ToList();
+        return UsableAccounts(res).Select(SimpleFinMapper.ToAccount).ToList();
     }
 
     public async Task<TransactionPage> GetTransactionsAsync(
         string providerAccountId, SyncCursor cursor, int pageSize = 100, CancellationToken cancellationToken = default)
     {
         var res = await FetchAsync(cancellationToken).ConfigureAwait(false);
-        var acct = res.Accounts!.FirstOrDefault(a => SimpleFinMapper.AccountId(a) == providerAccountId);
+        var acct = UsableAccounts(res).FirstOrDefault(a => SimpleFinMapper.AccountId(a) == providerAccountId);
         if (acct?.Transactions is null)
         {
             return TransactionPage.Empty(cursor);
         }
 
-        var floor = cursor.IsInitial || _options.BackfillDays > _options.HistoryDays || !DateOnly.TryParse(cursor.Value, out var c)
+        var (cursorDate, backfilledDays) = ParseCursor(cursor);
+        var backfillRequested = _options.BackfillDays > _options.HistoryDays;
+        var needsBackfill = backfillRequested && backfilledDays < _options.BackfillDays;
+        var backfillComplete = backfilledDays >= _options.BackfillDays;
+        if (needsBackfill)
+        {
+            backfillComplete = await EnsureBackfilledAsync(res, cancellationToken).ConfigureAwait(false);
+        }
+
+        var floor = cursor.IsInitial || needsBackfill || cursorDate is null
             ? DateOnly.MinValue
-            : c.AddDays(-Math.Max(0, _options.OverlapDays));
+            : cursorDate.Value.AddDays(-Math.Max(0, _options.OverlapDays));
 
         var dated = acct.Transactions.Where(SimpleFinMapper.HasUsableDate).ToList();
         var skipped = acct.Transactions.Count - dated.Count;
@@ -75,8 +90,63 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             .ToList();
 
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
-        var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
-        return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
+        DateOnly? nextDate = cursorDate;
+        if (settled != default)
+        {
+            nextDate = settled;
+        }
+        else if (cursorDate is null && items.Count > 0)
+        {
+            // Only pending rows so far: everything older than the earliest one has been seen, so do not re-read the whole window
+            // on every sync. A truly empty account keeps its initial cursor so late-arriving history is not skipped.
+            nextDate = items.Min(t => t.PostedDate).AddDays(-1);
+        }
+
+        var next = new SyncCursor(FormatCursor(nextDate, backfillRequested && backfillComplete ? _options.BackfillDays : 0));
+        return new TransactionPage(items, next.Value.Length == 0 ? cursor : next, HasMore: false) { SkippedCount = skipped };
+    }
+
+    /// <summary>Accounts whose currency the bridge did not report as ISO are left out (and logged), never booked as USD (#124).</summary>
+    private IEnumerable<SfAccount> UsableAccounts(SfResponse res)
+    {
+        foreach (var a in res.Accounts!)
+        {
+            if (SimpleFinMapper.HasUsableCurrency(a))
+            {
+                yield return a;
+            }
+            else
+            {
+                _logger.LogWarning("Skipping SimpleFIN account {AccountId}: no usable ISO currency reported.", SimpleFinMapper.AccountId(a));
+            }
+        }
+    }
+
+    private static (DateOnly? Date, int BackfilledDays) ParseCursor(SyncCursor cursor)
+    {
+        if (cursor.IsInitial)
+        {
+            return (null, 0);
+        }
+
+        var parts = cursor.Value.Split(BackfillMarker, 2);
+        var days = parts.Length == 2 && int.TryParse(parts[1], out var d) ? d : 0;
+        return (DateOnly.TryParse(parts[0], out var date) ? date : null, days);
+    }
+
+    private static string FormatCursor(DateOnly? date, int backfilledDays)
+    {
+        var text = date?.ToString("yyyy-MM-dd") ?? string.Empty;
+        return backfilledDays > 0 ? text + BackfillMarker + backfilledDays : text;
+    }
+
+    /// <summary>Runs the deep backfill at most once per provider instance; true when it completed (nothing older to fetch).</summary>
+    private Task<bool> EnsureBackfilledAsync(SfResponse body, CancellationToken ct)
+    {
+        var task = _backfill ??= BackfillAsync(body, _fetchedAt, _fetchedDays, Window, CancellationToken.None);
+        task.ContinueWith(t => Interlocked.CompareExchange(ref _backfill, null, t), CancellationToken.None,
+            TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
+        return task.WaitAsync(ct);
     }
 
     public Task VerifyWebhookAsync(ReadOnlyMemory<byte> rawBody, string signatureHeader, CancellationToken cancellationToken = default) =>
@@ -98,13 +168,20 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     private Task<SfResponse> FetchAsync(CancellationToken ct)
     {
         EnsureConfigured();
-        return _cached ??= FetchCoreAsync(ct);
+        // The shared fetch must not run under the first caller's token: cancelling that caller would otherwise leave a cancelled task
+        // cached for every later caller. Each caller waits with its own token instead, and a failed fetch is dropped from the cache (#128).
+        var task = _cached ??= FetchCoreAsync(CancellationToken.None);
+        task.ContinueWith(t => Interlocked.CompareExchange(ref _cached, null, t), CancellationToken.None,
+            TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
+        return task.WaitAsync(ct);
     }
+
+    // SimpleFIN rejects ranges "exceeding" 90 days; stay one day inside so clock skew can't trip the cap.
+    private const int Window = 89;
 
     private async Task<SfResponse> FetchCoreAsync(CancellationToken ct)
     {
-        // SimpleFIN rejects ranges "exceeding" 90 days; stay one day inside so clock skew can't trip the cap.
-        const int window = 89;
+        const int window = Window;
         var days = Math.Clamp(_options.HistoryDays, 1, window);
         var now = DateTimeOffset.UtcNow;
         var start = now.AddDays(-days).ToUnixTimeSeconds();
@@ -149,16 +226,13 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             }
         }
 
-        if (_options.BackfillDays > days)
-        {
-            await BackfillAsync(body, now, days, window, ct).ConfigureAwait(false);
-        }
-
+        _fetchedAt = now;
+        _fetchedDays = days;
         return body;
     }
 
     /// <summary>Walks backwards from the end of the first window, merging older transactions into <paramref name="body"/>.</summary>
-    private async Task BackfillAsync(SfResponse body, DateTimeOffset now, int coveredDays, int window, CancellationToken ct)
+    private async Task<bool> BackfillAsync(SfResponse body, DateTimeOffset now, int coveredDays, int window, CancellationToken ct)
     {
         var total = Math.Min(_options.BackfillDays, 1100);
         var byId = body.Accounts!.ToDictionary(SimpleFinMapper.AccountId);
@@ -174,7 +248,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("SimpleFIN backfill stopped at {Covered} days: HTTP {Status}.", covered, (int)resp.StatusCode);
-                return;
+                return false;
             }
 
             var page = await resp.Content.ReadFromJsonAsync<SfResponse>(ct).ConfigureAwait(false);
@@ -193,10 +267,12 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             _logger.LogInformation("SimpleFIN backfill window {Covered}-{Next} days: {Count} transaction(s).", covered, covered + span, added);
             if (added == 0)
             {
-                return; // nothing older is available
+                return true; // nothing older is available
             }
 
             covered += span;
         }
+
+        return covered >= total;
     }
 }

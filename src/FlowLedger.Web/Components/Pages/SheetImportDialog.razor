@@ -41,8 +41,9 @@
         try
         {
             await using var stream = e.File.OpenReadStream(2 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-            _csv = await reader.ReadToEndAsync();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _csv = FlowLedger.Contracts.ImportTextDecoder.Decode(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)); // UTF-8, else Windows-1252 (#128)
             _error = null;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
