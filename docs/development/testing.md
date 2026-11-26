@@ -152,3 +152,11 @@ dotnet test FlowLedger.slnx --filter "Category!=E2E" --configuration Release
 The standard CI pipeline (`ci.yml`) runs `--filter "Category!=E2E"` automatically.
 E2E tests run in the separate `e2e.yml` pipeline with the full Docker Compose stack, as
 described above.
+
+## Coverage
+
+`ci.yml` runs tests with `eng/coverage.runsettings` (excludes EF migrations, `*.Designer.cs`, generated and
+compiler-generated code) and then `eng/check-coverage.py` fails the build when merged line coverage of
+`FlowLedger.Domain` or `FlowLedger.Application` falls below its floor (baseline measured 2026-11: Domain 68.6%,
+Application 74.3% from their own test projects alone; floors 65% / 70%). Raise the floors in the script as
+coverage grows. The Markdown summary is added to the job summary.
