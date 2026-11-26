@@ -6,7 +6,7 @@
 <PageTitle>Goals — FlowLedger</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5">Savings goals</MudText>
+    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Savings goals</MudText>
     <DateRangeSelector Label="Target date" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
                        From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
 </div>

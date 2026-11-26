@@ -8,7 +8,7 @@
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-2" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h4">Dashboard</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Dashboard</MudText>
     <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
         <DateRangeSelector Label="History" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo"
                            Presets="@HistoryPresets" Changed="OnRangeChanged" />
