@@ -29,6 +29,35 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
             TransactionFingerprint.FromRawDescription(a, d, 18.40m, desc, pid));
 
     [DockerFact]
+    public async Task Merge_commits_under_the_production_retrying_execution_strategy()
+    {
+        var tenantCtx = TestTenantContext.New();
+        var tenant = TenantId.From(tenantCtx.TenantId);
+        var acct = AccountId.New();
+        var day = new DateOnly(2026, 11, 10);
+        var survivor = Tx(tenant, acct, "SQ *COFFEE HOUSE TULSA OK", day, "TRN-9");
+        var duplicate = Tx(tenant, acct, "Coffee House Tulsa", day.AddDays(1), null);
+
+        await using (var seed = fixture.CreateProductionStyleContext(tenantCtx))
+        {
+            seed.Transactions.AddRange(survivor, duplicate);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var db = fixture.CreateProductionStyleContext(tenantCtx))
+        {
+            var store = new DuplicateStore(db, tenantCtx);
+            var s = await db.Transactions.SingleAsync(t => t.Id == survivor.Id);
+            var d = await db.Transactions.SingleAsync(t => t.Id == duplicate.Id);
+            await store.MergeAsync(s, d, auto: false, "test", "{}");
+        }
+
+        await using var verify = fixture.CreateProductionStyleContext(tenantCtx);
+        (await verify.Transactions.AnyAsync(t => t.Id == duplicate.Id)).Should().BeFalse();
+        (await new DuplicateStore(verify, tenantCtx).RecentMergesAsync(5)).Should().ContainSingle();
+    }
+
+    [DockerFact]
     public async Task Auto_merge_removes_the_imported_twin_keeps_its_category_and_blocks_it_from_coming_back()
     {
         var tenantCtx = TestTenantContext.New();

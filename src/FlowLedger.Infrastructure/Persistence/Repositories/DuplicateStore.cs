@@ -58,14 +58,24 @@ internal sealed class DuplicateStore(FlowLedgerDbContext db, ITenantContext tena
     public async Task MergeAsync(Transaction survivor, Transaction duplicate, bool auto, string reason, string snapshotJson, CancellationToken ct = default)
     {
         await db.Database.ExecuteSqlRawAsync(CreateSqlText, ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync(
-            "INSERT INTO merged_transactions (tenant_id, duplicate_id, survivor_id, fingerprint, auto, reason, snapshot) " +
-            "VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}) ON CONFLICT DO NOTHING",
-            tenant.TenantId, duplicate.Id, survivor.Id, (object?)duplicate.Fingerprint?.Value ?? DBNull.Value, auto, reason, snapshotJson);
-        db.Transactions.Remove(duplicate);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        // A retrying execution strategy (AddInfrastructure enables one) rejects user transactions that
+        // are not wrapped in it, so the whole unit is retried together (#143).
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO merged_transactions (tenant_id, duplicate_id, survivor_id, fingerprint, auto, reason, snapshot) " +
+                "VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}) ON CONFLICT DO NOTHING",
+                tenant.TenantId, duplicate.Id, survivor.Id, (object?)duplicate.Fingerprint?.Value ?? DBNull.Value, auto, reason, snapshotJson);
+            if (db.Entry(duplicate).State != EntityState.Deleted)
+            {
+                db.Transactions.Remove(duplicate);
+            }
+
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task<IReadOnlyList<MergeLogEntry>> RecentMergesAsync(int take, CancellationToken ct = default)
