@@ -1,6 +1,4 @@
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -44,16 +42,12 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         }
     }
 
-    private sealed class Tenant(Guid id) : ITenantContext
-    {
-        public Guid TenantId { get; } = id;
-        public Guid UserId { get; } = Guid.NewGuid();
-    }
-
     [DockerFact]
     public async Task Rule_store_enforces_the_per_tenant_cap_in_sql_but_still_allows_replacing()
     {
-        var store = new NpgsqlCategoryRuleStore(_fixture.ConnectionString, new Tenant(NewTenant()));
+        var ctx = new TestTenantContext(NewTenant());
+        await using var db = _fixture.CreateProductionStyleContext(ctx);
+        var store = new FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryRuleStore(db, ctx);
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "Food");
@@ -71,7 +65,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Alias_store_enforces_the_per_tenant_cap_in_sql()
     {
-        var store = new NpgsqlMerchantAliasStore(_fixture.ConnectionString, new Tenant(NewTenant()));
+        var ctx = new TestTenantContext(NewTenant());
+        await using var db = _fixture.CreateProductionStyleContext(ctx);
+        var store = new FlowLedger.Infrastructure.Persistence.Repositories.EfMerchantAliasStore(db, ctx);
         for (var i = 0; i < 1000; i++)
         {
             await store.SetAsync($"P{i}", "A");
@@ -86,8 +82,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     public async Task Budget_and_goal_stores_reject_new_rows_over_the_cap_but_allow_updates()
     {
         var tenant = NewTenant();
-        var budgets = new NpgsqlBudgetStore(_fixture.ConnectionString);
-        for (var i = 0; i < NpgsqlBudgetStore.MaxBudgets; i++)
+        await using var db = _fixture.CreateProductionStyleContext(new TestTenantContext(tenant));
+        var budgets = new FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore(db, new TestTenantContext(tenant));
+        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore.MaxBudgets; i++)
         {
             await budgets.SetAsync(tenant, $"Cat{i}", 10m);
         }
@@ -96,9 +93,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         await overBudget.Should().ThrowAsync<InvalidOperationException>();
         await budgets.SetAsync(tenant, "Cat1", 99m);
 
-        var goals = new NpgsqlGoalStore(_fixture.ConnectionString);
+        var goals = new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, new TestTenantContext(tenant));
         Guid first = default;
-        for (var i = 0; i < NpgsqlGoalStore.MaxGoals; i++)
+        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore.MaxGoals; i++)
         {
             var id = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
             if (i == 0) { first = id; }
