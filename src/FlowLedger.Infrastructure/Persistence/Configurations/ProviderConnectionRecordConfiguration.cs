@@ -19,6 +19,14 @@ internal sealed class ProviderConnectionRecordConfiguration : IEntityTypeConfigu
         builder.Property(r => r.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(r => r.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
+        builder.Property(r => r.IssueKind).HasColumnName("issue_kind").HasMaxLength(50);
+        builder.Property(r => r.IssueMessage).HasColumnName("issue_message").HasMaxLength(500);
+        builder.Property(r => r.IssueRetryable).HasColumnName("issue_retryable").HasDefaultValue(false);
+        builder.Property(r => r.IssueRequiresUserAction).HasColumnName("issue_requires_user_action").HasDefaultValue(false);
+        builder.Property(r => r.IssueRetryAfter).HasColumnName("issue_retry_after");
+        builder.Property(r => r.IssueAt).HasColumnName("issue_at");
+        builder.Property(r => r.ConsecutiveFailures).HasColumnName("consecutive_failures").HasDefaultValue(0);
+
         // One connection per (tenant, provider) — the DB itself refuses a second provision.
         builder.HasIndex(r => new { r.TenantId, r.ProviderName })
             .IsUnique()

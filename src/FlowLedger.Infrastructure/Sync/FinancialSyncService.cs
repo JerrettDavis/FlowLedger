@@ -37,6 +37,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly IAccountConnectorLinkStore? _links;
     private readonly IProviderAccountCatalog? _catalog;
     private readonly bool _autoCreateAccounts;
+    private readonly IProviderConnectionStore? _health;
 
     /// <param name="configuration">
     /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
@@ -51,8 +52,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         ILogger<FinancialSyncService> logger,
         Microsoft.Extensions.Configuration.IConfiguration? configuration = null,
         IAccountConnectorLinkStore? links = null,
-        IProviderAccountCatalog? catalog = null)
+        IProviderAccountCatalog? catalog = null,
+        IProviderConnectionStore? health = null)
     {
+        _health = health;
         _links = links;
         _catalog = catalog;
         // Connectors:<id>:AutoCreateAccounts (default true): when false, provider accounts that match no existing account are only
@@ -130,7 +133,46 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
     // ── Sync ──────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Runs the sync and records the connection's health (ADR 0018): a classified <see cref="ProviderIssue"/> when the provider
+    /// fails (the original exception is then rethrown untouched), or recovery (clears any issue) when it succeeds.
+    /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
+    {
+        SyncResult result;
+        try
+        {
+            result = await SyncCoreAsync(ct);
+        }
+        catch (ProviderException ex)
+        {
+            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(ProviderIssue.FromException(ex), DateTimeOffset.UtcNow), CancellationToken.None);
+            throw; // never swallow: callers (UI, jobs) still see the original failure
+        }
+
+        await RecordHealthSafelyAsync(null, ct);
+        return result;
+    }
+
+    /// <summary>Health bookkeeping must never mask the sync outcome: its own failures are logged and dropped.</summary>
+    private async Task RecordHealthSafelyAsync(ConnectionIssueInfo? issue, CancellationToken ct)
+    {
+        if (_health is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _health.RecordHealthAsync(_provider.ProviderName, issue, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not record connection health for {Provider}.", _provider.ProviderName);
+        }
+    }
+
+    private async Task<SyncResult> SyncCoreAsync(CancellationToken ct)
     {
         EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
