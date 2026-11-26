@@ -6,11 +6,6 @@ using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.LocalAi;
 
-public sealed record SimilarTransactionDto(
-    Guid Id, DateOnly Date, string? Merchant, string Description, decimal Amount, string Direction, string? CategoryPath, double Similarity);
-
-public sealed record MerchantGroupDto(string Canonical, IReadOnlyList<MerchantOccurrence> Members, int TotalCount, double MinSimilarity, string SuggestedName);
-
 public sealed record MerchantGroupsResult(string Embedder, bool Semantic, double Threshold, IReadOnlyList<MerchantGroupDto> Groups);
 
 /// <summary>Precision/coverage at one confidence cut-off.</summary>

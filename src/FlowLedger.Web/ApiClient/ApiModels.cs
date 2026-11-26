@@ -143,15 +143,6 @@ public sealed record DebtPlanDto(PayoffPlanDto Avalanche, PayoffPlanDto Snowball
 
 public sealed record AlertDto(string Severity, string Title, string Detail);
 
-public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
-
-public sealed record DuplicateSideDto(
-    Guid Id, Guid AccountId, string Description, string? MerchantName, decimal Amount, string Direction, string Status,
-    DateOnly EffectiveDate, Guid? CategoryId, string CategorySource, string? Notes, bool BankSynced);
-
-public sealed record DuplicateSuggestionDto(
-    string Key, string Confidence, double Score, int DaysApart, string Reason, DuplicateSideDto Keep, DuplicateSideDto Remove);
-
 public sealed record DuplicateScanDto(int Total, int AutoMergeable, List<DuplicateSuggestionDto> Suggestions);
 
 public sealed record AutoMergeDto(int Merged, int Suggested);
@@ -164,8 +155,6 @@ public sealed record PeriodPerformanceDto(string Period, int Days, decimal Start
 public sealed record AccountPerformanceDto(Guid AccountId, string Name, decimal Balance, List<PeriodPerformanceDto> Periods);
 
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
-
-public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
 
 // ── Assets ────────────────────────────────────────────────────────────────────
 
@@ -316,18 +305,12 @@ public sealed record LocalAiStatusDto(
     string EmbeddingModelId, bool LlmEnabled, bool LlmModelInstalled, bool LlmLoaded, string? LlmNote,
     string ModelDirectory, bool DownloadsAllowed, List<LocalAiModelDto> Models, LocalAiDownloadDto? Download);
 
-public sealed record MerchantOccurrenceDto(string Raw, int Count);
-public sealed record MerchantGroupDto(string Canonical, List<MerchantOccurrenceDto> Members, int TotalCount, double MinSimilarity, string SuggestedName = "");
 public sealed record MerchantGroupsDto(string Embedder, bool Semantic, double Threshold, List<MerchantGroupDto> Groups);
 
 public sealed record EvalPointDto(double Threshold, int Predicted, int Correct, double Coverage, double Precision);
 public sealed record EvalMethodDto(string Name, double Accuracy, List<EvalPointDto> Curve);
 public sealed record EvaluationDto(string Embedder, bool Semantic, int Merchants, int Labels, int Folds, long Milliseconds, string Note, List<EvalMethodDto> Methods);
 
-public sealed record SimilarTransactionDto(Guid Id, DateOnly Date, string? Merchant, string Description, decimal Amount, string Direction, string? CategoryPath, double Similarity);
-
 public sealed record ImportFormatDto(string Id, string Name);
-
-public sealed record ImportSummaryDto(Guid ImportBatchId, int ImportedCount, int DuplicateCount, int FailedRowCount, int MatchedToPlanCount);
 
 public sealed record AutoImportResultDto(string FormatId, string FormatName, List<string> Warnings, ImportSummaryDto Summary);

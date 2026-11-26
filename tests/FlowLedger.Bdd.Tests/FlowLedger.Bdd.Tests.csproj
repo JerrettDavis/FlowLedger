@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="FlowLedger.Contracts" />
     <Using Include="FluentAssertions" />
   </ItemGroup>
 

@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="FlowLedger.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\FlowLedger.Domain\FlowLedger.Domain.csproj" />
     <ProjectReference Include="..\FlowLedger.Integrations.Abstractions\FlowLedger.Integrations.Abstractions.csproj" />

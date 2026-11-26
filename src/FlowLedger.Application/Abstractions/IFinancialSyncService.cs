@@ -22,9 +22,3 @@ public interface IFinancialSyncService
     Task<SyncResult> SyncAsync(CancellationToken ct = default);
 }
 
-/// <summary>Summary returned after a sync run.</summary>
-public sealed record SyncResult(
-    int AccountsUpserted,
-    int TransactionsAdded,
-    int TransactionsSkipped,
-    int RecurringFlowsAdded);
