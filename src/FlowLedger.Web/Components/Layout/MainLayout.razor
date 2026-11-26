@@ -510,6 +510,7 @@
     private async Task ConnectAndSync()
     {
         _syncing = true;
+        _syncAnnouncement = "Syncing";
         try
         {
             await ApiClient.ConnectAsync();
@@ -517,11 +518,13 @@
             var msg = result is not null
                 ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
                 : "Sync complete";
+            _syncAnnouncement = msg;
             Snackbar.Add(msg, Severity.Success);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect & Sync failed");
+            _syncAnnouncement = "Sync failed";
             Snackbar.AddFailure(ex, "Sync failed");
         }
         finally
