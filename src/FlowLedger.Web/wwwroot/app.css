@@ -166,17 +166,29 @@ html, body {
     }
 }
 
-/* Tables never show scrollbars. When space runs out we truncate text, then drop low-priority columns. */
+/* When space runs out we truncate text, then drop low-priority columns, and whatever is left scrolls
+   sideways inside the table instead of being clipped (phones, split screens, zoomed browsers). */
 .mud-table-container,
 .mud-simple-table,
 .mud-simple-table .mud-table-container {
-    overflow: hidden !important;
+    overflow-x: auto;
+    overflow-y: hidden;
     max-height: none !important;
 }
 
-@media (max-width: 1919.98px) { .fl-hide-lg { display: none !important; } }
-@media (max-width: 1599.98px) { .fl-hide-md { display: none !important; } }
-@media (max-width: 1279.98px) { .fl-hide-sm { display: none !important; } }
+/* Column hiding starts below laptop widths only: 1366/1440 laptops keep every column. */
+@media (max-width: 1279.98px) { .fl-hide-lg { display: none !important; } }
+@media (max-width: 959.98px) { .fl-hide-md { display: none !important; } }
+@media (max-width: 599.98px) { .fl-hide-sm { display: none !important; } }
+
+/* Touch devices: icon buttons meet the 44px target size. */
+@media (pointer: coarse) {
+    .mud-icon-button,
+    .mud-icon-button.mud-icon-size-small {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
 
 /* Gutters scale with the display: tight on phones, generous on 1440p/4K, content still fills the width. */
 .fl-page { padding-left: 16px; padding-right: 16px; }
@@ -612,7 +624,7 @@ html, body {
 
 /* Shown only while the dedicated Account column is hidden. */
 .fl-md-only { display: none; }
-@media (max-width: 1599.98px) { .fl-md-only { display: block; } }
+@media (max-width: 959.98px) { .fl-md-only { display: block; } }
 
 /* The merchant cell is the flexible column at every width: it shrinks (ellipsis) so Category/Account never get cropped. */
 @media (min-width: 960px) { .mud-table-cell:has(> .fl-merch) { width: 100%; max-width: 0; } }
