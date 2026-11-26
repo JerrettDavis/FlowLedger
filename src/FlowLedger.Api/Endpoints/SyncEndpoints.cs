@@ -89,18 +89,7 @@ internal static class SyncEndpoints
             {
                 return Results.Problem(title: "Sync already running", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
-            catch (FlowLedger.Integrations.Abstractions.ProviderCallBudgetExceededException ex)
-            {
-                return Results.Problem(title: "Provider call budget reached", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
-            }
-            catch (FlowLedger.Integrations.Abstractions.NeedsUserActionProviderException ex)
-            {
-                // Not a server fault: the user must (re)connect an institution first.
-                return Results.Problem(
-                    title: "Provider connection requires user action",
-                    detail: ex.UserHint ?? ex.Message,
-                    statusCode: StatusCodes.Status409Conflict);
-            }
+            // Provider failures (user action, rate limit, outage, call budget) are mapped centrally by ProviderExceptionHandler.
         })
         .WithName("Sync")
         .WithSummary("Run a full/incremental financial sync for the current tenant")
