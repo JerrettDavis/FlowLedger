@@ -110,10 +110,10 @@ internal static class QuilttIssueMapper
     public static ProviderException ToException(ProviderIssue issue) => issue.Kind switch
     {
         ProviderIssueKind.ReauthRequired or ProviderIssueKind.InvalidCredentials or ProviderIssueKind.Disconnected =>
-            new NeedsUserActionProviderException(issue.Message, "Reconnect the bank.", issue.ProviderCode) { Kind = issue.Kind },
-        ProviderIssueKind.RateLimited => new RateLimitedProviderException(issue.Message, issue.RetryAfter, issue.ProviderCode),
-        ProviderIssueKind.Internal or ProviderIssueKind.Unknown => new FatalProviderException(issue.Message, issue.ProviderCode) { Kind = issue.Kind },
-        _ => new TransientProviderException(issue.Message, providerCode: issue.ProviderCode) { Kind = issue.Kind },
+            new NeedsUserActionProviderException(issue.Message, "Reconnect the bank.", issue.ProviderCode) { Kind = issue.Kind, RepairRef = issue.RepairRef },
+        ProviderIssueKind.RateLimited => new RateLimitedProviderException(issue.Message, issue.RetryAfter, issue.ProviderCode) { RepairRef = issue.RepairRef },
+        ProviderIssueKind.Internal or ProviderIssueKind.Unknown => new FatalProviderException(issue.Message, issue.ProviderCode) { Kind = issue.Kind, RepairRef = issue.RepairRef },
+        _ => new TransientProviderException(issue.Message, providerCode: issue.ProviderCode) { Kind = issue.Kind, RepairRef = issue.RepairRef },
     };
 
     private static bool IsDisconnected(string? status) =>

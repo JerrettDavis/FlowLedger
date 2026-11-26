@@ -62,3 +62,13 @@ layers only see `ProviderIssue`, the same handling covers MX, SimpleFIN and any 
   (via `connectionSimulateError`) and `DISCONNECTED` are reproducible server-side. Capturing the Connector's exit event and reporting it to the API is the remaining gap.
 * Webhook-driven issue updates (`connection.synced.errored.*`) are mapped but untested end to end (no public URL).
 * `FinancialSyncService` still names connectors for tenancy/provisioning rules (not error handling); move to connector descriptors in a follow-up.
+
+## Live verification (2026-11-25, isolated sandbox stack, real Quiltt sandbox)
+`connectionSimulateError` on the in-app connection -> app auto-sync threw `ReauthRequired` -> HTTP 409 -> toast with Reconnect -> persisted `issue_kind=ReauthRequired`,
+`issue_repair_ref=conn_...`, `consecutive_failures` incrementing -> persistent app-bar **Reconnect** button (works for non-owner tenants via
+`GET /api/integrations/connections`) -> Quiltt Connector opened in reconnect mode for exactly that connection ("Action needed!") -> mock OAuth authorize ->
+sync -> issue cleared, failures 0, button gone, Quiltt connection back to `SYNCING`.
+Bugs this run exposed and fixed: (1) a *thrown* failure lost the reconnect reference (exceptions now carry `RepairRef`); (2) the owner-only Connectors page was the only
+Reconnect surface, unreachable for per-user tenants; (3) an issue observed after a clean read must be informational (never counts toward give-up or blocks the gate).
+Note: the two new migrations (`AddProviderConnectionIssue`, `AddProviderConnectionIssueRepairRef`) apply to whatever database the stack points at on its next start,
+including `flowledger_prod`.

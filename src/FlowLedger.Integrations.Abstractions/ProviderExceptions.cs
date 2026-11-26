@@ -24,6 +24,12 @@ public abstract class ProviderException : Exception
         init => _kind = value;
     }
 
+    /// <summary>
+    /// Opaque, connector-defined reference a UI hands back to that connector's repair flow (e.g. the exact connection to reconnect).
+    /// Carried into <see cref="ProviderIssue.RepairRef"/> so it survives persistence when the failure is thrown rather than observed.
+    /// </summary>
+    public string? RepairRef { get; init; }
+
     /// <summary>The kind implied by the exception type alone.</summary>
     protected virtual ProviderIssueKind DefaultKind => ProviderIssueKind.Unknown;
 

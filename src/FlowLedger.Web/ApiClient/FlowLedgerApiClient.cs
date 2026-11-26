@@ -1566,6 +1566,16 @@ public sealed class FlowLedgerApiClient
             return true;
         });
 
+    /// <summary>The signed-in tenant's own connections and their health; empty on any failure (never blocks the shell).</summary>
+    public async Task<IReadOnlyList<MyConnectionDto>> GetMyConnectionsAsync(CancellationToken ct = default) =>
+        await ExecuteAsync("read connections", async () =>
+        {
+            var response = await _http.GetAsync("/api/integrations/connections", ct);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<MyConnectionDto>>(JsonOptions, ct) ?? []
+                : [];
+        }) ?? [];
+
     /// <summary>Whether the in-app Quiltt Connector is enabled (false on any failure, so callers fall back to the old flow).</summary>
     public async Task<QuilttConfigDto> GetQuilttConfigAsync(CancellationToken ct = default) =>
         await ExecuteAsync("read Quiltt config", async () =>

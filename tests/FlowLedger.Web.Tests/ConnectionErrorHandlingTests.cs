@@ -256,3 +256,28 @@ public sealed class ConnectExitTests
             .Should().Contain("nothing was linked").And.Contain("Try again");
     }
 }
+
+public sealed class MyConnectionsClientTests
+{
+    private sealed class Stub(string json) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") });
+    }
+
+    [Fact]
+    public async Task GetMyConnectionsAsync_ReadsTheIssueAndRepairRef()
+    {
+        const string json = """[{"provider":"Quiltt","institution":"Mock","status":"ConnectionPending","issue":{"kind":"ReauthRequired","message":"m","retryable":false,"requiresUserAction":true,"retryAfter":null,"at":"2026-11-25T12:00:00Z","consecutiveFailures":2,"providerCode":"X","repairRef":"conn_1"}},{"provider":"Other","issue":null}]""";
+        var client = new FlowLedgerApiClient(
+            new HttpClient(new Stub(json)) { BaseAddress = new Uri("http://api.test") },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
+
+        var connections = await client.GetMyConnectionsAsync();
+
+        connections.Should().HaveCount(2);
+        connections[0].Issue!.RepairRef.Should().Be("conn_1");
+        connections[0].Issue!.RequiresUserAction.Should().BeTrue();
+        connections[1].Issue.Should().BeNull();
+    }
+}

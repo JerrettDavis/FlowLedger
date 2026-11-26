@@ -175,4 +175,28 @@ public sealed class ProviderErrorHandlingTests(ProviderFailureApiFactory factory
         connections.Single(c => c.GetProperty("institution").GetString() == "Fine Bank")
             .GetProperty("issue").ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    [Fact]
+    public async Task My_connections_endpoint_exposes_health_and_the_repair_ref_for_any_signed_in_tenant()
+    {
+        var at = new DateTimeOffset(2026, 11, 25, 12, 0, 0, TimeSpan.Zero);
+        factory.Connections =
+        [
+            new ProviderConnectionInfo("Simulated", "Broken Bank", "NeedsUserAction", at, at,
+                new ConnectionIssueInfo(nameof(ProviderIssueKind.ReauthRequired), "Login again.", false, true, null, at, 1,
+                    ProviderCode: "STATUS:conn_7", RepairRef: "conn_7")),
+        ];
+
+        var response = await _client.GetAsync("/api/integrations/connections");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var item = doc.RootElement.EnumerateArray().Single();
+        item.GetProperty("provider").GetString().Should().Be("Simulated");
+        var issue = item.GetProperty("issue");
+        issue.GetProperty("kind").GetString().Should().Be("ReauthRequired");
+        issue.GetProperty("requiresUserAction").GetBoolean().Should().BeTrue();
+        issue.GetProperty("repairRef").GetString().Should().Be("conn_7");
+        issue.GetProperty("providerCode").GetString().Should().Be("STATUS:conn_7");
+    }
 }

@@ -49,6 +49,19 @@ internal static class ConnectorEndpoints
 
     internal static IEndpointRouteBuilder MapConnectorEndpoints(this IEndpointRouteBuilder app)
     {
+        // The signed-in tenant's OWN connections and their health (no credentials). Unlike the connectors overview this is not
+        // household-owner-only: a per-user connector (Quiltt) must be repairable by the user whose bank it is.
+        app.MapGet("/api/integrations/connections", async (IProviderConnectionStore connections, CancellationToken ct) =>
+                Results.Ok((await connections.ListAsync(ct)).Select(c => new
+                {
+                    provider = c.ProviderName,
+                    institution = c.Institution,
+                    status = c.Status,
+                    issue = c.Issue is null ? null : ConnectionIssueDto.From(c.Issue),
+                })))
+            .WithName("MyConnections")
+            .WithSummary("The current tenant's provider connections and their health");
+
         app.MapGet("/api/integrations/connectors", async (
                 IConfiguration cfg,
                 IConnectorRegistry registry,
