@@ -19,7 +19,7 @@ public sealed class EfProviderAccountCatalogTests(IntegrationTestFixture fixture
     {
         var a = TestTenantContext.New();
         var b = TestTenantContext.New();
-        var seen = DateTimeOffset.UtcNow;
+        var seen = new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero);
         var catalog = Catalog(a);
 
         await catalog.UpsertAsync([

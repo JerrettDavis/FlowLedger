@@ -104,7 +104,7 @@ public sealed class HomeAssistantStoreTests : IAsyncLifetime
 
         // Tenant B's release and prune of the same key must not touch tenant A's claim.
         await storeB.ReleaseAsync(b.TenantId, "bill_due_soon:x:2026-11-20");
-        await storeB.PruneAsync(b.TenantId, DateTimeOffset.UtcNow.AddDays(1));
+        await storeB.PruneAsync(b.TenantId, new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
         (await storeA.TryClaimAsync(a.TenantId, "bill_due_soon:x:2026-11-20")).Should().BeFalse();
 
         await storeA.ReleaseAsync(a.TenantId, "bill_due_soon:x:2026-11-20");
