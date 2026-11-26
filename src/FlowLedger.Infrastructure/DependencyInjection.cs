@@ -324,6 +324,10 @@ public static class DependencyInjection
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 TenancySettings.Legacy(configuration)));
+        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlWebhookReplayStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlTenantRegistry(
                 configuration.GetConnectionString("flowledger")
