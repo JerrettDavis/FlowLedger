@@ -20,7 +20,8 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     {
         public int TransactionCalls;
         public readonly List<string> Queries = [];
-        public int PageRows;
+        /// <summary>When set, the fake server holds this many rows, pages them by skip/take and reports X-Total-Count.</summary>
+        public int? ServerTotal;
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -30,7 +31,18 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
             {
                 Interlocked.Increment(ref TransactionCalls);
                 Queries.Add(request.RequestUri.Query);
-                json = PageRows == 0 ? "[]" : "[" + string.Join(",", Enumerable.Range(0, PageRows).Select(_ => TxJson())) + "]";
+                var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
+                var skip = int.TryParse(query["skip"], out var sk) ? sk : 0;
+                var take = int.TryParse(query["take"], out var tk) ? tk : 100;
+                var rows = ServerTotal is { } total ? Math.Max(0, Math.Min(take, total - skip)) : 0;
+                json = rows == 0 ? "[]" : "[" + string.Join(",", Enumerable.Range(0, rows).Select(_ => TxJson())) + "]";
+                var ok = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+                if (ServerTotal is { } t)
+                {
+                    ok.Headers.Add("X-Total-Count", t.ToString());
+                }
+
+                return Task.FromResult(ok);
             }
             else if (path == "/api/accounts")
             {
@@ -71,25 +83,71 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_full_page_offers_older_transactions_and_loading_them_skips_what_is_loaded()
+    public void The_grid_shows_the_server_total_not_just_what_was_loaded()
     {
-        var handler = new Handler { PageRows = 500 };
+        var handler = new Handler { ServerTotal = 1234 };
         var cut = RenderPage(handler);
-        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Load older transactions"));
 
-        await cut.Find("button[aria-label='Load older transactions']").ClickAsync();
-
-        handler.Queries.Last().Should().Contain("skip=500");
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("1–50 of 1,234"));
     }
 
     [Fact]
-    public void A_short_page_has_no_load_older_button()
+    public async Task Next_page_asks_the_server_for_the_next_slice_and_previous_goes_back()
     {
-        var handler = new Handler { PageRows = 3 };
+        var handler = new Handler { ServerTotal = 120 };
         var cut = RenderPage(handler);
-        cut.WaitForState(() => handler.TransactionCalls >= 1);
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("1–50 of 120"));
 
-        cut.Markup.Should().NotContain("Load older transactions");
+        await cut.Find("button[aria-label='Next page']").ClickAsync();
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("51–100 of 120"));
+        handler.Queries.Last().Should().Contain("skip=50");
+
+        await cut.Find("button[aria-label='Next page']").ClickAsync();
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("101–120 of 120"));
+        cut.Find("button[aria-label='Next page']").HasAttribute("disabled").Should().BeTrue();
+
+        await cut.Find("button[aria-label='Previous page']").ClickAsync();
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("51–100 of 120"));
+    }
+
+    [Fact]
+    public void A_big_result_never_renders_more_rows_than_the_page_size()
+    {
+        var handler = new Handler { ServerTotal = 10_000 };
+        var cut = RenderPage(handler);
+
+        cut.WaitForAssertion(() => cut.FindAll("tbody tr").Count.Should().BeInRange(1, 100));
+    }
+
+    [Fact]
+    public void Previous_is_disabled_on_the_first_page_and_changing_page_size_goes_back_to_the_start()
+    {
+        var handler = new Handler { ServerTotal = 120 };
+        var cut = RenderPage(handler);
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Contain("of 120"));
+
+        cut.Find("button[aria-label='Previous page']").HasAttribute("disabled").Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task The_row_details_panel_opens_with_the_full_transaction_and_its_actions()
+    {
+        var handler = new Handler { ServerTotal = 1 };
+        var cut = RenderPage(handler);
+        var provider = Render<MudDialogProvider>();
+        cut.WaitForAssertion(() => cut.FindAll("button[aria-label^='Show details for']").Should().NotBeEmpty());
+
+        // The click handler awaits the dialog's result, so it only completes once the panel closes: do not await it here.
+        var opened = cut.Find("button[aria-label^='Show details for']").ClickAsync();
+
+        provider.WaitForAssertion(() =>
+        {
+            provider.Markup.Should().Contain("Transaction details").And.Contain("Rename merchant").And.Contain("Split");
+            provider.Markup.Should().Contain("ROW");
+        });
+
+        provider.FindAll("button").Single(b => b.TextContent.Trim() == "Close").Click();
+        await opened;
     }
 
     private static TransactionDto Tx(string merchant, Guid? id = null) =>

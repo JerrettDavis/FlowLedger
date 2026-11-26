@@ -101,10 +101,10 @@
              Striped="false"
              Dense="true"
              Virtualize="false"
-             RowsPerPage="50"
+             RowsPerPage="@PageSize"
              aria-label="Transactions table">
     <ToolBarContent>
-        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status">@_transactions.Count transaction(s) loaded@(_hasMore ? ", newest first" : "")</MudText>
+        <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status" data-testid="tx-count">@RangeText</MudText>
     </ToolBarContent>
     <Columns>
         <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.EffectiveDate">
@@ -142,6 +142,9 @@
                         }
                     </div>
                     <div class="fl-merch-actions">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Info" Size="Size.Small"
+                                       OnClick="@(() => ShowDetails(row))"
+                                       aria-label="@($"Show details for {row.Description}")" title="Show details" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                        OnClick="@(() => EditAlias(row))"
                                        aria-label="@($"Rename merchant for {row.Description}")" title="Rename merchant" />
@@ -202,17 +205,20 @@
             </CellTemplate>
         </TemplateColumn>
     </Columns>
-    <PagerContent>
-        <MudDataGridPager T="FlowLedger.Contracts.TransactionDto" aria-label="Transactions pager" />
-    </PagerContent>
 </MudDataGrid>
 
-@if (_hasMore && !_loading)
-{
-    <div class="d-flex justify-center mt-3">
-        <MudButton Variant="Variant.Outlined" OnClick="LoadMoreAsync" aria-label="Load older transactions">Load older transactions</MudButton>
-    </div>
-}
+<nav class="fl-pager" aria-label="Transactions pages">
+    <MudSelect T="int" Value="PageSize" ValueChanged="OnPageSizeChanged" Dense="true" Variant="Variant.Outlined" Label="Rows per page"
+               Class="fl-select-md" aria-label="Rows per page">
+        @foreach (var size in PageSizes)
+        {
+            <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+        }
+    </MudSelect>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary" data-testid="tx-range">@RangeText</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_page == 0 || _loading)" OnClick="PreviousPageAsync" aria-label="Previous page" />
+    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Disabled="@(!HasNextPage || _loading)" OnClick="NextPageAsync" aria-label="Next page" />
+</nav>
 
 @code {
     private bool _loading = true;
@@ -229,9 +235,21 @@
     private string? _search;
     private bool _applyToMerchant;
     private bool _categorizing;
-    private const int PageSize = 500;
-    private bool _hasMore;
+    private static readonly int[] PageSizes = [25, 50, 100, 250];
+    private int PageSize = 50;
+    private int _page;
+    private int? _total;
     private int _loadSeq;
+
+    // "1–50 of 1,234": the server reports the total, so the grid never silently hides older rows behind a client-side cap.
+    private string RangeText =>
+        _transactions.Count == 0
+            ? "No transactions"
+            : _total is { } total
+                ? $"{_page * PageSize + 1:N0}–{_page * PageSize + _transactions.Count:N0} of {total:N0}"
+                : $"{_page * PageSize + 1:N0}–{_page * PageSize + _transactions.Count:N0}";
+
+    private bool HasNextPage => _total is { } total ? (_page + 1) * PageSize < total : _transactions.Count >= PageSize;
 
     private List<FlowLedger.Contracts.TransactionDto> _visible = [];
     private Dictionary<Guid, FlowLedger.Contracts.CategoryDto> _categoryById = [];
@@ -286,12 +304,33 @@
         await LoadAsync();
     }
 
-    private Task LoadAsync() => LoadPageAsync(append: false);
+    /// <summary>Reloads from the first page; every filter, search or page-size change starts here.</summary>
+    private Task LoadAsync()
+    {
+        _page = 0;
+        return LoadPageAsync();
+    }
 
-    private Task LoadMoreAsync() => LoadPageAsync(append: true);
+    private Task NextPageAsync()
+    {
+        _page++;
+        return LoadPageAsync();
+    }
 
-    /// <summary>Loads one page from the server (filters and search are applied there); append adds the next older page.</summary>
-    private async Task LoadPageAsync(bool append)
+    private Task PreviousPageAsync()
+    {
+        _page = Math.Max(0, _page - 1);
+        return LoadPageAsync();
+    }
+
+    private Task OnPageSizeChanged(int size)
+    {
+        PageSize = size;
+        return LoadAsync();
+    }
+
+    /// <summary>Loads the current page from the server (filters, search and paging are applied there).</summary>
+    private async Task LoadPageAsync()
     {
         var seq = ++_loadSeq;
         _loading = true;
@@ -301,11 +340,11 @@
             var from = _fromDate.HasValue ? DateOnly.FromDateTime(_fromDate.Value) : (DateOnly?)null;
             var to = _toDate.HasValue ? DateOnly.FromDateTime(_toDate.Value) : (DateOnly?)null;
 
-            var page = await ApiClient.GetTransactionsAsync(
+            var page = await ApiClient.GetTransactionPageAsync(
                 accountId: _filterAccountId,
                 from: from,
                 to: to,
-                skip: append ? _transactions.Count : 0,
+                skip: _page * PageSize,
                 take: PageSize,
                 includeHidden: _includeHidden,
                 search: _search);
@@ -314,8 +353,8 @@
                 return; // a newer filter or search superseded this response
             }
 
-            _transactions = append ? [.. _transactions, .. page] : page;
-            _hasMore = page.Count >= PageSize;
+            _transactions = page.Items;
+            _total = page.Total;
             RecomputeVisible();
         }
         catch (Exception ex)
@@ -393,6 +432,24 @@
         if (result is { Canceled: false })
         {
             await LoadAsync();
+        }
+    }
+
+    private async Task ShowDetails(FlowLedger.Contracts.TransactionDto tx)
+    {
+        var category = tx.CategoryId is { } id && _categoryById.TryGetValue(id, out var c) ? c.Path : null;
+        var dialog = await Dialogs.ShowAsync<TransactionDetailsDialog>("Transaction details", new DialogParameters<TransactionDetailsDialog>
+        {
+            { x => x.Transaction, tx },
+            { x => x.AccountName, _accountById.TryGetValue(tx.AccountId, out var a) ? a.Name : null },
+            { x => x.CategoryName, category },
+        }, new DialogOptions { Position = DialogPosition.CenterRight, MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+        var result = await dialog.Result;
+        switch (result?.Data as string)
+        {
+            case TransactionDetailsDialog.Rename: await EditAlias(tx); break;
+            case TransactionDetailsDialog.Note: await EditNote(tx); break;
+            case TransactionDetailsDialog.Split: await EditSplits(tx); break;
         }
     }
 

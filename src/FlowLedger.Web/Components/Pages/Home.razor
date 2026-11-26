@@ -6,13 +6,13 @@
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-2" style="gap:12px;flex-wrap:wrap">
+<div class="fl-page-header">
     <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Dashboard</MudText>
-    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+    <div class="fl-page-header__actions">
         <DateRangeSelector Label="History" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo"
                            Presets="@HistoryPresets" Changed="OnRangeChanged" />
         <MudSelect T="int" Value="_horizonMonths" ValueChanged="OnHorizonChanged" Label="Forecast" Dense="true"
-                   Variant="Variant.Outlined" Style="width:min(130px,100%)" aria-label="Forecast horizon">
+                   Variant="Variant.Outlined" Class="fl-select-md" aria-label="Forecast horizon">
             @foreach (var m in new[] { 1, 3, 6, 12 })
             {
                 <MudSelectItem T="int" Value="@m">@m @(m == 1 ? "month" : "months")</MudSelectItem>
@@ -118,7 +118,7 @@ else
                         </MudText>
                         @if (!_forecastUnavailable && _lowWaterMark < 0)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">Below zero</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0 fl-chip-xs">Below zero</MudChip>
                         }
                     </div>
                 </MudCardContent>
@@ -137,7 +137,7 @@ else
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@(_forecastUnavailable ? "Retry from the projection card" : $"Next {_horizonMonths} months")</MudText>
                         @if (_overdraftCount > 0)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0 fl-chip-xs">
                                 <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" />
                             </MudChip>
                         }
@@ -148,27 +148,14 @@ else
 
     </MudGrid>
 
-    @if (_insightsUnavailable)
-    {
-        <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true">
-            Couldn't load spending insights.
-            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit" OnClick="ReloadInsightsAsync">Retry</MudButton>
-        </MudAlert>
-    }
-
     <div class="fl-masonry">
         <!-- Insights: spending by category -->
-        @if (_insights is { SpendingByCategory.Count: > 0 })
-        {
-            <div class="fl-masonry-item">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Spending · @RangeLabel</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">By category, excluding transfers between your accounts</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
+        <div class="fl-masonry-item">
+            <DashboardCard Title="@($"Spending · {RangeLabel}")" Caption="By category, excluding transfers between your accounts"
+                           State="@InsightState(_insights is { SpendingByCategory.Count: > 0 })" OnRetry="ReloadInsightsAsync"
+                           ErrorText="Couldn't load spending insights." EmptyText="No spending in this range.">
+                @if (_insights is { SpendingByCategory.Count: > 0 })
+                {
                         <ChartFigure Title="Spending by category"
                                      Summary="@ChartSummary.Categories($"Spending {RangeLabel}", _insights.SpendingByCategory.Select(c => (c.Category, c.Amount)), Format.Money)">
                             <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
@@ -181,23 +168,17 @@ else
                                 }
                             </tbody>
                         </MudSimpleTable>
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        }
+                }
+            </DashboardCard>
+        </div>
 
         <!-- Insights: income vs spending -->
-        @if (_insights is { CashFlow.Count: > 0 })
-        {
-            <div class="fl-masonry-item">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Income vs spending</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel, excluding transfers</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
+        <div class="fl-masonry-item">
+            <DashboardCard Title="Income vs spending" Caption="@($"{RangeLabel}, excluding transfers")"
+                           State="@InsightState(_insights is { CashFlow.Count: > 0 })" OnRetry="ReloadInsightsAsync"
+                           ErrorText="Couldn't load income and spending." EmptyText="No income or spending in this range.">
+                @if (_insights is { CashFlow.Count: > 0 })
+                {
                         <ChartFigure Title="Income vs spending by month"
                                      Summary="@FlowSummary()"
                                      Rows="@FlowRows()" LabelHeader="Month" ValueHeader="Income / spending / net">
@@ -214,24 +195,18 @@ else
                                 </MudText>
                             </div>
                         }
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        }
+                }
+            </DashboardCard>
+        </div>
 
         <!-- Insights: what changed vs the previous period -->
-        @if (_insights is { Movers.Count: > 0 })
-        {
-            <div class="fl-masonry-item">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Biggest changes</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel vs the previous period (@_insights.PreviousLabel)</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @{ var maxChange = (double)_insights.Movers.Max(m => Math.Abs(m.Change)); }
+        <div class="fl-masonry-item">
+            <DashboardCard Title="Biggest changes" Caption="@(_insights is null ? RangeLabel : $"{RangeLabel} vs the previous period ({_insights.PreviousLabel})")"
+                           State="@InsightState(_insights is { Movers.Count: > 0 })" OnRetry="ReloadInsightsAsync"
+                           ErrorText="Couldn't load the biggest changes." EmptyText="Nothing changed enough to list.">
+                @if (_insights is { Movers.Count: > 0 })
+                {
+                        var maxChange = (double)_insights.Movers.Max(m => Math.Abs(m.Change));
                         @foreach (var m in _insights.Movers)
                         {
                             <div class="mb-2">
@@ -247,24 +222,18 @@ else
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.Money(m.Previous) → @Format.Money(m.Current)</MudText>
                             </div>
                         }
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        }
+                }
+            </DashboardCard>
+        </div>
 
         <!-- Insights: top merchants -->
-        @if (_insights is { TopMerchants.Count: > 0 })
-        {
-            <div class="fl-masonry-item">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Top merchants</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel, excluding transfers</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @{ var topMerchant = (double)_insights.TopMerchants.Max(m => m.Amount); }
+        <div class="fl-masonry-item">
+            <DashboardCard Title="Top merchants" Caption="@($"{RangeLabel}, excluding transfers")"
+                           State="@InsightState(_insights is { TopMerchants.Count: > 0 })" OnRetry="ReloadInsightsAsync"
+                           ErrorText="Couldn't load top merchants." EmptyText="No merchant spending in this range.">
+                @if (_insights is { TopMerchants.Count: > 0 })
+                {
+                        var topMerchant = (double)_insights.TopMerchants.Max(m => m.Amount);
                         @foreach (var m in _insights.TopMerchants)
                         {
                             <div class="mb-2">
@@ -276,33 +245,26 @@ else
                                                    aria-valuetext="@($"{m.Merchant}: {Format.Money(m.Amount)} over {m.Visits} visits")" />
                             </div>
                         }
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        }
+                }
+            </DashboardCard>
+        </div>
 
         <!-- Insights: net worth trend -->
-        @if (_insights is { NetWorth.Count: > 1 })
-        {
-            <div class="fl-masonry-item">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Net worth trend</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Account balances captured at each sync (assets are valued separately)</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
+        <div class="fl-masonry-item">
+            <DashboardCard Title="Net worth trend" Caption="Account balances captured at each sync (assets are valued separately)"
+                           State="@InsightState(_insights is { NetWorth.Count: > 1 })" OnRetry="ReloadInsightsAsync"
+                           ErrorText="Couldn't load the net worth trend." EmptyText="The trend appears after a few syncs.">
+                @if (_insights is { NetWorth.Count: > 1 })
+                {
                         <ChartFigure Title="Net worth trend"
                                      Summary="@ChartSummary.Trend("Net worth", _insights.NetWorth.TakeLast(60).Select(p => (p.Date, p.Value)).ToList(), Format.Money)"
                                      Rows="@_insights.NetWorth.TakeLast(60).Select(p => new ChartRow(p.Date, Format.Money(p.Value))).ToList()"
                                      LabelHeader="Date" ValueHeader="Net worth">
                             <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
                         </ChartFigure>
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        }
+                }
+            </DashboardCard>
+        </div>
 
         <!-- Balance Projection Chart -->
         <div class="fl-masonry-item">
@@ -315,7 +277,7 @@ else
                 {
                     <ChartFigure Title="Balance projection"
                                  Summary="@ProjectionSummary()">
-                        <div style="height:220px;overflow:hidden">
+                        <div class="fl-chart-box">
                             @((MarkupString)SvgChart.BuildBalanceProjection(
                                 _forecastPoints,
                                 zeroLine: 0m,
@@ -335,25 +297,17 @@ else
 
         <!-- Upcoming Flows -->
         <div class="fl-masonry-item">
-            <MudCard>
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <div class="d-flex justify-space-between align-center" style="gap:8px">
-                            <div>
-                                <MudText Typo="Typo.h6">Upcoming Flows</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Next @_upcomingDays days</MudText>
-                            </div>
-                            <MudSelect T="int" Value="_upcomingDays" ValueChanged="OnUpcomingDaysChanged" Dense="true" Variant="Variant.Outlined"
-                                       Style="width:min(110px,100%)" aria-label="Upcoming flows window">
-                                @foreach (var d in new[] { 7, 14, 30, 60, 90 })
-                                {
-                                    <MudSelectItem T="int" Value="@d">@d days</MudSelectItem>
-                                }
-                            </MudSelect>
-                        </div>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent >
+            <DashboardCard Title="Upcoming Flows" Caption="@($"Next {_upcomingDays} days")">
+                <HeaderActions>
+                    <MudSelect T="int" Value="_upcomingDays" ValueChanged="OnUpcomingDaysChanged" Dense="true" Variant="Variant.Outlined"
+                               Class="fl-select-sm" aria-label="Upcoming flows window">
+                        @foreach (var d in new[] { 7, 14, 30, 60, 90 })
+                        {
+                            <MudSelectItem T="int" Value="@d">@d days</MudSelectItem>
+                        }
+                    </MudSelect>
+                </HeaderActions>
+                <ChildContent>
                     @if (_upcomingFlows.Count > 0)
                     {
                         <MudList T="UpcomingFlow" Dense="true" aria-label="Upcoming flows list">
@@ -362,7 +316,7 @@ else
                                 <MudListItem>
                                     <div class="d-flex justify-space-between align-center w-100">
                                         <div>
-                                            <MudText Typo="Typo.body2" Style="font-weight:500">@f.Name</MudText>
+                                            <MudText Typo="Typo.body2" Class="fl-strong">@f.Name</MudText>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.DayMonth(f.Date)</MudText>
                                         </div>
                                         <MudText Typo="Typo.body2" Class="fl-num" Color="@Format.Delta(f.IsCredit ? f.Amount : -f.Amount)">
@@ -379,24 +333,18 @@ else
                                     Title="No upcoming flows"
                                     Description="@($"No scheduled transactions in the next {_upcomingDays} days.")" />
                     }
-                </MudCardContent>
-            </MudCard>
+                </ChildContent>
+            </DashboardCard>
         </div>
 
         @if (_assetSummary is { AssetCount: > 0 })
         {
             <div class="fl-masonry-item">
-                <MudCard Class="fl-card-hover">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">Assets</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@_assetSummary.AssetCount item(s) tracked</MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudButton Href="assets" Size="Size.Small" Variant="Variant.Text" aria-label="View all assets">View all</MudButton>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
+                <DashboardCard Title="Assets" Caption="@($"{_assetSummary.AssetCount} item(s) tracked")" Class="fl-card-hover">
+                    <HeaderActions>
+                        <MudButton Href="assets" Size="Size.Small" Variant="Variant.Text" aria-label="View all assets">View all</MudButton>
+                    </HeaderActions>
+                    <ChildContent>
                         <div class="d-flex justify-space-between align-end mb-3">
                             <div>
                                 <MudText Typo="Typo.h5" Class="fl-num" aria-label="Total asset value">@Format.Money(_assetSummary.TotalValue)</MudText>
@@ -427,8 +375,16 @@ else
                                 Equity after linked debt: <span class="fl-num">@Format.Money(_assetSummary.TotalEquity)</span>
                             </MudText>
                         }
-                    </MudCardContent>
-                </MudCard>
+                    </ChildContent>
+                </DashboardCard>
+            </div>
+        }
+
+        @if (_activity is null && _activityUnavailable)
+        {
+            <div class="fl-masonry-item">
+                <DashboardCard Title="Recent activity" State="DashboardCardState.Error" OnRetry="ReloadActivityAsync"
+                               ErrorText="Couldn't load recent activity, pending or flagged transactions." />
             </div>
         }
 
@@ -478,19 +434,12 @@ else
             @if (_activity.Suspicious.Count > 0)
             {
                 <div class="fl-masonry-item">
-                    <MudCard>
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">Suspicious Activity</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Worth a second look. Heuristics, not proof of fraud.</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
-                        <MudCardContent>
+                    <DashboardCard Title="Suspicious Activity" Caption="Worth a second look. Heuristics, not proof of fraud.">
                             @foreach (var f in _activity.Suspicious)
                             {
                                 <div class="d-flex justify-space-between align-center py-1">
                                     <div>
-                                        <MudText Typo="Typo.body2" Style="font-weight:500">@(string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName)</MudText>
+                                        <MudText Typo="Typo.body2" Class="fl-strong">@(string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName)</MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@AccountName(f.Transaction.AccountId) · @Format.DayMonth(f.Transaction.PostedDate ?? f.Transaction.EffectiveDate)</MudText>
                                         <div>
                                             @foreach (var r in f.Reasons)
@@ -506,8 +455,7 @@ else
                                     </div>
                                 </div>
                             }
-                        </MudCardContent>
-                    </MudCard>
+                    </DashboardCard>
                 </div>
             }
 
@@ -610,31 +558,37 @@ else
     private RenderFragment ActivityList(string title, string subtitle,
         IReadOnlyList<FlowLedger.Contracts.TransactionDto> items, string empty) => __builder =>
     {
-        <MudCard Style="height:100%">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">@title</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@subtitle</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent >
-                @if (items.Count == 0)
-                {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@empty</MudText>
-                }
+        <DashboardCard Title="@title" Caption="@subtitle" Class="fl-fill" State="@(items.Count == 0 ? DashboardCardState.Empty : DashboardCardState.Ready)" EmptyText="@empty">
                 @foreach (var t in items)
                 {
                     <div class="d-flex justify-space-between align-center py-1">
                         <div>
-                            <MudText Typo="Typo.body2" Style="font-weight:500">@(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName)</MudText>
+                            <MudText Typo="Typo.body2" Class="fl-strong">@(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName)</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@AccountName(t.AccountId) · @Format.DayMonth(t.PostedDate ?? t.EffectiveDate)@(t.Status == "Pending" ? " · pending" : "")</MudText>
                         </div>
                         <MudText Typo="Typo.body2" Class="fl-num" Color="@Format.Delta(SignedValue(t))">@Signed(t)</MudText>
                     </div>
                 }
-            </MudCardContent>
-        </MudCard>
+        </DashboardCard>
     };
+
+    private async Task ReloadActivityAsync()
+    {
+        try
+        {
+            _activity = await ApiClient.GetDashboardActivityAsync();
+            _activityUnavailable = _activity is null;
+        }
+        catch (Exception ex)
+        {
+            _activityUnavailable = true;
+            Logger.LogWarning(ex, "Failed to reload dashboard activity");
+            Snackbar.AddFailure(ex, "Couldn't load recent activity");
+        }
+    }
+
+    private DashboardCardState InsightState(bool hasData) =>
+        _insightsUnavailable ? DashboardCardState.Error : hasData ? DashboardCardState.Ready : DashboardCardState.Empty;
 
     private bool _loading = true;
     private string? _error;
@@ -804,6 +758,7 @@ else
     private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
     private bool _insightsUnavailable;
+    private bool _activityUnavailable;
     private bool _forecastUnavailable;
     private List<MudBlazor.ChartSeries<double>> _spendSeries = [];
     private string[] _spendLabels = [];
@@ -873,8 +828,16 @@ else
             catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset summary"); }
 
             // Activity feed is best-effort: a failure here must not blank the rest of the dashboard.
-            try { _activity = await activityTask; }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard activity"); }
+            try
+            {
+                _activity = await activityTask;
+                _activityUnavailable = _activity is null;
+            }
+            catch (Exception ex)
+            {
+                _activityUnavailable = true;
+                Logger.LogWarning(ex, "Failed to load dashboard activity");
+            }
 
             // Insight widgets are best-effort: a failure must not blank the rest of the dashboard.
             try

@@ -177,9 +177,9 @@ html, body {
 }
 
 /* Column hiding starts below laptop widths only: 1366/1440 laptops keep every column. */
-@media (max-width: 1279.98px) { .fl-hide-lg { display: none !important; } }
-@media (max-width: 959.98px) { .fl-hide-md { display: none !important; } }
-@media (max-width: 599.98px) { .fl-hide-sm { display: none !important; } }
+@media (max-width: 1279.98px) { html .fl-hide-lg { display: none; } }
+@media (max-width: 959.98px) { html .fl-hide-md { display: none; } }
+@media (max-width: 599.98px) { html .fl-hide-sm { display: none; } }
 
 /* Touch devices: icon buttons meet the 44px target size. */
 @media (pointer: coarse) {
@@ -332,9 +332,9 @@ html, body {
    Page padding — responsive gutters
    ─────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    .fl-page {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
+    .mud-container.fl-page {
+        padding-left: 12px;
+        padding-right: 12px;
     }
 }
 
@@ -661,3 +661,41 @@ html.fl-share .fl-user-name { display: none; }
 .fl-integration-card { transition: border-color .15s, box-shadow .15s; }
 .fl-integration-card:hover { border-color: var(--mud-palette-primary); }
 .fl-integration-selected { border-color: var(--mud-palette-primary); box-shadow: 0 0 0 1px var(--mud-palette-primary); }
+/* ───────────────────────────────────────────────────────────────────────────
+   Shared layout helpers (replace per-page inline style attributes)
+   ─────────────────────────────────────────────────────────────────────────── */
+.fl-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.fl-page-header__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fl-select-sm { width: min(110px, 100%); }
+.fl-select-md { width: min(130px, 100%); }
+.fl-chip-xs { height: 18px; font-size: 10px; }
+.fl-chart-box { height: 220px; overflow: hidden; }
+.fl-fill { height: 100%; }
+.fl-strong { font-weight: 500; }
+
+.fl-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.fl-details { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
+.fl-details dt { color: var(--mud-palette-text-secondary); font-size: .8125rem; }
+.fl-details dd { margin: 0; overflow-wrap: anywhere; }
