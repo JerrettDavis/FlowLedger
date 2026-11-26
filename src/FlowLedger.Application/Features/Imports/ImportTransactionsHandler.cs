@@ -47,6 +47,7 @@ public sealed class ImportTransactionsHandler
     private readonly ITenantContext _tenant;
     private readonly MatchingEngine _matcher;
     private readonly TimeProvider? _clock;
+    private readonly IOutbox? _outbox;
 
     public ImportTransactionsHandler(
         ITransactionRepository txRepo,
@@ -54,9 +55,11 @@ public sealed class ImportTransactionsHandler
         IPlannedOccurrenceRepository occurrenceRepo,
         ITenantContext tenant,
         MatchingEngine matcher,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        IOutbox? outbox = null)
     {
         _clock = clock;
+        _outbox = outbox;
         _txRepo = txRepo;
         _accountRepo = accountRepo;
         _occurrenceRepo = occurrenceRepo;
@@ -152,6 +155,14 @@ public sealed class ImportTransactionsHandler
         {
             await FlowLedger.Application.Features.Transactions.TransactionQuota.EnsureRoomAsync(_txRepo, toInsert.Count, ct);
             await _txRepo.AddRangeAsync(toInsert.Select(x => x.Tx), ct);
+
+            // Recorded in the same save as the rows, so a committed import always has its event and a failed one never does (#92).
+            // Duplicate merge, bill-sheet refresh and webhooks are outbox consumers of this event, not inline steps.
+            _outbox?.Enqueue(new FlowLedger.Domain.Events.TransactionsImported(
+                FlowLedger.Domain.ValueObjects.TenantId.From(_tenant.TenantId),
+                FlowLedger.Domain.ValueObjects.AccountId.From(command.AccountId),
+                batchId,
+                toInsert.Count));
             await _txRepo.SaveChangesAsync(ct);
         }
 

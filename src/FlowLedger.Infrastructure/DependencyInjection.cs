@@ -109,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
         services.AddSingleton(configuration.GetSection(OutboxOptions.SectionName).Get<OutboxOptions>() ?? new OutboxOptions());
         services.AddScoped<OutboxProcessor>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IOutbox, EfOutbox>();
 
         // Auto-register all IDomainEventHandler<> implementations in this assembly.
         var infrastructureAssembly = typeof(DependencyInjection).Assembly;
@@ -261,7 +262,7 @@ public static class DependencyInjection
             AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto,
         });
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
-        // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
+        // Decorators (outer -> inner): outbox SyncCompleted -> recurring detection -> categorization -> cost guard (min interval + single-flight) -> sync.
         services.AddScoped<FlowLedger.Infrastructure.Sync.MultiConnectorSyncService>();
         services.AddScoped<IFinancialSyncService>(sp =>
         {
@@ -293,13 +294,10 @@ public static class DependencyInjection
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
             // After every successful sync, fill in missing categories (never overwrites existing ones).
-            var deduped = new FlowLedger.Infrastructure.Sync.DedupingSyncService(
-                guarded,
-                sp.GetRequiredService<FlowLedger.Application.Features.Duplicates.DuplicateService>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.DedupingSyncService>>());
-
+            // Duplicate merge, bill-sheet refresh, webhooks and Home Assistant alerts are not inline steps any more: the outermost
+            // decorator records SyncCompleted in the outbox and idempotent handlers do them with retry (#92, #175, #180).
             var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
-                deduped,
+                guarded,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
@@ -314,10 +312,10 @@ public static class DependencyInjection
                 !bool.TryParse(cfg["RecurringFlows:AutoAdd"], out var autoAdd) || autoAdd,
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.RecurringFlowSyncService>>());
 
-            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+            return new FlowLedger.Infrastructure.Sync.OutboxPublishingSyncService(
                 recurring,
-                sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
+                sp.GetRequiredService<FlowLedger.Application.Abstractions.IOutbox>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>());
         });
 
         services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>

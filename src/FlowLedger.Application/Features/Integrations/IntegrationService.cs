@@ -344,9 +344,10 @@ public sealed partial class IntegrationService(
 
     /// <summary>
     /// Pushes an event to every enabled webhook subscribed to it. Never throws: a broken receiver must not break the action that
-    /// raised the event; each outcome is in the delivery log instead.
+    /// raised the event; each outcome is in the delivery log instead. <paramref name="deliveryId"/> (the outbox event id) is sent
+    /// as <c>X-FlowLedger-Delivery</c> so a receiver can drop an at-least-once replay.
     /// </summary>
-    public async Task<int> DispatchAsync(string eventKind, object? data, CancellationToken ct = default)
+    public async Task<int> DispatchAsync(string eventKind, object? data, CancellationToken ct = default, Guid? deliveryId = null)
     {
         var sent = 0;
         IReadOnlyList<Integration> all;
@@ -371,7 +372,7 @@ public sealed partial class IntegrationService(
             limit.CancelAfter(DispatchTimeout);
             try
             {
-                await DeliverAsync(integration, eventKind, data, limit.Token);
+                await DeliverAsync(integration, eventKind, data, limit.Token, deliveryId);
                 sent++;
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -403,10 +404,10 @@ public sealed partial class IntegrationService(
         }
     }
 
-    private async Task<IntegrationCallResult> DeliverAsync(Integration integration, string eventKind, object? data, CancellationToken ct)
+    private async Task<IntegrationCallResult> DeliverAsync(Integration integration, string eventKind, object? data, CancellationToken ct, Guid? eventDeliveryId = null)
     {
         var secrets = await store.GetSecretsAsync(TenantId, integration.Id, ct);
-        var deliveryId = Guid.NewGuid().ToString("N");
+        var deliveryId = (eventDeliveryId ?? Guid.NewGuid()).ToString("N");
         var body = JsonSerializer.Serialize(new Dictionary<string, object?>
         {
             ["source"] = "flowledger",

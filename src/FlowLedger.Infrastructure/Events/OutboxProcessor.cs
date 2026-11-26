@@ -121,6 +121,8 @@ public sealed class OutboxProcessor
 
                 try
                 {
+                    // Handlers share this scope's context: a previous handler's failed (or half-staged) changes must never be committed by the next one's SaveChanges.
+                    _db.ChangeTracker.Clear();
                     await (Task)handleMethod.Invoke(handler, [domainEvent, ct])!;
                     completed.Add(key);
                     var progress = string.Join(',', completed);
@@ -137,6 +139,7 @@ public sealed class OutboxProcessor
                     _logger.LogError(inner, "Outbox handler {Handler} failed for {EventType} {MessageId} (attempt {Attempt}).",
                         key, message.EventType, message.Id, message.Attempts + 1);
                     error = $"{key}: {inner.Message}";
+                    _db.ChangeTracker.Clear();
                 }
             }
         }
