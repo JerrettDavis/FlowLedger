@@ -546,10 +546,10 @@ else
     /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
     [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
 
-    private static string FlagName(FlowLedger.Web.ApiClient.FlaggedTransactionDto f) =>
+    private static string FlagName(FlowLedger.Contracts.FlaggedTransactionDto f) =>
         string.IsNullOrWhiteSpace(f.Transaction.MerchantName) ? f.Transaction.Description : f.Transaction.MerchantName;
 
-    private async Task DismissFlag(FlowLedger.Web.ApiClient.FlaggedTransactionDto f)
+    private async Task DismissFlag(FlowLedger.Contracts.FlaggedTransactionDto f)
     {
         var dialog = await Dialogs.ShowAsync<DismissFlagDialog>("Dismiss alert", new DialogParameters<DismissFlagDialog>
         {
@@ -604,11 +604,11 @@ else
 
     private string AccountName(Guid id) => _accounts.FirstOrDefault(a => a.Id == id)?.Name ?? "Unknown account";
 
-    private static decimal SignedValue(FlowLedger.Web.ApiClient.TransactionDto t) => t.Direction == "Debit" ? -t.Amount : t.Amount;
-    private static string Signed(FlowLedger.Web.ApiClient.TransactionDto t) => Format.Signed(SignedValue(t));
+    private static decimal SignedValue(FlowLedger.Contracts.TransactionDto t) => t.Direction == "Debit" ? -t.Amount : t.Amount;
+    private static string Signed(FlowLedger.Contracts.TransactionDto t) => Format.Signed(SignedValue(t));
 
     private RenderFragment ActivityList(string title, string subtitle,
-        List<FlowLedger.Web.ApiClient.TransactionDto> items, string empty) => __builder =>
+        IReadOnlyList<FlowLedger.Contracts.TransactionDto> items, string empty) => __builder =>
     {
         <MudCard Style="height:100%">
             <MudCardHeader>
@@ -647,10 +647,10 @@ else
     private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 6 months").To;
     private int _horizonMonths = 3;
     private int _upcomingDays = 14;
-    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flowDefs = [];
+    private List<FlowLedger.Contracts.RecurringFlowDto> _flowDefs = [];
 
     // The activity feed is the recent window the API returns; the History range narrows it further (never widens it).
-    private List<FlowLedger.Web.ApiClient.TransactionDto> InHistoryRange(List<FlowLedger.Web.ApiClient.TransactionDto> items) =>
+    private IReadOnlyList<FlowLedger.Contracts.TransactionDto> InHistoryRange(IReadOnlyList<FlowLedger.Contracts.TransactionDto> items) =>
         items.Where(t =>
         {
             var d = t.PostedDate ?? t.EffectiveDate;
@@ -801,7 +801,7 @@ else
         _netWorthLabels = nw.Select(p => p.Date).ToArray();
     }
 
-    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
     private bool _insightsUnavailable;
     private bool _forecastUnavailable;
@@ -819,14 +819,14 @@ else
     private decimal _loans;
     private decimal _investments;
     private decimal _netWorth;
-    private FlowLedger.Web.ApiClient.AssetSummaryDto? _assetSummary;
+    private FlowLedger.Contracts.AssetSummaryDto? _assetSummary;
     private decimal _lowWaterMark;
     private DateOnly? _lowWaterMarkDate;
     private int _overdraftCount;
     private List<FlowLedger.Web.ApiClient.OverdraftWarningDto> _overdraftWarnings = [];
     private List<FlowLedger.Web.ApiClient.AggregateForecastPointDto> _forecastSeries = [];
     private List<UpcomingFlow> _upcomingFlows = [];
-    private FlowLedger.Web.ApiClient.DashboardActivityDto? _activity;
+    private FlowLedger.Contracts.DashboardActivityDto? _activity;
 
     // Derived collections for SvgChart
     private IReadOnlyList<(DateOnly date, decimal balance)> _forecastPoints = [];
@@ -940,7 +940,7 @@ else
         }
     }
 
-    private static bool IsFlowOnDate(FlowLedger.Web.ApiClient.RecurringFlowDto flow, DateOnly date)
+    private static bool IsFlowOnDate(FlowLedger.Contracts.RecurringFlowDto flow, DateOnly date)
     {
         if (date < flow.StartDate) return false;
         if (flow.EndDate.HasValue && date > flow.EndDate) return false;

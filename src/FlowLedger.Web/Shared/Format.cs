@@ -8,13 +8,11 @@ namespace FlowLedger.Web.Shared;
 /// </summary>
 public static class Format
 {
-    private static readonly CultureInfo UsCulture = CultureInfo.GetCultureInfo("en-US");
-
     /// <summary>
-    /// Format a decimal as currency (e.g., "$1,234.56").
+    /// Format a decimal as currency in the display currency/locale (default "$1,234.56"; see <see cref="DisplaySettings"/>).
     /// </summary>
     public static string Money(decimal v) =>
-        v.ToString("C2", UsCulture);
+        v.ToString("C", CultureInfo.CurrentCulture);
 
     private static readonly Dictionary<string, string> CurrencySymbols = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -42,14 +40,20 @@ public static class Format
     /// </summary>
     public static string Money(decimal v, string? currency, CultureInfo? culture = null)
     {
-        culture ??= UsCulture;
+        culture ??= CultureInfo.CurrentCulture;
         if (string.IsNullOrWhiteSpace(currency))
         {
-            return v.ToString("C2", culture.Equals(UsCulture) ? UsCulture : culture);
+            return v.ToString("C", culture);
         }
 
-        var code = currency.Trim().ToUpperInvariant();
         var nf = (NumberFormatInfo)culture.NumberFormat.Clone();
+        ApplyCurrency(nf, currency.Trim().ToUpperInvariant());
+        return v.ToString("C", nf);
+    }
+
+    /// <summary>Sets symbol and decimals on <paramref name="nf"/> for an ISO currency code (unknown codes show as the code).</summary>
+    internal static void ApplyCurrency(NumberFormatInfo nf, string code)
+    {
         if (CurrencySymbols.TryGetValue(code, out var symbol))
         {
             nf.CurrencySymbol = symbol;
@@ -62,7 +66,6 @@ public static class Format
         }
 
         nf.CurrencyDecimalDigits = ZeroDecimalCurrencies.Contains(code) ? 0 : 2;
-        return v.ToString("C", nf);
     }
 
     /// <summary>
@@ -70,7 +73,7 @@ public static class Format
     /// Uses a proper minus sign (−, U+2212) for negative values.
     /// </summary>
     public static string Signed(decimal v) =>
-        (v >= 0 ? "+" : "−") + Math.Abs(v).ToString("C2", UsCulture);
+        (v >= 0 ? "+" : "−") + Math.Abs(v).ToString("C", CultureInfo.CurrentCulture);
 
     /// <summary>
     /// Format an absolute amount as signed currency based on direction.
@@ -93,7 +96,7 @@ public static class Format
 
         var pct = change / Math.Abs(baseline) * 100m;
         var rounded = Math.Round(pct, pct is > -10 and < 10 ? 2 : 1);
-        return (rounded >= 0 ? "+" : "−") + Math.Abs(rounded).ToString("0.##", UsCulture) + "%";
+        return (rounded >= 0 ? "+" : "−") + Math.Abs(rounded).ToString("0.##", CultureInfo.CurrentCulture) + "%";
     }
 
     /// <summary>"+$12.00 (+1.2%)" - signed amount with its percentage change when computable.</summary>

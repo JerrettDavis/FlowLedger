@@ -131,15 +131,17 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Enable/disable an account, set its mode (Standard/Holding) and whether its transactions are hidden.</summary>
-    public async Task<AccountDto?> UpdateAccountSettingsAsync(Guid id, AccountSettingsRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> UpdateAccountSettingsAsync(Guid id, AccountSettingsRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("update account settings", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/accounts/{id}/settings", request, JsonOptions, ct);
+            var response = await PutAccountAsync($"/api/accounts/{id}/settings", request, expectedVersion, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
+
+            ThrowIfChangedElsewhere(response);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -174,15 +176,17 @@ public sealed class FlowLedgerApiClient
         });
     }
 
-    public async Task<AccountDto?> UpdateAccountAsync(Guid id, UpdateAccountRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> UpdateAccountAsync(Guid id, UpdateAccountRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("update account", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/accounts/{id}", request, JsonOptions, ct);
+            var response = await PutAccountAsync($"/api/accounts/{id}", request, expectedVersion, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
+
+            ThrowIfChangedElsewhere(response);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -197,15 +201,17 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Corrects an account's type by hand; the server pins it so provider sync never overwrites it.</summary>
-    public async Task<AccountDto?> ChangeAccountTypeAsync(Guid id, ChangeAccountTypeRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> ChangeAccountTypeAsync(Guid id, ChangeAccountTypeRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         return await ExecuteAsync("change account type", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/accounts/{id}/type", request, JsonOptions, ct);
+            var response = await PutAccountAsync($"/api/accounts/{id}/type", request, expectedVersion, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
+
+            ThrowIfChangedElsewhere(response);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -221,6 +227,29 @@ public sealed class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<AccountDto>(JsonOptions, ct);
         });
     }
+
+    /// <summary>PUT with an <c>If-Match</c> precondition carrying the account's version (its ETag) when the caller has one.</summary>
+    private Task<HttpResponseMessage> PutAccountAsync(string url, object body, uint? expectedVersion, CancellationToken ct)
+    {
+        var message = new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(body, options: JsonOptions) };
+        if (expectedVersion is { } version)
+        {
+            message.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
+        }
+
+        return _http.SendAsync(message, ct);
+    }
+
+    /// <summary>A 409 means someone (another tab, a sync) changed the row after it was loaded; say so instead of a status code.</summary>
+    private static void ThrowIfChangedElsewhere(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new ApiClientException(ChangedElsewhereMessage, response.StatusCode);
+        }
+    }
+
+    public const string ChangedElsewhereMessage = "This account was changed elsewhere (another tab or a sync). Reload to see the latest version, then try again.";
 
     private static async Task<string?> ReadProblemDetailAsync(HttpResponseMessage response, CancellationToken ct)
     {

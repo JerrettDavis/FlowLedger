@@ -7,8 +7,8 @@ namespace FlowLedger.Domain.Events;
 /// <summary>Base record that satisfies IDomainEvent for all domain events in this layer.</summary>
 public abstract record DomainEventBase : IDomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
-    public DateTimeOffset OccurredAt { get; } = DateTimeOffset.UtcNow;
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTimeOffset OccurredAt { get; init; } = DateTimeOffset.UtcNow;
 }
 
 // ── Account events ───────────────────────────────────────────────────────────

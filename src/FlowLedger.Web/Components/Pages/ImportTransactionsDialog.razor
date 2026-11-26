@@ -52,7 +52,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Inject] private FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient { get; set; } = default!;
-    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
 
     private Guid _accountId;
     private string _format = "";

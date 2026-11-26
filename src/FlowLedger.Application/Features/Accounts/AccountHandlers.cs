@@ -82,7 +82,7 @@ public sealed class UpdateAccountHandler
     public UpdateAccountHandler(IAccountRepository repo)
         => _repo = repo;
 
-    public async Task<AccountDto?> HandleAsync(Guid id, UpdateAccountRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> HandleAsync(Guid id, UpdateAccountRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
         if (account is null)
@@ -90,6 +90,7 @@ public sealed class UpdateAccountHandler
             return null;
         }
 
+        _repo.ExpectVersion(account, expectedVersion);
         account.Rename(request.Name);
         await _repo.SaveChangesAsync(ct);
 
@@ -115,7 +116,7 @@ public sealed class ChangeAccountTypeHandler
     }
 
     /// <exception cref="Domain.Exceptions.InvalidBalanceException">The type is incompatible with the balance.</exception>
-    public async Task<AccountDto?> HandleAsync(Guid id, ChangeAccountTypeRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> HandleAsync(Guid id, ChangeAccountTypeRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
         if (account is null)
@@ -124,6 +125,7 @@ public sealed class ChangeAccountTypeHandler
         }
 
         var newType = Enum.Parse<AccountType>(request.AccountType, ignoreCase: true);
+        _repo.ExpectVersion(account, expectedVersion);
         var changed = account.SetTypeManually(newType);
         await _repo.SaveChangesAsync(ct);
 
@@ -139,7 +141,7 @@ public sealed class ChangeAccountTypeHandler
 /// <summary>Changes an account's tracking settings: enabled, mode (standard/holding) and hidden transactions.</summary>
 public sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
 {
-    public async Task<AccountDto?> HandleAsync(Guid id, AccountSettingsRequest request, CancellationToken ct = default)
+    public async Task<AccountDto?> HandleAsync(Guid id, AccountSettingsRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
         var account = await repo.GetByIdAsync(AccountId.From(id), ct);
         if (account is null)
@@ -147,6 +149,7 @@ public sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
             return null;
         }
 
+        repo.ExpectVersion(account, expectedVersion);
         account.ApplySettings(request.IsActive, Enum.Parse<AccountMode>(request.Mode, ignoreCase: true), request.HideTransactions);
         await repo.SaveChangesAsync(ct);
         return AccountMapper.ToDto(account);
@@ -161,7 +164,7 @@ public sealed class DeactivateAccountHandler
     public DeactivateAccountHandler(IAccountRepository repo)
         => _repo = repo;
 
-    public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
+    public async Task<bool> HandleAsync(Guid id, uint? expectedVersion = null, CancellationToken ct = default)
     {
         var account = await _repo.GetByIdAsync(AccountId.From(id), ct);
         if (account is null)
@@ -169,6 +172,7 @@ public sealed class DeactivateAccountHandler
             return false;
         }
 
+        _repo.ExpectVersion(account, expectedVersion);
         account.Deactivate();
         await _repo.SaveChangesAsync(ct);
         return true;
@@ -190,5 +194,6 @@ internal static class AccountMapper
         a.LastBalanceConfirmedAt,
         a.TypeLockedByUser,
         a.Mode.ToString(),
-        a.HideTransactions);
+        a.HideTransactions,
+        a.RowVersion);
 }

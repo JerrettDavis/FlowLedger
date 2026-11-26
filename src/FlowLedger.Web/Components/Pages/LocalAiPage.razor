@@ -377,7 +377,7 @@ else
         }
     }
 
-    private async Task AcceptAsync(FlowLedger.Web.ApiClient.MerchantGroupDto g)
+    private async Task AcceptAsync(FlowLedger.Contracts.MerchantGroupDto g)
     {
         var name = _aliasNames.GetValueOrDefault(g.Canonical)?.Trim();
         if (string.IsNullOrEmpty(name))

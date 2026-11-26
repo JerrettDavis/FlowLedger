@@ -110,7 +110,7 @@
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public Guid AssetId { get; set; }
 
-    private FlowLedger.Web.ApiClient.AssetDto? _asset;
+    private FlowLedger.Contracts.AssetDto? _asset;
     private decimal? _amount;
     private DateTime? _asOf = DateTime.Today;
     private string? _source;
@@ -133,7 +133,7 @@
         if (_amount is null) { Snackbar.Add("Enter a value first", Severity.Warning); return; }
         await Busy(async () =>
         {
-            _asset = await ApiClient.RecordAssetValuationAsync(AssetId, new FlowLedger.Web.ApiClient.RecordValuationRequest(
+            _asset = await ApiClient.RecordAssetValuationAsync(AssetId, new FlowLedger.Contracts.RecordValuationRequest(
                 _amount.Value, _asOf is { } d ? DateOnly.FromDateTime(d) : null, _source, null));
             _amount = null;
             Snackbar.Add("Valuation recorded", Severity.Success);
