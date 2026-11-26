@@ -1,0 +1,21 @@
+{
+  "data": {
+    "accounts": {
+      "nodes": [
+        {
+          "id": "acc_0001", "name": "Everyday Checking", "type": "CHECKING", "mask": "1234", "currencyCode": "USD",
+          "balance": { "current": 2412.37, "available": 2312.37 },
+          "institution": { "name": "Example Credit Union" },
+          "connection": { "id": "conn_0001", "status": "SYNCED" }
+        },
+        {
+          "id": "acc_0002", "name": "Rewards Visa", "type": "CREDIT", "mask": "9876", "currencyCode": "USD",
+          "balance": { "current": -350.25, "available": 4649.75 },
+          "institution": { "name": "Example Card Services" },
+          "connection": { "id": "conn_0001", "status": "SYNCED" }
+        }
+      ],
+      "pageInfo": { "hasNextPage": false }
+    }
+  }
+}

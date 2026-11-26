@@ -1,0 +1,67 @@
+[
+  {
+    "ProviderId": "acc_0001",
+    "Name": "Example Credit Union - Everyday Checking \u2022\u20221234",
+    "AccountType": "CHECKING",
+    "Balance": 2412.37,
+    "Available": 2312.37,
+    "CurrencyCode": "USD",
+    "Transactions": [
+      {
+        "ProviderId": "txn_0001",
+        "ProviderAccountId": "acc_0001",
+        "PostedDate": "2026-11-01",
+        "IsPending": false,
+        "Amount": -54.12,
+        "Currency": "USD",
+        "RawDescription": "GROCERY MART #123"
+      },
+      {
+        "ProviderId": "txn_0002",
+        "ProviderAccountId": "acc_0001",
+        "PostedDate": "2026-11-02",
+        "IsPending": false,
+        "Amount": 3200.00,
+        "Currency": "USD",
+        "RawDescription": "EXAMPLE EMPLOYER PAYROLL"
+      },
+      {
+        "ProviderId": "txn_0003",
+        "ProviderAccountId": "acc_0001",
+        "PostedDate": "2026-11-03",
+        "IsPending": true,
+        "Amount": -18.40,
+        "Currency": "USD",
+        "RawDescription": "COFFEE SHOP"
+      }
+    ]
+  },
+  {
+    "ProviderId": "acc_0002",
+    "Name": "Example Card Services - Rewards Visa \u2022\u20229876",
+    "AccountType": "CREDIT_CARD",
+    "Balance": 350.25,
+    "Available": 4649.75,
+    "CurrencyCode": "USD",
+    "Transactions": [
+      {
+        "ProviderId": "txn_0101",
+        "ProviderAccountId": "acc_0002",
+        "PostedDate": "2026-11-03",
+        "IsPending": false,
+        "Amount": -42.00,
+        "Currency": "USD",
+        "RawDescription": "ONLINE RETAILER ORDER"
+      },
+      {
+        "ProviderId": "txn_0102",
+        "ProviderAccountId": "acc_0002",
+        "PostedDate": "2026-11-04",
+        "IsPending": false,
+        "Amount": 500.00,
+        "Currency": "USD",
+        "RawDescription": "PAYMENT THANK YOU"
+      }
+    ]
+  }
+]

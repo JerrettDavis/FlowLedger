@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Bogus" />
     <PackageReference Include="CsCheck" />
+    <PackageReference Include="xunit.extensibility.core" />
   </ItemGroup>
 
   <ItemGroup>

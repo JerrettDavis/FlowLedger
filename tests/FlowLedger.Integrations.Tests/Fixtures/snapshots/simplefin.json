@@ -1,0 +1,76 @@
+[
+  {
+    "ProviderId": "bank.example:ACT-0001",
+    "Name": "Example Credit Union - Everyday Checking",
+    "AccountType": "CHECKING",
+    "Balance": 2412.37,
+    "Available": 2312.37,
+    "CurrencyCode": "USD",
+    "Transactions": [
+      {
+        "ProviderId": "TRN-0001",
+        "ProviderAccountId": "bank.example:ACT-0001",
+        "PostedDate": "2026-11-15",
+        "IsPending": false,
+        "Amount": -54.12,
+        "Currency": "USD",
+        "RawDescription": "GROCERY MART #123 ANYTOWN ST"
+      },
+      {
+        "ProviderId": "TRN-0002",
+        "ProviderAccountId": "bank.example:ACT-0001",
+        "PostedDate": "2026-11-16",
+        "IsPending": false,
+        "Amount": 3200.00,
+        "Currency": "USD",
+        "RawDescription": "EXAMPLE EMPLOYER PAYROLL"
+      },
+      {
+        "ProviderId": "TRN-0003",
+        "ProviderAccountId": "bank.example:ACT-0001",
+        "PostedDate": "2026-11-18",
+        "IsPending": false,
+        "Amount": -9.99,
+        "Currency": "USD",
+        "RawDescription": "STREAMING SERVICE"
+      },
+      {
+        "ProviderId": "TRN-0004",
+        "ProviderAccountId": "bank.example:ACT-0001",
+        "PostedDate": "2026-11-19",
+        "IsPending": true,
+        "Amount": -18.40,
+        "Currency": "USD",
+        "RawDescription": "COFFEE SHOP PENDING"
+      }
+    ]
+  },
+  {
+    "ProviderId": "cards.example:ACT-0002",
+    "Name": "Example Card Services - Rewards Visa",
+    "AccountType": "CREDIT_CARD",
+    "Balance": 350.25,
+    "Available": 4649.75,
+    "CurrencyCode": "USD",
+    "Transactions": [
+      {
+        "ProviderId": "TRN-0101",
+        "ProviderAccountId": "cards.example:ACT-0002",
+        "PostedDate": "2026-11-17",
+        "IsPending": false,
+        "Amount": -42.00,
+        "Currency": "USD",
+        "RawDescription": "ONLINE RETAILER ORDER"
+      },
+      {
+        "ProviderId": "TRN-0102",
+        "ProviderAccountId": "cards.example:ACT-0002",
+        "PostedDate": "2026-11-18",
+        "IsPending": false,
+        "Amount": 500.00,
+        "Currency": "USD",
+        "RawDescription": "PAYMENT THANK YOU"
+      }
+    ]
+  }
+]
