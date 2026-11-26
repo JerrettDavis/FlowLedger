@@ -15,7 +15,15 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<QuilttOptions>(configuration.GetSection(QuilttOptions.SectionName));
+        services.AddOptions<QuilttOptions>()
+            .Bind(configuration.GetSection(QuilttOptions.SectionName))
+            .Validate(o => o.Environment is { } e && (e.Equals("sandbox", StringComparison.OrdinalIgnoreCase) || e.Equals("production", StringComparison.OrdinalIgnoreCase)),
+                "Quiltt:Environment must be 'sandbox' or 'production'.")
+            .Validate(o => o.InitialHistoryDays > 0 && o.OverlapDays >= 0 && o.PageSize > 0 && o.MaxPages > 0,
+                "Quiltt:InitialHistoryDays, PageSize and MaxPages must be positive and OverlapDays must not be negative.")
+            .Validate(o => Uri.TryCreate(o.AuthBaseUrl, UriKind.Absolute, out _) && Uri.TryCreate(o.ApiBaseUrl, UriKind.Absolute, out _),
+                "Quiltt:AuthBaseUrl and Quiltt:ApiBaseUrl must be absolute URLs.")
+            .ValidateOnStart();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<QuilttSessionCache>();
 
