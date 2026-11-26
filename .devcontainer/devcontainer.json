@@ -13,7 +13,7 @@
     "ghcr.io/devcontainers/features/git:1": {}
   },
 
-  "postCreateCommand": "dotnet workload install aspire && dotnet restore",
+  "postCreateCommand": "dotnet restore",
 
   "customizations": {
     "vscode": {

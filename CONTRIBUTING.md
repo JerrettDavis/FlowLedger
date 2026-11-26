@@ -6,14 +6,21 @@ Thank you for considering contributing.
 
 1. Install [.NET 10 SDK](https://dot.net/download).
 2. Install Docker Desktop (for Aspire-managed Postgres and Redis).
-3. Install the Aspire workload: `dotnet workload install aspire`.
+3. No Aspire workload is needed: Aspire is consumed as NuGet packages and CI builds the whole solution without it.
 4. Clone the repo and run `./eng/scripts/run.ps1` (Windows) or `./eng/scripts/run.sh` (Linux/macOS).
 5. Install pre-commit hooks (required — prevents secret leaks before commits reach the remote):
    ```bash
    pip install pre-commit
    pre-commit install
    ```
+   Hooks: gitleaks, private-key and large-file detection, YAML/JSON/merge-conflict checks and hadolint
+   (needs Docker). `dotnet format` is a manual-stage hook: `pre-commit run --hook-stage manual dotnet-format`.
+   Gitleaks is the required secret scanner; GitGuardian (`ggshield`) is optional and its CI workflow
+   skips itself unless the `GITGUARDIAN_API_KEY` repository secret is set.
    See [docs/development/secret-scanning.md](docs/development/secret-scanning.md) for full details.
+
+Alternatively open the repo in the dev container (`.devcontainer/`): it provides the .NET SDK,
+Docker-outside-of-Docker and runs `dotnet restore` on creation.
 
 ## Code style
 

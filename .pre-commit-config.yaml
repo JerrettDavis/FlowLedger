@@ -8,6 +8,30 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         args: ['--maxkb=512']
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: check-merge-conflict
+      - id: check-json
+        exclude: '(^|/)(\.vscode|\.devcontainer)/'
+
+  # Lint Dockerfiles (runs hadolint in Docker; needs a running Docker daemon).
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint-docker
+        files: 'Dockerfile'
+
+  # Same check CI runs. Manual stage because it needs a restored solution and is slow:
+  #   pre-commit run --hook-stage manual dotnet-format
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format --verify-no-changes
+        entry: dotnet format FlowLedger.slnx --verify-no-changes --no-restore
+        language: system
+        pass_filenames: false
+        types: [c#]
+        stages: [manual]
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
