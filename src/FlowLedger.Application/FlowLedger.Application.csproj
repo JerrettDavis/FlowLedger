@@ -6,6 +6,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Feature internals (calculators, detectors, result records) are exercised directly by the unit tests. -->
+    <InternalsVisibleTo Include="FlowLedger.Application.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="FlowLedger.Contracts" />
   </ItemGroup>
 

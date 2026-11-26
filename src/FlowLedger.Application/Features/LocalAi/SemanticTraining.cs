@@ -5,7 +5,7 @@ using FlowLedger.Domain.Aggregates;
 namespace FlowLedger.Application.Features.LocalAi;
 
 /// <summary>Builds the semantic classifier's training set and scores uncategorized rows, shared by categorization and evaluation.</summary>
-public static class SemanticTraining
+internal static class SemanticTraining
 {
     public static string TextOf(Transaction t) => DescriptorNormalizer.Normalize(t.MerchantName, t.Description);
 

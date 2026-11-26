@@ -38,7 +38,7 @@ public sealed record BreakdownResult(
 /// Pure spending/income breakdown (Mint-style). Transfers between own accounts are excluded, splits contribute one row per
 /// part, and categories are hierarchical ("Food/Groceries") so a slice can be drilled into its children.
 /// </summary>
-public static class SpendingInsightsAnalyzer
+internal static class SpendingInsightsAnalyzer
 {
     public const string Uncategorized = "Uncategorized";
     public const string NoTag = "Untagged";

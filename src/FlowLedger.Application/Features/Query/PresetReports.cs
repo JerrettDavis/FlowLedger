@@ -1,7 +1,7 @@
 namespace FlowLedger.Application.Features.Query;
 
 /// <summary>Built-in views and reports. Read-only; users copy them via "Save as…" to customise.</summary>
-public static class PresetReports
+internal static class PresetReports
 {
     public const string IdPrefix = "preset:";
 

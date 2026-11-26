@@ -4,7 +4,7 @@ using FlowLedger.Domain.Aggregates;
 namespace FlowLedger.Application.Features.Duplicates;
 
 /// <summary>How sure the detector is that two rows are one real-world transaction.</summary>
-public enum DuplicateConfidence
+internal enum DuplicateConfidence
 {
     /// <summary>Plausible but could be two genuine purchases; only ever suggested, never merged without a click.</summary>
     Possible,
@@ -14,7 +14,7 @@ public enum DuplicateConfidence
 }
 
 /// <summary>One suspected duplicate pair. <see cref="Survivor"/> is the row that is kept; <see cref="Duplicate"/> is folded into it.</summary>
-public sealed record DuplicatePair(
+internal sealed record DuplicatePair(
     Transaction Survivor, Transaction Duplicate, DuplicateConfidence Confidence, double Score, int DaysApart, string Reason)
 {
     /// <summary>Stable across scans (order-independent), so a dismissal keeps hiding the same pair.</summary>
@@ -30,7 +30,7 @@ public sealed record DuplicatePair(
 /// reconciled is never the one that is deleted. A duplicate is a recoverable annoyance; a wrong merge loses data, so
 /// every ambiguity falls back to "suggest".
 /// </summary>
-public static class DuplicateDetector
+internal static class DuplicateDetector
 {
     public const int MaxDaysApart = 3;
     public const int MaxPendingToPostedDays = 7;

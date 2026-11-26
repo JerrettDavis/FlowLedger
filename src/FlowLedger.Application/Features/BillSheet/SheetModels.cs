@@ -47,9 +47,9 @@ public sealed record SheetPaymentData(
 /// <summary>Minimal transaction projection the matcher works on.</summary>
 /// <param name="Text">Merchant plus description, used for matching.</param>
 /// <param name="Label">Display name of the merchant, used when detecting recurring expenses.</param>
-public sealed record SheetTxn(Guid Id, DateOnly Date, decimal Amount, string Text, string? Label = null);
+internal sealed record SheetTxn(Guid Id, DateOnly Date, decimal Amount, string Text, string? Label = null);
 
 /// <summary>Result of a matcher run: cells to write and cells to clear.</summary>
-public sealed record SheetMatchResult(
+internal sealed record SheetMatchResult(
     IReadOnlyList<SheetPaymentData> Upserts,
     IReadOnlyList<(Guid BillId, DateOnly Month, int Slot)> Clears);

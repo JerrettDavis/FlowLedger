@@ -8,7 +8,7 @@ namespace FlowLedger.Application.Features.Integrations;
 /// reserved for the household owner, and anything reachable over the internet must use https. The destination is checked again
 /// at connect time by the transport.
 /// </summary>
-public static class IntegrationUrl
+internal static class IntegrationUrl
 {
     public const int MaxLength = 2048;
 

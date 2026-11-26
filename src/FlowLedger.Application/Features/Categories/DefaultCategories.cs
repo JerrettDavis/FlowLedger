@@ -5,7 +5,7 @@ namespace FlowLedger.Application.Features.Categories;
 /// exists (the paths <see cref="AutoCategorizer"/> already emits, e.g. Mint "Groceries" -> "Food/Groceries"), otherwise
 /// to a new "Group/Name" path using Mint's own names. Seeding is additive and idempotent: existing paths are never touched.
 /// </summary>
-public static class DefaultCategories
+internal static class DefaultCategories
 {
     /// <summary>Mint "Group > Category" and the FlowLedger path it maps to.</summary>
     public sealed record MintMapping(string MintGroup, string MintCategory, string Path);

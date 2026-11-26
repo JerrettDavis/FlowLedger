@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Categories;
 /// It only ever fills in a MISSING category; user choices and learned merchants are applied by the caller first.
 /// Rules are ordered: the first match wins, so specific rules come before broad ones.
 /// </summary>
-public static class AutoCategorizer
+internal static class AutoCategorizer
 {
     public const string TransferCategory = "Transfer";
 

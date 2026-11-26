@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Transactions;
 /// Turns a raw bank descriptor ("SQ *BLUE BOTTLE COFFEE #1234 SAN FRANCISCO CA 94103") into a readable merchant name
 /// ("Blue Bottle Coffee"). Pure and conservative: returns null when it can't improve on the original.
 /// </summary>
-public static partial class MerchantNameSuggester
+internal static partial class MerchantNameSuggester
 {
     // Payment-processor / channel prefixes that are not part of the merchant name.
     [GeneratedRegex(@"^(?:sq\s*\*|tst\s*\*|pp\s*\*|paypal\s*\*|pos\s+(?:debit|purchase)?|debit\s+card\s+purchase|purchase\s+authorized\s+on\s+\d{1,2}/\d{1,2}|recurring\s+payment|ach\s+(?:debit|withdrawal)|checkcard|visa\s+purchase)\s*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

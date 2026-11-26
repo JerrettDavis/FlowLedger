@@ -12,14 +12,14 @@ public sealed record WsdlOperation(
     string Namespace,
     string BodySkeleton);
 
-public sealed record WsdlDescription(string? TargetNamespace, IReadOnlyList<WsdlOperation> Operations);
+internal sealed record WsdlDescription(string? TargetNamespace, IReadOnlyList<WsdlOperation> Operations);
 
 /// <summary>
 /// Reads the operations, SOAP actions and endpoints out of a WSDL 1.1 document (SOAP 1.1 and 1.2 bindings). External entities and
 /// DTDs are refused, and imports are not followed (an imported WSDL is not fetched), so a hostile document cannot make the server read
 /// files or call other hosts.
 /// </summary>
-public static class WsdlParser
+internal static class WsdlParser
 {
     public const int MaxCharacters = 2_000_000;
 
@@ -138,7 +138,7 @@ public static class WsdlParser
 }
 
 /// <summary>Builds a SOAP envelope around a body fragment and detects faults in a response.</summary>
-public static class SoapEnvelope
+internal static class SoapEnvelope
 {
     public const string Ns11 = "http://schemas.xmlsoap.org/soap/envelope/";
     public const string Ns12 = "http://www.w3.org/2003/05/soap-envelope";

@@ -1,13 +1,13 @@
 namespace FlowLedger.Application.Features.Alerts;
 
-public sealed record BudgetUsage(string Category, decimal Limit, decimal Spent);
+internal sealed record BudgetUsage(string Category, decimal Limit, decimal Spent);
 
-public sealed record GoalProgress(string Name, decimal Target, decimal Saved, DateOnly? TargetDate);
+internal sealed record GoalProgress(string Name, decimal Target, decimal Saved, DateOnly? TargetDate);
 
 public sealed record Alert(string Severity, string Title, string Detail);
 
 /// <summary>Pure rules that turn budget and goal state into user-facing alerts (no I/O).</summary>
-public static class AlertBuilder
+internal static class AlertBuilder
 {
     public const decimal WarnAtPercent = 80m;
 

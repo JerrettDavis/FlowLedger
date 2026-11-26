@@ -46,7 +46,7 @@ internal readonly record struct DurationValue(int Amount, string Unit)
 /// Everything is evaluated against already tenant-scoped datasets in memory, so there is no
 /// SQL surface and no way to reach another tenant's data.
 /// </summary>
-public static class QueryEngine
+internal static class QueryEngine
 {
     public const int MaxResultRows = 5000;
 

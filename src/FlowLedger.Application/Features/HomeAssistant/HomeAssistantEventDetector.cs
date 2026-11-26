@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.HomeAssistant;
 /// The default output carries no numbers: titles and messages are worded without amounts, and the numeric fields stay
 /// null unless <c>ShareAmounts</c> is on. Every event has a stable dedupe key so a condition fires once, not on every run.
 /// </summary>
-public static class HomeAssistantEventDetector
+internal static class HomeAssistantEventDetector
 {
     /// <summary>A transaction counts as the flow's payment when it lands within this many days of a scheduled date.</summary>
     public const int PaidWindowDays = 5;

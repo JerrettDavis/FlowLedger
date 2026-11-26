@@ -17,7 +17,7 @@ namespace FlowLedger.Application.Features.Assets;
 /// that currency's totals; with several, <see cref="NetWorthDto.MixedCurrencies"/> is set, <see cref="NetWorthDto.ByCurrency"/>
 /// lists every currency, and the top-level figures describe only the primary (most populated) currency.
 /// </summary>
-public static class NetWorthCalculator
+internal static class NetWorthCalculator
 {
     private static readonly HashSet<AccountType> AssetAccountTypes =
         [AccountType.Checking, AccountType.Savings, AccountType.Investment, AccountType.Cash, AccountType.ManualAsset];

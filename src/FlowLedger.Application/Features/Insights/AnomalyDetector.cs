@@ -8,7 +8,7 @@ namespace FlowLedger.Application.Features.Insights;
 /// Pure statistical anomaly rules over a household's own history (robust median/MAD, no training step, no I/O).
 /// "Anomaly" means worth a second look, not proven fraud. Returns human-readable reasons per transaction id.
 /// </summary>
-public static class AnomalyDetector
+internal static class AnomalyDetector
 {
     public const string PriceIncreasePrefix = "Price increase";
     public const string MerchantOutlierPrefix = "Unusual amount for this merchant";
