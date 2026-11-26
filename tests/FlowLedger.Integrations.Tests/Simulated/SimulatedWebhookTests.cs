@@ -93,7 +93,7 @@ public sealed class SimulatedWebhookTests
     public async Task ParseWebhook_returns_correct_member_id()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret, 
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret,
             memberId: "sim-member-custom");
 
         var evt = await provider.ParseWebhookAsync(body);

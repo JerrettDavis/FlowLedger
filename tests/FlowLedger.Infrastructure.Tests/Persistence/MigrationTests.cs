@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
@@ -8,8 +10,6 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
-using System.Reflection;
-using System.Text.RegularExpressions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 

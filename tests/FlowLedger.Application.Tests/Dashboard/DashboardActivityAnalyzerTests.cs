@@ -1,7 +1,7 @@
 using FlowLedger.Application.Features.Dashboard;
 using FlowLedger.Application.Features.Transactions;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Dashboard;
 
