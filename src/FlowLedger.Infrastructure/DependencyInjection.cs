@@ -364,10 +364,10 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender,
             FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender>();
         // -- Integrations (REST / SOAP / signed webhooks; per-tenant definitions, encrypted secrets, delivery log) --
-        services.AddSingleton<FlowLedger.Application.Features.Integrations.IIntegrationStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlIntegrationStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+        services.AddScoped<FlowLedger.Application.Features.Integrations.IIntegrationStore>(sp =>
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfIntegrationStore(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(),
                 configuration["Integrations:EncryptionKey"] ?? configuration["HomeAssistant:EncryptionKey"]));
         foreach (var clientName in new[]
         {

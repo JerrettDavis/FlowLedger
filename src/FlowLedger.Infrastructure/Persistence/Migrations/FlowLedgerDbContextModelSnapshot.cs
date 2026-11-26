@@ -698,6 +698,116 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("home_assistant_settings", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.IntegrationDeliveryRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("integration_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("target");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trigger");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "IntegrationId", "AtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_integration_deliveries_integration");
+
+                    b.ToTable("integration_deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.IntegrationRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("config");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastUsedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Secrets")
+                        .HasColumnType("text")
+                        .HasColumnName("secrets");
+
+                    b.HasKey("TenantId", "Id");
+
+                    b.ToTable("integrations", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.MerchantAliasRecord", b =>
                 {
                     b.Property<Guid>("TenantId")
