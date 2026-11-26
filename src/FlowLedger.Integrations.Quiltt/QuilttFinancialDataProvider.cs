@@ -93,7 +93,19 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     public async Task<IReadOnlyList<ProviderAccount>> GetAccountsAsync(string memberProviderId, CancellationToken cancellationToken = default)
     {
         var raw = await GetAccountsCoreAsync(memberProviderId, cancellationToken).ConfigureAwait(false);
-        var mapped = raw.Select(QuilttMapper.ToAccount).ToList();
+        var mapped = new List<ProviderAccount>();
+        foreach (var qa in raw)
+        {
+            try
+            {
+                mapped.Add(QuilttMapper.ToAccount(qa));
+            }
+            catch (UnknownCurrencyException ex)
+            {
+                _logger.LogWarning("Skipping Quiltt account: {Message}", ex.Message); // never guess USD (#124)
+            }
+        }
+
         foreach (var a in mapped)
         {
             _currencyByAccount[a.ProviderId] = a.CurrencyCode;
@@ -161,7 +173,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
         var read = await _transactions.Value.Task.ConfigureAwait(false);
         var all = read.Items;
-        var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId, "USD");
+        var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId);
 
         // The read is cut at MaxPages. Rows are ordered by date, so the last date seen may continue on the next page: deliver only
         // the days before it and resume from there in the next sync-loop iteration instead of failing the whole sync.
@@ -193,8 +205,21 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             _logger.LogWarning("Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.", bad.Id);
         }
 
-        var items = ingestible
-            .Select(t => QuilttMapper.ToTransaction(t, fallback))
+        var mappedItems = new List<ProviderTransaction>();
+        foreach (var raw in ingestible)
+        {
+            try
+            {
+                mappedItems.Add(QuilttMapper.ToTransaction(raw, fallback));
+            }
+            catch (UnknownCurrencyException ex)
+            {
+                skipped++;
+                _logger.LogWarning("Skipping Quiltt transaction: {Message}", ex.Message);
+            }
+        }
+
+        var items = mappedItems
             .Where(t => t.PostedDate >= from && (cutAt is null || t.PostedDate < cutAt.Value))
             .OrderBy(t => t.PostedDate)
             .ToList();

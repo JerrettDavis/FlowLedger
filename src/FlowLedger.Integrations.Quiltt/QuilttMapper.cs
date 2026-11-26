@@ -9,7 +9,8 @@ internal static class QuilttMapper
     public static ProviderAccount ToAccount(QAccount a)
     {
         var id = a.Id ?? throw new FatalProviderException("Quiltt account is missing its id.");
-        var currency = Currency(a.CurrencyCode);
+        var currency = ProviderCurrency.Normalize(a.CurrencyCode)
+            ?? throw new UnknownCurrencyException($"Quiltt account {id} reports no usable currencyCode.");
         var type = MapType(a.Kind, a.Name);
         var balance = a.Balance?.Current ?? 0m;
         var available = a.Balance?.Available;
@@ -38,7 +39,7 @@ internal static class QuilttMapper
         !string.Equals(t.Status, "PROJECTED", StringComparison.OrdinalIgnoreCase)
         && DateOnly.TryParse(t.Date, CultureInfo.InvariantCulture, out _);
 
-    public static ProviderTransaction ToTransaction(QTransaction t, string fallbackCurrency)
+    public static ProviderTransaction ToTransaction(QTransaction t, string? fallbackCurrency)
     {
         var accountId = t.Account?.Id ?? throw new FatalProviderException("Quiltt transaction is missing its account.");
         var date = DateOnly.TryParse(t.Date, CultureInfo.InvariantCulture, out var d)
@@ -54,7 +55,8 @@ internal static class QuilttMapper
             _ => raw,
         };
 
-        var currency = string.IsNullOrWhiteSpace(t.CurrencyCode) ? fallbackCurrency : Currency(t.CurrencyCode);
+        var currency = ProviderCurrency.Normalize(t.CurrencyCode) ?? ProviderCurrency.Normalize(fallbackCurrency)
+            ?? throw new UnknownCurrencyException($"Quiltt transaction {t.Id} has no currencyCode and its account currency is unknown.");
         var pending = string.Equals(t.Status, "PENDING", StringComparison.OrdinalIgnoreCase)
                       || string.Equals(t.Status, "PROJECTED", StringComparison.OrdinalIgnoreCase);
         var desc = string.IsNullOrWhiteSpace(t.Description) ? "UNKNOWN" : t.Description.Trim();
@@ -74,7 +76,4 @@ internal static class QuilttMapper
         if (t.Contains("INVEST") || t.Contains("BROKERAGE") || t.Contains("RETIREMENT") || t.Contains("401")) { return "INVESTMENT"; }
         return "CHECKING";
     }
-
-    internal static string Currency(string? c) =>
-        c is { Length: 3 } && c.All(char.IsLetter) ? c.ToUpperInvariant() : "USD";
 }
