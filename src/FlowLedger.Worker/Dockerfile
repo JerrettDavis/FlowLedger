@@ -21,6 +21,7 @@ COPY src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractio
 COPY src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj                 src/FlowLedger.Integrations.Mx/
 COPY src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj   src/FlowLedger.Integrations.Simulated/
 COPY src/FlowLedger.Integrations.SimpleFin/FlowLedger.Integrations.SimpleFin.csproj   src/FlowLedger.Integrations.SimpleFin/
+COPY src/FlowLedger.Integrations.Quiltt/FlowLedger.Integrations.Quiltt.csproj         src/FlowLedger.Integrations.Quiltt/
 
 RUN dotnet restore src/FlowLedger.Worker/FlowLedger.Worker.csproj
 
@@ -41,9 +42,19 @@ RUN dotnet publish src/FlowLedger.Worker/FlowLedger.Worker.csproj \
 # Aspire.StackExchange.Redis and other packages that transitively depend on the
 # Microsoft.AspNetCore.App shared framework.  Use the aspnet image so that
 # framework is present; the smaller dotnet/runtime image would be missing it.
+
+# restic is a static Go binary; the chiseled image has no package manager or shell, so it is copied
+# from the official image. The same stage pre-creates the data directories owned by the image's
+# non-root user (APP_UID 1654 in the .NET 8+ images): Docker seeds a new named volume from the image
+# path, so the volumes mounted at /data/objects and /data/backups come up writable.
+FROM restic/restic:0.18.0 AS data-dirs
+RUN mkdir -p /data/objects /data/backups && chown 1654:1654 /data/objects /data/backups
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
 WORKDIR /app
 
+COPY --from=data-dirs /usr/bin/restic /usr/local/bin/restic
+COPY --from=data-dirs --chown=1654:1654 /data /data
 COPY --from=publish /app/publish .
 
 ENTRYPOINT ["dotnet", "FlowLedger.Worker.dll"]
