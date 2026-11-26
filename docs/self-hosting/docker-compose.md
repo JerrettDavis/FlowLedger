@@ -56,6 +56,11 @@ Health endpoints:
   Use it as a compose/k8s exec probe (the image has no shell or curl).
 - `GET http://localhost:5002/alive` — Web liveness
 
+Scheduling: run a single worker replica. The scheduler is in-memory (a worker that is down at a fire time skips
+that run). Each job takes a Postgres advisory lock while it runs, so an overlapping second worker or a rolling
+deploy cannot run the same job twice at once; runs are logged and exported as `flowledger.job.runs`,
+`flowledger.job.duration` and `flowledger.job.last_success_age` (meter `FlowLedger`).
+
 ## Infra-only mode (for Aspire dev loop)
 
 Start only PostgreSQL and Redis so the Aspire orchestrator can connect to them:

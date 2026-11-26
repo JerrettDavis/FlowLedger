@@ -28,6 +28,8 @@ public sealed class ScheduledBackupJob : IJob
         else
         {
             _logger.LogError("BACKUP FAILED: {Error}", result.Error);
+            // Surface the failure to the job listener (history + flowledger.job.runs{outcome=failure}); Quartz does not refire on this.
+            throw new JobExecutionException($"Backup failed: {result.Error}");
         }
 
         try
