@@ -124,6 +124,38 @@ public sealed class MainLayoutTests : BunitContext, IAsyncLifetime
         cut.Markup.Should().NotContain("Connect and sync demo data");
     }
 
+    private static readonly FlowLedger.Web.Auth.OidcOptions Oidc = new() { Authority = "https://idp.test/", ClientId = "fl" };
+
+    [Fact]
+    public void Non_owner_never_sees_connect_bank_but_can_still_sync()
+    {
+        Arrange("production");
+        Services.AddSingleton(Oidc);
+        var auth = this.AddAuthorization();
+        auth.SetAuthorized("member");
+        auth.SetClaims(new System.Security.Claims.Claim("fl_tenant", Guid.NewGuid().ToString()));
+
+        var cut = RenderLayout();
+        cut.WaitForState(() => cut.Markup.Contains("Sync now"));
+
+        cut.Markup.Should().NotContain("Connect bank");
+    }
+
+    [Fact]
+    public void Owner_sees_connect_bank_when_oidc_is_enabled()
+    {
+        Arrange("production");
+        Services.AddSingleton(Oidc);
+        var auth = this.AddAuthorization();
+        auth.SetAuthorized("owner");
+        auth.SetClaims(new System.Security.Claims.Claim("fl_tenant", Guid.NewGuid().ToString()),
+            new System.Security.Claims.Claim(FlowLedger.Web.Auth.HouseholdAccess.Claim, "true"));
+
+        var cut = RenderLayout();
+
+        cut.WaitForState(() => cut.Markup.Contains("Connect bank"));
+    }
+
     [Fact]
     public void Skip_link_targets_a_focusable_main_landmark()
     {

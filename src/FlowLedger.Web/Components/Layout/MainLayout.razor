@@ -7,6 +7,7 @@
 @inject ThemeService ThemeService
 @inject DisplaySettingsService DisplayService
 @inject PersistentComponentState Persisted
+@using Microsoft.AspNetCore.Components.Authorization
 @implements IDisposable
 
 @* ObserveSystemDarkModeChange tells MudBlazor to watch prefers-color-scheme and
@@ -54,16 +55,19 @@
         }
         @if (_environment == "production")
         {
-            <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
-                <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
-                           Color="Color.Inherit"
-                           Variant="Variant.Text"
-                           OnClick="ConnectBank"
-                           Disabled="_syncing"
-                           aria-label="Connect bank">
-                    <span class="fl-bar-label">Connect bank</span>
-                </MudButton>
-            </MudTooltip>
+            @if (_isOwner)
+            {
+                <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
+                    <MudButton StartIcon="@Icons.Material.Filled.AccountBalance"
+                               Color="Color.Inherit"
+                               Variant="Variant.Text"
+                               OnClick="ConnectBank"
+                               Disabled="_syncing"
+                               aria-label="Connect bank">
+                        <span class="fl-bar-label">Connect bank</span>
+                    </MudButton>
+                </MudTooltip>
+            }
             <MudTooltip Text="Fetch new data from your connected institutions">
                 <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
                            Color="Color.Inherit"
@@ -298,6 +302,16 @@
     // ── Connect & Sync ───────────────────────────────────────────────────────
 
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
+
+    // Only the household owner can link banks (the API refuses everyone else), so other users never see the action.
+    private bool _isOwner = true;
+
+    protected override async Task OnParametersSetAsync() =>
+        _isOwner = FlowLedger.Web.Auth.HouseholdAccess.IsHousehold(AuthState is null ? null : (await AuthState).User, Oidc);
 
     protected override async Task OnInitializedAsync()
     {
