@@ -8,7 +8,7 @@ namespace FlowLedger.Web.Security;
 /// <item>No framing (clickjacking): <c>frame-ancestors 'none'</c> + <c>X-Frame-Options: DENY</c>.</item>
 /// <item><c>nosniff</c>, a strict referrer policy, and a restrictive Permissions-Policy.</item>
 /// <item>CSP (outside Development: hot reload / the WASM debugger inject scripts): scripts only from self, plus
-    ///   a per-request nonce for the inline
+///   a per-request nonce for the inline
 ///   <c>&lt;ImportMap&gt;</c>. MudBlazor sets inline styles, so <c>style-src</c> needs <c>'unsafe-inline'</c>;
 ///   the Inter font is self-hosted from wwwroot/fonts. <c>form-action</c> is deliberately NOT set: the OIDC sign-out POST
 ///   redirects to the identity provider, which Chrome would block.</item>
