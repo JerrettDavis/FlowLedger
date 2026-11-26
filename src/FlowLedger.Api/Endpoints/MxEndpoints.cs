@@ -81,6 +81,8 @@ internal static class MxEndpoints
             IRawPayloadArchive archive,
             ISchedulerFactory schedulerFactory,
             IWebhookTenantResolver tenantResolver,
+            IWebhookReplayStore? replayStore,
+            ILoggerFactory loggers,
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
@@ -106,7 +108,7 @@ internal static class MxEndpoints
             }
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
-            if (WebhookReplayGuard.SeenRecently(rawBody))
+            if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
             {
                 return Results.Accepted(value: new { duplicate = true });
             }

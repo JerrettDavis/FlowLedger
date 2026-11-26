@@ -75,6 +75,8 @@ internal static class QuilttEndpoints
                 IRawPayloadArchive archive,
                 ISchedulerFactory schedulerFactory,
                 IWebhookTenantResolver tenantResolver,
+                IWebhookReplayStore? replayStore,
+                ILoggerFactory loggers,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
@@ -103,7 +105,7 @@ internal static class QuilttEndpoints
                     return Results.Unauthorized();
                 }
 
-                if (WebhookReplayGuard.SeenRecently(rawBody))
+                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
                 {
                     return Results.Accepted(value: new { duplicate = true });
                 }

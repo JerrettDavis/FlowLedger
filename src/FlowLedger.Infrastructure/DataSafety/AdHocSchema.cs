@@ -20,6 +20,7 @@ public static class AdHocSchema
         BackupRunStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
         NpgsqlTenantRegistry.CreateSqlText,
+        NpgsqlWebhookReplayStore.CreateSqlText,
     ];
 
     public static string AllSql => string.Join("\n", Scripts);
