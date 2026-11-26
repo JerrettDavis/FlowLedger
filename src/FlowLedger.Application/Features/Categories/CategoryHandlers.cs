@@ -121,17 +121,23 @@ public sealed class CreateCategoryHandler
 public sealed class UpdateCategoryHandler
 {
     private readonly ICategoryRepository _repo;
+    private readonly IRowVersionGuard? _guard;
 
-    public UpdateCategoryHandler(ICategoryRepository repo)
-        => _repo = repo;
+    public UpdateCategoryHandler(ICategoryRepository repo, IRowVersionGuard? guard = null)
+    {
+        _repo = repo;
+        _guard = guard;
+    }
 
-    public async Task<CategoryDto?> HandleAsync(Guid id, UpdateCategoryRequest request, CancellationToken ct = default)
+    public async Task<CategoryDto?> HandleAsync(Guid id, UpdateCategoryRequest request, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var cat = await _repo.GetByIdAsync(CategoryId.From(id), ct);
         if (cat is null)
         {
             return null;
         }
+
+        _guard?.Expect(cat, expectedVersion);
 
         cat.Rename(new CategoryPath(request.Path), request.DisplayName);
         await _repo.SaveChangesAsync(ct);
@@ -144,17 +150,23 @@ public sealed class UpdateCategoryHandler
 public sealed class DeleteCategoryHandler
 {
     private readonly ICategoryRepository _repo;
+    private readonly IRowVersionGuard? _guard;
 
-    public DeleteCategoryHandler(ICategoryRepository repo)
-        => _repo = repo;
+    public DeleteCategoryHandler(ICategoryRepository repo, IRowVersionGuard? guard = null)
+    {
+        _repo = repo;
+        _guard = guard;
+    }
 
-    public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var cat = await _repo.GetByIdAsync(CategoryId.From(id), ct);
         if (cat is null)
         {
             return false;
         }
+
+        _guard?.Expect(cat, expectedVersion);
 
         if (cat.IsSystem)
         {
@@ -174,5 +186,6 @@ internal static class CategoryMapper
         c.Path.Value,
         c.DisplayName,
         c.IsSystem,
-        c.ParentId?.Value);
+        c.ParentId?.Value,
+        c.RowVersion);
 }

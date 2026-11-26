@@ -230,8 +230,17 @@ public sealed class FlowLedgerApiClient
 
     /// <summary>PUT with an <c>If-Match</c> precondition carrying the account's version (its ETag) when the caller has one.</summary>
     private Task<HttpResponseMessage> PutAccountAsync(string url, object body, uint? expectedVersion, CancellationToken ct)
+        => SendVersionedAsync(HttpMethod.Put, url, body, expectedVersion, ct);
+
+    /// <summary>Sends a write with an <c>If-Match</c> precondition carrying the row's version (its ETag) when the caller has one (#157).</summary>
+    private Task<HttpResponseMessage> SendVersionedAsync(HttpMethod method, string url, object? body, uint? expectedVersion, CancellationToken ct)
     {
-        var message = new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(body, options: JsonOptions) };
+        var message = new HttpRequestMessage(method, url);
+        if (body is not null)
+        {
+            message.Content = JsonContent.Create(body, options: JsonOptions);
+        }
+
         if (expectedVersion is { } version)
         {
             message.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
@@ -240,14 +249,21 @@ public sealed class FlowLedgerApiClient
         return _http.SendAsync(message, ct);
     }
 
+    /// <summary>The new version a write returned in its <c>ETag</c>, so the caller can chain its next write.</summary>
+    private static uint? ReadVersion(HttpResponseMessage response)
+        => uint.TryParse(response.Headers.ETag?.Tag.Trim('"'), out var v) ? v : null;
+
     /// <summary>A 409 means someone (another tab, a sync) changed the row after it was loaded; say so instead of a status code.</summary>
-    private static void ThrowIfChangedElsewhere(HttpResponseMessage response)
+    private static void ThrowIfChangedElsewhere(HttpResponseMessage response, string noun = "account")
     {
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            throw new ApiClientException(ChangedElsewhereMessage, response.StatusCode);
+            throw new ApiClientException(ChangedElsewhereFor(noun), response.StatusCode);
         }
     }
+
+    public static string ChangedElsewhereFor(string noun)
+        => $"This {noun} was changed elsewhere (another tab or a sync). Reload to see the latest version, then try again.";
 
     public const string ChangedElsewhereMessage = "This account was changed elsewhere (another tab or a sync). Reload to see the latest version, then try again.";
 
@@ -730,16 +746,17 @@ public sealed class FlowLedgerApiClient
         });
     }
 
-    public async Task<RecurringFlowDto?> UpdateRecurringFlowAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default)
+    public async Task<RecurringFlowDto?> UpdateRecurringFlowAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default, uint? expectedVersion = null)
     {
         return await ExecuteAsync("update recurring flow", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/recurring-flows/{id}", request, JsonOptions, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/recurring-flows/{id}", request, expectedVersion, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
 
+            ThrowIfChangedElsewhere(response, "recurring flow");
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Non-success status {StatusCode} updating recurring flow {Id}", (int)response.StatusCode, id);
@@ -752,11 +769,12 @@ public sealed class FlowLedgerApiClient
         });
     }
 
-    public async Task DeleteRecurringFlowAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteRecurringFlowAsync(Guid id, CancellationToken ct = default, uint? expectedVersion = null)
     {
         await ExecuteAsync("delete recurring flow", async () =>
         {
-            var response = await _http.DeleteAsync($"/api/recurring-flows/{id}", ct);
+            var response = await SendVersionedAsync(HttpMethod.Delete, $"/api/recurring-flows/{id}", null, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "recurring flow");
             if (response.StatusCode != HttpStatusCode.NotFound && !response.IsSuccessStatusCode)
             {
                 _logger.LogError("Non-success status {StatusCode} deleting recurring flow {Id}", (int)response.StatusCode, id);
@@ -938,15 +956,22 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Sets a transaction's category; optionally applies it to every uncategorized transaction of the same merchant.</summary>
-    public async Task<int> SetTransactionCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
+    public async Task<int> SetTransactionCategoryAsync(
+        Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         return await ExecuteAsync("set category", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/category",
-                new { categoryId, applyToMerchant }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/category",
+                new { categoryId, applyToMerchant }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't set category (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            if (ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
             }
 
             var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
@@ -955,15 +980,22 @@ public sealed class FlowLedgerApiClient
     }
 
     /// <summary>Recategorizes one transaction, or (applyToAll) every transaction of the same merchant plus future syncs. Returns how many changed.</summary>
-    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null)
+    public async Task<int> RecategorizeAsync(
+        Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         return await ExecuteAsync("recategorize", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/recategorize",
-                new { categoryId, applyToAll, note }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/recategorize",
+                new { categoryId, applyToAll, note }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't recategorize (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            if (ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
             }
 
             var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
@@ -1278,25 +1310,38 @@ public sealed class FlowLedgerApiClient
             return true;
         });
 
-    public async Task SetTransactionNoteAsync(Guid transactionId, string note, CancellationToken ct = default)
+    public async Task SetTransactionNoteAsync(Guid transactionId, string note, CancellationToken ct = default, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         await ExecuteAsync("save transaction note", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/note", new { note }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/note", new { note }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't save note (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            if (ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
             }
 
             return true;
         });
     }
 
-    public async Task SetTransactionSplitsAsync(Guid transactionId, List<TransactionSplitDto> splits, CancellationToken ct = default)
+    public async Task SetTransactionSplitsAsync(
+        Guid transactionId, List<TransactionSplitDto> splits, CancellationToken ct = default, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         await ExecuteAsync("save transaction splits", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/splits", new { splits }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/splits", new { splits }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
+            if (response.IsSuccessStatusCode && ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var detail = response.StatusCode == System.Net.HttpStatusCode.BadRequest ? await response.Content.ReadAsStringAsync(ct) : "";

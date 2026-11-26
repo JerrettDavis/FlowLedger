@@ -110,6 +110,7 @@ public static class DependencyInjection
         services.AddSingleton(configuration.GetSection(OutboxOptions.SectionName).Get<OutboxOptions>() ?? new OutboxOptions());
         services.AddScoped<OutboxProcessor>();
         services.AddScoped<FlowLedger.Application.Abstractions.IOutbox, EfOutbox>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IRowVersionGuard, EfRowVersionGuard>();
 
         // Auto-register all IDomainEventHandler<> implementations in this assembly.
         var infrastructureAssembly = typeof(DependencyInjection).Assembly;
