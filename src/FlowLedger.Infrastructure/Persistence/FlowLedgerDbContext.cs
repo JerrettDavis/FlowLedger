@@ -120,9 +120,15 @@ public sealed class FlowLedgerDbContext : DbContext
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         ValidateTenantBoundaries();
-        var events = CollectDomainEvents();
+        var (events, aggregates) = CollectDomainEvents();
 
         var result = await base.SaveChangesAsync(cancellationToken);
+
+        // Only a committed save consumes the events; if it threw they stay on the aggregates (#92).
+        foreach (var aggregate in aggregates)
+        {
+            aggregate.ClearDomainEvents();
+        }
 
         // Dispatch after successful persistence so handlers see committed state.
         if (events.Count > 0)
@@ -183,8 +189,8 @@ public sealed class FlowLedgerDbContext : DbContext
         }
     }
 
-    /// <summary>Collects all uncommitted domain events from tracked aggregate roots and clears them.</summary>
-    private List<IDomainEvent> CollectDomainEvents()
+    /// <summary>Collects (without clearing) all uncommitted domain events from tracked aggregate roots.</summary>
+    private (List<IDomainEvent> Events, List<IAggregateRoot> Aggregates) CollectDomainEvents()
     {
         var aggregates = ChangeTracker.Entries<IAggregateRoot>()
             .Where(e => e.Entity.DomainEvents.Count > 0)
@@ -195,11 +201,6 @@ public sealed class FlowLedgerDbContext : DbContext
             .SelectMany(a => a.DomainEvents)
             .ToList();
 
-        foreach (var aggregate in aggregates)
-        {
-            aggregate.ClearDomainEvents();
-        }
-
-        return events;
+        return (events, aggregates);
     }
 }

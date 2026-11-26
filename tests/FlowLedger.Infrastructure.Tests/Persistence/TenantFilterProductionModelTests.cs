@@ -114,4 +114,23 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
         var act = () => db.SaveChanges();
         act.Should().Throw<NotSupportedException>();
     }
+
+    [DockerFact]
+    public async Task A_failed_save_leaves_domain_events_on_the_aggregate()
+    {
+        // #92: events used to be cleared before SaveChanges, so a failed save lost them for good.
+        var t = TestTenantContext.New();
+        await using var db = _fixture.CreateProductionStyleContext(t);
+        var account = Account.Create(TenantId.From(t.TenantId), "Evt", AccountType.Checking, new Money(1m, Currency.Usd));
+        account.DomainEvents.Should().NotBeEmpty("precondition: creating an account raises an event");
+        var before = account.DomainEvents.Count;
+        db.Accounts.Add(account);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var act = () => db.SaveChangesAsync(cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        account.DomainEvents.Count.Should().Be(before, "a save that did not commit must not consume the events");
+    }
 }
