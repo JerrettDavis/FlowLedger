@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace FlowLedger.Web.Tests.Pages;
 
 /// <summary>
-/// Every routed page needs exactly one h1: Routes.razor's FocusOnNavigate targets "h1", so a page without one gives keyboard and
+/// Every routed page needs exactly one h1: Routes.razor's FocusHeadingOnNavigate targets "h1", so a page without one gives keyboard and
 /// screen-reader users no focus move or announcement on navigation (axe: page-has-heading-one).
 /// </summary>
 public sealed class PageHeadingTests
@@ -36,7 +36,7 @@ public sealed class PageHeadingTests
             .Select(Path.GetFileName)
             .ToList();
 
-        missing.Should().BeEmpty("every page needs an h1 for FocusOnNavigate and the document outline");
+        missing.Should().BeEmpty("every page needs an h1 for FocusHeadingOnNavigate and the document outline");
     }
 
     [Fact]

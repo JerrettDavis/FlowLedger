@@ -11,6 +11,12 @@ window.flowledgerDownload = async (fileName, streamRef) => {
     URL.revokeObjectURL(url);
 };
 
+// Moves focus to the page heading after in-app navigation (see FocusHeadingOnNavigate).
+window.flowledgerFocusHeading = () => {
+    const h = document.querySelector('h1');
+    if (h) h.focus();
+};
+
 // Scrolls the bill sheet horizontally so the current-month column is in view.
 window.flowledgerFocusCurrentMonth = () => {
     const th = document.querySelector('.fl-sheet thead th.fl-sheet-cur');
