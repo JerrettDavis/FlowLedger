@@ -18,8 +18,6 @@ public static class AdHocSchema
         SystemSettingsSql,
         NpgsqlProviderCallLedger.CreateSqlText,
         BackupRunStore.CreateSqlText,
-        NpgsqlCategoryRuleStore.CreateSqlText,
-        NpgsqlMerchantAliasStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
         NpgsqlAccountConnectorLinkStore.CreateSqlText,
         NpgsqlProviderAccountCatalog.CreateSqlText,
