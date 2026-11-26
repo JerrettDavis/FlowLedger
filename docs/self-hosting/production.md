@@ -206,6 +206,42 @@ permanently lost.
   database is not on the same private network as the app. The compose connection string
   has no TLS option; see [database.md](database.md) for an override example, pool sizing,
   RPO/RTO and the major-version upgrade procedure.
+- Enable SSL for the Postgres connection by adding `sslmode=require` to the connection
+  string when the database is not on the same private network as the app.
+
+## Data Protection key ring (web sign-in cookies, antiforgery)
+
+The web app encrypts its sign-in cookie and antiforgery tokens with an ASP.NET Data Protection key ring. By default
+that ring lives in the container's home directory and is lost on every recreate, which logs every user out; with
+more than one web replica each would use a different ring and sign-in would break.
+
+- Mount a persistent volume into the web container and set `DataProtection__KeysPath` to it (for example
+  `/keys`, owned by the container user). All replicas must share it.
+- Optional: `DataProtection__CertificatePath` (+ `DataProtection__CertificatePassword`) encrypts the key files at
+  rest with a PFX. Without it the key files are plain XML, so restrict the volume to the container user.
+- Set `DataProtection__Required=true` once the volume is mounted: outside Development the web app then refuses to
+  start without a key path, instead of silently using an ephemeral ring.
+- Include the key directory in the recovery set (back it up with the database; restoring the database without it
+  only costs users a re-sign-in).
+- Rotation: keys roll automatically every 90 days; old keys stay in the directory so existing cookies keep working.
+  To force every session to end (suspected compromise), stop the web app, move the key files out of the directory,
+  and start it again. Never delete keys while the app is running.
+- Verification: sign in, run `docker compose up -d --force-recreate web`, reload: you must still be signed in.
+  (Not yet verified end to end; compose does not mount the volume yet.)
+
+## Checklist before going live
+
+- [ ] `DataProtection__KeysPath` points at a persistent volume (and `DataProtection__Required=true`).
+
+- [ ] `POSTGRES_PASSWORD` is a strong random value (not the default).
+- [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
+- [ ] Postgres port is not exposed to the public internet.
+- [ ] TLS termination is in place; all HTTP redirects to HTTPS.
+- [ ] `Mx__Enabled=false` (or credentials are set and verified if enabling MX).
+- [ ] `Mx__BaseUrl=https://api.mx.com` (not the sandbox URL) if using live MX data.
+- [ ] Secrets are stored in a secrets manager, not in `.env` on the server.
+- [ ] OTLP telemetry is wired up for observability (`OTEL_EXPORTER_OTLP_ENDPOINT`).
+- [ ] Backups are configured for the `postgres_data` volume.
 
 ## Reverse proxy / TLS
 
