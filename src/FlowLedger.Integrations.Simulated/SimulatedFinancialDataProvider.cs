@@ -18,7 +18,7 @@ namespace FlowLedger.Integrations.Simulated;
 /// - Configurable fault injection via <see cref="SimulatedProviderOptions"/>.
 /// - Webhook verification accepts a fixed HMAC using a test secret ("test-webhook-secret").
 /// </summary>
-public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
+public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRecurringFlowSeedSource
 {
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -48,6 +48,14 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         ProviderCapabilities.WebhookVerification |
         ProviderCapabilities.WebhookParsing |
         ProviderCapabilities.FaultSimulation;
+
+    /// <summary>No credentials, local provisioning, fabricated data.</summary>
+    public const ConnectorTraits DeclaredTraits = ConnectorTraits.PerTenantAccess | ConnectorTraits.ProvisionsLocally | ConnectorTraits.SeedsDemoData;
+
+    public ConnectorTraits Traits => DeclaredTraits;
+
+    public IReadOnlyList<RecurringFlowSeed> GetRecurringFlowSeeds(string checkingProviderAccountId, string creditProviderAccountId)
+        => SimulatedDataFactory.GetRecurringFlowSeeds(checkingProviderAccountId, creditProviderAccountId);
 
     public async Task<ProviderMemberRef> BeginConnectionAsync(
         TenantId tenantId,

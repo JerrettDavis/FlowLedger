@@ -8,7 +8,8 @@ namespace FlowLedger.Integrations.Abstractions;
 /// True when the connector runs on operator-held, instance-wide credentials. Such a connector may only act for the household
 /// (legacy) tenant. False means the connector needs no shared secret (Simulated) or holds credentials per user.
 /// </param>
-public sealed record ConnectorDescriptor(string Id, string DisplayName, string Kind, bool SharedCredentials);
+/// <param name="Traits">The provider's declared <see cref="ConnectorTraits"/>, so host code can branch on behaviour without resolving the provider.</param>
+public sealed record ConnectorDescriptor(string Id, string DisplayName, string Kind, bool SharedCredentials, ConnectorTraits Traits = ConnectorTraits.None);
 
 /// <summary>
 /// The connectors enabled on this instance and a way to get the provider behind each. Enablement is configuration (per instance);

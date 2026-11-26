@@ -107,6 +107,7 @@ public sealed class SyncCrashResilienceTests : IAsyncLifetime
         private int _calls;
         public string ProviderName => inner.ProviderName;
         public ProviderCapabilities Capabilities => inner.Capabilities;
+        public ConnectorTraits Traits => inner.Traits;
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default) => inner.BeginConnectionAsync(t, ct);
         public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default) => inner.GetConnectionStatusAsync(m, ct);
         public Task<IReadOnlyList<ProviderAccount>> GetAccountsAsync(string m, CancellationToken ct = default) => inner.GetAccountsAsync(m, ct);

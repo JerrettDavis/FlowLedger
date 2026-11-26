@@ -31,10 +31,10 @@ internal static class AccountConnectorEndpoints
                 IConnectorRegistry registry,
                 IAccountConnectorLinkStore links,
                 IProviderAccountCatalog catalog,
-                HttpContext http,
+                IHouseholdTenantAccess household,
                 CancellationToken ct) =>
             {
-                var denied = Check(registry, connectorId, http);
+                var denied = Check(registry, connectorId, household);
                 if (denied is not null)
                 {
                     return denied;
@@ -61,7 +61,7 @@ internal static class AccountConnectorEndpoints
                 IConnectorRegistry registry,
                 IAccountConnectorLinkStore links,
                 IProviderAccountCatalog catalog,
-                HttpContext http,
+                IHouseholdTenantAccess household,
                 CancellationToken ct) =>
             {
                 if (await accounts.GetByIdAsync(AccountId.From(id), ct) is null)
@@ -75,7 +75,7 @@ internal static class AccountConnectorEndpoints
                     return Results.NoContent();
                 }
 
-                var denied = Check(registry, request.ConnectorId, http);
+                var denied = Check(registry, request.ConnectorId, household);
                 if (denied is not null)
                 {
                     return denied;
@@ -112,7 +112,7 @@ internal static class AccountConnectorEndpoints
     }
 
     /// <summary>Null when the connector is enabled and the caller may use it; otherwise the error result.</summary>
-    private static IResult? Check(IConnectorRegistry registry, string connectorId, HttpContext http)
+    private static IResult? Check(IConnectorRegistry registry, string connectorId, IHouseholdTenantAccess household)
     {
         var descriptor = registry.Enabled.FirstOrDefault(c => string.Equals(c.Id, connectorId, StringComparison.OrdinalIgnoreCase));
         if (descriptor is null)
@@ -121,7 +121,7 @@ internal static class AccountConnectorEndpoints
         }
 
         // Operator-held credentials serve the household tenant only.
-        if (descriptor.SharedCredentials && !DataEndpoints.IsHouseholdTenant(http.RequestServices))
+        if (descriptor.SharedCredentials && !household.IsHouseholdTenant)
         {
             return Results.Problem(title: "This connector is limited to the household owner", statusCode: StatusCodes.Status403Forbidden);
         }

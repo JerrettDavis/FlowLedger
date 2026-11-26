@@ -66,11 +66,11 @@ internal static class AssetEndpoints
             Guid id,
             [FromQuery] string? feed,
             RefreshAssetValuationHandler h,
-            HttpContext http,
+            FlowLedger.Application.Abstractions.IHouseholdTenantAccess household,
             CancellationToken ct) =>
         {
             // Named feeds can be paid third-party lookups on the operator's key; non-household tenants get the built-in model only.
-            if (!string.IsNullOrWhiteSpace(feed) && !DataEndpoints.IsHouseholdTenant(http.RequestServices))
+            if (!string.IsNullOrWhiteSpace(feed) && !household.IsHouseholdTenant)
             {
                 return Results.Problem("External valuation feeds are limited to the household owner.", statusCode: StatusCodes.Status403Forbidden);
             }

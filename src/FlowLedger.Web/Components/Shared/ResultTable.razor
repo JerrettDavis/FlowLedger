@@ -36,11 +36,12 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public QueryResultDto Result { get; set; } = default!;
+    [Parameter, EditorRequired] public QueryResult Result { get; set; } = default!;
     [Parameter] public int MaxRows { get; set; } = 500;
 
-    private static string Display(JsonElement e, string type)
+    private static string Display(object? cell, string type)
     {
+        var e = ChartModel.ToElement(cell);
         if (e.ValueKind == JsonValueKind.Number)
         {
             var d = e.GetDecimal();

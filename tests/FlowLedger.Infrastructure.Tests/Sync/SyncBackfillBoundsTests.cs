@@ -70,6 +70,7 @@ public sealed class SyncBackfillBoundsTests : IAsyncLifetime
         public int MaxTrackedTransactions { get; private set; }
         public string ProviderName => "Simulated";
         public ProviderCapabilities Capabilities => ProviderCapabilities.Accounts;
+        public ConnectorTraits Traits => ConnectorTraits.PerTenantAccess | ConnectorTraits.ProvisionsLocally | ConnectorTraits.SeedsDemoData;
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default)
             => Task.FromResult(new ProviderMemberRef("m1", "Bank", ConnectionStatus.Connected));
         public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default)
