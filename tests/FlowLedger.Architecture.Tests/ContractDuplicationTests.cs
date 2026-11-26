@@ -18,7 +18,6 @@ public sealed class ContractDuplicationTests
         "AssetValuationDto",
         "CategoryRuleDto",
         "CreateAssetRequest",
-        "CreateRecurringFlowRequest",
         "DuplicateSideDto",
         "DuplicateSuggestionDto",
         "ImportSheetRequest",
@@ -28,8 +27,6 @@ public sealed class ContractDuplicationTests
         "PanelResultDto",
         "QuerySchemaDto",
         "RecordValuationRequest",
-        "RecurringFlowDto",
-        "RecurringSuggestionDto",
         "RunReportResultDto",
         "SaveBillRequest",
         "SavedReportDto",
@@ -48,7 +45,6 @@ public sealed class ContractDuplicationTests
         "SimilarTransactionDto",
         "SyncResult",
         "UpdateAssetRequest",
-        "UpdateRecurringFlowRequest",
         "ValuationSpreadDto",
     ];
 

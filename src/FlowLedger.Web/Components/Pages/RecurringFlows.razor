@@ -157,13 +157,13 @@
 
     private bool _loading = true;
     private string? _error;
-    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _allFlows = [];
+    private List<FlowLedger.Contracts.RecurringFlowDto> _allFlows = [];
     private string _rangePreset = "All time";
     private DateOnly? _rangeFrom;
     private DateOnly _rangeTo = DateOnly.FromDateTime(DateTime.Today);
 
     // A flow counts when its start/end window overlaps the chosen range ("All time" keeps everything).
-    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> FilterFlows() => _rangePreset == "All time"
+    private List<FlowLedger.Contracts.RecurringFlowDto> FilterFlows() => _rangePreset == "All time"
         ? _allFlows
         : _allFlows.Where(f => f.StartDate <= _rangeTo && (f.EndDate is null || f.EndDate >= (_rangeFrom ?? DateOnly.MinValue))).ToList();
 
@@ -174,12 +174,12 @@
         _rangeTo = r.To;
         _flows = FilterFlows();
     }
-    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flows = [];
+    private List<FlowLedger.Contracts.RecurringFlowDto> _flows = [];
     private List<FlowLedger.Contracts.AccountDto> _accounts = [];
-    private List<FlowLedger.Web.ApiClient.RecurringSuggestionDto> _suggestions = [];
+    private List<FlowLedger.Contracts.RecurringSuggestionDto> _suggestions = [];
     private bool _busy;
 
-    private static string DescribeSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s) => s.Frequency switch
+    private static string DescribeSuggestion(FlowLedger.Contracts.RecurringSuggestionDto s) => s.Frequency switch
     {
         "Weekly" => $"Weekly on {s.AnchorDayOfWeek}",
         "EveryNWeeks" => $"Every {s.IntervalWeeks} weeks on {s.AnchorDayOfWeek}",
@@ -204,7 +204,7 @@
         }
     }
 
-    private async Task AcceptSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s)
+    private async Task AcceptSuggestion(FlowLedger.Contracts.RecurringSuggestionDto s)
     {
         _busy = true;
         try
@@ -225,7 +225,7 @@
         }
     }
 
-    private async Task DismissSuggestion(FlowLedger.Web.ApiClient.RecurringSuggestionDto s)
+    private async Task DismissSuggestion(FlowLedger.Contracts.RecurringSuggestionDto s)
     {
         _busy = true;
         try
@@ -241,7 +241,7 @@
         }
     }
 
-    private async Task FlagNotRecurring(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    private async Task FlagNotRecurring(FlowLedger.Contracts.RecurringFlowDto flow)
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
@@ -358,7 +358,7 @@
                 { x => x.Accounts, _accounts }
             });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.CreateRecurringFlowRequest req })
+        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateRecurringFlowRequest req })
         {
             try
             {
@@ -374,7 +374,7 @@
         }
     }
 
-    private async Task OpenEditDialog(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    private async Task OpenEditDialog(FlowLedger.Contracts.RecurringFlowDto flow)
     {
         var dialog = await DialogService.ShowAsync<RecurringFlowFormDialog>("Edit Recurring Flow",
             new DialogParameters<RecurringFlowFormDialog>
@@ -383,7 +383,7 @@
                 { x => x.Accounts, _accounts }
             });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.UpdateRecurringFlowRequest updateReq })
+        if (result is { Canceled: false, Data: FlowLedger.Contracts.UpdateRecurringFlowRequest updateReq })
         {
             try
             {
@@ -399,7 +399,7 @@
         }
     }
 
-    private async Task DeleteFlow(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    private async Task DeleteFlow(FlowLedger.Contracts.RecurringFlowDto flow)
     {
         var options = new DialogOptions { CloseButton = true };
         var parameters = new DialogParameters<ConfirmDialog>
@@ -428,13 +428,13 @@
     private decimal MonthlyTotal(string direction) =>
         _flows.Where(f => f.IsActive && f.Direction == direction).Sum(f => f.MonthlyAmount);
 
-    private static decimal PerMonthCount(FlowLedger.Web.ApiClient.RecurringFlowDto f) =>
+    private static decimal PerMonthCount(FlowLedger.Contracts.RecurringFlowDto f) =>
         f.Amount > 0 ? f.MonthlyAmount / f.Amount : 0;
 
     // Sort key for the Schedule column: monthly flows order by their due day (like the bill sheet's Due column);
     // twice-monthly use their first day; flows without a fixed day of the month (weekly, every-N-weeks, daily)
     // follow, grouped by how often they repeat.
-    internal static int ScheduleSortKey(FlowLedger.Web.ApiClient.RecurringFlowDto f) => f.RecurrenceFrequency switch
+    internal static int ScheduleSortKey(FlowLedger.Contracts.RecurringFlowDto f) => f.RecurrenceFrequency switch
     {
         "Monthly" or "TwiceMonthly" when f.DayOfMonth.HasValue => f.DayOfMonth.Value,
         "Monthly" or "TwiceMonthly" => 50,
@@ -444,7 +444,7 @@
         _ => 200,
     };
 
-    private static string DescribeSchedule(FlowLedger.Web.ApiClient.RecurringFlowDto flow)
+    private static string DescribeSchedule(FlowLedger.Contracts.RecurringFlowDto flow)
     {
         return flow.RecurrenceFrequency switch
         {
