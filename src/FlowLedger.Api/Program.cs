@@ -76,7 +76,8 @@ if (builder.Environment.IsDevelopment() || builder.Configuration.GetValue("Datab
 // production boundary. Registered AFTER the migration service so the schema exists first.
 builder.Services.AddDataEnvironmentGuard();
 
-// ── ProblemDetails (with TenantResolutionException → 401 mapping) ─────────────
+// ── ProblemDetails (TenantResolutionException → 401; any ProviderException → ProviderExceptionHandler, ADR 0018) ──
+builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ProviderExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = ctx =>
