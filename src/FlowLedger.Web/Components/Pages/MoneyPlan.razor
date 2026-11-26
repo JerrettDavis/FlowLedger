@@ -4,30 +4,29 @@
 
 <PageTitle>Money Plan — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
-    <div>
-        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Money Plan</MudText>
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
-            Planned &amp; actual flows with running balance — virtualized for large data sets
-        </MudText>
-    </div>
-    <div class="d-flex align-center gap-2" style="gap:8px">
-        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
-                   aria-label="Forecast horizon in months">
-            <MudSelectItem Value="1">1 month</MudSelectItem>
-            <MudSelectItem Value="3">3 months</MudSelectItem>
-            <MudSelectItem Value="6">6 months</MudSelectItem>
-            <MudSelectItem Value="12">12 months</MudSelectItem>
-        </MudSelect>
-        <MudButton StartIcon="@Icons.Material.Filled.Refresh"
-                   Color="Color.Primary"
-                   Variant="Variant.Outlined"
-                   OnClick="LoadAsync"
-                   aria-label="Refresh money plan">
-            Refresh
-        </MudButton>
-    </div>
-</div>
+<PageHeader Title="Money Plan">
+    <Description>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Planned &amp; actual flows with running balance — virtualized for large data sets
+            </MudText>
+    </Description>
+    <ChildContent>
+            <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
+                       aria-label="Forecast horizon in months">
+                <MudSelectItem Value="1">1 month</MudSelectItem>
+                <MudSelectItem Value="3">3 months</MudSelectItem>
+                <MudSelectItem Value="6">6 months</MudSelectItem>
+                <MudSelectItem Value="12">12 months</MudSelectItem>
+            </MudSelect>
+            <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       Variant="Variant.Outlined"
+                       OnClick="LoadAsync"
+                       aria-label="Refresh money plan">
+                Refresh
+            </MudButton>
+    </ChildContent>
+</PageHeader>
 
 @if (_loading)
 {

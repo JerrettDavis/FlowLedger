@@ -1,4 +1,4 @@
-using FlowLedger.Web.Components.Pages;
+using FlowLedger.Web.Components.Dialogs;
 using MudBlazor;
 
 namespace FlowLedger.Web.Shared;

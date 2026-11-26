@@ -7,23 +7,20 @@
 
 <PageTitle>Transactions — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
-    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Transactions</MudText>
-    <div class="d-flex align-center gap-2">
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="AutoCategorize" Disabled="_categorizing"
-                   aria-label="Auto-categorize transactions">
-            @(_categorizing ? "Categorizing…" : "Auto-categorize")
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" OnClick="OpenImport"
-                   aria-label="Import transactions from another app or bank">
-            Import
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCsv"
-                   aria-label="Export visible transactions as CSV">
-            Export CSV
-        </MudButton>
-    </div>
-</div>
+<PageHeader Title="Transactions">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="AutoCategorize" Disabled="_categorizing"
+                       aria-label="Auto-categorize transactions">
+                @(_categorizing ? "Categorizing…" : "Auto-categorize")
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" OnClick="OpenImport"
+                       aria-label="Import transactions from another app or bank">
+                Import
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCsv"
+                       aria-label="Export visible transactions as CSV">
+                Export CSV
+            </MudButton>
+</PageHeader>
 
 <!-- Filter bar -->
 <MudPaper Elevation="0" Class="pa-3 mb-4" Style="border: 1px solid var(--mud-palette-divider);">

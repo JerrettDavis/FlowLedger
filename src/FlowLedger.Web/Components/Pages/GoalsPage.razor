@@ -5,11 +5,10 @@
 
 <PageTitle>Goals — FlowLedger</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Savings goals</MudText>
-    <DateRangeSelector Label="Target date" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
-                       From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
-</div>
+<PageHeader Title="Savings goals">
+        <DateRangeSelector Label="Target date" Presets="@DateRangeSelector.ForwardPresets" Preset="@_rangePreset"
+                           From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
+</PageHeader>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Set a target (emergency fund, vacation, down payment), track what you've set aside, and see the monthly amount needed to hit your date.
 </MudText>
