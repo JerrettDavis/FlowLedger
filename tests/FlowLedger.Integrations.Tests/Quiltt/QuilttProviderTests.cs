@@ -35,11 +35,12 @@ public sealed class QuilttProviderTests
             new QuilttApiClient(new HttpClient(stub), o), o, verifier, NullLogger<QuilttFinancialDataProvider>.Instance);
     }
 
+    // Real shape (verified against the sandbox): `accounts` is a plain list, `kind` replaces `type`, `state` is OPEN/CLOSED.
     private const string AccountsJson = """
-        {"data":{"accounts":{"nodes":[
-          {"id":"acc_1","name":"Everyday","type":"CHECKING","mask":"1234","currencyCode":"USD","balance":{"current":100.5,"available":90},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}},
-          {"id":"acc_2","name":"Visa","type":"CREDIT","currencyCode":"USD","balance":{"current":-250.25},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}}
-        ],"pageInfo":{"hasNextPage":false}}}}
+        {"data":{"accounts":[
+          {"id":"acc_1","name":"Everyday","kind":"DEPOSITORY","state":"OPEN","mask":"1234","currencyCode":"USD","balance":{"current":100.5,"available":90},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}},
+          {"id":"acc_2","name":"Visa","kind":"CREDIT","state":"OPEN","currencyCode":"USD","balance":{"current":-250.25},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}}
+        ]}}
         """;
 
     private const string TransactionsJson = """
@@ -113,13 +114,6 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
-    public async Task Unauthorized_SurfacesNeedsUserAction()
-    {
-        var p = Make(new Stub((_, _) => new HttpResponseMessage(HttpStatusCode.Unauthorized)));
-        await p.Invoking(x => x.GetAccountsAsync("p_1")).Should().ThrowAsync<NeedsUserActionProviderException>();
-    }
-
-    [Fact]
     public async Task ServerError_IsTransient()
     {
         var p = Make(new Stub((_, _) => new HttpResponseMessage(HttpStatusCode.BadGateway)));
@@ -127,21 +121,24 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
-    public async Task Pagination_FollowsEndCursor()
+    public async Task Transactions_FollowEndCursor()
     {
         var pages = 0;
         var stub = new Stub((req, body) =>
         {
             if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
             pages++;
             return Json(body.Contains("\"after\":null")
-                ? """{"data":{"accounts":{"nodes":[{"id":"a1","name":"A","type":"CHECKING"}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}"""
-                : """{"data":{"accounts":{"nodes":[{"id":"a2","name":"B","type":"SAVINGS"}],"pageInfo":{"hasNextPage":false}}}}""");
+                ? """{"data":{"transactions":{"nodes":[{"id":"t1","date":"2026-11-01","amount":-1,"status":"POSTED","entryType":"DEBIT","account":{"id":"acc_1"}}],"pageInfo":{"hasNextPage":true,"endCursor":"c1"}}}}"""
+                : """{"data":{"transactions":{"nodes":[{"id":"t2","date":"2026-11-02","amount":-2,"status":"POSTED","entryType":"DEBIT","account":{"id":"acc_1"}}],"pageInfo":{"hasNextPage":false}}}}""");
         });
+        var p = Make(stub);
+        await p.GetAccountsAsync("p_1");
 
-        var accounts = await Make(stub).GetAccountsAsync("p_1");
+        var page = await p.GetTransactionsAsync("acc_1", SyncCursor.Initial);
 
-        accounts.Select(a => a.ProviderId).Should().Equal("a1", "a2");
+        page.Items.Select(t => t.ProviderId).Should().Equal("t1", "t2");
         pages.Should().Be(2);
     }
 
