@@ -60,6 +60,35 @@ Other settings: `Backup__Enabled` (default true), `Backup__CronExpression` (defa
 `Backup__Directory`, `Backup__KeepLocalSnapshots` (default 30; pruning happens only after a confirmed off-site copy and never
 touches `premigrate-*` snapshots or the raw archive), `Backup__DrillAfterBackup` (default true).
 
+## Docker Compose (`--profile full`)
+
+The compose stack gives the api and worker a persistent **`backups_data`** volume mounted at `/data/backups`, and sets
+`Backup__Directory=/data/backups`, so `backup-*` and `premigrate-*` folders survive container recreation (the raw archive
+lives on `objects_data` at `/data/objects`). The api and worker images ship the `restic` binary (a static build copied from
+the official `restic/restic` image), so no host install is needed.
+
+To enable the off-site copy, set these in `.env` (all optional; empty means "no off-site backup configured"):
+
+```
+Backup__Restic__Repository=b2:YOUR-BUCKET:flowledger
+RESTIC_PASSWORD=<repository password>
+B2_ACCOUNT_ID=<key id>
+B2_ACCOUNT_KEY=<application key>
+```
+
+`RESTIC_PASSWORD` is read by restic directly from the environment (the `Backup__Restic__PasswordFile` setting also works if you
+mount a file yourself). Check the binary and the repository from inside the worker:
+
+```
+docker compose --profile full exec worker restic version
+docker compose --profile full exec -e RESTIC_REPOSITORY=... worker restic snapshots
+```
+
+Caveats: the chiseled runtime images have no shell, so `exec ... sh` is not available; `exec <binary>` as above works. The app
+does not yet refuse to run in Production with a backup directory that is not on a mounted volume, so if you override
+`Backup__Directory` away from `/data/backups`, keep it on a volume. Back up the `backups_data` volume itself only via the
+off-site copy; do not treat a same-host volume as your only copy.
+
 ## Migrations
 
 * Aspire/dev: a verified `premigrate-*` snapshot is taken automatically before any pending migration is applied to a database that has data; startup aborts if it fails.

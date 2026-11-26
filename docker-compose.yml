@@ -35,6 +35,17 @@ x-db-env: &db-env
   ConnectionStrings__flowledger: >-
     Host=postgres;Port=5432;Database=flowledger;Username=flowledger;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (openssl rand -hex 32)}
 
+x-backup-env: &backup-env
+  # Backups and pre-migration snapshots must land on the persistent backups_data volume (/data/backups),
+  # never on ephemeral container storage. restic ships in the api and worker images.
+  Backup__Directory: /data/backups
+  # Off-site copy (restic -> B2/S3/sftp/folder). Leave Backup__Restic__Repository empty to disable; see
+  # docs/self-hosting/backups-and-recovery.md. restic reads RESTIC_PASSWORD and B2_* from the environment.
+  Backup__Restic__Repository: ${Backup__Restic__Repository:-}
+  RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+  B2_ACCOUNT_ID: ${B2_ACCOUNT_ID:-}
+  B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY:-}
+
 x-redis-env: &redis-env
   ConnectionStrings__redis: "redis:6379"
 
@@ -93,7 +104,7 @@ services:
       # Loopback only: the API key is the only gate in front of every tenant's data.
       - "127.0.0.1:5001:8080"
     environment:
-      <<: [*app-common-env, *db-env, *redis-env]
+      <<: [*app-common-env, *db-env, *redis-env, *backup-env]
       # Required; the API refuses to start outside Development with a missing or dev-default key.
       Api__Key: ${API__KEY:?Set API__KEY in .env (openssl rand -hex 32)}
       Api__TenantId: "00000000-0000-0000-0000-000000000001"
@@ -103,6 +114,7 @@ services:
     # Raw provider payload archive — MUST be a persistent volume (see ADR 0007).
     volumes:
       - objects_data:/data/objects
+      - backups_data:/data/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -181,9 +193,10 @@ services:
       dockerfile: src/FlowLedger.Worker/Dockerfile
     restart: unless-stopped
     environment:
-      <<: [*app-common-env, *db-env, *redis-env]
+      <<: [*app-common-env, *db-env, *redis-env, *backup-env]
     volumes:
       - objects_data:/data/objects
+      - backups_data:/data/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -200,3 +213,4 @@ volumes:
   postgres_data:
   redis_data:
   objects_data:
+  backups_data:

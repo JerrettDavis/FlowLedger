@@ -23,6 +23,7 @@ COPY src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractio
 COPY src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj                 src/FlowLedger.Integrations.Mx/
 COPY src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj   src/FlowLedger.Integrations.Simulated/
 COPY src/FlowLedger.Integrations.SimpleFin/FlowLedger.Integrations.SimpleFin.csproj   src/FlowLedger.Integrations.SimpleFin/
+COPY src/FlowLedger.Integrations.Quiltt/FlowLedger.Integrations.Quiltt.csproj         src/FlowLedger.Integrations.Quiltt/
 
 RUN dotnet restore src/FlowLedger.Api/FlowLedger.Api.csproj
 
@@ -42,10 +43,20 @@ RUN dotnet publish src/FlowLedger.Api/FlowLedger.Api.csproj \
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds curl + a minimal shell so Docker healthchecks work
 # while keeping the image hardened (non-root, distroless-like).
+
+# restic (static Go binary) is copied in for "Back up now" off-site copies; the same stage pre-creates
+# the data directories owned by the image's non-root user (APP_UID 1654 in the .NET 8+ images) so
+# named volumes mounted there come up writable.
+FROM restic/restic:0.18.0 AS data-dirs
+RUN mkdir -p /data/objects /data/backups && chown 1654:1654 /data/objects /data/backups
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76 AS runtime
 WORKDIR /app
 
-# chiseled images run as non-root (uid=65532) by default
+COPY --from=data-dirs /usr/bin/restic /usr/local/bin/restic
+COPY --from=data-dirs --chown=1654:1654 /data /data
+
+# chiseled images run as non-root (APP_UID=1654) by default
 COPY --from=publish /app/publish .
 
 # ASP.NET chiseled images listen on 8080 (HTTP) by default; TLS is terminated
