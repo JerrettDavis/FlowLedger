@@ -10,7 +10,8 @@ public sealed class AssetOperationException(string message) : Exception(message)
 
 internal static class AssetClock
 {
-    public static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    /// <summary>Today (UTC) from the injected <see cref="TimeProvider"/>; the system clock only when none was supplied.</summary>
+    public static DateOnly Today(TimeProvider? clock) => DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime);
 }
 
 internal static class AssetMapper
@@ -110,37 +111,37 @@ internal static class AssetMapper
     }
 }
 
-public sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider? clock = null)
 {
     public async Task<IReadOnlyList<AssetDto>> HandleAsync(CancellationToken ct = default)
     {
         var map = await AssetMapper.AccountsByIdAsync(accounts, ct);
-        var today = AssetClock.Today;
+        var today = AssetClock.Today(clock);
         return (await assets.ListAsync(ct)).Select(a => AssetMapper.ToDto(a, today, map, withHistory: false)).ToList();
     }
 }
 
-public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings)
+public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider? clock = null)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, CancellationToken ct = default)
     {
         var asset = await assets.GetByIdAsync(AssetId.From(id), ct);
         return asset is null
             ? null
-            : AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
+            : AssetMapper.ToDto(asset, AssetClock.Today(clock), await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
     }
 }
 
-public sealed class CreateAssetHandler(IAssetRepository assets, IAccountRepository accounts, ITenantContext tenant)
+public sealed class CreateAssetHandler(IAssetRepository assets, IAccountRepository accounts, ITenantContext tenant, TimeProvider? clock = null)
 {
     public async Task<AssetDto> HandleAsync(CreateAssetRequest r, CancellationToken ct = default)
     {
         var currency = new Currency(r.Currency);
         var linked = await AssetMapper.ResolveLinkAsync(accounts, r.LinkedAccountId, ct);
         var category = Enum.Parse<AssetCategory>(r.Category, ignoreCase: true);
-        var valuedOn = r.ValuedOn ?? AssetClock.Today;
+        var valuedOn = r.ValuedOn ?? AssetClock.Today(clock);
 
-        var asset = Asset.Create(TenantId.From(tenant.TenantId), r.Name, category, new Money(r.CurrentValue, currency), valuedOn);
+        var asset = Asset.Create(TenantId.From(tenant.TenantId), r.Name, category, new Money(r.CurrentValue, currency), valuedOn, time: clock);
         asset.UpdateDetails(r.Name, category, r.Manufacturer, r.Model, r.SerialNumber, r.Notes, r.PurchaseDate,
             r.PurchasePrice is { } p ? new Money(p, currency) : null, r.Attributes);
         asset.SetValuationModel(AssetMapper.ParseMethod(r.ValuationMethod), r.AnnualRate ?? 0m, r.SalvageValue, r.UsefulLifeYears);
@@ -151,11 +152,11 @@ public sealed class CreateAssetHandler(IAssetRepository assets, IAccountReposito
         await assets.SaveChangesAsync(ct);
 
         var map = await AssetMapper.AccountsByIdAsync(accounts, ct);
-        return AssetMapper.ToDto(asset, AssetClock.Today, map, withHistory: true);
+        return AssetMapper.ToDto(asset, AssetClock.Today(clock), map, withHistory: true);
     }
 }
 
-public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider? clock = null)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, UpdateAssetRequest r, CancellationToken ct = default)
     {
@@ -176,12 +177,12 @@ public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountReposito
         await AssetMapper.SyncManualAccountsAsync(assets, accounts, [previousLink, asset.LinkedAccountId], asset, ct);
 
         await assets.SaveChangesAsync(ct);
-        return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
+        return AssetMapper.ToDto(asset, AssetClock.Today(clock), await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true);
     }
 }
 
 /// <summary>Records a new valuation (e.g. an appraisal) and keeps a linked ManualAsset account in step.</summary>
-public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings)
+public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider? clock = null)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, RecordValuationRequest r, CancellationToken ct = default)
     {
@@ -192,12 +193,12 @@ public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccoun
         }
 
         asset.RecordValuation(
-            new Money(r.Amount, asset.CurrentValue.Currency), r.AsOf ?? AssetClock.Today,
-            string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note, settings.BlendWindowDays);
+            new Money(r.Amount, asset.CurrentValue.Currency), r.AsOf ?? AssetClock.Today(clock),
+            string.IsNullOrWhiteSpace(r.Source) ? AssetValuationSources.Manual : r.Source, r.Note, settings.BlendWindowDays, clock);
         await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
 
         await assets.SaveChangesAsync(ct);
-        return AssetMapper.ToDto(asset, AssetClock.Today, await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
+        return AssetMapper.ToDto(asset, AssetClock.Today(clock), await AssetMapper.AccountsByIdAsync(accounts, ct), withHistory: true, spreadWindowDays: settings.BlendWindowDays);
     }
 }
 
@@ -219,11 +220,11 @@ public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepo
 }
 
 /// <summary>Dashboard overview: holdings totals, gain/loss, equity, category breakdown and net worth.</summary>
-public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepository accounts)
+public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider? clock = null)
 {
     public async Task<AssetSummaryDto> HandleAsync(CancellationToken ct = default)
     {
-        var today = AssetClock.Today;
+        var today = AssetClock.Today(clock);
         var accountList = await accounts.ListAsync(ct);
         var map = accountList.ToDictionary(a => a.Id);
         var domainAssets = await assets.ListAsync(ct);
@@ -258,7 +259,8 @@ public sealed class RefreshAssetValuationHandler(
     IAssetRepository assets,
     IAccountRepository accounts,
     IEnumerable<IAssetValuationFeed> feeds,
-    AssetValuationSettings settings)
+    AssetValuationSettings settings,
+    TimeProvider? clock = null)
 {
     public async Task<AssetRefreshResultDto?> HandleAsync(Guid id, string? feedName, CancellationToken ct = default)
     {
@@ -269,7 +271,7 @@ public sealed class RefreshAssetValuationHandler(
         }
 
         var feed = ResolveFeed(feedName);
-        var today = AssetClock.Today;
+        var today = AssetClock.Today(clock);
         var quote = await feed.GetQuoteAsync(asset, today, ct);
         var map = await AssetMapper.AccountsByIdAsync(accounts, ct);
         if (quote is null)
@@ -278,7 +280,7 @@ public sealed class RefreshAssetValuationHandler(
                 AssetMapper.ToDto(asset, today, map, withHistory: true, spreadWindowDays: settings.BlendWindowDays));
         }
 
-        asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note, settings.BlendWindowDays);
+        asset.RecordValuation(new Money(quote.Amount, asset.CurrentValue.Currency), quote.AsOf, feed.Name, quote.Note, settings.BlendWindowDays, clock);
         await AssetMapper.SyncManualAccountsAsync(assets, accounts, [asset.LinkedAccountId], asset, ct);
         await assets.SaveChangesAsync(ct);
         map = await AssetMapper.AccountsByIdAsync(accounts, ct);

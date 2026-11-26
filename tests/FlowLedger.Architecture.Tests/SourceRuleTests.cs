@@ -74,16 +74,8 @@ public sealed class SourceRuleTests
 
     // ── 3. Time comes from a TimeProvider, not the wall clock (ratchet) ──────
 
-    /// <summary>Files that still read the wall clock directly. Remove an entry when the file is fixed (#127).</summary>
-    private static readonly HashSet<string> WallClockAllowlist =
-    [
-        "src/FlowLedger.Domain/Aggregates/Transaction.cs",
-        "src/FlowLedger.Domain/Aggregates/Account.cs",
-        "src/FlowLedger.Domain/Aggregates/RecurringFlow.cs",
-        "src/FlowLedger.Domain/Aggregates/Asset.cs",
-        "src/FlowLedger.Domain/Events/DomainEvents.cs",
-        "src/FlowLedger.Application/Features/Assets/AssetHandlers.cs",
-    ];
+    /// <summary>Files that still read the wall clock directly. Empty since #127: Domain and Application take time from a TimeProvider.</summary>
+    private static readonly HashSet<string> WallClockAllowlist = [];
 
     private static readonly Regex WallClock = new(@"DateTime(Offset)?\.(UtcNow|Now|Today)\b", RegexOptions.Compiled);
 

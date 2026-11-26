@@ -119,7 +119,8 @@ public sealed class Transaction : AggregateRoot
         DateOnly effectiveDate,
         DateOnly? postedDate,
         TransactionSource source,
-        TransactionFingerprint? fingerprint = null)
+        TransactionFingerprint? fingerprint = null,
+        TimeProvider? time = null)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -133,9 +134,9 @@ public sealed class Transaction : AggregateRoot
         var tx = new Transaction(
             TransactionId.New(), tenantId, accountId, amount, direction,
             description.Trim(), status, source, effectiveDate, postedDate,
-            fingerprint, DateTimeOffset.UtcNow);
+            fingerprint, Now(time));
 
-        tx.RaiseEvent(new TransactionImported(tx.TransactionId, tx.TenantId, tx.AccountId, amount, direction, source));
+        tx.RaiseEvent(new TransactionImported(tx.TransactionId, tx.TenantId, tx.AccountId, amount, direction, source), tx.CreatedAt);
         return tx;
     }
 
@@ -146,7 +147,8 @@ public sealed class Transaction : AggregateRoot
         Money amount,
         TransactionDirection direction,
         string description,
-        DateOnly plannedDate)
+        DateOnly plannedDate,
+        TimeProvider? time = null)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -158,7 +160,7 @@ public sealed class Transaction : AggregateRoot
         return new Transaction(
             TransactionId.New(), tenantId, accountId, amount, direction,
             description.Trim(), TransactionStatus.Planned, TransactionSource.RecurringPlan,
-            plannedDate, null, null, DateTimeOffset.UtcNow);
+            plannedDate, null, null, Now(time));
     }
 
     // ── Behaviour ────────────────────────────────────────────────────────────

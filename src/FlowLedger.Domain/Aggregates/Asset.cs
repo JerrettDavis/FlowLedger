@@ -74,7 +74,8 @@ public sealed class Asset : AggregateRoot
         AssetCategory category,
         Money currentValue,
         DateOnly valuedOn,
-        string source = AssetValuationSources.Manual)
+        string source = AssetValuationSources.Manual,
+        TimeProvider? time = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -83,9 +84,10 @@ public sealed class Asset : AggregateRoot
 
         GuardNotNegative(currentValue, "current value");
 
-        var asset = new Asset(tenantId, name.Trim(), category, currentValue, valuedOn, DateTimeOffset.UtcNow);
-        asset._valuations.Add(AssetValuation.Create(currentValue.Amount, valuedOn, source, "Initial value"));
-        asset.RaiseEvent(new AssetAdded(asset.AssetId, tenantId, category));
+        var now = Now(time);
+        var asset = new Asset(tenantId, name.Trim(), category, currentValue, valuedOn, now);
+        asset._valuations.Add(AssetValuation.Create(currentValue.Amount, valuedOn, source, "Initial value", now));
+        asset.RaiseEvent(new AssetAdded(asset.AssetId, tenantId, category), now);
         return asset;
     }
 
@@ -161,7 +163,7 @@ public sealed class Asset : AggregateRoot
     /// When greater than zero, competing valuations (different sources) dated within this many days of the
     /// newest valuation are averaged into <see cref="CurrentValue"/> instead of the latest one winning.
     /// </param>
-    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, string? note = null, int blendWindowDays = 0)
+    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, string? note = null, int blendWindowDays = 0, TimeProvider? time = null)
     {
         if (value.Currency != CurrentValue.Currency)
         {
@@ -170,7 +172,8 @@ public sealed class Asset : AggregateRoot
 
         GuardNotNegative(value, "valuation");
 
-        var valuation = AssetValuation.Create(value.Amount, asOf, source, note);
+        var now = Now(time);
+        var valuation = AssetValuation.Create(value.Amount, asOf, source, note, now);
         _valuations.Add(valuation);
 
         if (asOf >= ValuedOn)
@@ -179,7 +182,7 @@ public sealed class Asset : AggregateRoot
             var blended = blendWindowDays > 0 ? BlendedValue(asOf, blendWindowDays, value.Currency) : value;
             CurrentValue = blended;
             ValuedOn = asOf;
-            RaiseEvent(new AssetRevalued(AssetId, TenantId, previous, blended));
+            RaiseEvent(new AssetRevalued(AssetId, TenantId, previous, blended), now);
         }
 
         return valuation;
@@ -294,14 +297,14 @@ public sealed class AssetValuation
 
     private AssetValuation() { }
 
-    internal static AssetValuation Create(decimal amount, DateOnly asOf, string source, string? note) => new()
+    internal static AssetValuation Create(decimal amount, DateOnly asOf, string source, string? note, DateTimeOffset recordedAt) => new()
     {
         Id = Guid.NewGuid(),
         Amount = amount,
         AsOf = asOf,
         Source = string.IsNullOrWhiteSpace(source) ? AssetValuationSources.Manual : source.Trim(),
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
-        RecordedAt = DateTimeOffset.UtcNow,
+        RecordedAt = recordedAt,
     };
 }
 

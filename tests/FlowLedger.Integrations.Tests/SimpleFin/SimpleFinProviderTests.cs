@@ -117,7 +117,7 @@ public sealed class SimpleFinProviderTests
     [Fact]
     public async Task An_account_with_only_pending_rows_advances_its_cursor_instead_of_rereading_the_window()
     {
-        var pendingDay = DateTimeOffset.UtcNow.AddDays(-3);
+        var pendingDay = TimeProvider.System.GetUtcNow().AddDays(-3);
         var json = $$"""
         { "errors": [], "accounts": [
           { "org": { "id": "arvest", "name": "Arvest Bank" }, "id": "chk1", "name": "Checking", "currency": "USD", "balance": "10",
