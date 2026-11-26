@@ -50,6 +50,23 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
+    /// <summary>
+    /// Persists a real account for the tenant and returns its id. Composite tenant foreign keys (#146) mean transactions, flows,
+    /// snapshots, links and rates can only reference an account that exists in the same tenant.
+    /// </summary>
+    public async Task<FlowLedger.Domain.ValueObjects.AccountId> SeedAccountAsync(TestTenantContext tenant, string name = "Seeded account")
+    {
+        await using var ctx = CreateDbContext(tenant);
+        var account = FlowLedger.Domain.Aggregates.Account.Create(
+            FlowLedger.Domain.ValueObjects.TenantId.From(tenant.TenantId),
+            name,
+            FlowLedger.Domain.Aggregates.AccountType.Checking,
+            new FlowLedger.Domain.ValueObjects.Money(0m, FlowLedger.Domain.ValueObjects.Currency.Usd));
+        ctx.Accounts.Add(account);
+        await ctx.SaveChangesAsync();
+        return account.AccountId;
+    }
+
     /// <summary>Resets all data between tests. Call at the start of each test.</summary>
     public async Task ResetAsync()
     {
