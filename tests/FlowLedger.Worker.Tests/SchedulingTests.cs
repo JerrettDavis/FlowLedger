@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.TestSupport;
 using FlowLedger.Worker.Jobs;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;
@@ -75,7 +76,7 @@ public sealed class SchedulingTests
 
         var history = new JobRunHistory();
         var recorder = new JobRunRecorder(history, NullLogger<JobRunRecorder>.Instance);
-        var t0 = DateTimeOffset.UtcNow;
+        var t0 = TestClock.Instant;
 
         recorder.Finished("sched-test-job", t0, t0.AddSeconds(2), new JobExecutionException("boom"));
         recorder.Finished("sched-test-job", t0, t0.AddSeconds(1), null);

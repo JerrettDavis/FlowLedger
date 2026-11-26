@@ -1,6 +1,7 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -120,7 +121,7 @@ public sealed class ScheduledSyncJobRetryTests
         public JobDataMap MergedJobDataMap => new();
         public IJobDetail JobDetail => throw new NotImplementedException();
         public IJob JobInstance => throw new NotImplementedException();
-        public DateTimeOffset FireTimeUtc => DateTimeOffset.UtcNow;
+        public DateTimeOffset FireTimeUtc => TestClock.Instant;
         public DateTimeOffset? ScheduledFireTimeUtc => null;
         public DateTimeOffset? PreviousFireTimeUtc => null;
         public DateTimeOffset? NextFireTimeUtc => null;

@@ -40,4 +40,4 @@ MX stubs still live inline in `Mx/MxWireMockFixture.cs`; moving them here is fol
 
 Tests tagged `[LiveFact("<ENV_VAR>")]` run only when the named environment variable is set (otherwise they report
 as skipped with the reason), instead of a hard-coded `Skip`. A scheduled workflow that sets the secrets weekly and
-opens an issue on failure is still to be added (workflow files are outside the scope of the commit that introduced these).
+opens an issue on failure is `.github/workflows/live-providers.yml` (unverified until its first run, needs the MX and Quiltt secrets).
