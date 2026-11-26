@@ -22,6 +22,7 @@ builder.Services.AddFlowLedgerDataProtection(builder.Configuration, builder.Envi
 var oidc = builder.AddFlowLedgerAuth();
 AuthSetup.EnsureSignInConfigured(oidc, builder.Environment, builder.Configuration); // refuse to run open outside Development
 builder.Services.AddSingleton(oidc);
+AuthSetup.ConfigureDataProtection(builder.Services, oidc, builder.Environment, builder.Configuration);
 
 // ── Razor + Blazor ──────────────────────────────────────────────────────────
 builder.Services.AddRazorComponents()

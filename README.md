@@ -41,6 +41,8 @@ FlowLedger combines four traditionally separate tools into one system:
 
 [AGPL-3.0-only](./LICENSE) — free and open source. The self-hosted version is first-class, not a crippled community edition.
 
+AGPL section 13 note for operators: if you modify FlowLedger and let users interact with it over a network, you must offer those users the corresponding source of your modified version. Running unmodified releases carries no extra obligation. Third-party licences are listed in [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
+
 ## Tech stack
 
 | Layer | Technology |
@@ -49,7 +51,7 @@ FlowLedger combines four traditionally separate tools into one system:
 | Orchestration | .NET Aspire 13.4 |
 | Frontend | Blazor Web App (interactive auto), MudBlazor 9 |
 | API | ASP.NET Core Minimal APIs, vertical slices |
-| Database | PostgreSQL (EF Core 10 + Npgsql) |
+| Database | PostgreSQL 15+ only (EF Core 10 + Npgsql); no SQLite or other engines |
 | Cache / locks | Redis |
 | Scheduler | Quartz.NET |
 | Identity / Auth | External OIDC provider for the Web UI sign-in (see [multi-user-auth](docs/self-hosting/multi-user-auth.md)); API key between services. OpenIddict is not used (ADR 0001) |
@@ -171,6 +173,16 @@ Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping
 - Backups and recovery: [docs/self-hosting/backups-and-recovery.md](docs/self-hosting/backups-and-recovery.md)
 - Runbooks (incident, key rotation, restore, provider outage, SLO notes): [docs/runbooks/](docs/runbooks/incident-response.md)
 - Architecture decisions: [docs/adr/](docs/adr/README.md)
+- Upgrading and rolling back: [docs/self-hosting/upgrading.md](docs/self-hosting/upgrading.md)
+- Service objectives and capacity: [docs/self-hosting/slo-and-capacity.md](docs/self-hosting/slo-and-capacity.md)
+- Observability and sample alerts: [docs/self-hosting/observability.md](docs/self-hosting/observability.md)
+
+## Security & privacy
+
+- [Threat model](docs/security/threat-model.md) and [SECURITY.md](./SECURITY.md)
+- [Data inventory, retention and subprocessors](docs/privacy/data-inventory-and-retention.md)
+- Runbooks: [incident response](docs/runbooks/incident-response.md), [key rotation](docs/runbooks/key-rotation.md), [restore](docs/runbooks/restore.md), [provider outage](docs/runbooks/provider-outage.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 

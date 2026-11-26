@@ -100,6 +100,17 @@ jobs:
           exit-code:         "0"   # Report but don't fail the build (informational)
           ignore-unfixed:    true
 
+      # Release gate: a tagged build fails on any FIXABLE critical vulnerability.
+      - name: Trivy release gate (fixable CRITICAL)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
+          format:            table
+          severity:          CRITICAL
+          exit-code:         "1"
+          ignore-unfixed:    true
+
       - name: Upload Trivy scan results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -221,6 +232,22 @@ jobs:
             echo "ERROR: Expected 200, got $HTTP_STATUS"
             exit 1
           fi
+
+      # Executes the documented backup -> restore -> row-count compare procedure (docs/self-hosting/backups-and-recovery.md).
+      - name: DR drill - backup, restore into scratch DB, compare row counts
+        env:
+          OUT_DIR: ${{ runner.temp }}/flowledger-backups
+          OBJECTS_DIR: ${{ runner.temp }}/no-objects
+        run: |
+          out=$(./eng/scripts/backup.sh)
+          echo "$out"
+          dir=$(echo "$out" | sed -n 's/^Backup OK -> //p')
+          restored=$(./eng/scripts/restore.sh "$dir")
+          echo "$restored"
+          live=$(docker compose exec -T postgres psql -U flowledger -d flowledger -tA -c "SELECT count(*) FROM transactions;" | tr -d '[:space:]')
+          back=$(echo "$restored" | awk '$1=="transactions"{print $2}')
+          echo "live=$live restored=$back"
+          [ "$live" = "$back" ] || { echo "::error::Row count mismatch after restore"; exit 1; }
 
       - name: Show compose logs on failure
         if: failure()

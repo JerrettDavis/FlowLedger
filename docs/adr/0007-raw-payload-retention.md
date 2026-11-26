@@ -22,6 +22,13 @@ after a mapping bug — is unacceptable.
 5. The archive directory is pinned to a persistent path (AppHost: `~/.flowledger/objects`; compose:
    `objects_data` volume) and `eng/scripts/backup.ps1` backs up DB + archive together.
 
+## Amendment: deletion exception (tenant offboarding)
+"Keep everything" applies to routine operation. When a tenant is offboarded or a data-subject deletion is
+requested, the tenant's archive objects and rows MUST be removable by an explicit operator action; the
+procedure and the current implementation gap are documented in
+`docs/privacy/data-inventory-and-retention.md`. Backups age out under the restic retention window, or are
+crypto-shredded by destroying the repository password.
+
 ## Consequences
 - Disk grows without bound; acceptable for a personal-scale deployment. Secrets/PII live in the
   archive: protect the directory like the database.

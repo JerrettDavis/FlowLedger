@@ -9,10 +9,14 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <RootNamespace>$(MSBuildProjectName.Replace('-', '_'))</RootNamespace>
-    <!-- Reproducible builds; SourceLink ships with the .NET SDK. -->
-    <Deterministic>true</Deterministic>
+    <Authors>FlowLedger contributors</Authors>
+    <Copyright>Copyright (c) FlowLedger contributors</Copyright>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/JerrettDavis/FlowLedger</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true' Or '$(CI)' == 'true'">

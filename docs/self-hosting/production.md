@@ -252,3 +252,15 @@ If a proxy terminates TLS in front of the Web app (or the API), set `ForwardedHe
 ## Many tenants
 
 Scheduled jobs visit tenants one at a time by default. With more than a handful of users set `Worker__MaxParallelTenants` (1-16, e.g. 4) on the worker to sync several tenants concurrently; keep it small so provider rate limits and the database connection pool hold.
+
+## Session key ring (Data Protection)
+
+The Web app persists its ASP.NET Data Protection key ring at `DataProtection__KeyPath` (compose mounts the
+`web_keys` volume at `/keys`). With OIDC enabled outside Development the Web app refuses to start without it.
+Include the volume in your backups; losing it only signs users out. See [key rotation](../runbooks/key-rotation.md).
+
+## Single worker replica
+
+Run exactly one Worker. Quartz uses the in-memory store, so a second replica would double-run scheduled
+backup and alert jobs (per-tenant sync is protected by an advisory lock). Migrations are serialized by an
+advisory lock, so concurrent API/Worker starts are safe.

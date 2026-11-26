@@ -5,12 +5,13 @@
 | Version | Supported |
 |---|---|
 | main | Yes |
+| tagged releases | Latest release only (once releases are cut; see CHANGELOG.md) |
 
 ## Reporting a vulnerability
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Report privately by emailing the maintainers (contact in the repository profile) or using GitHub's private vulnerability reporting feature.
+Report privately through GitHub's private vulnerability reporting: <https://github.com/JerrettDavis/FlowLedger/security/advisories/new>. If you cannot use it, open a minimal public issue asking for a private contact channel (without any details of the vulnerability).
 
 Include:
 

@@ -31,6 +31,31 @@ public sealed class PostgresAdvisoryLock : IAsyncDisposable
         return unchecked((long)hash);
     }
 
+    /// <summary>
+    /// Waits (polling) until the named lock is free, e.g. so concurrent starters run migrations one at a time.
+    /// </summary>
+    /// <exception cref="TimeoutException">The lock was not obtained within <paramref name="timeout"/>.</exception>
+    public static async Task<PostgresAdvisoryLock> AcquireAsync(
+        string connectionString, string name, TimeSpan timeout, CancellationToken ct = default)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (true)
+        {
+            var handle = await TryAcquireAsync(connectionString, name, ct);
+            if (handle is not null)
+            {
+                return handle;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"Timed out after {timeout} waiting for advisory lock '{name}'.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+        }
+    }
+
     /// <returns>A handle holding the lock, or null when another session already holds it.</returns>
     public static async Task<PostgresAdvisoryLock?> TryAcquireAsync(string connectionString, string name, CancellationToken ct = default)
     {
