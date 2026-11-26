@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="FlowLedger.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Contracts\FlowLedger.Contracts.csproj" />
     <ProjectReference Include="..\FlowLedger.Web.Client\FlowLedger.Web.Client.csproj" />
     <ProjectReference Include="..\FlowLedger.ServiceDefaults\FlowLedger.ServiceDefaults.csproj" />
   </ItemGroup>

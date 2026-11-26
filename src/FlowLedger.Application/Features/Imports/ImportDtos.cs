@@ -30,21 +30,6 @@ public sealed record ImportTransactionsCommand(
 
 // ── Import result ─────────────────────────────────────────────────────────────
 
-/// <summary>Summary returned after a CSV import operation.</summary>
-public sealed record ImportSummaryDto(
-    Guid ImportBatchId,
-    int ImportedCount,
-    int DuplicateCount,
-    int FailedRowCount,
-    int MatchedToPlanCount,
-    IReadOnlyList<RowErrorDto> RowErrors);
-
-/// <summary>Details about a row that failed to parse or validate.</summary>
-public sealed record RowErrorDto(
-    int RowNumber,
-    string RawLine,
-    string Error);
-
 // ── Match command ─────────────────────────────────────────────────────────────
 
 /// <summary>Manually match an actual transaction to a planned occurrence.</summary>

@@ -212,7 +212,7 @@
     /// <summary>Weekly, every-other-week and twice-monthly bills (or any row with several dates this month) pay more than once a month.</summary>
     private bool IsMultiPayment(SheetRowDto row) => row.Frequency != "Monthly" || SlotCount(row) > 1;
 
-    private IEnumerable<SheetRowDto> Sorted(List<SheetRowDto> rows)
+    private IEnumerable<SheetRowDto> Sorted(IReadOnlyList<SheetRowDto> rows)
     {
         if (_sortKey is null) return rows;
 

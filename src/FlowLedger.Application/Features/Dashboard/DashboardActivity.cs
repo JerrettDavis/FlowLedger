@@ -5,27 +5,12 @@ using FlowLedger.Application.Features.Transactions;
 
 namespace FlowLedger.Application.Features.Dashboard;
 
-/// <summary>A transaction surfaced for attention, with human-readable reasons.</summary>
-public sealed record FlaggedTransactionDto(TransactionDto Transaction, IReadOnlyList<string> Reasons);
-
 /// <summary>Per-tenant record of flagged transactions the user reviewed and dismissed, each with an optional note.</summary>
 public interface ISuspiciousDismissalStore
 {
     Task<IReadOnlySet<Guid>> ListIdsAsync(CancellationToken ct = default);
     Task DismissAsync(Guid transactionId, string? note, CancellationToken ct = default);
 }
-
-/// <summary>At-a-glance activity feed across all accounts.</summary>
-public sealed record DashboardActivityDto(
-    IReadOnlyList<TransactionDto> RecentPosted,
-    IReadOnlyList<TransactionDto> Pending,
-    decimal PendingNetAmount,
-    IReadOnlyList<TransactionDto> Large,
-    decimal LargeThreshold,
-    IReadOnlyList<FlaggedTransactionDto> Suspicious,
-    decimal MoneyInLast30Days,
-    decimal MoneyOutLast30Days,
-    int TransfersExcluded = 0);
 
 /// <summary>
 /// Pure heuristics that turn raw transactions into dashboard insights. No I/O so it is trivially testable.

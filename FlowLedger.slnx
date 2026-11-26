@@ -3,6 +3,7 @@
     <Project Path="src/FlowLedger.Api/FlowLedger.Api.csproj" />
     <Project Path="src/FlowLedger.AppHost/FlowLedger.AppHost.csproj" />
     <Project Path="src/FlowLedger.Application/FlowLedger.Application.csproj" />
+    <Project Path="src/FlowLedger.Contracts/FlowLedger.Contracts.csproj" />
     <Project Path="src/FlowLedger.Domain/FlowLedger.Domain.csproj" />
     <Project Path="src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj" />
     <Project Path="src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractions.csproj" />
