@@ -99,7 +99,7 @@ public sealed class DatabaseSnapshotService
         var entries = new List<SnapshotTable>();
         foreach (var table in tables)
         {
-            var file = Path.Combine(dir, table + ".csv");
+            var file = CsvPath(dir, table);
             await using (var export = await conn.BeginTextExportAsync(
                 $"COPY ({selects[table]}) TO STDOUT (FORMAT csv, HEADER true)", ct))
             await using (var fs = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -219,7 +219,7 @@ public sealed class DatabaseSnapshotService
 
         foreach (var t in manifest.Tables)
         {
-            var file = Path.Combine(dir, t.Table + ".csv");
+            var file = CsvPath(dir, t.Table);
             if (!File.Exists(file)) { problems.Add($"{t.Table}.csv is missing"); continue; }
             var (rows, sha, bytes) = await InspectAsync(file, ct);
             if (sha != t.Sha256)
@@ -250,6 +250,24 @@ public sealed class DatabaseSnapshotService
             result[t] = (long)(await cmd.ExecuteScalarAsync(ct))!;
         }
         return result;
+    }
+
+    /// <summary>Resolves <c>{dir}/{table}.csv</c>. Table names come from the database catalog or from a bundle manifest, so they must be plain identifiers and the result must stay inside <paramref name="dir"/>.</summary>
+    private static string CsvPath(string dir, string table)
+    {
+        if (table.Length == 0 || !table.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'))
+        {
+            throw new InvalidDataException("Unexpected table name in snapshot.");
+        }
+
+        var root = Path.GetFullPath(dir);
+        if (!root.EndsWith(Path.DirectorySeparatorChar))
+        {
+            root += Path.DirectorySeparatorChar;
+        }
+
+        var full = Path.GetFullPath(Path.Combine(root, table + ".csv"));
+        return full.StartsWith(root, StringComparison.Ordinal) ? full : throw new InvalidDataException("Unexpected table name in snapshot.");
     }
 
     private static string Quote(string ident) => "\"" + ident.Replace("\"", "\"\"") + "\"";
