@@ -104,9 +104,11 @@ public static class DependencyInjection
         });
 
         // ── Domain event dispatching ────────────────────────────────────────────
-        // DispatchingDomainEventDispatcher resolves all IDomainEventHandler<TEvent>
-        // registrations for each raised event via closed-generic reflection.
-        services.AddScoped<IDomainEventDispatcher, DispatchingDomainEventDispatcher>();
+        // Events are written to the transactional outbox inside SaveChanges (#92) and delivered by OutboxProcessor
+        // (run by the Worker), which resolves every IDomainEventHandler<TEvent> registration. The context no longer dispatches inline.
+        services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
+        services.AddSingleton(configuration.GetSection(OutboxOptions.SectionName).Get<OutboxOptions>() ?? new OutboxOptions());
+        services.AddScoped<OutboxProcessor>();
 
         // Auto-register all IDomainEventHandler<> implementations in this assembly.
         var infrastructureAssembly = typeof(DependencyInjection).Assembly;
