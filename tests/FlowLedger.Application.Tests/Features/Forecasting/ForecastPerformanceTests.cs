@@ -13,6 +13,7 @@ namespace FlowLedger.Application.Tests.Features.Forecasting;
 /// CI tolerance is 1500 ms to avoid flakiness on slow agents.
 /// The test logs actual elapsed time regardless of pass/fail.
 /// </summary>
+[Trait("Category", "Perf")]
 public sealed class ForecastPerformanceTests
 {
     private const int CiToleranceMs = 1500;

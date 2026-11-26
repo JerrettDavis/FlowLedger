@@ -17,6 +17,7 @@ namespace FlowLedger.Infrastructure.Tests.Sync;
 /// Postgres database (via Testcontainers). Tests skip cleanly when Docker is not available.
 /// </summary>
 [Collection("Integration")]
+[Trait("Invariant", "INV-02")]
 public sealed class FinancialSyncServiceTests : IAsyncLifetime
 {
     private readonly IntegrationTestFixture _fixture;

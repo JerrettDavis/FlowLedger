@@ -11,6 +11,7 @@ namespace FlowLedger.Application.Tests.Features.Forecasting;
 /// Deterministic golden tests, reconciliation, overdraft detection, and goal affordability
 /// for <see cref="ForecastEngine"/>.
 /// </summary>
+[Trait("Invariant", "INV-05")]
 public sealed class ForecastEngineTests
 {
     private static readonly AccountId Checking = AccountId.New();
