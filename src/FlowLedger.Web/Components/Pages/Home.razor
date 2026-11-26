@@ -112,12 +112,12 @@ else
             <MudCard Class="fl-card-hover fl-enter fl-enter-3">
                 <MudCardContent>
                     <MudText Typo="Typo.overline" Color="@(_lowWaterMark < 0 ? Color.Error : Color.Warning)">Forecast Low</MudText>
-                    <MudText Typo="Typo.h5" Class="fl-num" Color="@Format.Delta(_lowWaterMark)" aria-label="Forecast low water mark">@Format.Money(_lowWaterMark)</MudText>
+                    <MudText Typo="Typo.h5" Class="fl-num" Color="@(_forecastUnavailable ? Color.Default : Format.Delta(_lowWaterMark))" aria-label="Forecast low water mark">@(_forecastUnavailable ? "Unavailable" : Format.Money(_lowWaterMark))</MudText>
                     <div class="d-flex align-center gap-1 mt-1">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @(_lowWaterMarkDate.HasValue ? $"on {Format.DayMonth(_lowWaterMarkDate.Value)}" : "3-month horizon")
+                            @(_forecastUnavailable ? "Couldn't load the forecast" : _lowWaterMarkDate.HasValue ? $"on {Format.DayMonth(_lowWaterMarkDate.Value)}" : $"{_horizonMonths}-month horizon")
                         </MudText>
-                        @if (_lowWaterMark < 0)
+                        @if (!_forecastUnavailable && _lowWaterMark < 0)
                         {
                             <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">Below zero</MudChip>
                         }
@@ -132,10 +132,10 @@ else
                 <MudCardContent>
                     <MudText Typo="Typo.overline" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)">Overdraft Risk</MudText>
                     <MudText Typo="Typo.h5" Class="fl-num" Color="@(_overdraftCount > 0 ? Color.Error : Color.Success)" aria-label="Overdraft warnings">
-                        @(_overdraftCount > 0 ? $"{_overdraftCount} warning(s)" : "None")
+                        @(_forecastUnavailable ? "Unavailable" : _overdraftCount > 0 ? $"{_overdraftCount} warning(s)" : "None")
                     </MudText>
                     <div class="d-flex align-center gap-1 mt-1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Next 3 months</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(_forecastUnavailable ? "Retry from the projection card" : $"Next {_horizonMonths} months")</MudText>
                         @if (_overdraftCount > 0)
                         {
                             <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Class="pa-0" Style="height:18px;font-size:10px">
@@ -148,6 +148,14 @@ else
         </MudItem>
 
     </MudGrid>
+
+    @if (_insightsUnavailable)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true">
+            Couldn't load spending insights.
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit" OnClick="ReloadInsightsAsync">Retry</MudButton>
+        </MudAlert>
+    }
 
     <div class="fl-masonry">
         <!-- Insights: spending by category -->
@@ -220,7 +228,7 @@ else
                     <MudCardHeader>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">Biggest changes</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last 30 days vs the 30 before (@_insights.PreviousLabel)</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@RangeLabel vs the previous period (@_insights.PreviousLabel)</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
@@ -319,6 +327,16 @@ else
                                     lowWaterMark: _lwmTuple))
                             </div>
                         </ChartFigure>
+                    }
+                    else if (_forecastUnavailable)
+                    {
+                        <EmptyState Icon="@Icons.Material.Outlined.ErrorOutline"
+                                    Title="Couldn't load the forecast"
+                                    Description="The numbers above are unknown, not zero.">
+                            <Action>
+                                <MudButton Variant="Variant.Outlined" OnClick="@(() => OnHorizonChanged(_horizonMonths))">Retry</MudButton>
+                            </Action>
+                        </EmptyState>
                     }
                     else
                     {
@@ -700,6 +718,7 @@ else
         try
         {
             var forecast = await ApiClient.GetForecastAsync(months: _horizonMonths);
+            _forecastUnavailable = forecast is null;
             if (forecast is not null)
             {
                 _forecastPoints = forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList();
@@ -716,6 +735,7 @@ else
         }
         catch (Exception ex)
         {
+            _forecastUnavailable = true;
             Logger.LogWarning(ex, "Failed to reload forecast");
             Snackbar.Add("Couldn't load the forecast", Severity.Error);
         }
@@ -726,10 +746,12 @@ else
         try
         {
             _insights = await ApiClient.GetDashboardInsightsAsync(_rangeFrom, _rangeTo);
+            _insightsUnavailable = _insights is null;
             ApplyInsights();
         }
         catch (Exception ex)
         {
+            _insightsUnavailable = true;
             Logger.LogWarning(ex, "Failed to reload dashboard insights");
             Snackbar.Add("Couldn't load that date range", Severity.Error);
         }
@@ -796,6 +818,8 @@ else
 
     private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
     private FlowLedger.Web.ApiClient.DashboardInsightsDto? _insights;
+    private bool _insightsUnavailable;
+    private bool _forecastUnavailable;
     private List<MudBlazor.ChartSeries<double>> _spendSeries = [];
     private string[] _spendLabels = [];
     private List<MudBlazor.ChartSeries<double>> _flowSeries = [];
@@ -871,12 +895,20 @@ else
             try
             {
                 _insights = await insightsTask;
+                _insightsUnavailable = _insights is null;
                 ApplyInsights();
             }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
+            catch (Exception ex)
+            {
+                _insightsUnavailable = true;
+                Logger.LogWarning(ex, "Failed to load dashboard insights");
+            }
 
-            // Forecast
-            var forecast = await forecastTask;
+            // Forecast is best-effort too: a failure shows "Unavailable" on its cards, never a fake zero.
+            FlowLedger.Web.ApiClient.ForecastResultDto? forecast = null;
+            try { forecast = await forecastTask; }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load forecast"); }
+            _forecastUnavailable = forecast is null;
             if (forecast is not null)
             {
                 _forecastSeries = forecast.AggregateSeries;
