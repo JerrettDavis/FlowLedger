@@ -24,6 +24,10 @@ public sealed class FakeAccountRepository : IAccountRepository
         return Task.CompletedTask;
     }
 
+    public void ExpectVersion(Account account, uint? expectedVersion)
+    {
+    }
+
     public Task SaveChangesAsync(CancellationToken ct = default)
         => Task.CompletedTask;
 }
