@@ -2,9 +2,6 @@ using FlowLedger.Application.Abstractions;
 
 namespace FlowLedger.Application.Features.LocalAi;
 
-/// <summary>One distinct raw merchant string and how often it occurs.</summary>
-public sealed record MerchantOccurrence(string Raw, int Count);
-
 /// <summary>A set of raw merchant strings that very likely name one merchant.</summary>
 public sealed record MerchantGroup(string Canonical, IReadOnlyList<MerchantOccurrence> Members, double MinSimilarity)
 {

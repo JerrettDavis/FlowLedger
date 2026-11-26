@@ -67,6 +67,18 @@ window.FlowLedgerTheme = {
     }
 };
 
+// Display currency/locale preference lives in a cookie so the server can format the very first (prerendered) paint.
+window.FlowLedgerDisplay = {
+    save: function (value) {
+        try {
+            document.cookie = 'fl-display=' + encodeURIComponent(value) + '; path=/; max-age=31536000; samesite=lax';
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+};
+
 // Skip link: move focus to <main> without a server round trip or a base-href navigation.
 document.addEventListener('click', function (e) {
     var link = e.target && e.target.closest && e.target.closest('.fl-skip-link');

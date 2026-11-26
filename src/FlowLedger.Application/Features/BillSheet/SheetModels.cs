@@ -24,17 +24,6 @@ public sealed record SheetBillData(
     DateOnly? AnchorDate = null,
     int? SecondDueDay = null);
 
-/// <summary>How often a sheet row is paid. <see cref="Estimated"/> amounts are per payment, not per month.</summary>
-public static class BillFrequency
-{
-    public const string Monthly = "Monthly";
-    public const string TwiceMonthly = "TwiceMonthly";
-    public const string Weekly = "Weekly";
-    public const string EveryNWeeks = "EveryNWeeks";
-
-    public static bool IsKnown(string? f) => f is Monthly or TwiceMonthly or Weekly or EveryNWeeks;
-}
-
 public enum SheetPaymentSource
 {
     /// <summary>Set by the matcher from a real transaction.</summary>

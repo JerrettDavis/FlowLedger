@@ -106,7 +106,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
                 await seed.SaveChangesAsync();
             }
 
-            async Task<FlowLedger.Application.Abstractions.SyncResult> RunSync()
+            async Task<FlowLedger.Contracts.SyncResult> RunSync()
             {
                 await using var scope = sp.CreateAsyncScope();
                 await using var db = _fixture.CreateDbContext(tenant);
@@ -175,7 +175,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
             await seed.SaveChangesAsync();
         }
 
-        async Task<FlowLedger.Application.Abstractions.SyncResult> RunSync()
+        async Task<FlowLedger.Contracts.SyncResult> RunSync()
         {
             await using var scope = sp.CreateAsyncScope();
             await using var db = _fixture.CreateDbContext(tenant);

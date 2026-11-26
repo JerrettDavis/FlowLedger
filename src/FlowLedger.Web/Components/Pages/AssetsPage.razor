@@ -120,10 +120,10 @@
 @code {
     private bool _loading = true;
     private string? _error;
-    private List<FlowLedger.Web.ApiClient.AssetDto> _assets = [];
-    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
-    private List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> _templates = [];
-    private FlowLedger.Web.ApiClient.AssetSummaryDto? _summary;
+    private List<FlowLedger.Contracts.AssetDto> _assets = [];
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
+    private List<FlowLedger.Contracts.AssetCategoryTemplateDto> _templates = [];
+    private FlowLedger.Contracts.AssetSummaryDto? _summary;
     private string _rangePreset = "Last 12 months";
     private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 12 months").From;
     private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 12 months").To;
@@ -172,7 +172,7 @@
         }
     }
 
-    private static string MethodHint(FlowLedger.Web.ApiClient.AssetDto a) => a.ValuationMethod switch
+    private static string MethodHint(FlowLedger.Contracts.AssetDto a) => a.ValuationMethod switch
     {
         "DecliningBalance" => $"−{a.AnnualRate:P0}/yr",
         "Appreciation" => $"+{a.AnnualRate:P0}/yr",
@@ -180,7 +180,7 @@
         _ => ""
     };
 
-    private DialogParameters<AssetFormDialog> FormParams(FlowLedger.Web.ApiClient.AssetDto? asset) => new()
+    private DialogParameters<AssetFormDialog> FormParams(FlowLedger.Contracts.AssetDto? asset) => new()
     {
         { x => x.Asset, asset },
         { x => x.Accounts, _accounts },
@@ -193,23 +193,23 @@
     {
         var dialog = await DialogService.ShowAsync<AssetFormDialog>("Add Asset", FormParams(null), Wide);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.CreateAssetRequest req })
+        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateAssetRequest req })
         {
             await Run("Asset added", () => ApiClient.CreateAssetAsync(req));
         }
     }
 
-    private async Task OpenEditDialog(FlowLedger.Web.ApiClient.AssetDto asset)
+    private async Task OpenEditDialog(FlowLedger.Contracts.AssetDto asset)
     {
         var dialog = await DialogService.ShowAsync<AssetFormDialog>("Edit Asset", FormParams(asset), Wide);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.UpdateAssetRequest req })
+        if (result is { Canceled: false, Data: FlowLedger.Contracts.UpdateAssetRequest req })
         {
             await Run("Asset updated", () => ApiClient.UpdateAssetAsync(asset.Id, req));
         }
     }
 
-    private async Task OpenDetailDialog(FlowLedger.Web.ApiClient.AssetDto asset)
+    private async Task OpenDetailDialog(FlowLedger.Contracts.AssetDto asset)
     {
         var dialog = await DialogService.ShowAsync<AssetDetailDialog>(asset.Name,
             new DialogParameters<AssetDetailDialog> { { x => x.AssetId, asset.Id } }, Wide);
@@ -220,7 +220,7 @@
         }
     }
 
-    private async Task Remove(FlowLedger.Web.ApiClient.AssetDto asset)
+    private async Task Remove(FlowLedger.Contracts.AssetDto asset)
     {
         if (await DialogService.ConfirmAsync("Remove asset",
                 $"Remove \"{asset.Name}\"? Its valuation history is kept but it stops counting toward net worth.", "Remove"))

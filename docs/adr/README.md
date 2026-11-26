@@ -22,6 +22,7 @@ superseding ADR named). Add a new ADR as the next number and add it to this tabl
 | [0015](0015-strategy-engine-and-simulators.md) | Strategy engine, market rates and simulators | Accepted |
 | [0016](0016-integrations-base.md) | Integration base layer (REST, SOAP/WSDL, signed webhooks) | Accepted and implemented |
 | [0017](0017-quiltt-embedded-connector.md) | Quiltt embedded connector | Accepted (code complete; waiting on production keys) |
+| [0019](0019-fluentassertions-licensing.md) | FluentAssertions licensing: pin to 7.x | Accepted |
 
 ## Decisions with no ADR yet
 

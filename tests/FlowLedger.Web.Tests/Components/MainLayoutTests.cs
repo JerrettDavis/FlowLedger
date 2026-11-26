@@ -54,6 +54,7 @@ public sealed class MainLayoutTests : BunitContext, IAsyncLifetime
         Services.AddSingleton(new FlowLedgerApiClient(
             new HttpClient(handler) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
         Services.AddScoped<ThemeService>();
+        Services.AddScoped<DisplaySettingsService>();
         Services.AddSingleton(new FlowLedger.Web.Auth.OidcOptions());
         Services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());

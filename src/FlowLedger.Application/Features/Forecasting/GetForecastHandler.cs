@@ -173,7 +173,7 @@ public sealed class GetForecastHandler
 
             var debitFlows = activeFlows.Where(f => f.Direction == Domain.Aggregates.TransactionDirection.Debit).ToList();
 
-            bool Scheduled(Transactions.TransactionDto t)
+            bool Scheduled(TransactionDto t)
             {
                 var k = BillSheet.RecurringDetector.Key(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName);
                 if (k.Length >= 4 && flowKeys.Any(f => k.Contains(f) || f.Contains(k)))

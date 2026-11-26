@@ -1,6 +1,4 @@
-using FlowLedger.Domain.Aggregates;
-
-namespace FlowLedger.Application.Features.Accounts;
+namespace FlowLedger.Contracts;
 
 /// <summary>Response DTO for a single account.</summary>
 public sealed record AccountDto(
@@ -16,7 +14,8 @@ public sealed record AccountDto(
     DateTimeOffset? LastBalanceConfirmedAt,
     bool TypeLockedByUser = false,
     string Mode = "Standard",
-    bool HideTransactions = false);
+    bool HideTransactions = false,
+    uint Version = 0);
 
 /// <summary>Request DTO for correcting an account's type by hand (pins it against provider sync).</summary>
 public sealed record ChangeAccountTypeRequest(string AccountType);

@@ -1,0 +1,49 @@
+@page "/settings/display"
+@inject DisplaySettingsService DisplayService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Display settings - FlowLedger</PageTitle>
+
+<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-2">Display settings</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">
+    Choose how amounts and numbers are shown. This only changes formatting: amounts are never converted between currencies.
+</MudText>
+
+<MudPaper Class="pa-4" Elevation="0" Outlined="true" Style="max-width:480px">
+    <MudSelect T="string" Label="Display currency" @bind-Value="_currency" data-testid="display-currency">
+        @foreach (var c in DisplaySettings.SupportedCurrencies)
+        {
+            <MudSelectItem T="string" Value="@c">@c</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="string" Label="Locale" @bind-Value="_locale" Class="mt-3" data-testid="display-locale">
+        @foreach (var l in DisplaySettings.SupportedLocales)
+        {
+            <MudSelectItem T="string" Value="@l">@l</MudSelectItem>
+        }
+    </MudSelect>
+    <MudText Typo="Typo.body2" Class="mt-3" data-testid="display-preview">Preview: @Format.Money(1234567.89m, _currency, System.Globalization.CultureInfo.GetCultureInfo(_locale))</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="Save" data-testid="display-save">Save</MudButton>
+</MudPaper>
+
+@code {
+    private string _currency = DisplaySettings.Default.Currency;
+    private string _locale = DisplaySettings.Default.Locale;
+
+    protected override void OnInitialized()
+    {
+        _currency = DisplayService.Current.Currency;
+        _locale = DisplayService.Current.Locale;
+    }
+
+    private async Task Save()
+    {
+        var settings = new DisplaySettings(_currency, _locale);
+        try { await JS.InvokeVoidAsync("FlowLedgerDisplay.save", settings.ToCookieValue()); }
+        catch (JSException) { /* cookie unavailable: still applies for this session */ }
+        DisplayService.Set(settings);
+        DisplayService.ApplyToCurrentThread();
+        Snackbar.Add("Display settings saved", Severity.Success);
+    }
+}

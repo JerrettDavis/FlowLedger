@@ -13,7 +13,7 @@ public sealed class SecurityHeadersTests
     {
         var csp = SecurityHeaders.BuildCsp("abc123");
 
-        csp.Should().Contain("script-src 'self' 'wasm-unsafe-eval' 'nonce-abc123'");
+        csp.Should().Contain("script-src 'self' 'nonce-abc123'");
         csp.Should().Contain("frame-ancestors 'none'");
         csp.Should().Contain("object-src 'none'");
         csp.Should().NotContain("'unsafe-eval'");

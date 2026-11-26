@@ -86,7 +86,7 @@ else
 @code {
     private sealed record Node(string Path, string Name, int Depth, int Children, int Descendants, bool IsSystem);
 
-    private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+    private List<FlowLedger.Contracts.CategoryDto> _categories = [];
     private List<Node> _nodes = [];
     private HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
     private string _search = "";
