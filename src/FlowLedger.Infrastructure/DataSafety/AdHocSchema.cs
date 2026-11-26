@@ -19,7 +19,6 @@ public static class AdHocSchema
         NpgsqlProviderCallLedger.CreateSqlText,
         BackupRunStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
-        NpgsqlAccountConnectorLinkStore.CreateSqlText,
         NpgsqlProviderAccountCatalog.CreateSqlText,
         NpgsqlHomeAssistantStore.CreateSqlText,
         NpgsqlIntegrationStore.CreateSqlText,

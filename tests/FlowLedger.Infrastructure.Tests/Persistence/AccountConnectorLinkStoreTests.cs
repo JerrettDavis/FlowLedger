@@ -1,56 +1,29 @@
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
-using Npgsql;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 
+/// <summary>#154: account_connector_links moved from an ad-hoc Npgsql table to EF (migration + tenant filter).</summary>
 [Collection("Integration")]
 public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
 {
     private readonly IntegrationTestFixture _fixture;
-    private readonly List<Guid> _tenants = [];
 
     public AccountConnectorLinkStoreTests(IntegrationTestFixture fixture) => _fixture = fixture;
 
     public Task InitializeAsync() => _fixture.ResetAsync();
 
-    // Ad-hoc tables are not in Respawn's reset set, so remove what these tests wrote.
-    public async Task DisposeAsync()
-    {
-        await using var conn = new NpgsqlConnection(_fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("DELETE FROM account_connector_links WHERE tenant_id = ANY(@t)", conn);
-        cmd.Parameters.AddWithValue("t", _tenants.ToArray());
-        try
-        {
-            await cmd.ExecuteNonQueryAsync();
-        }
-        catch (PostgresException ex) when (ex.SqlState == "42P01")
-        {
-            // table never created
-        }
-    }
+    public Task DisposeAsync() => Task.CompletedTask;
 
-    private sealed class Tenant(Guid id) : ITenantContext
-    {
-        public Guid TenantId { get; } = id;
-        public Guid UserId { get; } = Guid.NewGuid();
-    }
-
-    private NpgsqlAccountConnectorLinkStore Store(out Guid tenant)
-    {
-        tenant = Guid.NewGuid();
-        _tenants.Add(tenant);
-        return new NpgsqlAccountConnectorLinkStore(_fixture.ConnectionString, new Tenant(tenant));
-    }
+    private EfAccountConnectorLinkStore Store(TestTenantContext tenant) =>
+        new(_fixture.CreateProductionStyleContext(tenant), tenant);
 
     [DockerFact]
     public async Task Links_are_one_per_account_and_one_account_per_provider_account()
     {
-        var store = Store(out _);
+        var store = Store(TestTenantContext.New());
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
 
@@ -68,13 +41,15 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Pinned_manual_accounts_and_unlink_and_tenant_isolation()
     {
-        var store = Store(out _);
-        var other = Store(out _);
+        var store = Store(TestTenantContext.New());
+        var other = Store(TestTenantContext.New());
         var a = Guid.NewGuid();
 
         await store.PinManualAsync(a);
         (await store.FindByAccountAsync(a))!.ConnectorId.Should().Be(AccountConnectorLinks.Manual);
         (await other.FindByAccountAsync(a)).Should().BeNull("links are per tenant");
+        (await other.ListAsync()).Should().BeEmpty();
+        (await other.UnlinkAsync(a)).Should().BeFalse("another tenant's unlink must not touch this tenant's link");
 
         (await store.UnlinkAsync(a)).Should().BeTrue();
         (await store.UnlinkAsync(a)).Should().BeFalse();

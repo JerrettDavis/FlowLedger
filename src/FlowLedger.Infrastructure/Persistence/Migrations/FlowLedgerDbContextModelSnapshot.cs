@@ -459,6 +459,41 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_balance_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AccountConnectorLinkRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("ConnectorId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("connector_id");
+
+                    b.Property<DateTimeOffset>("LinkedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ProviderAccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider_account_id");
+
+                    b.HasKey("TenantId", "AccountId");
+
+                    b.HasIndex("TenantId", "ConnectorId", "ProviderAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_account_connector_links_provider");
+
+                    b.ToTable("account_connector_links", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AccountRateRecord", b =>
                 {
                     b.Property<Guid>("TenantId")

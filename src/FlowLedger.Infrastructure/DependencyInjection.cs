@@ -200,11 +200,8 @@ public static class DependencyInjection
             connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false));
         }
 
-        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAccountConnectorLinkStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
 
         services.AddScoped<FlowLedger.Application.Abstractions.IProviderAccountCatalog>(sp =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderAccountCatalog(
