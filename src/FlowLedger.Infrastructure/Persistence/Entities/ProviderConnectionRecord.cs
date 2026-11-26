@@ -16,6 +16,16 @@ internal sealed class ProviderConnectionRecord
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Connector-neutral health (ADR 0018). IssueKind is a ProviderIssueKind name; null = healthy. Written via
+    // EfProviderConnectionStore.RecordHealthAsync (set-based update), never by the sync's tracked unit of work.
+    public string? IssueKind { get; private set; }
+    public string? IssueMessage { get; private set; }
+    public bool IssueRetryable { get; private set; }
+    public bool IssueRequiresUserAction { get; private set; }
+    public DateTimeOffset? IssueRetryAfter { get; private set; }
+    public DateTimeOffset? IssueAt { get; private set; }
+    public int ConsecutiveFailures { get; private set; }
+
     private ProviderConnectionRecord() { }
 
     public static ProviderConnectionRecord Create(

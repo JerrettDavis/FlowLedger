@@ -1,4 +1,6 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Sync;
+using FlowLedger.Integrations.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,8 +14,9 @@ namespace FlowLedger.Worker.Jobs;
 /// Tenancy note: in the current milestone the tenant context is provided by the DI
 /// registration (dev tenant / simulated provider). Multi-tenant fan-out is a later concern.
 ///
-/// Error tolerance: transient provider errors are caught, logged, and do NOT crash the
-/// worker — Quartz will fire the job again on the next scheduled interval.
+/// Error tolerance: provider errors are caught and logged, and do NOT crash the worker. Whether a failing
+/// connection is retried on the next fire (back-off window, user action pending, retries exhausted) is decided
+/// by <see cref="SyncRetryPolicy"/>, never by ad hoc catch blocks here.
 /// </summary>
 [DisallowConcurrentExecution]
 public sealed class ScheduledSyncJob : IJob
@@ -50,6 +53,15 @@ public sealed class ScheduledSyncJob : IJob
         // One DI scope per tenant (DbContext, tenant context, sync service); a failing tenant never blocks the others.
         await FlowLedger.Worker.TenantFanOut.ForEachTenantAsync(_services, _logger, async (sp, tenantId) =>
         {
+            // ADR 0018: one shared policy decides whether this tenant's connections may be retried yet (back-off window,
+            // waiting for the user, retries exhausted). The sync itself records health; the job only consults the verdict.
+            var gate = sp.GetService<SyncAttemptGate>();
+            if (gate is not null && await gate.CheckAsync(SyncTrigger.Scheduled, cancellationToken) is { Allowed: false, Blocking: { } blocked })
+            {
+                _logger.LogInformation("ScheduledSyncJob: tenant {TenantId} skipped — {Reason}", tenantId, blocked.Reason);
+                return;
+            }
+
             var syncService = sp.GetRequiredService<IFinancialSyncService>();
 
             try
@@ -69,9 +81,11 @@ public sealed class ScheduledSyncJob : IJob
             {
                 _logger.LogInformation("ScheduledSyncJob: tenant {TenantId} skipped — {Reason}", tenantId, ex.Message);
             }
-            catch (FlowLedger.Integrations.Abstractions.RateLimitedProviderException ex)
+            catch (ProviderException ex)
             {
-                _logger.LogWarning("ScheduledSyncJob: provider rate-limited tenant {TenantId} ({Message}); retrying next interval.", tenantId, ex.Message);
+                // Already classified and persisted by the sync service; the next fire consults the retry policy.
+                _logger.LogWarning("ScheduledSyncJob: tenant {TenantId} sync failed ({Kind}): {Message}",
+                    tenantId, ProviderIssue.FromException(ex).Kind, ex.Message);
             }
             catch (Exception ex)
             {

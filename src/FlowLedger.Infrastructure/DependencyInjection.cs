@@ -111,6 +111,8 @@ public static class DependencyInjection
         services.AddScoped<IPlannedOccurrenceRepository, PlannedOccurrenceRepository>();
         services.AddScoped<ISyncCursorStore, EfSyncCursorStore>();
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
+        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
+        services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();
         services.AddScoped<FlowLedger.Application.Abstractions.IBillSheetStore, FlowLedger.Infrastructure.Reports.EfBillSheetStore>();
