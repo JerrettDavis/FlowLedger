@@ -37,4 +37,36 @@ internal sealed class CategorizationStore(FlowLedgerDbContext db) : ICategorizat
             && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped, ct);
 
     public async Task SaveAsync(CancellationToken ct = default) => await db.SaveChangesAsync(ct);
+
+    public async Task<IReadOnlyList<Transaction>> LoadAsync(int max, CancellationToken ct = default)
+        => await db.Transactions.AsNoTracking()
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenBy(t => t.Id)
+            .Take(max)
+            .ToListAsync(ct);
+
+    /// <summary>
+    /// Writes rows that were loaded without tracking. Each batch is attached as modified, saved, then detached, so the change tracker
+    /// holds at most one batch however many rows the post-sync step touched (the whole history used to stay tracked, #163).
+    /// </summary>
+    public async Task SaveChangedAsync(IReadOnlyCollection<Transaction> changed, CancellationToken ct = default)
+    {
+        if (changed.Count == 0)
+        {
+            await db.SaveChangesAsync(ct); // still flush anything else (e.g. categories) the caller staged
+            return;
+        }
+
+        foreach (var batch in changed.Chunk(SaveBatchSize))
+        {
+            db.Transactions.UpdateRange(batch);
+            await db.SaveChangesAsync(ct);
+            foreach (var t in batch)
+            {
+                db.Entry(t).State = EntityState.Detached;
+            }
+        }
+    }
+
+    internal const int SaveBatchSize = 500;
 }

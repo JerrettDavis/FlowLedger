@@ -15,6 +15,15 @@ public interface ICategorizationStore
 
     Task SaveAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Newest-first transactions WITHOUT change tracking. Use for whole-history analysis; mutate the rows you change and pass
+    /// them to <see cref="SaveChangedAsync"/>. Default falls back to the tracked load for simple stores.
+    /// </summary>
+    Task<IReadOnlyList<Transaction>> LoadAsync(int max, CancellationToken ct = default) => LoadTrackedAsync(max, ct);
+
+    /// <summary>Persists only <paramref name="changed"/> rows (loaded via <see cref="LoadAsync"/>), in bounded batches. Default saves everything tracked.</summary>
+    Task SaveChangedAsync(IReadOnlyCollection<Transaction> changed, CancellationToken ct = default) => SaveAsync(ct);
+
     /// <summary>One tracked transaction by id (null when absent). Default falls back to a full load for simple stores.</summary>
     async Task<Transaction?> FindTrackedAsync(Guid id, CancellationToken ct = default)
         => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).FirstOrDefault(t => t.Id == id);
@@ -85,8 +94,8 @@ public sealed class CategorizationService(
             return new CategorizationResult(0, 0, 0, 0, 0);
         }
 
-        var txs = await store.LoadTrackedAsync(Max, ct);
-        var real = txs.Where(t => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped).ToList();
+        var txs = await store.LoadAsync(Max, ct);
+        var real = txs.Where(t => TransactionStatusExtensions.IsReal(t.Status)).ToList();
         var uncategorized = real.Where(t => t.CategoryId is null).ToList();
         if (uncategorized.Count == 0)
         {
@@ -145,8 +154,10 @@ public sealed class CategorizationService(
             .Select(x => x!).ToList();
 
         int byLearned = 0, byKeyword = 0, byModel = 0, byLlm = 0, suggested = 0, transfers = 0, left = 0;
+        var changedRows = new List<Transaction>();
         foreach (var t in uncategorized)
         {
+            var before = (t.CategoryId, t.CategorySource, t.SuggestedCategoryId, t.SuggestedConfidence);
             var key = AutoCategorizer.MerchantKey(t.MerchantName, t.Description);
             if (transferIds.Contains(t.Id))
             {
@@ -202,10 +213,15 @@ public sealed class CategorizationService(
                     left++;
                 }
             }
+
+            if ((t.CategoryId, t.CategorySource, t.SuggestedCategoryId, t.SuggestedConfidence) != before)
+            {
+                changedRows.Add(t);
+            }
         }
 
         await categories.SaveChangesAsync(ct);
-        await store.SaveAsync(ct);
+        await store.SaveChangedAsync(changedRows, ct);
         return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm);
     }
 
@@ -341,8 +357,8 @@ public sealed class CategorizationService(
     /// </summary>
     public async Task<int> RecategorizeAfterAccountTypeChangeAsync(CancellationToken ct = default)
     {
-        var txs = await store.LoadTrackedAsync(Max, ct);
-        var real = txs.Where(t => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped).ToList();
+        var txs = await store.LoadAsync(Max, ct);
+        var real = txs.Where(t => TransactionStatusExtensions.IsReal(t.Status)).ToList();
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
         var transferIds = TransferDetector.Detect(real.Select(TransactionMapper.ToDto).ToList(), accountTypes);
         var transferCategoryId = (await categories.ListAsync(ct))
