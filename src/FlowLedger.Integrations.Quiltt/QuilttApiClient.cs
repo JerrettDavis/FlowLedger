@@ -14,6 +14,7 @@ namespace FlowLedger.Integrations.Quiltt;
 /// </summary>
 internal sealed class QuilttApiClient
 {
+    // `accounts` and `connections` are plain lists in the Quiltt schema (no paging args); `kind`, not `type`.
     internal const string AccountsQuery = """
         query FlowLedgerAccounts {
           accounts {
@@ -22,6 +23,12 @@ internal sealed class QuilttApiClient
             institution { name }
             connection { id status }
           }
+        }
+        """;
+
+    internal const string ConnectionsQuery = """
+        query FlowLedgerConnections {
+          connections { id status at provider }
         }
         """;
 
@@ -53,7 +60,8 @@ internal sealed class QuilttApiClient
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKeySecret))
         {
-            throw new NeedsUserActionProviderException("Quiltt:ApiKeySecret is not set.", "Add the Quiltt API key secret to the server configuration.");
+            // Operator configuration problem, not something the end user can fix.
+            throw new FatalProviderException("Quiltt:ApiKeySecret is not set.", "CONFIG") { Kind = ProviderIssueKind.Internal };
         }
 
         var url = new Uri(new Uri(_options.AuthBaseUrl, UriKind.Absolute), "users/sessions");
@@ -65,8 +73,8 @@ internal sealed class QuilttApiClient
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKeySecret);
 
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        ThrowIfFailed(resp, "session");
+        using var resp = await SendAsync(req, ct).ConfigureAwait(false);
+        ThrowIfFailed(resp, QuilttIssueMapper.Endpoint.Session);
 
         var body = await resp.Content.ReadFromJsonAsync<QSessionResponse>(Json, ct).ConfigureAwait(false);
         var token = body?.Token;
@@ -85,6 +93,12 @@ internal sealed class QuilttApiClient
     {
         var data = await QueryAsync<QAccountsData>(sessionToken, AccountsQuery, new { }, ct).ConfigureAwait(false);
         return data?.Accounts ?? [];
+    }
+
+    public async Task<IReadOnlyList<QConnectionNode>> ListConnectionsAsync(string sessionToken, CancellationToken ct)
+    {
+        var data = await QueryAsync<QConnectionsData>(sessionToken, ConnectionsQuery, new { }, ct).ConfigureAwait(false);
+        return data?.Connections ?? [];
     }
 
     public async Task<IReadOnlyList<QTransaction>> ListTransactionsAsync(string sessionToken, DateOnly from, CancellationToken ct)
@@ -114,52 +128,43 @@ internal sealed class QuilttApiClient
         using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(new { query, variables }) };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        ThrowIfFailed(resp, "graphql");
+        using var resp = await SendAsync(req, ct).ConfigureAwait(false);
+        ThrowIfFailed(resp, QuilttIssueMapper.Endpoint.GraphQl);
 
         var body = await resp.Content.ReadFromJsonAsync<QGraphQlResponse<T>>(Json, ct).ConfigureAwait(false)
                    ?? throw new FatalProviderException("Quiltt returned an empty GraphQL body.");
         if (body.Errors is { Count: > 0 } errors)
         {
-            var text = string.Join("; ", errors.Select(e => e.Message));
-            if (errors.Any(e => e.Message?.Contains("unauthor", StringComparison.OrdinalIgnoreCase) == true
-                                || e.Message?.Contains("expired", StringComparison.OrdinalIgnoreCase) == true))
-            {
-                throw new NeedsUserActionProviderException($"Quiltt rejected the session: {text}", "Reconnect the bank.");
-            }
-
-            throw new FatalProviderException($"Quiltt GraphQL error: {text}");
+            throw QuilttIssueMapper.FromGraphQlErrors(errors, _options.RateLimitFallback);
         }
 
         return body.Data;
     }
 
+    /// <summary>Transport failures (DNS, TLS, reset, timeout) surface as a typed transient error instead of leaking HttpRequestException.</summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
+    {
+        try
+        {
+            return await _http.SendAsync(req, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested
+            && (ex is HttpRequestException or OperationCanceledException || ex.GetType().Name == "TimeoutRejectedException"))
+        {
+            throw QuilttIssueMapper.FromTransportFailure(ex);
+        }
+    }
+
     // The response body is never echoed into the message: it can carry identifiers.
-    private static void ThrowIfFailed(HttpResponseMessage resp, string what)
+    private void ThrowIfFailed(HttpResponseMessage resp, QuilttIssueMapper.Endpoint endpoint)
     {
         if (resp.IsSuccessStatusCode)
         {
             return;
         }
 
-        var code = (int)resp.StatusCode;
-        switch (resp.StatusCode)
-        {
-            case HttpStatusCode.Unauthorized:
-            case HttpStatusCode.Forbidden:
-                throw new NeedsUserActionProviderException(
-                    $"Quiltt {what} request was rejected (HTTP {code}).", "Check the Quiltt API key or reconnect the bank.");
-            case HttpStatusCode.TooManyRequests:
-                DateTimeOffset? retry = resp.Headers.RetryAfter?.Delta is { } d ? DateTimeOffset.UtcNow + d : null;
-                throw new RateLimitedProviderException("Quiltt rate limit reached.", retry);
-        }
-
-        if (code >= 500 || resp.StatusCode == HttpStatusCode.RequestTimeout)
-        {
-            throw new TransientProviderException($"Quiltt {what} request failed (HTTP {code}).");
-        }
-
-        throw new FatalProviderException($"Quiltt {what} request failed (HTTP {code}).");
+        var retry = resp.Headers.RetryAfter is { } ra ? ra.Delta ?? (ra.Date is { } d ? d - DateTimeOffset.UtcNow : null) : null;
+        throw QuilttIssueMapper.FromHttpFailure(resp.StatusCode, endpoint, retry, _options.RateLimitFallback);
     }
 
     private static string? FirstNonEmpty(params string?[] values) => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));

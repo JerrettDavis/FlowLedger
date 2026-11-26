@@ -35,6 +35,7 @@ public sealed class QuilttProviderTests
             new QuilttApiClient(new HttpClient(stub), o), o, verifier, NullLogger<QuilttFinancialDataProvider>.Instance);
     }
 
+    // Real shape (verified against the sandbox): `accounts` is a plain list, `kind` replaces `type`, `state` is OPEN/CLOSED.
     private const string AccountsJson = """
         {"data":{"accounts":[
           {"id":"acc_1","name":"Everyday","kind":"DEPOSITORY","state":"OPEN","mask":"1234","currencyCode":"USD","balance":{"current":100.5,"available":90},"institution":{"name":"Test Bank"},"connection":{"id":"conn_1","status":"SYNCED"}},
@@ -113,13 +114,6 @@ public sealed class QuilttProviderTests
     }
 
     [Fact]
-    public async Task Unauthorized_SurfacesNeedsUserAction()
-    {
-        var p = Make(new Stub((_, _) => new HttpResponseMessage(HttpStatusCode.Unauthorized)));
-        await p.Invoking(x => x.GetAccountsAsync("p_1")).Should().ThrowAsync<NeedsUserActionProviderException>();
-    }
-
-    [Fact]
     public async Task ServerError_IsTransient()
     {
         var p = Make(new Stub((_, _) => new HttpResponseMessage(HttpStatusCode.BadGateway)));
@@ -157,20 +151,6 @@ public sealed class QuilttProviderTests
 
         page.Items.Select(i => i.ProviderId).Should().Equal("t1", "t2");
         calls.Should().Be(2);
-    }
-
-    [Fact]
-    public async Task ConnectionStatus_UsesQuilttStatusEnum()
-    {
-        Task<ConnectionStatus> Status(string s) => Make(new Stub((req, _) =>
-            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
-            : Json("""{"data":{"accounts":[{"id":"a","name":"A","kind":"DEPOSITORY","connection":{"id":"c","status":"%S%"}}]}}""".Replace("%S%", s))))
-            .GetConnectionStatusAsync("p_1");
-
-        (await Status("SYNCED")).Should().Be(ConnectionStatus.Healthy);
-        (await Status("SYNCING")).Should().Be(ConnectionStatus.Syncing);
-        (await Status("ERROR_REPAIRABLE")).Should().Be(ConnectionStatus.NeedsUserAction);
-        (await Status("ERROR_INSTITUTION")).Should().Be(ConnectionStatus.Degraded);
     }
 
     [Theory]

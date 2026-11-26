@@ -37,7 +37,19 @@ internal sealed class QConnection<T>
     [JsonPropertyName("pageInfo")] public QPageInfo? PageInfo { get; set; }
 }
 
+// Verified against the live schema: Query.accounts / Query.connections are plain lists (no first/after, no nodes/pageInfo);
+// only transactions, holdings and statements are paged connections.
 internal sealed class QAccountsData { [JsonPropertyName("accounts")] public List<QAccount>? Accounts { get; set; } }
+internal sealed class QConnectionsData { [JsonPropertyName("connections")] public List<QConnectionNode>? Connections { get; set; } }
+
+/// <summary>A Quiltt Connection (one linked institution login) as read for health classification.</summary>
+internal sealed class QConnectionNode
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
+    [JsonPropertyName("at")] public DateTimeOffset? At { get; set; }
+    [JsonPropertyName("provider")] public string? Provider { get; set; }
+}
 internal sealed class QTransactionsData { [JsonPropertyName("transactions")] public QConnection<QTransaction>? Transactions { get; set; } }
 
 internal sealed class QAccount
