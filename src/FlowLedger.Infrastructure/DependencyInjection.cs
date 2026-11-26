@@ -35,6 +35,7 @@ public static class DependencyInjection
         AddPersistence(services, configuration);
         AddProvidersAndSync(services, configuration);
         AddStorageAndHealth(services, configuration);
+        services.AddPostgresVersionGuard();
 
         return services;
     }
