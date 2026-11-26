@@ -18,6 +18,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string ReadinessEndpointPath = "/ready";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -76,6 +77,7 @@ public static class Extensions
                         tracing.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                            && !context.Request.Path.StartsWithSegments(ReadinessEndpointPath)
                     )
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
@@ -126,6 +128,14 @@ public static class Extensions
         // All health checks must pass for app to be considered ready to accept traffic after starting.
         app.MapHealthChecks(HealthEndpointPath)
            .AllowAnonymous();
+
+        // Readiness: only checks tagged "ready" (Postgres + migrations, Redis if configured, backup freshness). 503 when
+        // a dependency is down; /alive is unaffected so an orchestrator restarts a dead process, not a starved one.
+        app.MapHealthChecks(ReadinessEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("ready")
+        })
+        .AllowAnonymous();
 
         // Only health checks tagged with the "live" tag must pass for app to be considered alive.
         app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions

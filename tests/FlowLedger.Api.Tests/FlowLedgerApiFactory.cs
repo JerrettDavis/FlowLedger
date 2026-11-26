@@ -52,6 +52,8 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     /// <summary>Connection string of the test container, for tests that must tweak rows directly (e.g. expire a link code).</summary>
     public string ConnectionString => _postgres.GetConnectionString();
 
+    protected Task StopPostgresAsync() => _postgres.StopAsync();
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();

@@ -103,6 +103,7 @@ public static class WorkerHostBuilderFactory
         });
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        builder.Services.AddHostedService<WorkerHeartbeat>();
     }
 
     /// <summary>

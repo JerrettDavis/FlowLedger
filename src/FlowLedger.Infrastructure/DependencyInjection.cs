@@ -404,6 +404,9 @@ public static class DependencyInjection
         services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
         services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
 
+        // Readiness probes (/ready): Postgres + migrations, Redis (if configured), backup freshness.
+        FlowLedger.Infrastructure.Health.ReadinessHealthExtensions.AddFlowLedgerReadinessChecks(services);
+
         return services;
     }
 }
