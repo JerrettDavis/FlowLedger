@@ -298,6 +298,7 @@ public static class DependencyInjection
             // decorator records SyncCompleted in the outbox and idempotent handlers do them with retry (#92, #175, #180).
             var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
                 guarded,
+                db,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
@@ -308,6 +309,7 @@ public static class DependencyInjection
             // Config: RecurringFlows:AutoAdd (default true) adds only fixed-amount, very regular patterns.
             var recurring = new FlowLedger.Infrastructure.Sync.RecurringFlowSyncService(
                 categorizing,
+                db,
                 sp.GetRequiredService<FlowLedger.Application.Features.RecurringFlows.RecurringSuggestionService>(),
                 !bool.TryParse(cfg["RecurringFlows:AutoAdd"], out var autoAdd) || autoAdd,
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.RecurringFlowSyncService>>());

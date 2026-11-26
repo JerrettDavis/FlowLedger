@@ -146,6 +146,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
+        // A user edit landing between this sync's reads and writes must neither fail the sync nor be overwritten (#157).
+        using var conflicts = new SyncConflictResolver(_db, _logger).Install();
         SyncResult result;
         try
         {

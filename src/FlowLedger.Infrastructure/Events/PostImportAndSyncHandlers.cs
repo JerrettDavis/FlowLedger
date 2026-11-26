@@ -3,6 +3,8 @@ using FlowLedger.Application.Features.Duplicates;
 using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Application.Features.Integrations;
 using FlowLedger.Domain.Events;
+using FlowLedger.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Infrastructure.Events;
 
@@ -20,11 +22,13 @@ internal sealed class ImportCompletedWebhookHandler(IntegrationService integrati
 }
 
 /// <summary>A file often overlaps what the bank already synced: fold the unambiguous overlaps, then refresh the bill sheet.</summary>
-internal sealed class PostImportMaintenanceHandler(DuplicateService duplicates, ISheetAutoMarker sheet) : IDomainEventHandler<TransactionsImported>
+internal sealed class PostImportMaintenanceHandler(
+    FlowLedgerDbContext db, DuplicateService duplicates, ISheetAutoMarker sheet, ILogger<PostImportMaintenanceHandler> logger)
+    : IDomainEventHandler<TransactionsImported>
 {
     public async Task HandleAsync(TransactionsImported e, CancellationToken ct = default)
     {
-        await duplicates.AutoMergeAsync(ct);
+        await ConcurrencyRetry.RunAsync(db, () => duplicates.AutoMergeAsync(ct), logger, "Duplicate merge after import", ct);
         await sheet.RefreshAsync(ct);
     }
 }
@@ -38,13 +42,15 @@ internal sealed class SyncCompletedWebhookHandler(IntegrationService integration
 }
 
 /// <summary>Folds unambiguous duplicates the sync brought in (High confidence only), then refreshes the bill sheet.</summary>
-internal sealed class PostSyncMaintenanceHandler(DuplicateService duplicates, ISheetAutoMarker sheet) : IDomainEventHandler<SyncCompleted>
+internal sealed class PostSyncMaintenanceHandler(
+    FlowLedgerDbContext db, DuplicateService duplicates, ISheetAutoMarker sheet, ILogger<PostSyncMaintenanceHandler> logger)
+    : IDomainEventHandler<SyncCompleted>
 {
     public async Task HandleAsync(SyncCompleted e, CancellationToken ct = default)
     {
         if (e.TransactionsAdded > 0)
         {
-            await duplicates.AutoMergeAsync(ct);
+            await ConcurrencyRetry.RunAsync(db, () => duplicates.AutoMergeAsync(ct), logger, "Duplicate merge after sync", ct);
         }
 
         await sheet.RefreshAsync(ct);
