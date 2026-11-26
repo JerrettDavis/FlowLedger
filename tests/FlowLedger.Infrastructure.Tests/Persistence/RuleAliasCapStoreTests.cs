@@ -86,8 +86,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     public async Task Budget_and_goal_stores_reject_new_rows_over_the_cap_but_allow_updates()
     {
         var tenant = NewTenant();
-        var budgets = new NpgsqlBudgetStore(_fixture.ConnectionString);
-        for (var i = 0; i < NpgsqlBudgetStore.MaxBudgets; i++)
+        await using var db = _fixture.CreateProductionStyleContext(new TestTenantContext(tenant));
+        var budgets = new FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore(db, new TestTenantContext(tenant));
+        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore.MaxBudgets; i++)
         {
             await budgets.SetAsync(tenant, $"Cat{i}", 10m);
         }
@@ -96,9 +97,9 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         await overBudget.Should().ThrowAsync<InvalidOperationException>();
         await budgets.SetAsync(tenant, "Cat1", 99m);
 
-        var goals = new NpgsqlGoalStore(_fixture.ConnectionString);
+        var goals = new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, new TestTenantContext(tenant));
         Guid first = default;
-        for (var i = 0; i < NpgsqlGoalStore.MaxGoals; i++)
+        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore.MaxGoals; i++)
         {
             var id = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
             if (i == 0) { first = id; }

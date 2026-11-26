@@ -15,7 +15,7 @@ public sealed class NpgsqlCategoryMaintenanceStore(string connectionString, ITen
         var tenantId = tenant.TenantId;
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);
-        foreach (var create in new[] { NpgsqlBudgetStore.CreateSqlText, NpgsqlCategoryRuleStore.CreateSqlText })
+        foreach (var create in new[] { NpgsqlCategoryRuleStore.CreateSqlText })
         {
             await using var c = new NpgsqlCommand(create, conn);
             await c.ExecuteNonQueryAsync(ct);
