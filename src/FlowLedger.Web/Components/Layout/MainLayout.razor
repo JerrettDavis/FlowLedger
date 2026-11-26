@@ -135,7 +135,7 @@
 
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
-            @Body
+            <AppErrorBoundary>@Body</AppErrorBoundary>
         </MudContainer>
     </MudMainContent>
 </MudLayout>
@@ -288,14 +288,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var env = await ApiClient.GetEnvironmentAsync();
-        _environment = env?.Environment ?? "unknown";
-        await RefreshRepairStateAsync();
-        var data = await ApiClient.GetDataStatusAsync();
-        _backupAlert = data is null ? null
-            : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
-            : !data.Backup.OffsiteConfigured && _environment == "production" ? "No off-site backup configured"
-            : null;
+        // Shell bootstrap: an API hiccup here must never end the circuit (it would take every page down with it).
+        try
+        {
+            var env = await ApiClient.GetEnvironmentAsync();
+            _environment = env?.Environment ?? "unknown";
+            await RefreshRepairStateAsync();
+            var data = await ApiClient.GetDataStatusAsync();
+            _backupAlert = data is null ? null
+                : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
+                : !data.Backup.OffsiteConfigured && _environment == "production" ? "No off-site backup configured"
+                : null;
+        }
+        catch (Exception ex) when (ex is ApiClientException or HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogWarning(ex, "Could not load layout status; continuing without it.");
+        }
     }
 
     private async Task ConnectBank()
