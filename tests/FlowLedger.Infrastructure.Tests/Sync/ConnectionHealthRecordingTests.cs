@@ -138,7 +138,7 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
     }
 
     [DockerFact]
-    public async Task Non_provider_exceptions_propagate_and_are_not_recorded_as_provider_issues()
+    public async Task Non_provider_exceptions_propagate_and_are_recorded_as_internal_issues()
     {
         var tenant = TestTenantContext.New();
         var (db, sync, store, provider) = await ArrangeAsync(tenant);
@@ -147,7 +147,10 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
 
         await FluentActions.Awaiting(() => sync.SyncAsync()).Should().ThrowAsync<InvalidOperationException>();
 
-        (await store.ListAsync()).Single().Issue.Should().BeNull();
+        var issue = (await store.ListAsync()).Single().Issue;
+        issue.Should().NotBeNull("an unexpected failure must leave a trail so the retry policy can bound it");
+        issue!.Kind.Should().Be(nameof(ProviderIssueKind.Internal));
+        issue.ConsecutiveFailures.Should().Be(1);
     }
 
     [DockerFact]
