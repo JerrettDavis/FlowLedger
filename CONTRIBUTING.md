@@ -25,6 +25,7 @@ Thank you for considering contributing.
 
 - One feature or fix per PR.
 - All new features need tests (see `tests/`).
+- Bug fixes (`fix:` commits) must include a regression test that fails without the fix, or the PR must state why a test is not possible. The PR template asks for the test, the invariants touched and any migration.
 - Follow the vertical slice pattern in `src/FlowLedger.Application/Features/`.
 - Architecture tests in `FlowLedger.Architecture.Tests` must pass.
 - No sensitive data in logs or telemetry.
