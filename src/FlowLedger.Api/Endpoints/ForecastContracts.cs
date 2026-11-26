@@ -35,6 +35,9 @@ internal sealed class ForecastResponse
     public decimal TypicalWeeklySpend { get; init; }
     public decimal WeeklySpendStdDev { get; init; }
     public int SpendHistoryWeeks { get; init; }
+
+    /// <summary>Plain-language caveats, e.g. accounts in different currencies cannot be projected as one total (#124).</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }
 
 internal sealed class ForecastBandPointResponse
@@ -169,6 +172,7 @@ internal static class ForecastResponseMapper
             MinBalanceAmount = result.AggregateLowWaterMark.MinBalance.Amount,
             Date = result.AggregateLowWaterMark.Date
         },
+        Warnings = result.Warnings,
         OverdraftWarnings = result.OverdraftWarnings.Select(o => new OverdraftWarningResponse
         {
             AccountId = o.AccountId.Value,
