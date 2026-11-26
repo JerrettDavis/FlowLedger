@@ -23,6 +23,8 @@ public sealed class GetForecastHandler
     private readonly IForecastEngine _engine;
     private readonly ITenantContext _tenant;
 
+    private const int PendingLookbackDays = 14;
+
     public GetForecastHandler(
         IAccountRepository accounts,
         IRecurringFlowRepository flows,
@@ -43,7 +45,8 @@ public sealed class GetForecastHandler
     {
         // ── Resolve horizon ───────────────────────────────────────────────────
 
-        DateOnly horizonStart = query.HorizonStart ?? query.AsOf;
+        // History belongs to a different view: the starting balance is as of AsOf, so never start earlier.
+        DateOnly horizonStart = query.HorizonStart is { } requested && requested > query.AsOf ? requested : query.AsOf;
         DateOnly horizonEnd = query.HorizonEnd
             ?? query.AsOf.AddMonths(query.Months ?? 3);
 
@@ -113,7 +116,8 @@ public sealed class GetForecastHandler
 
         // Load transactions from horizon start through horizon end; include actuals
         // that fall within the window.
-        var txList = await _transactions.ListForAccountsAsync(accountIds, horizonStart, horizonEnd, ct);
+        // A short look-back picks up pending items dated just before the horizon (not yet in the settled balance).
+        var txList = await _transactions.ListForAccountsAsync(accountIds, horizonStart.AddDays(-PendingLookbackDays), horizonEnd, ct);
 
         var actualInputs = txList
             .Select(t => new ForecastTransactionInput
