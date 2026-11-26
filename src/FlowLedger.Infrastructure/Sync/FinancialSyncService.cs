@@ -369,13 +369,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 existing.CurrentBalance.Currency.Code != pa.CurrencyCode)
             {
                 var updatedBalance = new Money(providerAmount, new Currency(pa.CurrencyCode));
-                try { existing.UpdateBalance(updatedBalance); }
-                catch (Domain.Exceptions.InvalidBalanceException)
+                try { existing.ApplyProviderBalance(updatedBalance); }
+                catch (Domain.Exceptions.CurrencyMismatchException ex)
                 {
-                    // Asset-account negative balance guard — provider may return negative
-                    // for overdraft situations. Accept as-is without throwing.
-                    _logger.LogWarning(
-                        "Skipping balance update for account {AccountId}: provider returned negative balance on asset account.",
+                    // A provider changing an account's currency must not abort the whole sync.
+                    _logger.LogWarning(ex,
+                        "Skipping balance update for account {AccountId}: provider currency differs from the stored account currency.",
                         existing.Id);
                 }
             }
