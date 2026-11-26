@@ -106,4 +106,12 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
 
         Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>());
     }
+
+    [DockerFact]
+    public async Task Synchronous_SaveChanges_is_not_supported_so_event_dispatch_never_blocks()
+    {
+        await using var db = _fixture.CreateProductionStyleContext(TestTenantContext.New());
+        var act = () => db.SaveChanges();
+        act.Should().Throw<NotSupportedException>();
+    }
 }

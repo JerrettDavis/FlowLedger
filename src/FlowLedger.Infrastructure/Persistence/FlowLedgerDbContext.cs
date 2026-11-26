@@ -133,22 +133,12 @@ public sealed class FlowLedgerDbContext : DbContext
         return result;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Synchronous saves are not supported: domain events are dispatched asynchronously after commit, and blocking on that
+    /// (sync-over-async) can deadlock or swallow handler failures (#116, #92). Use <see cref="SaveChangesAsync"/>.
+    /// </summary>
     public override int SaveChanges()
-    {
-        ValidateTenantBoundaries();
-        var events = CollectDomainEvents();
-
-        var result = base.SaveChanges();
-
-        // Fire-and-forget dispatch on sync path (sync callers should prefer async).
-        if (events.Count > 0)
-        {
-            _eventDispatcher.DispatchAsync(events).GetAwaiter().GetResult();
-        }
-
-        return result;
-    }
+        => throw new NotSupportedException("Use SaveChangesAsync: synchronous SaveChanges would block on asynchronous domain event dispatch.");
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
