@@ -1,0 +1,98 @@
+name: Nightly
+
+# Scheduled verification that does not belong in the PR gate:
+#  - repeat the unit/integration suite 3x to surface flakes
+#  - run the wall-clock Perf tests excluded from the PR gate (trend via TRX artifacts)
+# Failures open (or comment on) a tracking issue. Mutation testing and live-sandbox runs are not
+# wired up yet (they need Stryker tooling and provider credentials respectively).
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # Daily 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repeat-suite:
+    name: Suite x3 (flake detection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FLOWLEDGER_REQUIRE_DOCKER: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build --configuration Release
+      - name: Run suite three times
+        run: |
+          status=0
+          for i in 1 2 3; do
+            dotnet test --no-build --configuration Release \
+              --filter "Category!=E2E&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests" \
+              --logger "trx" \
+              --results-directory "./artifacts/nightly/run-$i" || status=1
+          done
+          exit $status
+      - name: Fail on unexpected skipped tests
+        if: always()
+        run: python3 eng/ci/check-trx.py "artifacts/nightly/**/*.trx" --allow-skip "LiveSandbox" --min-executed 500
+      - name: Upload TRX results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-trx-suite
+          path: artifacts/nightly/**/*.trx
+          if-no-files-found: warn
+
+  perf:
+    name: Perf tests (trend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build tests/FlowLedger.Application.Tests --configuration Release
+      - name: Run Perf tests
+        run: >
+          dotnet test tests/FlowLedger.Application.Tests --no-build --configuration Release
+          --filter "Category=Perf|FullyQualifiedName~ForecastPerformanceTests"
+          --logger "trx;LogFileName=perf.trx"
+          --results-directory ./artifacts/perf
+      - name: Upload Perf TRX
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-trx-perf
+          path: artifacts/perf/**/*.trx
+          if-no-files-found: warn
+
+  report-failure:
+    name: Open issue on failure
+    needs: [repeat-suite, perf]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Nightly verification failed"
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          body="The scheduled nightly run failed: $RUN_URL"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
