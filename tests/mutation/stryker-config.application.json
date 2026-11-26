@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/stryker-config.schema.json",
+  "stryker-config": {
+    "project": "FlowLedger.Application.csproj",
+    "reporters": [ "html", "json", "progress" ],
+    "mutation-level": "Standard",
+    "mutate": [
+      "**/Features/Forecasting/**/*.cs",
+      "**/Features/Transactions/**/*.cs",
+      "**/Features/RecurringFlows/**/*.cs",
+      "**/Features/Imports/**/*.cs",
+      "!**/obj/**"
+    ],
+    "thresholds": {
+      "high": 85,
+      "low": 70,
+      "break": 0
+    },
+    "concurrency": 4,
+    "disable-bail": false
+  }
+}
