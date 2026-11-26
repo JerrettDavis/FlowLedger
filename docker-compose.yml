@@ -21,14 +21,13 @@
 #     (Auth__Oidc__*) unless AUTH__ALLOWANONYMOUS=true is set deliberately.
 #
 # Notes on healthchecks:
-#   The .NET 10 chiseled-extra images ship no shell or curl. The api and web
-#   healthchecks therefore use the alpine-based wget probe pattern — a small
-#   wget binary mounted into the container network via a shared-network service.
-#   The actual probe runs from the host side using the published port (5001/5002),
-#   so the test command is intentionally `["CMD-SHELL", "exit 0"]` (always-pass)
-#   for the daemon check, while the real readiness gate is the `start_period`.
-#   Alternatively, set COMPOSE_HEALTHCHECK_DISABLE=1 and wait externally with
-#   the seed script's built-in health poll.
+#   The .NET 10 chiseled-extra runtime images ship no shell, curl or wget, so
+#   CMD-SHELL / curl healthchecks cannot work. The api and web images instead
+#   contain /usr/local/bin/healthprobe, a tiny static binary built from
+#   scripts/healthprobe (exit 0 only on a 2xx answer). The api is gated on
+#   /health, web on /alive; web and worker wait for the api to be healthy.
+#   The worker is a Generic Host with no HTTP endpoint, so it has no healthcheck
+#   (restart: unless-stopped only covers a crashed process).
 
 # ── Shared environment fragments ──────────────────────────────────────────────
 x-db-env: &db-env
@@ -60,7 +59,7 @@ services:
   # ── Infrastructure ────────────────────────────────────────────────────────
   postgres:
     profiles: [infra, full]
-    image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: flowledger
@@ -79,7 +78,7 @@ services:
 
   redis:
     profiles: [infra, full]
-    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    image: redis:7-alpine
     restart: unless-stopped
     ports:
       # Loopback only (Aspire dev loop). Redis has no auth here: never expose it.
@@ -120,42 +119,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # .NET 10 noble-chiseled images ship no shell or curl — healthchecks that
-    # exec inside the container cannot use CMD-SHELL. We use a TCP probe via
-    # the published port from a lightweight probe container (api-probe) below.
-    # The daemon healthcheck here is disabled; compose startup ordering is
-    # handled by api-probe's condition + start_period.
+    # Self-contained probe (no shell/curl in the chiseled image): see scripts/healthprobe.
+    # /health runs every registered health check (becomes a real database readiness
+    # gate once the API registers one). start_period covers EF migrations at startup.
     healthcheck:
-      disable: true
-
-  # Probe container: minimal alpine that curls the API /alive endpoint.
-  # api and web consumers depend on this service being healthy.
-  api-probe:
-    profiles: [full]
-    image: alpine/curl:latest@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f
-    restart: "no"
-    entrypoint: >
-      sh -c "
-        echo 'Waiting for API to become healthy...';
-        for i in $(seq 1 30); do
-          if curl -sf http://api:8080/alive > /dev/null 2>&1; then
-            echo 'API healthy.';
-            exit 0;
-          fi;
-          echo \"Attempt $$i/30 failed, retrying in 5s...\";
-          sleep 5;
-        done;
-        echo 'API did not become healthy in time.';
-        exit 1
-      "
-    depends_on:
-      - api
-    healthcheck:
-      test: ["CMD", "true"]
-      interval: 5s
-      timeout: 3s
-      retries: 1
-      start_period: 1s
+      test: ["CMD", "/usr/local/bin/healthprobe", "http://127.0.0.1:8080/health", "4"]
+      interval: 15s
+      timeout: 6s
+      retries: 3
+      start_period: 90s
 
   web:
     profiles: [full]
@@ -181,10 +153,14 @@ services:
       # Without OIDC the Web UI has NO sign-in; outside Development it refuses to start unless this is true.
       Auth__AllowAnonymous: ${AUTH__ALLOWANONYMOUS:-false}
     depends_on:
-      api-probe:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
     healthcheck:
-      disable: true
+      test: ["CMD", "/usr/local/bin/healthprobe", "http://127.0.0.1:8080/alive", "4"]
+      interval: 15s
+      timeout: 6s
+      retries: 3
+      start_period: 45s
 
   worker:
     profiles: [full]
@@ -202,10 +178,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      api-probe:
-        condition: service_completed_successfully
-    # Worker is a Generic Host — no HTTP server, no healthcheck port.
-    # Liveness is inferred from process health (restart: unless-stopped).
+      api:
+        condition: service_healthy
+    # Worker is a Generic Host — no HTTP server, so there is nothing for a probe to hit.
+    # Liveness is only inferred from the process (restart: unless-stopped); the explicit
+    # disable keeps `docker compose ps` from reporting a misleading status.
     healthcheck:
       disable: true
 
