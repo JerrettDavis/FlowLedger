@@ -15,6 +15,9 @@ public sealed class QuilttIssueMappingTests
 {
     // ── Table: ConnectionStatus → kind / retry / user action / status ──
 
+    // OBSERVED live in the sandbox: SYNCED, ERROR_REPAIRABLE (connectionSimulateError), DISCONNECTING -> DISCONNECTED (connectionDisconnect).
+    // SCHEMA-DERIVED only (enum + descriptions; no sandbox login produced them): ERROR_INSTITUTION, ERROR_PROVIDER, ERROR_SERVICE,
+    // SYNCING, INITIALIZING, UPGRADING.
     public static TheoryData<string, ProviderIssueKind, bool, bool, ConnectionStatus> StatusTable => new()
     {
         { "SYNCED", ProviderIssueKind.None, false, false, ConnectionStatus.Healthy },
@@ -141,6 +144,8 @@ public sealed class QuilttIssueMappingTests
     [InlineData("Field 'nodes' doesn't exist on type 'Account'", "undefinedField", ProviderIssueKind.Internal)]
     [InlineData("Field 'accounts' doesn't accept argument 'first'", "argumentNotAccepted", ProviderIssueKind.Internal)]
     [InlineData("Not Authenticated", null, ProviderIssueKind.Internal)]
+    // Real: connectionSimulateError with an unknown (or DISCONNECTED) connection id.
+    [InlineData("No Connection found for `id: \"conn_x\"`", "NOT_FOUND", ProviderIssueKind.Internal)]
     [InlineData("Forbidden", "FORBIDDEN", ProviderIssueKind.ReauthRequired)]
     [InlineData("Too many requests", "RATE_LIMITED", ProviderIssueKind.RateLimited)]
     [InlineData("Upstream timeout", "TIMEOUT", ProviderIssueKind.ServiceUnavailable)]
@@ -219,6 +224,19 @@ public sealed class QuilttIssueMappingTests
         var health = await p.GetConnectionHealthAsync("p_1");
         health.Status.Should().Be(ConnectionStatus.NeedsUserAction);
         QuilttProviderCode.TryGetConnectionId(health.Issue!.ProviderCode).Should().Be("bad");
+    }
+
+    [Fact]
+    public async Task CapturedSandbox_SimulatedErrorRepairable_AccountsStayReadable_ButSoleConnectionBlocksSync()
+    {
+        // Real payload after connectionSimulateError: status flips, accounts/balances remain (stale) and readable.
+        var p = Provider(Wire(
+            """{"data":{"connections":[{"id":"conn_1353zGOwESRQn8cFUccy6k","status":"ERROR_REPAIRABLE","at":"2026-11-26T00:05:06Z","provider":"MOCK"}]}}""",
+            """{"data":{"accounts":[{"id":"acct_1353zGPa6hCIaOTRSyhWgj","name":"Spending","kind":"DEPOSITORY","state":"OPEN","mask":"5944","currencyCode":"USD","balance":{"current":548.56,"available":null},"institution":{"name":"Mock Sandbox Bank"},"connection":{"id":"conn_1353zGOwESRQn8cFUccy6k","status":"ERROR_REPAIRABLE"}}]}}"""));
+
+        var thrown = (await p.Invoking(x => x.GetAccountsAsync("p_1")).Should().ThrowAsync<NeedsUserActionProviderException>()).Which;
+        thrown.Kind.Should().Be(ProviderIssueKind.ReauthRequired);
+        QuilttProviderCode.TryGetConnectionId(thrown.ProviderCode).Should().Be("conn_1353zGOwESRQn8cFUccy6k");
     }
 
     [Fact]
