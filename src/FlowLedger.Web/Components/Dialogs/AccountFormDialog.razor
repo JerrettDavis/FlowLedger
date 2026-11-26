@@ -170,7 +170,7 @@
             catch (FlowLedger.Web.ApiClient.ApiClientException ex)
             {
                 _serverErrors = ex.FieldErrors is { Count: > 0 } ? new Dictionary<string, string>(ex.FieldErrors, StringComparer.OrdinalIgnoreCase) : null;
-                _formError = _serverErrors is null ? ex.Message : "Fix the highlighted fields and try again.";
+                _formError = _serverErrors is null ? SnackbarExtensions.ProblemText(ex) : "Fix the highlighted fields and try again.";
             }
             catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
             {

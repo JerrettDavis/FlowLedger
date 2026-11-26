@@ -55,6 +55,47 @@ public sealed class SnackbarProblemTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Undo_runs_the_reversal_and_confirms_it()
+    {
+        Services.AddMudServices();
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        var undone = false;
+        var options = new SnackbarOptions(Severity.Success, new SnackbarConfiguration());
+
+        SnackbarExtensions.ConfigureUndo(options, snackbar, () => { undone = true; return Task.CompletedTask; });
+
+        options.Action.Should().Be("Undo");
+        options.VisibleStateDuration.Should().Be(SnackbarExtensions.UndoVisibleMilliseconds);
+        await options.OnClick!(null!);
+        undone.Should().BeTrue();
+        snackbar.ShownSnackbars.Should().Contain(s => s.Message == "Change undone");
+    }
+
+    [Fact]
+    public async Task A_failing_undo_is_reported_as_a_persistent_error()
+    {
+        Services.AddMudServices();
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+        var options = new SnackbarOptions(Severity.Success, new SnackbarConfiguration());
+
+        SnackbarExtensions.ConfigureUndo(options, snackbar, () => throw new ApiClientException("Gone."));
+        await options.OnClick!(null!);
+
+        snackbar.ShownSnackbars.Should().ContainSingle(s => s.Severity == Severity.Error).Which.Message.Should().Be("Couldn't undo: Gone.");
+    }
+
+    [Fact]
+    public void Add_with_undo_shows_the_message_as_a_success_toast()
+    {
+        Services.AddMudServices();
+        var snackbar = Services.GetRequiredService<ISnackbar>();
+
+        snackbar.AddWithUndo("Set to Food", () => Task.CompletedTask);
+
+        snackbar.ShownSnackbars.Should().ContainSingle().Which.Message.Should().Be("Set to Food");
+    }
+
+    [Fact]
     public void No_page_shows_exception_messages_directly()
     {
         foreach (var file in RepoFiles.Razor())
