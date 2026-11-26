@@ -111,6 +111,12 @@ public sealed record TransactionPage(
     /// <summary>True when additional pages are available.</summary>
     bool HasMore)
 {
+    /// <summary>
+    /// Rows the provider returned but the connector refused to ingest (no usable date, projected rather than real, ...).
+    /// They are logged with the provider id and counted here so a sync can report them.
+    /// </summary>
+    public int SkippedCount { get; init; }
+
     /// <summary>Returns an empty page with the given cursor (e.g. "already up to date").</summary>
     public static TransactionPage Empty(SyncCursor cursor) =>
         new(Array.Empty<ProviderTransaction>(), cursor, false);

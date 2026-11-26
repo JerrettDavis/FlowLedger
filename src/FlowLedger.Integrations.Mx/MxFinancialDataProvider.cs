@@ -491,12 +491,24 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             .GetTransactionsAsync(userGuid, accountGuid, position.Page, position.RecordsPerPage, cancellationToken, position.FromDate)
             .ConfigureAwait(false);
 
-        var items = (response.Transactions ?? [])
+        var mapped = (response.Transactions ?? [])
             .Select(t => MxMapper.ToProviderTransaction(t, _logger))
             .Select(t => t with { ProviderAccountId = providerAccountId })
             .ToList();
 
-        var hasMore = HasMorePages(response.Pagination, position.Page);
+        // A row with no parseable date maps to DateOnly.MinValue (year 0001); never persist that sentinel.
+        var items = mapped.Where(t => t.PostedDate != DateOnly.MinValue).ToList();
+        var skipped = mapped.Count - items.Count;
+        foreach (var bad in mapped.Where(t => t.PostedDate == DateOnly.MinValue))
+        {
+            _logger.LogWarning("Skipping MX transaction {ProviderTransactionId}: no usable date.", bad.ProviderId);
+        }
+
+        // Without pagination metadata a full page may be truncated: keep paging (a short page ends the pass) so the
+        // date watermark is only written once the pass really completed.
+        var hasMore = response.Pagination is null
+            ? (response.Transactions?.Count ?? 0) >= position.RecordsPerPage
+            : HasMorePages(response.Pagination, position.Page);
 
         // Mid-pass: advance to the next page (same date window) so a crash resumes here.
         // End of pass: persist a date WATERMARK (page 1, from = today - overlap), never "last page + 1".
@@ -507,7 +519,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                 position.RecordsPerPage,
                 DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-Math.Max(0, _options.IncrementalOverlapDays))).Encode();
 
-        return new TransactionPage(items, nextCursor, hasMore);
+        return new TransactionPage(items, nextCursor, hasMore) { SkippedCount = skipped };
     }
 
     // ── Webhooks ──────────────────────────────────────────────────────────────

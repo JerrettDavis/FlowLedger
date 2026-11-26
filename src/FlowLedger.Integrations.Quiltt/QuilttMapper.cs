@@ -33,6 +33,11 @@ internal static class QuilttMapper
             currency);
     }
 
+    /// <summary>True when the row is a real ledger entry: not PROJECTED and carrying a parseable date.</summary>
+    public static bool IsIngestible(QTransaction t) =>
+        !string.Equals(t.Status, "PROJECTED", StringComparison.OrdinalIgnoreCase)
+        && DateOnly.TryParse(t.Date, CultureInfo.InvariantCulture, out _);
+
     public static ProviderTransaction ToTransaction(QTransaction t, string fallbackCurrency)
     {
         var accountId = t.Account?.Id ?? throw new FatalProviderException("Quiltt transaction is missing its account.");

@@ -58,6 +58,13 @@ public sealed class MxWireMockFixture : IDisposable
 
     public void Reset() => _server.ResetLogEntries();
 
+    /// <summary>Overrides the transactions response for an account (all pages) with a raw JSON body.</summary>
+    public void StubTransactionsBody(string accountGuid, string json) =>
+        _server
+            .Given(Request.Create().WithPath($"/users/{UserGuid}/accounts/{accountGuid}/transactions").UsingGet())
+            .AtPriority(1)
+            .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", Vnd).WithBody(json));
+
     /// <summary>Builds a fully-wired MX provider against the WireMock server with fake creds.</summary>
     public MxFinancialDataProvider CreateProvider(int recordsPerPage = RecordsPerPage)
     {

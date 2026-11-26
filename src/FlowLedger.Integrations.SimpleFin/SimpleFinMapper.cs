@@ -71,6 +71,9 @@ internal static class SimpleFinMapper
             currency);
     }
 
+    /// <summary>True when the row has a real date (posted, or at least transacted_at); otherwise it would move to "now" on every sync.</summary>
+    public static bool HasUsableDate(SfTransaction t) => t.Posted > 0 || t.TransactedAt is > 0;
+
     public static ProviderTransaction ToTransaction(SfAccount a, SfTransaction t)
     {
         var currency = NormalizeCurrency(a.Currency);
