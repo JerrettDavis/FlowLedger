@@ -52,7 +52,7 @@ FlowLedger combines four traditionally separate tools into one system:
 | Database | PostgreSQL (EF Core 10 + Npgsql) |
 | Cache / locks | Redis |
 | Scheduler | Quartz.NET |
-| Identity / Auth | ASP.NET Core Identity + OpenIddict |
+| Identity / Auth | External OIDC provider for the Web UI sign-in (see [multi-user-auth](docs/self-hosting/multi-user-auth.md)); API key between services. OpenIddict is not used (ADR 0001) |
 | Testing | xUnit, FluentAssertions, Testcontainers, Playwright E2E, TinyBDD, PatternKit.Core (dogfooded) |
 | Observability | OpenTelemetry, Aspire dashboard |
 | Security | CodeQL, Dependabot, SCA via dotnet list package --vulnerable |

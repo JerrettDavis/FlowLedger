@@ -1,5 +1,7 @@
 # ADR 0004 — Sync Cursor Persistence
 
+Status: Accepted
+
 ## Context
 MX syncs can be partial (the API returns a cursor for pagination). If the process restarts mid-sync, we need to resume rather than re-fetch everything.
 

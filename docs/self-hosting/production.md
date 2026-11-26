@@ -1,8 +1,70 @@
 # Production Hardening & Secrets
 
-This guide covers what you must do before exposing a FlowLedger instance to real users
-or real financial data. Read it before switching `Mx__Enabled` to `true` in a non-dev
-environment.
+This guide is the ordered runbook for exposing a FlowLedger instance to real users or real
+financial data. Follow the steps in [Go-live runbook](#go-live-runbook) in order; the sections
+after it are the reference material each step points to. Read it before switching any real
+provider on (`Mx__Enabled`, `SimpleFin__Enabled`, `Quiltt__Enabled`) in a non-dev environment.
+
+> **Compose forwards only some settings.** `docker-compose.yml` passes an explicit list of
+> variables to the containers and hard-codes `Mx__Enabled=false`. Settings that are not in
+> that list (providers, backups, `Integrations__EncryptionKey`, `ForwardedHeaders__Enabled`,
+> `Worker__MaxParallelTenants`, ...) must be added to the `environment:` of the `api`/`worker`/`web`
+> services in a `docker-compose.override.yml`. See [.env.example](../../.env.example).
+
+## Go-live runbook
+
+1. **Secrets and database.** Set `POSTGRES_PASSWORD` and `API__KEY` to strong random values
+   (`openssl rand -hex 32`). Keep Postgres on loopback or a private network and enable TLS if it
+   is remote ([database.md](database.md)). See [Supplying secrets](#supplying-secrets-in-production).
+2. **Sign-in.** Configure OIDC (`Auth__Oidc__*`, [multi-user-auth.md](multi-user-auth.md)). Without
+   it the Web UI has no login and refuses to start outside Development. Set
+   `AUTH__ALLOWANONYMOUS=true` only on a trusted single-user host where every port stays bound
+   to `127.0.0.1`. For multi-user stacks also set `Api__TenantSigningKey` (same value on api and web).
+3. **TLS and proxy.** Put a TLS reverse proxy in front of the Web UI
+   ([TLS termination](#tls-termination)) and, if the proxy is the only path to the Web port, set
+   `ForwardedHeaders__Enabled=true` ([Reverse proxy / TLS](#reverse-proxy--tls)).
+4. **Encryption keys.** Set `HomeAssistant__EncryptionKey` (and `Integrations__EncryptionKey` if you
+   use integrations) to `openssl rand -base64 32`, the same value on `api` and `worker`. Without a
+   key FlowLedger refuses to store webhook URLs and integration credentials.
+5. **Backups.** Configure off-site backups (restic, `Backup__Restic__*`, `B2_ACCOUNT_*`) and run
+   **Back up now** on the Data & Backups page; confirm it shows an off-site copy. Back up the raw
+   payload archive volume (`objects_data`) as well. Details and recovery:
+   [backups-and-recovery.md](backups-and-recovery.md). The built-in backup is a daily logical
+   snapshot (RPO up to 24 hours; see [database.md](database.md)).
+6. **Fresh database for real data.** Real data must go into a database that never held demo or
+   sandbox data. The `data_environment` marker (`demo` / `sandbox` / `production`) makes the API and
+   Worker refuse to start when it disagrees with the provider settings; follow
+   [Switching from demo/sandbox to real data](backups-and-recovery.md#switching-from-demosandbox-to-real-data).
+7. **Providers.** Enable exactly the provider you intend, with its credentials from a secrets
+   manager: MX ([mx-integration.md](../architecture/mx-integration.md), `Mx__Environment=production`,
+   `Mx__BaseUrl=https://api.mx.com`), SimpleFIN (`SimpleFin__Enabled`, `SimpleFin__AccessUrl`), or
+   Quiltt (`Quiltt__Enabled`, `Quiltt__Environment=production`,
+   [ADR 0017](../adr/0017-quiltt-embedded-connector.md)). Set the API cost budgets
+   (`Mx__Provider__DailyCallBudget`, `Mx__Provider__MonthlyCallBudget`) if you use MX.
+8. **Data admin endpoints.** `GET /api/data/export`, `POST /api/data/import` and
+   `POST /api/data/backup-now` accept loopback callers only. Leave `DataAdmin__AllowRemote` unset
+   unless you understand the exposure; never publish these through the proxy.
+9. **Observability.** Wire `OTEL_EXPORTER_OTLP_ENDPOINT` if you want traces, metrics and logs
+   exported. Application logs are not redacted (see [SECURITY.md](../../SECURITY.md)); treat the
+   telemetry backend as sensitive.
+10. **Verify** with the checklist below, then take a fresh backup.
+
+### Checklist before going live
+
+- [ ] `POSTGRES_PASSWORD` is a strong random value (compose refuses to start without one).
+- [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
+- [ ] OIDC sign-in is configured, or `AUTH__ALLOWANONYMOUS=true` is set deliberately on a trusted single-user host.
+- [ ] Postgres and Redis ports are not exposed to the public internet; Postgres uses TLS if remote.
+- [ ] TLS termination is in place; all HTTP redirects to HTTPS; only the Web UI (and provider webhook endpoints) are exposed.
+- [ ] `ForwardedHeaders__Enabled=true` if a proxy terminates TLS in front of the Web app.
+- [ ] `HomeAssistant__EncryptionKey` / `Integrations__EncryptionKey` are set (if those features are used) and shared by api and worker.
+- [ ] Real data is in a fresh database; the `data_environment` marker is `production`.
+- [ ] Exactly one real provider is enabled and points at its production endpoint (e.g. `Mx__BaseUrl=https://api.mx.com`, `Quiltt__Environment=production`); `Mx__Enabled=false` if you are not using MX.
+- [ ] Secrets live in a secrets manager, not in a `.env` on the server.
+- [ ] Off-site backup (restic) is configured, **Back up now** succeeded and the Data & Backups page is green.
+- [ ] The `postgres_data` and `objects_data` volumes are covered by your host backups or snapshots.
+- [ ] `DataAdmin__AllowRemote` is unset and `/api/data/*` is not reachable through the proxy.
+- [ ] `OTEL_EXPORTER_OTLP_ENDPOINT` is set if you want telemetry exported.
 
 ## The simulated-vs-real toggle
 
@@ -144,18 +206,6 @@ permanently lost.
   database is not on the same private network as the app. The compose connection string
   has no TLS option; see [database.md](database.md) for an override example, pool sizing,
   RPO/RTO and the major-version upgrade procedure.
-
-## Checklist before going live
-
-- [ ] `POSTGRES_PASSWORD` is a strong random value (not the default).
-- [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
-- [ ] Postgres port is not exposed to the public internet.
-- [ ] TLS termination is in place; all HTTP redirects to HTTPS.
-- [ ] `Mx__Enabled=false` (or credentials are set and verified if enabling MX).
-- [ ] `Mx__BaseUrl=https://api.mx.com` (not the sandbox URL) if using live MX data.
-- [ ] Secrets are stored in a secrets manager, not in `.env` on the server.
-- [ ] OTLP telemetry is wired up for observability (`OTEL_EXPORTER_OTLP_ENDPOINT`).
-- [ ] Backups are configured for the `postgres_data` volume.
 
 ## Reverse proxy / TLS
 
