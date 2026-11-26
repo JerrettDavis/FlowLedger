@@ -102,7 +102,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public FlowLedger.Web.ApiClient.AssetDto? Asset { get; set; }
-    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
     [Parameter] public List<FlowLedger.Web.ApiClient.AssetCategoryTemplateDto> Templates { get; set; } = [];
 
     private sealed class Row { public string Key { get; set; } = ""; public string Value { get; set; } = ""; }

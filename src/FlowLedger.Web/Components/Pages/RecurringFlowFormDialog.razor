@@ -77,7 +77,7 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public FlowLedger.Web.ApiClient.RecurringFlowDto? Flow { get; set; }
-    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
 
     private MudForm _form = default!;
     private string _name = "";

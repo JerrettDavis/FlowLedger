@@ -16,6 +16,7 @@ COPY Directory.Packages.props     Directory.Packages.props
 COPY src/FlowLedger.Api/FlowLedger.Api.csproj                                         src/FlowLedger.Api/
 COPY src/FlowLedger.Application/FlowLedger.Application.csproj                         src/FlowLedger.Application/
 COPY src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj                   src/FlowLedger.Infrastructure/
+COPY src/FlowLedger.Contracts/FlowLedger.Contracts.csproj                                 src/FlowLedger.Contracts/
 COPY src/FlowLedger.Domain/FlowLedger.Domain.csproj                                   src/FlowLedger.Domain/
 COPY src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj                       src/FlowLedger.SharedKernel/
 COPY src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj                 src/FlowLedger.ServiceDefaults/

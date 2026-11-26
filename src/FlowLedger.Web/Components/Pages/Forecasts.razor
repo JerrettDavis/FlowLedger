@@ -301,7 +301,7 @@ else
     private string? _error;
     private int _horizonMonths = 3;
     private FlowLedger.Web.ApiClient.ForecastResultDto? _forecast;
-    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private IReadOnlyCollection<Guid> _selectedIds = new HashSet<Guid>();
     private string _view = "aggregate";
 

@@ -219,8 +219,8 @@
     private string? _error;
 
     private List<FlowLedger.Web.ApiClient.TransactionDto> _transactions = [];
-    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
-    private List<FlowLedger.Web.ApiClient.CategoryDto> _categories = [];
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
+    private List<FlowLedger.Contracts.CategoryDto> _categories = [];
 
     private DateTime? _fromDate;
     private DateTime? _toDate;
@@ -234,9 +234,9 @@
     private int _loadSeq;
 
     private List<FlowLedger.Web.ApiClient.TransactionDto> _visible = [];
-    private Dictionary<Guid, FlowLedger.Web.ApiClient.CategoryDto> _categoryById = [];
-    private List<FlowLedger.Web.ApiClient.CategoryDto> _sortedCategories = [];
-    private Dictionary<Guid, FlowLedger.Web.ApiClient.AccountDto> _accountById = [];
+    private Dictionary<Guid, FlowLedger.Contracts.CategoryDto> _categoryById = [];
+    private List<FlowLedger.Contracts.CategoryDto> _sortedCategories = [];
+    private Dictionary<Guid, FlowLedger.Contracts.AccountDto> _accountById = [];
 
     private List<FlowLedger.Web.ApiClient.TransactionDto> Visible => _visible;
 
@@ -344,7 +344,7 @@
 
     private Task OnIncludeHiddenChanged(bool value) { _includeHidden = value; return LoadAsync(); }
 
-    private async Task SetCategory(FlowLedger.Web.ApiClient.TransactionDto tx, FlowLedger.Web.ApiClient.CategoryDto category)
+    private async Task SetCategory(FlowLedger.Web.ApiClient.TransactionDto tx, FlowLedger.Contracts.CategoryDto category)
     {
         try
         {
