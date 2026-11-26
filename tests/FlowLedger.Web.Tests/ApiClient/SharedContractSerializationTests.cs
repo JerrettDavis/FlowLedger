@@ -63,6 +63,35 @@ public sealed class SharedContractSerializationTests
     }
 
     [Fact]
+    public void TransactionDto_and_dashboard_activity_round_trip_between_API_and_Web_options()
+    {
+        var tx = new TransactionDto(
+            Guid.Parse("33333333-3333-3333-3333-333333333333"), Guid.Parse("11111111-1111-1111-1111-111111111111"), -5.5m, "USD",
+            "Outflow", "Coffee", "Posted", "Manual", new DateOnly(2026, 1, 2), null, null, "Cafe", null, null,
+            new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero), null, ["a"], [new TransactionSplitDto(1m, null, null)]);
+
+        var json = JsonSerializer.Serialize(tx, ApiOptions);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            Assert.Equal("Coffee", doc.RootElement.GetProperty("description").GetString());
+            Assert.Equal("2026-01-02", doc.RootElement.GetProperty("effectiveDate").GetString());
+        }
+
+        var back = JsonSerializer.Deserialize<TransactionDto>(json, WebOptions)!;
+        Assert.Equal(tx.Id, back.Id);
+        Assert.Equal(["a"], back.Tags);
+        Assert.Single(back.Splits!);
+
+        var activity = new DashboardActivityDto([tx], [], 0m, [], 500m, [new FlaggedTransactionDto(tx, ["big"])], 1m, 2m);
+        var activityBack = JsonSerializer.Deserialize<DashboardActivityDto>(JsonSerializer.Serialize(activity, ApiOptions), WebOptions)!;
+        Assert.Single(activityBack.RecentPosted);
+        Assert.Equal(["big"], activityBack.Suspicious[0].Reasons);
+
+        var create = new CreateTransactionRequest(tx.AccountId, 1m, "USD", "Inflow", "x", new DateOnly(2026, 1, 2), null, null, null, null);
+        Assert.Equal(create, JsonSerializer.Deserialize<CreateTransactionRequest>(JsonSerializer.Serialize(create, WebOptions), ApiOptions));
+    }
+
+    [Fact]
     public void CategoryDto_and_requests_round_trip_with_camelCase_names()
     {
         var category = new CategoryDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Food.Dining", "Dining", false, null);

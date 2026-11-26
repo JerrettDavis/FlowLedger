@@ -43,7 +43,7 @@
     [Parameter] public string Description { get; set; } = "";
     [Parameter] public decimal Total { get; set; }
     [Parameter] public Guid? CurrentCategoryId { get; set; }
-    [Parameter] public List<FlowLedger.Web.ApiClient.TransactionSplitDto>? Existing { get; set; }
+    [Parameter] public List<FlowLedger.Contracts.TransactionSplitDto>? Existing { get; set; }
     [Parameter] public List<FlowLedger.Contracts.CategoryDto> Categories { get; set; } = [];
 
     private sealed class Row
@@ -77,8 +77,8 @@
 
     private void Cancel() => MudDialog.Cancel();
 
-    private void Clear() => MudDialog.Close(DialogResult.Ok(new List<FlowLedger.Web.ApiClient.TransactionSplitDto>()));
+    private void Clear() => MudDialog.Close(DialogResult.Ok(new List<FlowLedger.Contracts.TransactionSplitDto>()));
 
     private void Save() => MudDialog.Close(DialogResult.Ok(
-        _rows.Select(r => new FlowLedger.Web.ApiClient.TransactionSplitDto(r.Amount, r.CategoryId, r.Notes)).ToList()));
+        _rows.Select(r => new FlowLedger.Contracts.TransactionSplitDto(r.Amount, r.CategoryId, r.Notes)).ToList()));
 }
