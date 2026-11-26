@@ -55,6 +55,8 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<GoalRecord> Goals => Set<GoalRecord>();
     internal DbSet<CategoryRuleRecord> CategoryRules => Set<CategoryRuleRecord>();
     internal DbSet<MerchantAliasRecord> MerchantAliases => Set<MerchantAliasRecord>();
+    internal DbSet<DuplicateDismissalRecord> DuplicateDismissals => Set<DuplicateDismissalRecord>();
+    internal DbSet<MergedTransactionRecord> MergedTransactions => Set<MergedTransactionRecord>();
     internal DbSet<IntegrationDeliveryRecord> IntegrationDeliveries => Set<IntegrationDeliveryRecord>();
     internal DbSet<IntegrationRecord> Integrations => Set<IntegrationRecord>();
     internal DbSet<HomeAssistantSentRecord> HomeAssistantSent => Set<HomeAssistantSentRecord>();
@@ -108,6 +110,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new HomeAssistantSentRecordConfiguration());
         modelBuilder.ApplyConfiguration(new IntegrationRecordConfiguration());
         modelBuilder.ApplyConfiguration(new IntegrationDeliveryRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new MergedTransactionRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new DuplicateDismissalRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
@@ -159,6 +163,10 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.Entity<IntegrationRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
         modelBuilder.Entity<IntegrationDeliveryRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<MergedTransactionRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<DuplicateDismissalRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 
