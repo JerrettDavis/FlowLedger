@@ -264,7 +264,7 @@ else
         }
         catch (Exception ex)
         {
-            _callError = ex.Message;
+            _callError = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {
@@ -306,7 +306,7 @@ else
         }
         catch (Exception ex)
         {
-            _soapError = ex.Message;
+            _soapError = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {

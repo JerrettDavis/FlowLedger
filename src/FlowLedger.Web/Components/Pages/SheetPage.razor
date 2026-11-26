@@ -262,7 +262,7 @@
         }
         catch (ApiClientException ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
             Logger.LogError(ex, "Failed to load sheet");
         }
         finally

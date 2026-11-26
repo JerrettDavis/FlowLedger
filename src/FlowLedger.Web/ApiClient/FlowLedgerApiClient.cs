@@ -425,7 +425,8 @@ public sealed class FlowLedgerApiClient
         throw new ApiClientException(
             detail is { Length: > 0 } ? detail : $"Couldn't {description} (server returned {(int)response.StatusCode}).",
             response.StatusCode,
-            problem: problem.Extensions);
+            problem: problem.Extensions,
+            fieldErrors: problem.FieldErrors);
     }
 
     private static async Task<ProblemDocument> ReadProblemAsync(HttpResponseMessage response, CancellationToken ct)
