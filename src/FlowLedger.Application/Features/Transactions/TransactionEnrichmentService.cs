@@ -11,33 +11,42 @@ public sealed record EnrichmentResult(int Tagged, int Named);
 /// </summary>
 public sealed class TransactionEnrichmentService(ICategorizationStore store)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public async Task<EnrichmentResult> RunAsync(CancellationToken ct = default)
     {
         int tagged = 0, named = 0;
-        foreach (var t in await store.LoadTrackedAsync(Max, ct))
+        var changedRows = new List<FlowLedger.Domain.Aggregates.Transaction>();
+        foreach (var t in await store.LoadAsync(Max, ct))
         {
-            if (t.Status is TransactionStatus.Planned or TransactionStatus.Skipped)
+            if (!t.Status.IsReal())
             {
                 continue;
             }
 
+            var touched = false;
             if (t.SetSuggestedName(MerchantNameSuggester.Suggest(t.Description)))
             {
                 named++;
+                touched = true;
             }
 
             var tags = AutoTagger.Suggest(t.MerchantName, t.Description, t.Direction.ToString(), t.Amount.Amount, t.Status);
             if (t.ApplyAutoTags(tags, AutoTagger.Vocabulary))
             {
                 tagged++;
+                touched = true;
+            }
+
+            if (touched)
+            {
+                changedRows.Add(t);
             }
         }
 
         if (tagged + named > 0)
         {
-            await store.SaveAsync(ct);
+            await store.SaveChangedAsync(changedRows, ct);
         }
 
         return new EnrichmentResult(tagged, named);

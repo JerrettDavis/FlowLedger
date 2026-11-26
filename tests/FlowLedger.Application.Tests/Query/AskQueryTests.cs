@@ -20,6 +20,7 @@ public sealed class AskQueryTests
     private sealed class NoHistory : IBalanceHistoryReader
     {
         public Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<BalancePoint>>([]);
+        public Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(DateOnly from, DateOnly? to = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<BalancePoint>>([]);
     }
 
     private sealed class ScriptedTranslator(params string[] replies) : IQueryTranslator

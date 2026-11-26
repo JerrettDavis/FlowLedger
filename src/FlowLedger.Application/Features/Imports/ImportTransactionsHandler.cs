@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.SharedKernel;
@@ -38,7 +39,7 @@ public sealed class ImportTransactionsHandler
     ];
 
     /// <summary>Upper bound on rows per import, so a single request cannot flood a tenant (and the database).</summary>
-    public const int MaxImportRows = 50_000;
+    public const int MaxImportRows = TransactionQuota.ProcessingCap;
 
     private readonly ITransactionRepository _txRepo;
     private readonly IAccountRepository _accountRepo;

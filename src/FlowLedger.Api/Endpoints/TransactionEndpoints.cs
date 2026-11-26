@@ -34,7 +34,7 @@ internal static class TransactionEndpoints
             ListTransactionsHandler handler,
             CancellationToken ct) =>
         {
-            const int Page = 500, Cap = 50_000;
+            const int Page = 500, Cap = TransactionQuota.ProcessingCap;
             var all = new List<TransactionDto>();
             for (var skip = 0; all.Count < Cap; skip += Page)
             {

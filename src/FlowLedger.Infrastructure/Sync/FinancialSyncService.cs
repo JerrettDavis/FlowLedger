@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
@@ -38,6 +39,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly IProviderAccountCatalog? _catalog;
     private readonly bool _autoCreateAccounts;
     private readonly IProviderConnectionStore? _health;
+
+    /// <summary>Per-tenant stored-transaction ceiling the provider path enforces; tests lower it.</summary>
+    internal int MaxTransactionsPerTenant { get; init; } = TransactionQuota.MaxPerTenant;
 
     /// <param name="configuration">
     /// When supplied (always, via DI), real providers are restricted to the configured household (legacy) tenant:
@@ -465,6 +469,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Pending fingerprints the provider (re)reported during this sync; only the others can be considered stale.
         var seenPending = new HashSet<string>(StringComparer.Ordinal);
 
+        // The provider path obeys the same per-tenant ceiling as manual create and import (#166).
+        var stored = await _db.Transactions.CountAsync(ct);
+
         bool hasMore = true;
         while (hasMore)
         {
@@ -608,6 +615,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
                 if (toInsert.Count > 0)
                 {
+                    EnsureQuotaRoom(stored, toInsert.Count);
+                    stored += toInsert.Count;
                     await _db.Transactions.AddRangeAsync(toInsert, ct);
                     added += toInsert.Count;
                     foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
@@ -635,6 +644,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             // Persist cursor after each successful page so a mid-sync crash resumes
             // from the last committed position rather than re-fetching from the beginning.
             await _cursorStore.SetAsync(_provider.ProviderName, providerAccountId, cursor.Value, ct);
+
+            // Everything above is now committed. Keep only rows that can still change in this sync (pending ones) tracked;
+            // otherwise a long backfill grows the change tracker to the whole history and every SaveChanges rescans it (#163).
+            DetachCommittedTransactions(insertedByFingerprint);
         }
 
         // Authorizations the provider never settled or re-reported (cancelled holds, fuel pre-auths) must not count as
@@ -653,6 +666,40 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
 
         return (added, skipped);
+    }
+
+    private void EnsureQuotaRoom(int stored, int adding)
+    {
+        try
+        {
+            TransactionQuota.EnsureRoom(stored, adding, MaxTransactionsPerTenant);
+        }
+        catch (TransactionQuotaExceededException ex)
+        {
+            _logger.LogWarning("Sync stopped: {Message}", ex.Message);
+            throw new NeedsUserActionProviderException(
+                ex.Message, "Remove old transactions (or ask the administrator to raise the limit), then sync again.", "transaction_quota_exceeded")
+            {
+                Kind = ProviderIssueKind.Internal,
+            };
+        }
+    }
+
+    /// <summary>Stops tracking saved transactions that cannot change again during this sync (anything not Pending).</summary>
+    private void DetachCommittedTransactions(Dictionary<string, Transaction> insertedByFingerprint)
+    {
+        foreach (var entry in _db.ChangeTracker.Entries<Transaction>().ToList())
+        {
+            if (entry.State == EntityState.Unchanged && entry.Entity.Status != TransactionStatus.Pending)
+            {
+                if (entry.Entity.Fingerprint is { } fp)
+                {
+                    insertedByFingerprint.Remove(fp.Value);
+                }
+
+                entry.State = EntityState.Detached;
+            }
+        }
     }
 
     private static TransactionFingerprint BuildFingerprint(AccountId accountId, ProviderTransaction pt)
