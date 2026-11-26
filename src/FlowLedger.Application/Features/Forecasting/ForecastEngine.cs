@@ -209,8 +209,10 @@ public sealed class ForecastEngine : IForecastEngine
 
         // ── 1. Actual transactions (already realized) ─────────────────────────
         // Only include transactions with statuses that are "real" (not planned).
-        // Actuals within the horizon are included regardless of asOf; they represent
-        // already-settled reality the starting balance may not yet reflect.
+        // The starting balance is the account balance as of asOf, so anything already settled on or before
+        // asOf is inside it and must not be applied again. Pending items are not yet in the settled balance, so
+        // they are applied (a pending item dated before the horizon lands on its first day); anything dated
+        // after asOf has not yet been reflected either.
         foreach (var tx in actuals)
         {
             if (tx.Status is TransactionStatus.Planned or TransactionStatus.Skipped
@@ -219,13 +221,20 @@ public sealed class ForecastEngine : IForecastEngine
                 continue;
             }
 
-            if (tx.EffectiveDate < horizon.Start || tx.EffectiveDate > horizonEnd)
+            var isPending = tx.Status == TransactionStatus.Pending;
+            if (!isPending && tx.EffectiveDate <= asOf)
+            {
+                continue; // already reflected in the starting balance
+            }
+
+            if (tx.EffectiveDate > horizonEnd || (tx.EffectiveDate < horizon.Start && !isPending))
             {
                 continue;
             }
 
             var delta = SignedDelta(tx.Amount, tx.Direction);
-            events.Add((tx.EffectiveDate, new ForecastLineItem
+            var eventDate = tx.EffectiveDate < horizon.Start ? horizon.Start : tx.EffectiveDate;
+            events.Add((eventDate, new ForecastLineItem
             {
                 Source = ForecastItemSource.ActualTransaction,
                 SourceId = tx.TransactionId.Value,
