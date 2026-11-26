@@ -328,11 +328,8 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
 
-        services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlRecurringDismissalStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.RecurringFlows.IRecurringDismissalStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfRecurringDismissalStore>();
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>
