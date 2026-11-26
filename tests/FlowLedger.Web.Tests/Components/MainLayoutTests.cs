@@ -29,9 +29,27 @@ public sealed class MainLayoutTests : BunitContext, IAsyncLifetime
         }
     }
 
-    private CountingHandler Arrange(string environment = "demo")
+    private CountingHandler Arrange(string environment = "demo") => Arrange(new CountingHandler(environment));
+
+    private sealed class SyncHandler(HttpStatusCode syncStatus) : HttpMessageHandler
     {
-        var handler = new CountingHandler(environment);
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/sync")
+            {
+                return Task.FromResult(new HttpResponseMessage(syncStatus) { Content = new StringContent("null", Encoding.UTF8, "application/json") });
+            }
+
+            var json = path == "/api/environment"
+                ? """{"environment":"production","isProduction":true}"""
+                : """{"environment":"x","backup":{"healthy":true,"stale":false,"offsiteConfigured":true,"lastSuccessUtc":null,"lastRun":null,"runs":[]},"providerUsage":{"provider":"x","callsToday":0,"callsThisMonth":0,"dailyBudget":1,"monthlyBudget":1,"paused":false,"byEndpoint":[]}}""";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+        }
+    }
+
+    private T Arrange<T>(T handler) where T : HttpMessageHandler
+    {
         Services.AddMudServices();
         Services.AddSingleton(new FlowLedgerApiClient(
             new HttpClient(handler) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
@@ -58,6 +76,28 @@ public sealed class MainLayoutTests : BunitContext, IAsyncLifetime
         var status = cut.Find("[data-testid=sync-status]");
         status.GetAttribute("role").Should().Be("status");
         status.GetAttribute("aria-live").Should().Be("polite");
+    }
+
+    [Fact]
+    public void Successful_sync_is_announced_in_the_polite_live_region()
+    {
+        Arrange(new SyncHandler(HttpStatusCode.OK));
+        var cut = RenderLayout();
+
+        cut.Find("button[aria-label='Sync now']").Click();
+
+        cut.WaitForAssertion(() => cut.Find("[data-testid=sync-status]").TextContent.Should().Contain("Sync complete"));
+    }
+
+    [Fact]
+    public void Failed_sync_is_announced_without_raw_exception_text()
+    {
+        Arrange(new SyncHandler(HttpStatusCode.InternalServerError));
+        var cut = RenderLayout();
+
+        cut.Find("button[aria-label='Sync now']").Click();
+
+        cut.WaitForAssertion(() => cut.Find("[data-testid=sync-status]").TextContent.Should().Contain("Sync failed"));
     }
 
     [Fact]

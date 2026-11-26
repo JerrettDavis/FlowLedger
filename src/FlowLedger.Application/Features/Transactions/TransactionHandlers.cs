@@ -21,7 +21,7 @@ public sealed class ListTransactionsHandler
             ? AccountId.From(query.AccountId.Value)
             : null;
 
-        var txs = await _repo.ListAsync(accountId, query.From, query.To, query.Skip, query.Take, ct, everydayOnly: !query.IncludeHidden);
+        var txs = await _repo.ListAsync(accountId, query.From, query.To, query.Skip, query.Take, ct, everydayOnly: !query.IncludeHidden, search: query.Search);
         return txs.Select(TransactionMapper.ToDto).ToList().AsReadOnly();
     }
 }

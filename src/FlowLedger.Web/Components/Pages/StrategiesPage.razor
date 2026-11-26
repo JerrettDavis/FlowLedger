@@ -1,4 +1,4 @@
-@page "/strategies"
+﻿@page "/strategies"
 @using FlowLedger.Web.ApiClient
 @inject FlowLedgerApiClient ApiClient
 @implements IDisposable
@@ -62,7 +62,9 @@ else
         <MudPaper Class="pa-4 mb-4" Outlined="true">
             <MudText Typo="Typo.subtitle1">Cash trajectory (next 12 months)</MudText>
             <MudText Class="mb-2">@tr.Summary</MudText>
-            <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_trajSeries" ChartLabels="@_trajLabels" Width="100%" Height="220px" />
+            <ChartFigure Title="Cash trajectory" Summary="@SeriesSummary("Cash trajectory", _trajLabels, _trajSeries)">
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_trajSeries" ChartLabels="@_trajLabels" Width="100%" Height="220px" />
+            </ChartFigure>
             <MudText Typo="Typo.caption" Class="fl-muted">Trend of your recent monthly net cash flow, damped toward the average. The low/high lines are an approximate 80% range.</MudText>
         </MudPaper>
     }
@@ -153,7 +155,9 @@ else
                     </MudText>
                     <MudText Typo="Typo.caption" Class="fl-muted">Scenario saves @Format.Money(_goal.ScenarioMonthly)/mo. Your recent surplus is @Format.Money(_goal.Surplus)/mo.@(_goal.RequiredMonthly is { } rq ? $" To hit the deadline you need {Format.Money(rq)}/mo." : "")</MudText>
                 </MudPaper>
+                <ChartFigure Title="Goal progress projection" Summary="@SeriesSummary("Goal progress projection", _goalLabels, _goalSeries)">
                 <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_goalSeries" ChartLabels="@_goalLabels" Width="100%" Height="260px" />
+            </ChartFigure>
                 @if (_goal.Callouts.Count > 0)
                 {
                     <MudAlert Severity="Severity.Info" Class="mb-2" Dense="true">
@@ -189,7 +193,9 @@ else
             @if (_growth is not null)
             {
                 <MudText Class="fl-num mt-3">After @_gYears years: @Format.Money(_growth.Baseline[^1].Balance) → @Format.Money(_growth.Scenario[^1].Balance) (<b>@(_growth.Difference >= 0 ? "+" : "")@Format.Money(_growth.Difference)</b>)</MudText>
+                <ChartFigure Title="Growth projection" Summary="@SeriesSummary("Growth projection", _growthLabels, _growthSeries)">
                 <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_growthSeries" ChartLabels="@_growthLabels" Width="100%" Height="260px" />
+            </ChartFigure>
             }
         </MudTabPanel>
         <MudTabPanel Text="What if (past)">
@@ -207,7 +213,9 @@ else
             @if (_past is not null)
             {
                 <MudText Class="fl-num mt-3">You would have <b>@Format.Money(_past.TotalExtra)</b> more: @Format.Money(_past.FromSaving) saved plus @Format.Money(_past.FromYield) of growth and yield.</MudText>
+                <ChartFigure Title="Past what-if extra wealth" Summary="@SeriesSummary("Past what-if extra wealth", _pastLabels, _pastSeries)">
                 <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_pastSeries" ChartLabels="@_pastLabels" Width="100%" Height="240px" />
+            </ChartFigure>
             }
         </MudTabPanel>
         <MudTabPanel Text="Refinance">
@@ -299,6 +307,9 @@ else
     }
 
     private List<RateRow> _rateRows = [];
+    private static string SeriesSummary(string subject, string[] labels, List<ChartSeries<double>> series) =>
+        ChartSummary.Series(subject, labels, series.Select(x => (x.Name, x.Data.ToArray())), v => Format.Money((decimal)v));
+
     private List<ChartSeries<double>> _trajSeries = [];
     private string[] _trajLabels = [];
     private static readonly HashSet<string> RateTypes = new(StringComparer.OrdinalIgnoreCase) { "Checking", "Savings", "CreditCard", "Loan", "Mortgage" };

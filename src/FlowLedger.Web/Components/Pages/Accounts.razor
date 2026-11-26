@@ -268,7 +268,7 @@
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to create account");
-                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't create account. Please try again.", Severity.Error);
+                Snackbar.AddFailure(ex, fallback: "Couldn't create account. Please try again.");
             }
         }
     }
@@ -303,7 +303,7 @@
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to update account {AccountId}", account.Id);
-                Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Couldn't update account. Please try again.", Severity.Error);
+                Snackbar.AddFailure(ex, fallback: "Couldn't update account. Please try again.");
             }
         }
     }

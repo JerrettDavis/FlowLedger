@@ -109,7 +109,7 @@
         }
         catch (FlowLedger.Web.ApiClient.ApiClientException ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {
