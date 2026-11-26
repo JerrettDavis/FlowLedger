@@ -14,6 +14,17 @@ internal sealed class ProviderExceptionHandler(IProblemDetailsService problems) 
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        if (exception is FlowLedger.Application.Abstractions.ReferencedEntityNotFoundException missing)
+        {
+            // A foreign id and a missing id are deliberately indistinguishable (#146).
+            return await WriteAsync(httpContext, exception, new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = $"{missing.Kind} not found",
+                Detail = missing.Message,
+            });
+        }
+
         if (exception is not ProviderException pe)
         {
             return false;
