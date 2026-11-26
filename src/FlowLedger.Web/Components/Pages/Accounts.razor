@@ -251,22 +251,18 @@
 
     private async Task OpenCreateDialog()
     {
+        // The dialog performs the create and stays open on failure, so field-level API errors land on their fields.
         var dialog = await DialogService.ShowAsync<AccountFormDialog>("Create Account",
-            new DialogParameters<AccountFormDialog> { { x => x.Account, null } });
+            new DialogParameters<AccountFormDialog>
+            {
+                { x => x.Account, null },
+                { x => x.CreateAsync, async req => { await ApiClient.CreateAccountAsync(req); } },
+            });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateAccountRequest req })
+        if (result is { Canceled: false })
         {
-            try
-            {
-                await ApiClient.CreateAccountAsync(req);
-                Snackbar.Add("Account created", Severity.Success);
-                await LoadAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to create account");
-                Snackbar.AddFailure(ex, fallback: "Couldn't create account. Please try again.");
-            }
+            Snackbar.Add("Account created", Severity.Success);
+            await LoadAsync();
         }
     }
 
