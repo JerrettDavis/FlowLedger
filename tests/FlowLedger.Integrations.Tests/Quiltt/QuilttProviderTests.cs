@@ -153,6 +153,44 @@ public sealed class QuilttProviderTests
         calls.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Transactions_HittingMaxPages_ContinueInTheSyncLoopInsteadOfFailing()
+    {
+        // Five days of rows, one per day, two rows per page and a one-page bound: the read is cut every time.
+        var d0 = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-10);
+        var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
+        var stub = new Stub((req, body) =>
+        {
+            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
+            var from = DateOnly.Parse(System.Text.RegularExpressions.Regex.Match(body, "\"from\":\"([0-9-]+)\"").Groups[1].Value);
+            var remaining = rows.Where(r => r.Date >= from).ToList();
+            var nodes = string.Join(",", remaining.Take(2).Select(r =>
+                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd") + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}}"));
+            return Json("{\"data\":{\"transactions\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + (remaining.Count > 2 ? "true" : "false") + ",\"endCursor\":\"c\"}}}}");
+        });
+        var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", MaxPages = 1, PageSize = 2, OverlapDays = 3 });
+        await p.GetAccountsAsync("p_1");
+
+        // The loop FinancialSyncService runs: persist the cursor, call again while HasMore.
+        var cursor = SyncCursor.Initial;
+        var seen = new List<string>();
+        var guard = 0;
+        bool more;
+        do
+        {
+            var page = await p.GetTransactionsAsync("acc_1", cursor);
+            seen.AddRange(page.Items.Select(i => i.ProviderId!));
+            cursor = page.NextCursor;
+            more = page.HasMore;
+            (++guard).Should().BeLessThan(20, "the continuation must make progress");
+        }
+        while (more);
+
+        seen.Distinct().Should().BeEquivalentTo(rows.Select(r => r.Id), "every row is delivered even though one read never holds them all");
+        guard.Should().BeGreaterThan(1, "the bound forced at least one continuation");
+    }
+
     [Theory]
     [InlineData("connection.synced.successful", true)]
     [InlineData("connection.synced.successful.initial", true)]

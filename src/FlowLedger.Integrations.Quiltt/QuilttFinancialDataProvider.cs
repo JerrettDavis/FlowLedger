@@ -25,7 +25,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
     private QuilttSession? _session;
     private Task<IReadOnlyList<QAccount>>? _accounts;
     private Task<IReadOnlyList<QConnectionNode>>? _connections;
-    private (DateOnly From, Task<IReadOnlyList<QTransaction>> Task)? _transactions;
+    private (DateOnly From, Task<QTransactionsRead> Task)? _transactions;
     private readonly Dictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
     internal QuilttFinancialDataProvider(
@@ -145,18 +145,42 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         { Kind = ProviderIssueKind.Internal };
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var from = cursor.IsInitial || !DateOnly.TryParse(cursor.Value, out var c)
+        // A continuation cursor ("c:yyyy-MM-dd") marks a backfill cut at the page bound; it resumes exactly there. Re-applying the
+        // overlap would step back over what the previous page covered and never finish.
+        var continuing = cursor.Value.StartsWith(ContinuationPrefix, StringComparison.Ordinal);
+        var cursorText = continuing ? cursor.Value[ContinuationPrefix.Length..] : cursor.Value;
+        var from = cursor.IsInitial || !DateOnly.TryParse(cursorText, out var c)
             ? today.AddDays(-Math.Max(1, _options.InitialHistoryDays))
-            : c.AddDays(-Math.Max(0, _options.OverlapDays));
+            : continuing ? c : c.AddDays(-Math.Max(0, _options.OverlapDays));
 
-        // One read serves every account; if a later account needs older history, read again from the earlier floor.
-        if (_transactions is not { } cached || from < cached.From)
+        // One read serves every account while it is complete; a bounded (truncated) read only serves the window it started at.
+        if (_transactions is not { } cached || from < cached.From || (from > cached.From && cached.Task.IsCompletedSuccessfully && cached.Task.Result.Truncated))
         {
             _transactions = (from, _client.ListTransactionsAsync(session.Token, from, cancellationToken));
         }
 
-        var all = await _transactions.Value.Task.ConfigureAwait(false);
+        var read = await _transactions.Value.Task.ConfigureAwait(false);
+        var all = read.Items;
         var fallback = _currencyByAccount.GetValueOrDefault(providerAccountId, "USD");
+
+        // The read is cut at MaxPages. Rows are ordered by date, so the last date seen may continue on the next page: deliver only
+        // the days before it and resume from there in the next sync-loop iteration instead of failing the whole sync.
+        DateOnly? cutAt = null;
+        if (read.Truncated)
+        {
+            var lastDate = all.Where(QuilttMapper.IsIngestible)
+                .Select(t => DateOnly.Parse(t.Date!, System.Globalization.CultureInfo.InvariantCulture))
+                .DefaultIfEmpty().Max();
+            if (lastDate > from)
+            {
+                cutAt = lastDate;
+            }
+            else
+            {
+                _logger.LogWarning("Quiltt returned {Max} pages inside one day; continuing is not possible, so this pass ends here.", _options.MaxPages);
+            }
+        }
+
         var forAccount = all
             .Where(t => string.Equals(t.Account?.Id, providerAccountId, StringComparison.Ordinal))
             .ToList();
@@ -171,15 +195,23 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
         var items = ingestible
             .Select(t => QuilttMapper.ToTransaction(t, fallback))
-            .Where(t => t.PostedDate >= from)
+            .Where(t => t.PostedDate >= from && (cutAt is null || t.PostedDate < cutAt.Value))
             .OrderBy(t => t.PostedDate)
             .ToList();
+
+        if (cutAt is { } cut)
+        {
+            _logger.LogInformation("Quiltt read was cut at {Max} pages; continuing from {Date}.", _options.MaxPages, cut);
+            return new TransactionPage(items, new SyncCursor(ContinuationPrefix + cut.ToString("yyyy-MM-dd")), HasMore: true) { SkippedCount = skipped };
+        }
 
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
         var next = settled == default ? cursor : new SyncCursor(settled.ToString("yyyy-MM-dd"));
         _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
         return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
+
+    private const string ContinuationPrefix = "c:";
 
     // ── Webhooks ─────────────────────────────────────────────────────────────
 
