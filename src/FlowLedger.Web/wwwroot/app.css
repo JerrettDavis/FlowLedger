@@ -1,3 +1,12 @@
+/* Inter (variable) is self-hosted; see wwwroot/fonts/Inter-LICENSE.txt (SIL OFL 1.1). */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("fonts/InterVariable.woff2") format("woff2");
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    Global typography and font smoothing
    ─────────────────────────────────────────────────────────────────────────── */

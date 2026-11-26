@@ -21,6 +21,14 @@ public sealed class SecurityHeadersTests
         csp.Should().NotMatchRegex("script-src[^;]*'unsafe-inline'");
     }
 
+    [Fact]
+    public void Csp_has_no_third_party_hosts()
+    {
+        var csp = SecurityHeaders.BuildCsp("abc123");
+
+        csp.Should().NotMatchRegex("https?://", "fonts are self-hosted so no external origin may be whitelisted");
+    }
+
     private sealed class ResponseFeature : HttpResponseFeature
     {
         private Func<Task>? _starting;
