@@ -20,6 +20,9 @@ public sealed class LocalAiOptions
     /// <summary>Where model files live. Empty = a "models" folder under the per-user local application-data directory.</summary>
     public string ModelDirectory { get; set; } = string.Empty;
 
+    /// <summary>A model download is aborted when no bytes arrive for this long (stalled connection). Applies to the response headers and to every read.</summary>
+    public TimeSpan DownloadInactivityTimeout { get; set; } = TimeSpan.FromMinutes(2);
+
     /// <summary>Allow the owner to download catalog models (pinned URL + SHA-256) from the UI. Off = place the files by hand.</summary>
     public bool AllowModelDownload { get; set; } = true;
 

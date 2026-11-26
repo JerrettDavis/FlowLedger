@@ -9,7 +9,11 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// Owns the model directory: reports what is installed, downloads catalog models (explicit, owner-initiated, one at a time,
 /// size- and SHA-256-verified, atomically moved into place) and removes them. Nothing downloads at startup.
 /// </summary>
-public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory http, ILogger<LocalModelManager> logger) : ILocalAiModels
+public sealed class LocalModelManager(
+    LocalAiOptions options,
+    IHttpClientFactory http,
+    ILogger<LocalModelManager> logger,
+    Microsoft.Extensions.Hosting.IHostApplicationLifetime? lifetime = null) : ILocalAiModels
 {
     public const string HttpClientName = "local-ai-models";
     private static readonly string[] AllowedHosts = ["huggingface.co", "cdn-lfs.huggingface.co", "cas-bridge.xethub.hf.co"];
@@ -68,7 +72,9 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
             _download = new LocalAiDownload(model.Id, "Downloading", 0, model.SizeBytes, null);
         }
 
-        _ = Task.Run(() => RunAsync(model));
+        // The host's ApplicationStopping token cancels the download on shutdown; a stalled read is cut off by the inactivity timeout.
+        var shutdown = lifetime?.ApplicationStopping ?? CancellationToken.None;
+        _ = Task.Run(() => RunAsync(model, shutdown));
         return true;
     }
 
@@ -101,7 +107,7 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         return removed;
     }
 
-    private async Task RunAsync(CatalogModel model)
+    private async Task RunAsync(CatalogModel model, CancellationToken ct)
     {
         try
         {
@@ -116,7 +122,7 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
                     continue;
                 }
 
-                await DownloadFileAsync(model, file, done);
+                await DownloadFileAsync(model, file, done, ct);
                 done += file.SizeBytes;
             }
 
@@ -125,8 +131,11 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         }
         catch (Exception ex)
         {
+            var message = ex is OperationCanceledException && ct.IsCancellationRequested
+                ? "Download cancelled (the host is shutting down)."
+                : ex.Message;
             logger.LogWarning(ex, "Local AI model download failed for {Model}", model.Id);
-            lock (_gate) { _download = new LocalAiDownload(model.Id, "Failed", 0, model.SizeBytes, ex.Message); }
+            lock (_gate) { _download = new LocalAiDownload(model.Id, "Failed", 0, model.SizeBytes, message); }
         }
         finally
         {
@@ -134,7 +143,7 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         }
     }
 
-    private async Task DownloadFileAsync(CatalogModel model, ModelFile file, long alreadyDone)
+    private async Task DownloadFileAsync(CatalogModel model, ModelFile file, long alreadyDone, CancellationToken shutdown)
     {
         var uri = new Uri(file.Url);
         if (uri.Scheme != Uri.UriSchemeHttps || !AllowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
@@ -143,8 +152,47 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         }
 
         var tmp = PathOf(file) + ".partial";
+        var idle = options.DownloadInactivityTimeout > TimeSpan.Zero ? options.DownloadInactivityTimeout : Timeout.InfiniteTimeSpan;
+
+        // One linked source: host shutdown, plus an inactivity timer that is re-armed after every successful read.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(shutdown);
+        cts.CancelAfter(idle);
+        try
+        {
+            await FetchToPartialAsync(model, file, alreadyDone, uri, tmp, idle, cts);
+        }
+        catch (OperationCanceledException) when (!shutdown.IsCancellationRequested && cts.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Download of {file.Name} stalled: no data for {idle.TotalSeconds:0.#}s.");
+        }
+        finally
+        {
+            // Never leave a half-written file behind on any failure (the successful path moves it into place first).
+            TryDelete(tmp);
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // best effort: a lingering .partial is overwritten by the next attempt
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private async Task FetchToPartialAsync(
+        CatalogModel model, ModelFile file, long alreadyDone, Uri uri, string tmp, TimeSpan idle, CancellationTokenSource cts)
+    {
+        var ct = cts.Token;
         using var client = http.CreateClient(HttpClientName);
-        using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         // Redirects (HF -> CDN) are followed by the handler; refuse to end up anywhere unexpected.
         var finalHost = response.RequestMessage?.RequestUri?.Host ?? uri.Host;
@@ -155,15 +203,16 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         }
 
         using var sha = SHA256.Create();
-        await using (var src = await response.Content.ReadAsStreamAsync())
+        await using (var src = await response.Content.ReadAsStreamAsync(ct))
         await using (var dst = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
             var buffer = new byte[81920];
             long got = 0;
             int n;
-            while ((n = await src.ReadAsync(buffer)) > 0)
+            while ((n = await src.ReadAsync(buffer, ct)) > 0)
             {
-                await dst.WriteAsync(buffer.AsMemory(0, n));
+                cts.CancelAfter(idle); // progress: re-arm the inactivity timer
+                await dst.WriteAsync(buffer.AsMemory(0, n), ct);
                 sha.TransformBlock(buffer, 0, n, null, 0);
                 got += n;
                 if (got > file.SizeBytes + 1024)
@@ -180,7 +229,6 @@ public sealed class LocalModelManager(LocalAiOptions options, IHttpClientFactory
         var hash = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
         if (!hash.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
         {
-            File.Delete(tmp);
             throw new InvalidDataException($"Checksum mismatch for {file.Name}; the file was discarded.");
         }
 
