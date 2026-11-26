@@ -1,8 +1,8 @@
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
-using FluentAssertions;
 using FlowLedger.TestSupport;
+using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 

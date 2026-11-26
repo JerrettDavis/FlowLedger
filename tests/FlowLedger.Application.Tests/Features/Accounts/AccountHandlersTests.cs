@@ -1,7 +1,7 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Tests.Fakes;
-using FluentAssertions;
 using FlowLedger.TestSupport.Builders;
+using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Accounts;
 

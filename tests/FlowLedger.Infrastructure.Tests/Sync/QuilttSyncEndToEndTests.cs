@@ -4,12 +4,12 @@ using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Quiltt;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
 

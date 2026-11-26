@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.TestSupport;
 using FlowLedger.Worker.Jobs;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;
@@ -7,7 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Quartz;
-using FlowLedger.TestSupport;
 
 namespace FlowLedger.Worker.Tests;
 

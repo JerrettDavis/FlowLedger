@@ -1,13 +1,13 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Quartz;
-using FlowLedger.TestSupport;
 
 namespace FlowLedger.Worker.Tests.Jobs;
 
