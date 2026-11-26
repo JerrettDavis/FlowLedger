@@ -5,7 +5,7 @@
 
 <PageTitle>Rules — FlowLedger</PageTitle>
 
-<MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1" Class="mb-1">Categorization rules</MudText>
+<PageHeader Title="Categorization rules" />
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     When a transaction's description contains your text, it gets the category you choose — now and on every future sync.
     The longest matching text wins. Categories you set by hand on a transaction are never overridden.
@@ -22,8 +22,9 @@ else
             <MudTextField T="string" Immediate="true" @bind-Value="_pattern" Label="If description contains" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
             <MudTextField T="string" Immediate="true" @bind-Value="_category" Label="Category (e.g. Food/Coffee)" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save"
-                       Disabled="@(string.IsNullOrWhiteSpace(_pattern) || string.IsNullOrWhiteSpace(_category))">Save rule</MudButton>
+                       Disabled="@(FormRules.Rule(_pattern, _category) is not null)" aria-describedby="rule-reason">Save rule</MudButton>
         </div>
+        <SubmitReason Id="rule-reason" Reason="@FormRules.Rule(_pattern, _category)" />
     </MudPaper>
 
     @if (_rules is null || _rules.Count == 0)

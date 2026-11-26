@@ -25,6 +25,28 @@ internal sealed class TransactionRepository : ITransactionRepository
         bool everydayOnly = false,
         string? search = null)
     {
+        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
+
+        return await query
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenByDescending(t => t.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> CountMatchingAsync(
+        AccountId? accountId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        CancellationToken ct = default,
+        bool everydayOnly = false,
+        string? search = null)
+        => await (await FilteredAsync(accountId, from, to, everydayOnly, search, ct)).CountAsync(ct);
+
+    private async Task<IQueryable<Transaction>> FilteredAsync(
+        AccountId? accountId, DateOnly? from, DateOnly? to, bool everydayOnly, string? search, CancellationToken ct)
+    {
         var query = _db.Transactions.AsNoTracking();
 
         if (accountId.HasValue)
@@ -58,12 +80,7 @@ internal sealed class TransactionRepository : ITransactionRepository
 #pragma warning restore CA1304, CA1311, CA1862
         }
 
-        return await query
-            .OrderByDescending(t => t.EffectiveDate)
-            .ThenByDescending(t => t.CreatedAt)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync(ct);
+        return query;
     }
 
     /// <summary>

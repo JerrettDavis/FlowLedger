@@ -35,11 +35,13 @@ public sealed class LayoutAccessibilityTests : IAsyncDisposable
     [Fact]
     public void MainLayout_has_a_skip_link_target_and_announces_sync_as_status()
     {
-        var layout = File.ReadAllText(Path.Combine(FindRepoRoot(), "src", "FlowLedger.Web", "Components", "Layout", "MainLayout.razor"));
+        var dir = Path.Combine(FindRepoRoot(), "src", "FlowLedger.Web", "Components", "Layout");
+        var layout = File.ReadAllText(Path.Combine(dir, "MainLayout.razor"));
+        var appBar = File.ReadAllText(Path.Combine(dir, "AppBar.razor"));
 
         layout.Should().Contain("href=\"#main-content\"");
         layout.Should().Contain("id=\"main-content\"");
-        layout.Should().Contain("role=\"status\"");
+        appBar.Should().Contain("role=\"status\"");
     }
 
     private static string FindRepoRoot()

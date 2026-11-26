@@ -8,31 +8,30 @@
 
 <PageTitle>Sheet — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4 fl-enter" style="flex-wrap:wrap;gap:8px">
-    <div>
-        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Sheet</MudText>
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
-            Your bill sheet. Cells tick themselves when a matching payment syncs; click a cell to override.
-        </MudText>
-    </div>
-    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="() => ShiftAsync(-1)" aria-label="Previous month" />
-        <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite">@MonthTitle(_selected)</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="() => ShiftAsync(1)" aria-label="Next month" />
-        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoToTodayAsync" Disabled="@(_selected == CurrentMonth)" aria-label="Jump to this month">This month</MudButton>
-        <MudSelect T="int" Value="_monthCount" ValueChanged="SetMonthCountAsync" Label="Months shown" Dense="true" Variant="Variant.Outlined" Style="width:min(130px,100%)" aria-label="Months shown">
-            <MudSelectItem T="int" Value="3">3 (prev · this · next)</MudSelectItem>
-            <MudSelectItem T="int" Value="6">6</MudSelectItem>
-            <MudSelectItem T="int" Value="12">12</MudSelectItem>
-        </MudSelect>
-        <MudButton StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined" Color="Color.Primary"
-                   OnClick="RefreshAsync" Disabled="_busy" aria-label="Check transactions and tick paid rows">Update from payments</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="() => EditAsync(null, null)" aria-label="Add a row">Add row</MudButton>
-        <MudButton StartIcon="@Icons.Material.Filled.UploadFile" Variant="Variant.Text"
-                   OnClick="ImportAsync" aria-label="Import from CSV">Import</MudButton>
-    </div>
-</div>
+<PageHeader Title="Sheet">
+    <Description>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Your bill sheet. Cells tick themselves when a matching payment syncs; click a cell to override.
+            </MudText>
+    </Description>
+    <ChildContent>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="() => ShiftAsync(-1)" aria-label="Previous month" />
+            <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite">@MonthTitle(_selected)</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="() => ShiftAsync(1)" aria-label="Next month" />
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoToTodayAsync" Disabled="@(_selected == CurrentMonth)" aria-label="Jump to this month">This month</MudButton>
+            <MudSelect T="int" Value="_monthCount" ValueChanged="SetMonthCountAsync" Label="Months shown" Dense="true" Variant="Variant.Outlined" Style="width:min(130px,100%)" aria-label="Months shown">
+                <MudSelectItem T="int" Value="3">3 (prev · this · next)</MudSelectItem>
+                <MudSelectItem T="int" Value="6">6</MudSelectItem>
+                <MudSelectItem T="int" Value="12">12</MudSelectItem>
+            </MudSelect>
+            <MudButton StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined" Color="Color.Primary"
+                       OnClick="RefreshAsync" Disabled="_busy" aria-label="Check transactions and tick paid rows">Update from payments</MudButton>
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="() => EditAsync(null, null)" aria-label="Add a row">Add row</MudButton>
+            <MudButton StartIcon="@Icons.Material.Filled.UploadFile" Variant="Variant.Text"
+                       OnClick="ImportAsync" aria-label="Import from CSV">Import</MudButton>
+    </ChildContent>
+</PageHeader>
 
 @if (_loading)
 {

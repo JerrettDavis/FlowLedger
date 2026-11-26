@@ -41,6 +41,7 @@ builder.Services.AddMudServices();
 // ── Theme ────────────────────────────────────────────────────────────────────
 // Scoped so each circuit (browser tab) gets its own independent theme state.
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<SyncCoordinator>();
 
 // -- Display currency + locale (display-only, no FX) --
 builder.Services.AddScoped<DisplaySettingsService>();
