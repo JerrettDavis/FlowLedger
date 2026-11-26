@@ -177,8 +177,18 @@ public sealed class ForecastEngine : IForecastEngine
             goalOutcomes.Add(outcome);
         }
 
+        var warnings = new List<string>();
+        var distinctCurrencies = accountSeries.Select(s => s.StartingBalance.Currency.Code).Distinct().OrderBy(c => c).ToList();
+        if (distinctCurrencies.Count > 1)
+        {
+            warnings.Add(
+                $"Accounts use multiple currencies ({string.Join(", ", distinctCurrencies)}). FlowLedger does not convert currencies, " +
+                "so each account is forecast separately and no combined (aggregate) series, range or low-water mark is produced.");
+        }
+
         return new ForecastResult
         {
+            Warnings = warnings,
             ForecastRunId = Guid.NewGuid(),
             AsOf = request.AsOf,
             Horizon = request.Horizon,

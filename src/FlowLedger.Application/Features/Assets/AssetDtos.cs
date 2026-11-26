@@ -83,7 +83,20 @@ public sealed record AssetCategoryTemplateDto(
 
 public sealed record AssetCategoryBreakdownDto(string Category, int Count, decimal Value);
 
+/// <summary>Net worth. Currencies are never summed together: see <see cref="MixedCurrencies"/> and <see cref="ByCurrency"/>.</summary>
 public sealed record NetWorthDto(
+    decimal AccountAssets,
+    decimal AccountLiabilities,
+    decimal PhysicalAssets,
+    decimal NetWorth,
+    decimal CarriedByAccounts,
+    string Currency = "USD",
+    bool MixedCurrencies = false,
+    IReadOnlyList<CurrencyTotalDto>? ByCurrency = null);
+
+/// <summary>Net worth components for one currency.</summary>
+public sealed record CurrencyTotalDto(
+    string Currency,
     decimal AccountAssets,
     decimal AccountLiabilities,
     decimal PhysicalAssets,
