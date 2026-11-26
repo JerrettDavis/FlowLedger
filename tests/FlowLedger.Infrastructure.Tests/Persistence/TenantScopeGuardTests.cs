@@ -104,7 +104,6 @@ public sealed class TenantScopeGuardTests
     /// <summary>Literal fragments that are not complete statements: (file, text in the literal, reason).</summary>
     private static readonly (string File, string Contains, string Why)[] FragmentAllowlist =
     [
-        ("NpgsqlIntegrationStore.cs", "FROM integrations", "SelectSql is a prefix; every use appends WHERE tenant_id (see IntegrationEndpointTests)"),
     ];
 
     private static string InfrastructureRoot()
