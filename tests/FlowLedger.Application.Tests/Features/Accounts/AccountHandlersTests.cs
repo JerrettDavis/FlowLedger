@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Tests.Fakes;
 using FluentAssertions;
+using FlowLedger.TestSupport.Builders;
 
 namespace FlowLedger.Application.Tests.Features.Accounts;
 
@@ -15,7 +16,7 @@ public sealed class AccountHandlersTests
     public async Task CreateAccount_ValidRequest_ReturnsDto()
     {
         var handler = new CreateAccountHandler(_repo, _tenant);
-        var request = new CreateAccountRequest("Checking", "Checking", 1000m, "USD", "Chase", null);
+        var request = CreateAccountRequestBuilder.A().StartingAt(1000m).At("Chase").Build();
 
         var dto = await handler.HandleAsync(request);
 
@@ -30,7 +31,7 @@ public sealed class AccountHandlersTests
     public async Task CreateAccount_CreditCard_StoresBalance()
     {
         var handler = new CreateAccountHandler(_repo, _tenant);
-        var request = new CreateAccountRequest("Visa", "CreditCard", 0m, "USD", null, 5000m);
+        var request = CreateAccountRequestBuilder.A().Named("Visa").OfType("CreditCard").StartingAt(0m).WithCreditLimit(5000m).Build();
 
         var dto = await handler.HandleAsync(request);
 
@@ -44,7 +45,7 @@ public sealed class AccountHandlersTests
     public async Task GetAccount_ExistingId_ReturnsDto()
     {
         var createHandler = new CreateAccountHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateAccountRequest("Savings", "Savings", 5000m, "USD", null, null));
+        var created = await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("Savings").OfType("Savings").StartingAt(5000m).Build());
 
         var getHandler = new GetAccountHandler(_repo);
         var dto = await getHandler.HandleAsync(created.Id);
@@ -67,8 +68,8 @@ public sealed class AccountHandlersTests
     public async Task ListAccounts_MultipleAccounts_ReturnsAll()
     {
         var createHandler = new CreateAccountHandler(_repo, _tenant);
-        await createHandler.HandleAsync(new CreateAccountRequest("A1", "Checking", 100m, "USD", null, null));
-        await createHandler.HandleAsync(new CreateAccountRequest("A2", "Savings", 200m, "USD", null, null));
+        await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("A1").StartingAt(100m).Build());
+        await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("A2").OfType("Savings").StartingAt(200m).Build());
 
         var listHandler = new ListAccountsHandler(_repo);
         var accounts = await listHandler.HandleAsync();
@@ -82,7 +83,7 @@ public sealed class AccountHandlersTests
     public async Task UpdateAccount_ExistingId_RenamesAccount()
     {
         var createHandler = new CreateAccountHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateAccountRequest("Old Name", "Checking", 0m, "USD", null, null));
+        var created = await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("Old Name").StartingAt(0m).Build());
 
         var updateHandler = new UpdateAccountHandler(_repo);
         var updated = await updateHandler.HandleAsync(created.Id, new UpdateAccountRequest("New Name"));
@@ -105,7 +106,7 @@ public sealed class AccountHandlersTests
     public async Task DeactivateAccount_ExistingId_DeactivatesAndRemovedFromList()
     {
         var createHandler = new CreateAccountHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateAccountRequest("ToDeactivate", "Checking", 0m, "USD", null, null));
+        var created = await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("ToDeactivate").StartingAt(0m).Build());
 
         var deactivateHandler = new DeactivateAccountHandler(_repo);
         var found = await deactivateHandler.HandleAsync(created.Id);
