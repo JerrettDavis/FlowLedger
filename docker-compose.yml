@@ -231,6 +231,10 @@ services:
       Auth__Oidc__ClientSecret: ${AUTH__OIDC__CLIENTSECRET:-}
       # Without OIDC the Web UI has NO sign-in; outside Development it refuses to start unless this is true.
       Auth__AllowAnonymous: ${AUTH__ALLOWANONYMOUS:-false}
+      # Persisted Data Protection key ring: sessions/antiforgery survive `up --force-recreate web` (back this volume up).
+      DataProtection__KeyPath: /keys
+    volumes:
+      - web_keys:/keys
     depends_on:
       api:
         condition: service_healthy
@@ -282,3 +286,5 @@ volumes:
   redis_data:
   objects_data:
   backups_data:
+  web_keys:
+

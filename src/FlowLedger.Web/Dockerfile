@@ -41,6 +41,8 @@ RUN dotnet publish src/FlowLedger.Web/FlowLedger.Web.csproj \
         -o /app/publish \
         /p:UseAppHost=false
 
+RUN mkdir -p /keys
+
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds only ICU + tzdata: there is NO shell, curl or wget. Docker healthchecks
 # therefore use scripts/healthprobe (a static Go binary built below and copied in).
@@ -54,6 +56,10 @@ WORKDIR /app
 
 COPY --from=healthprobe /healthprobe /usr/local/bin/healthprobe
 COPY --from=publish /app/publish .
+
+# Data Protection key ring location (mount a volume here). Pre-created and owned by the non-root app user (uid 1654)
+# so a fresh named volume is writable: the chiseled runtime has no shell to mkdir/chown at start-up.
+COPY --from=publish --chown=1654:1654 /keys /keys
 
 # ASP.NET chiseled images listen on 8080 (HTTP) by default.
 EXPOSE 8080

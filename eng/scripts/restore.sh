@@ -1,63 +1,33 @@
 #!/usr/bin/env bash
-# FlowLedger — Restore a backup made by backup.sh/backup.ps1 into a SCRATCH database.
+# FlowLedger - restore a backup made by backup.sh/backup.ps1 into a SCRATCH database
+# (never overwrites the live one). Linux/macOS twin of restore.ps1.
 #
-# Linux/macOS twin of restore.ps1. Never overwrites the live 'flowledger' database: it creates
-# TARGET_DATABASE (default flowledger_restore_test), restores the dump into it and prints row
-# counts so you can compare against the live database. The object archive is restored to
-# OBJECTS_TARGET only if you set it.
-#
-# Usage:
-#   ./eng/scripts/restore.sh <backup-dir>
-#   TARGET_DATABASE=scratch OBJECTS_TARGET=/srv/objects ./eng/scripts/restore.sh <backup-dir>
-#
-# Environment: POSTGRES_CONTAINER, TARGET_DATABASE, OBJECTS_TARGET (see backup.sh for container discovery)
-
+# Usage: ./eng/scripts/restore.sh <backup-dir> [objects-target]
+# Env:   POSTGRES_CONTAINER, TARGET_DATABASE (default flowledger_restore_test), PG_USER (default: the container's POSTGRES_USER, else postgres)
 set -euo pipefail
 
-BACKUP_DIR="${1:-}"
-[[ -n "$BACKUP_DIR" && -f "$BACKUP_DIR/flowledger.dump" ]] || {
-  echo "Usage: $0 <backup-dir>   (a directory containing flowledger.dump)" >&2
-  exit 1
-}
-TARGET_DATABASE="${TARGET_DATABASE:-flowledger_restore_test}"
-OBJECTS_TARGET="${OBJECTS_TARGET:-}"
-if [[ "$TARGET_DATABASE" == "flowledger" ]]; then
-  echo "Refusing to restore over the live 'flowledger' database." >&2
-  exit 1
-fi
-# The name is interpolated into SQL identifiers below; allow only plain identifiers.
-[[ "$TARGET_DATABASE" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "Invalid TARGET_DATABASE." >&2; exit 1; }
+BACKUP_DIR="${1:?usage: restore.sh <backup-dir> [objects-target]}"
+OBJECTS_TARGET="${2:-}"
+TARGET="${TARGET_DATABASE:-flowledger_restore_test}"
+[ "$TARGET" != "flowledger" ] || { echo "Refusing to restore over the live 'flowledger' database." >&2; exit 1; }
+CONTAINER="${POSTGRES_CONTAINER:-$(docker ps --format '{{.Names}}' | grep -i postgres | head -n1 || true)}"
+[ -n "$CONTAINER" ] || { echo "No running postgres container found." >&2; exit 1; }
 
-find_postgres() {
-  local c
-  c="$(docker compose ps -q postgres 2>/dev/null | head -n1 || true)"
-  if [[ -z "$c" ]]; then
-    c="$(docker ps --format '{{.Names}}' | grep -E '(^|[-_])postgres' | head -n1 || true)"
-  fi
-  printf '%s' "$c"
-}
+PG_USER="${PG_USER:-$(docker exec "$CONTAINER" printenv POSTGRES_USER 2>/dev/null || echo postgres)}"
+# The password is read inside the container and never appears in host process arguments.
+pg() { docker exec "$CONTAINER" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec "$@"' sh "$@"; }
 
-PG="${POSTGRES_CONTAINER:-$(find_postgres)}"
-[[ -n "$PG" ]] || { echo "No running postgres container found." >&2; exit 1; }
-
-PGUSER_C="$(docker exec "$PG" printenv POSTGRES_USER 2>/dev/null || true)"
-PGUSER_C="${PGUSER_C:-postgres}"
-PGPASS_C="$(docker exec "$PG" printenv POSTGRES_PASSWORD 2>/dev/null || true)"
-[[ -n "$PGPASS_C" ]] || { echo "Could not read POSTGRES_PASSWORD from the container." >&2; exit 1; }
-pg() { docker exec -e "PGPASSWORD=$PGPASS_C" "$PG" "$@"; }
-
-docker cp "$BACKUP_DIR/flowledger.dump" "$PG:/tmp/restore.dump"
-pg psql -U "$PGUSER_C" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $TARGET_DATABASE;" >/dev/null
-pg psql -U "$PGUSER_C" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $TARGET_DATABASE;" >/dev/null
-pg pg_restore -U "$PGUSER_C" -d "$TARGET_DATABASE" --no-owner /tmp/restore.dump
-docker exec "$PG" rm -f /tmp/restore.dump
+docker cp "$BACKUP_DIR/flowledger.dump" "$CONTAINER:/tmp/restore.dump"
+pg psql -U "$PG_USER" -c "DROP DATABASE IF EXISTS $TARGET;" >/dev/null
+pg psql -U "$PG_USER" -c "CREATE DATABASE $TARGET;" >/dev/null
+pg pg_restore -U "$PG_USER" -d "$TARGET" --no-owner /tmp/restore.dump
+docker exec "$CONTAINER" rm -f /tmp/restore.dump
 
 for t in transactions accounts sync_cursors provider_connections account_balance_snapshots; do
-  n="$(pg psql -U "$PGUSER_C" -d "$TARGET_DATABASE" -tA -c "SELECT count(*) FROM $t;")"
-  printf '%-28s %s\n' "$t" "$n"
+  n="$(pg psql -U "$PG_USER" -d "$TARGET" -tA -c "SELECT count(*) FROM $t;")"
+  printf '%-28s %s\n' "$t" "$(echo "$n" | tr -d '[:space:]')"
 done
-
-if [[ -n "$OBJECTS_TARGET" ]]; then
+if [ -n "$OBJECTS_TARGET" ]; then
   mkdir -p "$OBJECTS_TARGET"
   cp -a "$BACKUP_DIR/objects/." "$OBJECTS_TARGET/"
   echo "Objects restored -> $OBJECTS_TARGET"
