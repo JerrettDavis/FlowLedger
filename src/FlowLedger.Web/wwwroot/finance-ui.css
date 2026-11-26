@@ -233,3 +233,12 @@ html, body { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .mud-select .mud-input-outlined-border, .mud-popover .mud-list-item, .mud-select .mud-input-adornment-end .mud-icon-root { transition: none; }
 }
+
+/* Dashboard account strip (moved from an inline <style> block in Home.razor). */
+.fl-account-strip { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 4px; }
+.fl-account-chip { display: flex; flex-direction: column; align-items: center; min-width: 96px; max-width: 120px;
+    padding: 8px; border-radius: 12px; text-decoration: none; color: inherit; border: 1px solid var(--mud-palette-divider); }
+.fl-account-chip:hover, .fl-account-chip:focus-visible { background: var(--mud-palette-action-default-hover); }
+.fl-account-chip__name { font-size: 12px; font-weight: 500; margin-top: 6px; text-align: center; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.fl-account-chip__bal { font-size: 11px; opacity: .75; }
