@@ -67,6 +67,15 @@ window.FlowLedgerTheme = {
     }
 };
 
+// Skip link: move focus to <main> without a server round trip or a base-href navigation.
+document.addEventListener('click', function (e) {
+    var link = e.target && e.target.closest && e.target.closest('.fl-skip-link');
+    if (!link) { return; }
+    e.preventDefault();
+    var main = document.getElementById('main-content');
+    if (main) { main.focus(); main.scrollIntoView(); }
+});
+
 // Used by MainLayout's auto-sync: only sync while the tab is actually on screen.
 window.FlowLedgerPage = {
     isVisible: () => document.visibilityState === 'visible'

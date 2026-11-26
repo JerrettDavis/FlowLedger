@@ -1,3 +1,34 @@
+/* Keyboard focus: a visible ring from the theme's primary colour on every interactive control. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+.mud-button-root:focus-visible,
+.mud-nav-link:focus-visible,
+.mud-icon-button:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+#main-content:focus { outline: none; }
+
+/* Skip link: off-screen until focused. */
+.fl-skip-link {
+    position: absolute;
+    left: 8px;
+    top: -48px;
+    z-index: 2000;
+    padding: 8px 16px;
+    border-radius: 4px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-shadow: var(--mud-elevation-4);
+}
+.fl-skip-link:focus { top: 8px; }
+
 /* Pre-paint dark background: the head script sets data-theme before MudBlazor's theme variables exist. */
 html[data-theme="dark"],
 html[data-theme="dark"] body {

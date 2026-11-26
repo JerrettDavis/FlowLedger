@@ -83,6 +83,32 @@ public sealed class MainLayoutTests : BunitContext, IAsyncLifetime
         cut.Markup.Should().NotContain("Connect and sync demo data");
     }
 
+    [Fact]
+    public void Skip_link_targets_a_focusable_main_landmark()
+    {
+        Arrange();
+
+        var cut = RenderLayout();
+
+        cut.Find("a.fl-skip-link").GetAttribute("href").Should().Be("#main-content");
+        var main = cut.Find("main#main-content");
+        main.GetAttribute("tabindex").Should().Be("-1");
+    }
+
+    [Fact]
+    public void Landmark_names_are_unique()
+    {
+        Arrange();
+
+        var cut = RenderLayout();
+
+        var names = cut.FindAll("nav[aria-label], aside[aria-label], header[aria-label], main[aria-label]")
+            .Select(e => $"{e.LocalName}:{e.GetAttribute("aria-label")}")
+            .ToList();
+        names.Should().OnlyHaveUniqueItems();
+        cut.FindAll("[aria-label='Main navigation']").Should().HaveCount(1);
+    }
+
     // MudBlazor services are async-disposable only, so the context must be disposed asynchronously.
     Task IAsyncLifetime.DisposeAsync() => base.DisposeAsync().AsTask();
 

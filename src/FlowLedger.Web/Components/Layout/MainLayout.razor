@@ -20,6 +20,8 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
+<a class="fl-skip-link" href="#main-content">Skip to main content</a>
+
 <MudLayout>
     <MudAppBar Color="Color.Surface" Elevation="0" Class="fl-appbar" aria-label="FlowLedger application bar">
         <MudIconButton Icon="@Icons.Material.Filled.Menu"
@@ -120,7 +122,7 @@
         </MudTooltip>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0" Width="256px" Class="fl-drawer" aria-label="Main navigation">
+    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0" Width="256px" Class="fl-drawer" aria-label="Sidebar">
         <MudDrawerHeader>
             <MudText Typo="Typo.subtitle1" Class="fw-bold">Navigation</MudText>
         </MudDrawerHeader>
@@ -128,9 +130,11 @@
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
-            @Body
-        </MudContainer>
+        <main id="main-content" tabindex="-1">
+            <MudContainer MaxWidth="MaxWidth.False" Class="mt-4 fl-page">
+                @Body
+            </MudContainer>
+        </main>
     </MudMainContent>
 </MudLayout>
 
