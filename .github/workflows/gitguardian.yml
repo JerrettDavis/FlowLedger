@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (full history)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: GitGuardian scan
         if: steps.check_key.outputs.key_present == 'true'
-        uses: GitGuardian/ggshield-action@v1
+        uses: GitGuardian/ggshield-action@60b8b0ad58c307757756e0aa127e23170ef73c2f # v1
         env:
           GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
           GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}

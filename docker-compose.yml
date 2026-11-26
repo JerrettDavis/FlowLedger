@@ -49,7 +49,7 @@ services:
   # ── Infrastructure ────────────────────────────────────────────────────────
   postgres:
     profiles: [infra, full]
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
     restart: unless-stopped
     environment:
       POSTGRES_USER: flowledger
@@ -68,7 +68,7 @@ services:
 
   redis:
     profiles: [infra, full]
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     restart: unless-stopped
     ports:
       # Loopback only (Aspire dev loop). Redis has no auth here: never expose it.
@@ -120,7 +120,7 @@ services:
   # api and web consumers depend on this service being healthy.
   api-probe:
     profiles: [full]
-    image: alpine/curl:latest
+    image: alpine/curl:latest@sha256:2a36f3dfe424231c1b03753929e43dda451c29a6193873916924f0b6073bbc5f
     restart: "no"
     entrypoint: >
       sh -c "
