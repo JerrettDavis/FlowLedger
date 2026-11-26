@@ -47,7 +47,13 @@ publish the API, PostgreSQL or Redis ports beyond the host.
 
 Health endpoints:
 - `GET http://localhost:5001/alive` — API liveness
-- `GET http://localhost:5001/health` — API readiness
+- `GET http://localhost:5001/ready` — API readiness: 503 when Postgres is unreachable or migrations are pending
+  (also checks Redis when `ConnectionStrings__redis` is set). Backup freshness (`Health__BackupMaxAgeHours`,
+  default 36) is reported as Degraded in the check list but never turns `/ready` 503.
+- `GET http://localhost:5001/health` — every check (liveness + readiness)
+- Worker: `dotnet FlowLedger.Worker.dll --healthcheck` exits 0 while the Quartz scheduler has refreshed its
+  heartbeat file (`Worker__HeartbeatFile`, default `<tmp>/flowledger-worker.heartbeat`) in the last 60 s, else 1.
+  Use it as a compose/k8s exec probe (the image has no shell or curl).
 - `GET http://localhost:5002/alive` — Web liveness
 
 ## Infra-only mode (for Aspire dev loop)
