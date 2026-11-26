@@ -67,6 +67,26 @@ Then run the Aspire dev loop in a separate terminal:
 
 See [local-dev.md](../development/local-dev.md) for the full Aspire workflow.
 
+## Health, hardening and sizing
+
+* **Healthchecks.** The chiseled runtime images have no shell or curl, so the api and web images carry a static
+  `healthprobe` binary (built from `scripts/healthprobe`). `docker compose ps` shows `healthy`/`unhealthy` for
+  postgres, redis, api (`/health`) and web (`/alive`); web and worker start only after the api is healthy. The worker has
+  no HTTP endpoint and therefore no healthcheck. `/health` only reflects the database once the API registers a database
+  readiness check; until then stopping postgres does not turn the api unhealthy.
+* **Containers.** api, web and worker run with `cap_drop: ALL`, `no-new-privileges`, a read-only root filesystem
+  (writable: the `objects_data` and `backups_data` volumes and a 128 MiB `/tmp` tmpfs), and `pids_limit`. postgres and redis
+  drop all capabilities except those their entrypoints need to chown their data directory and step down to their own user.
+  Because the root filesystem is read-only, ASP.NET Data Protection keys are in-memory only for now (sign-in cookies are
+  invalidated on restart) until persistent key storage is added.
+* **Limits.** Defaults: api 1 GiB / 2 CPUs, web 512 MiB / 1 CPU, worker 1 GiB / 2 CPUs, postgres 1 GiB / 2 CPUs
+  (`shared_buffers=256MB`), redis 256 MiB. They suit a single household; raise `mem_limit` (and postgres
+  `shared_buffers`/`effective_cache_size`, about 25%/75% of its limit) on larger hosts or for very large imports.
+* **Shutdown.** The worker gets `stop_grace_period: 120s` so a running sync or backup finishes; api and web get 30s.
+* **Logs** use the `json-file` driver capped at 5 x 10 MiB per container.
+* **Redis** requires a password: set `REDIS_PASSWORD` in `.env` (it falls back to `POSTGRES_PASSWORD` if unset). Use hex
+  only; a comma or semicolon would break the connection string.
+
 ## Profiles summary
 
 | Profile | Services started             | Use case                          |
