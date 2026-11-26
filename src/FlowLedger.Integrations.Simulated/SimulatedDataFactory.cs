@@ -82,12 +82,12 @@ public static class SimulatedDataFactory
 
         var balFaker = MakeFaker(tenantId, baseSeed, slotIndex: 1);
 
-        decimal CheckingBalance() => Math.Round(balFaker.Random.Decimal(2_400m, 5_800m), 2);
-        decimal SavingsBalance() => Math.Round(balFaker.Random.Decimal(14_000m, 32_000m), 2);
-        decimal CreditBalance() => -Math.Round(balFaker.Random.Decimal(380m, 1_800m), 2);
-        decimal ApexBalance() => -Math.Round(balFaker.Random.Decimal(220m, 960m), 2);
-        decimal BrokerageBalance() => Math.Round(balFaker.Random.Decimal(18_500m, 72_000m), 2);
-        decimal MortgageBalance() => -Math.Round(balFaker.Random.Decimal(198_000m, 312_000m), 2);
+        decimal CheckingBalance() => MoneyRounding.Round(balFaker.Random.Decimal(2_400m, 5_800m), 2);
+        decimal SavingsBalance() => MoneyRounding.Round(balFaker.Random.Decimal(14_000m, 32_000m), 2);
+        decimal CreditBalance() => -MoneyRounding.Round(balFaker.Random.Decimal(380m, 1_800m), 2);
+        decimal ApexBalance() => -MoneyRounding.Round(balFaker.Random.Decimal(220m, 960m), 2);
+        decimal BrokerageBalance() => MoneyRounding.Round(balFaker.Random.Decimal(18_500m, 72_000m), 2);
+        decimal MortgageBalance() => -MoneyRounding.Round(balFaker.Random.Decimal(198_000m, 312_000m), 2);
 
         var chkBal = CheckingBalance();
         var savBal = SavingsBalance();
@@ -157,7 +157,7 @@ public static class SimulatedDataFactory
         // ── Payroll (bi-weekly Fridays) ───────────────────────────────────
         // Use a fixed epoch Friday so the bi-weekly schedule is stable regardless
         // of when the history window starts.
-        var payroll = 3_400m + Math.Round(faker.Random.Decimal(-200m, 200m), 2);
+        var payroll = 3_400m + MoneyRounding.Round(faker.Random.Decimal(-200m, 200m), 2);
         // Epoch: 2024-01-05 is a known Friday used as the bi-weekly anchor.
         var epochFriday = new DateOnly(2024, 1, 5);
         for (var d = start; d <= today; d = d.AddDays(1))
@@ -186,7 +186,7 @@ public static class SimulatedDataFactory
             var fifteenth = new DateOnly(d.Year, d.Month, 15);
             if (fifteenth >= start && fifteenth <= today)
             {
-                var amount = -Math.Round(faker.Random.Decimal(88m, 165m), 2);
+                var amount = -MoneyRounding.Round(faker.Random.Decimal(88m, 165m), 2);
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), fifteenth, false,
                     new Money(amount, "USD"), "ELECTRIC UTILITY BILL", "Lumen Utilities", "Utilities");
             }
@@ -228,7 +228,7 @@ public static class SimulatedDataFactory
         // ── Groceries (weekly, Saturdays) ─────────────────────────────────
         for (var d = start; d <= today; d = d.AddDays(7))
         {
-            var amount = -Math.Round(faker.Random.Decimal(95m, 230m), 2);
+            var amount = -MoneyRounding.Round(faker.Random.Decimal(95m, 230m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), "GROCERY STORE PURCHASE", "Bluejay Grocery Co.", "Groceries");
         }
@@ -247,7 +247,7 @@ public static class SimulatedDataFactory
         // ── Fuel (every ~10 days) ─────────────────────────────────────────
         for (var d = start; d <= today; d = d.AddDays(10))
         {
-            var amount = -Math.Round(faker.Random.Decimal(42m, 88m), 2);
+            var amount = -MoneyRounding.Round(faker.Random.Decimal(42m, 88m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), "FUEL STATION PURCHASE", "QuickFuel Stations", "Transport");
         }
@@ -255,7 +255,7 @@ public static class SimulatedDataFactory
         // ── Healthcare / copay (roughly once every 6 weeks) ───────────────
         for (var d = start; d <= today; d = d.AddDays(42))
         {
-            var amount = -Math.Round(faker.Random.Decimal(25m, 75m), 2);
+            var amount = -MoneyRounding.Round(faker.Random.Decimal(25m, 75m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), "MEDICAL COPAY", "Clearview Medical Group", "Healthcare");
         }
@@ -285,7 +285,7 @@ public static class SimulatedDataFactory
         // ── Occasional refund (roughly every 2 months) ────────────────────
         for (var d = start; d <= today; d = d.AddDays(61))
         {
-            var amount = Math.Round(faker.Random.Decimal(18m, 120m), 2);
+            var amount = MoneyRounding.Round(faker.Random.Decimal(18m, 120m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), "MERCHANT REFUND", "Bluejay Grocery Co.", "Refunds");
         }
@@ -328,7 +328,7 @@ public static class SimulatedDataFactory
                 DateTime.DaysInMonth(d.Year, d.Month));
             if (lastDay >= start && lastDay <= today)
             {
-                var interest = Math.Round(faker.Random.Decimal(42m, 88m), 2);
+                var interest = MoneyRounding.Round(faker.Random.Decimal(42m, 88m), 2);
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), lastDay, false,
                     new Money(interest, "USD"), "INTEREST CREDIT", null, "Interest");
             }
@@ -395,7 +395,7 @@ public static class SimulatedDataFactory
         };
         for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(2, 4)))
         {
-            var amount = -Math.Round(faker.Random.Decimal(14m, 92m), 2);
+            var amount = -MoneyRounding.Round(faker.Random.Decimal(14m, 92m), 2);
             var restaurant = restaurants[faker.Random.Int(0, restaurants.Length - 1)];
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), $"RESTAURANT {restaurant.ToUpperInvariant()}", restaurant, "Dining");
@@ -435,7 +435,7 @@ public static class SimulatedDataFactory
         {
             for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(7, 14)))
             {
-                var amount = Math.Round(faker.Random.Decimal(lo, hi), 2);
+                var amount = MoneyRounding.Round(faker.Random.Decimal(lo, hi), 2);
                 yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                     new Money(amount, "USD"), desc, merchant, "Transport");
             }
@@ -445,7 +445,7 @@ public static class SimulatedDataFactory
         var shopMerchants = new[] { "MarketNest Online", "TechDen Electronics", "GreenLeaf Garden Supply" };
         for (var d = start; d <= today; d = d.AddDays(faker.Random.Int(12, 25)))
         {
-            var amount = -Math.Round(faker.Random.Decimal(22m, 220m), 2);
+            var amount = -MoneyRounding.Round(faker.Random.Decimal(22m, 220m), 2);
             var merchant = shopMerchants[faker.Random.Int(0, shopMerchants.Length - 1)];
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(amount, "USD"), $"ONLINE PURCHASE {merchant.ToUpperInvariant()}", merchant, "Shopping");
@@ -487,7 +487,7 @@ public static class SimulatedDataFactory
         // Quarterly dividend reinvestment
         for (var d = start; d <= today; d = d.AddMonths(3))
         {
-            var div = Math.Round(faker.Random.Decimal(28m, 145m), 2);
+            var div = MoneyRounding.Round(faker.Random.Decimal(28m, 145m), 2);
             yield return Tx(accountId, faker.Random.AlphaNumeric(12), d, false,
                 new Money(div, "USD"), "DIVIDEND REINVESTMENT", "Horizon Brokerage", "Investment Income");
         }
