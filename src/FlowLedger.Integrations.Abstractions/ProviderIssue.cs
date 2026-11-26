@@ -94,7 +94,7 @@ public sealed record ProviderIssue(
             TransientProviderException { RetryAfter: { } t } => DateTimeOffset.UtcNow + t,
             _ => (DateTimeOffset?)null,
         };
-        return Of(pe.Kind, pe.Message, retryAfter, pe.ProviderCode);
+        return Of(pe.Kind, pe.Message, retryAfter, pe.ProviderCode, pe.RepairRef);
     }
 }
 

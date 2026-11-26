@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 @inject IDialogService DialogService
 @inject NavigationManager Nav
+@inject ConnectionRepairService Repair
 @using FlowLedger.Web.Connections
 @inject ThemeService ThemeService
 @implements IDisposable
@@ -58,6 +59,19 @@
                     <span class="fl-bar-label">Connect bank</span>
                 </MudButton>
             </MudTooltip>
+            @if (_needsRepair)
+            {
+                <MudTooltip Text="A bank connection needs you to sign in again">
+                    <MudButton StartIcon="@Icons.Material.Filled.LinkOff"
+                               Color="Color.Warning"
+                               Variant="Variant.Text"
+                               OnClick="RepairNeededAsync"
+                               Disabled="_syncing"
+                               aria-label="Reconnect bank">
+                        <span class="fl-bar-label">Reconnect</span>
+                    </MudButton>
+                </MudTooltip>
+            }
             <MudTooltip Text="Fetch new data from your connected institutions">
                 <MudButton StartIcon="@Icons.Material.Filled.CloudSync"
                            Color="Color.Inherit"
@@ -276,6 +290,7 @@
     {
         var env = await ApiClient.GetEnvironmentAsync();
         _environment = env?.Environment ?? "unknown";
+        await RefreshRepairStateAsync();
         var data = await ApiClient.GetDataStatusAsync();
         _backupAlert = data is null ? null
             : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
@@ -326,11 +341,65 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect bank failed");
-            Snackbar.AddProblem(ex, "Connect", GoToConnectors);
+            Snackbar.AddProblem(ex, "Connect", () => _ = RepairNeededAsync());
         }
     }
 
-    private void GoToConnectors() => Nav.NavigateTo("connectors");
+
+    private bool _needsRepair;
+
+    /// <summary>True when the signed-in tenant has a connection only the user can fix. Failures to read never block the shell.</summary>
+    private async Task RefreshRepairStateAsync()
+    {
+        try
+        {
+            var connections = await ApiClient.GetMyConnectionsAsync();
+            _needsRepair = connections.Any(c => c.Issue is { RequiresUserAction: true });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Could not read connection health");
+        }
+    }
+
+    /// <summary>Repairs the first connection that needs the user, through the provider's pluggable repair handler, then syncs.</summary>
+    private async Task RepairNeededAsync()
+    {
+        _syncing = true;
+        try
+        {
+            var target = (await ApiClient.GetMyConnectionsAsync()).FirstOrDefault(c => c.Issue is { RequiresUserAction: true });
+            if (target is null)
+            {
+                _needsRepair = false;
+                return;
+            }
+
+            var result = await Repair.RepairAsync(new ConnectionRef(target.Provider, target.Issue?.RepairRef, target.Institution));
+            switch (result.Status)
+            {
+                case RepairStatus.Repaired:
+                    Snackbar.Add("Reconnected. Syncing your accounts…", Severity.Success);
+                    await RunSyncAsync(auto: false); // a successful sync is what clears the stored issue
+                    break;
+                case RepairStatus.Cancelled:
+                    break;
+                default:
+                    Snackbar.Add(result.Message ?? "The reconnect did not complete.", Severity.Warning);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Reconnect failed");
+            Snackbar.AddProblem(ex, "Reconnect");
+        }
+        finally
+        {
+            _syncing = false;
+            await RefreshRepairStateAsync();
+        }
+    }
 
     private async Task ConnectViaQuiltt()
     {
@@ -359,7 +428,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Quiltt connect failed");
-            Snackbar.AddProblem(ex, "Connect", GoToConnectors);
+            Snackbar.AddProblem(ex, "Connect", () => _ = RepairNeededAsync());
         }
     }
 
@@ -431,6 +500,7 @@
         {
             var result = await ApiClient.SyncAsync();
             _autoStopped = false;
+            await RefreshRepairStateAsync(); // a clean sync may have cleared an issue; a still-broken connection keeps the Reconnect button
             if (auto)
             {
                 if (result is { TransactionsAdded: > 0 })
@@ -447,6 +517,11 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Sync failed");
+            if (ex is ApiClientException { RequiresUserAction: true })
+            {
+                _needsRepair = true;
+            }
+
             if (auto)
             {
                 // Throttled / outage: back off (honouring Retry-After); needs-reauth: stop until the user acts.
@@ -455,12 +530,12 @@
                 if (decision.StopUntilUserActs && !_autoStopped)
                 {
                     _autoStopped = true;
-                    Snackbar.AddProblem(ex, "Sync", GoToConnectors); // tell the user once, not every tick
+                    Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync()); // tell the user once, not every tick
                 }
             }
             else
             {
-                Snackbar.AddProblem(ex, "Sync", GoToConnectors);
+                Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync());
             }
         }
         finally
@@ -486,7 +561,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Connect & Sync failed");
-            Snackbar.AddProblem(ex, "Sync", GoToConnectors);
+            Snackbar.AddProblem(ex, "Sync", () => _ = RepairNeededAsync());
         }
         finally
         {

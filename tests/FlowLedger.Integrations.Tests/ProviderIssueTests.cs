@@ -75,3 +75,30 @@ public sealed class ProviderIssueTests
         (health.Issue?.Kind ?? ProviderIssueKind.None).Should().Be(expected);
     }
 }
+
+public sealed class RepairRefPropagationTests
+{
+    [Fact]
+    public void ARepairRefOnAThrownException_SurvivesClassification()
+    {
+        // Found live: a thrown (not observed) failure lost the reconnect reference, so Reconnect had nothing to open.
+        var ex = new NeedsUserActionProviderException("log in again", "hint", "STATUS") { RepairRef = "conn-9" };
+
+        var issue = ProviderIssue.FromException(ex);
+
+        issue.RepairRef.Should().Be("conn-9");
+        issue.ProviderCode.Should().Be("STATUS");
+    }
+
+    [Fact]
+    public void QuilttToException_CarriesTheConnectionIdAsRepairRef_ForEveryKind()
+    {
+        foreach (var status in new[] { "ERROR_REPAIRABLE", "ERROR_INSTITUTION", "ERROR_PROVIDER", "ERROR_SERVICE", "DISCONNECTED", "WHAT_IS_THIS" })
+        {
+            var issue = FlowLedger.Integrations.Quiltt.QuilttIssueMapper.FromConnectionStatus(status, "conn_1");
+            var ex = FlowLedger.Integrations.Quiltt.QuilttIssueMapper.ToException(issue);
+
+            ProviderIssue.FromException(ex).RepairRef.Should().Be("conn_1", status);
+        }
+    }
+}
