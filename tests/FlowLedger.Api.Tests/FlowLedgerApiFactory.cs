@@ -45,7 +45,12 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
     // (unlike ConfigureAppConfiguration, which Program's eager config reads can miss). Without
     // this, a developer's Api user-secrets (Mx:Enabled=true + real creds) leak into tests and
     // could make real, billable MX calls.
-    static FlowLedgerApiFactory() => Environment.SetEnvironmentVariable("Mx__Enabled", "false");
+    static FlowLedgerApiFactory()
+    {
+        Environment.SetEnvironmentVariable("Mx__Enabled", "false");
+        // Readiness results are cached for 5 s in production; tests stop and start the database and need the live answer.
+        Environment.SetEnvironmentVariable("Health__CacheSeconds", "0");
+    }
 
     public static readonly Guid DemoTenantId = new("00000000-0000-0000-0000-000000000001");
 

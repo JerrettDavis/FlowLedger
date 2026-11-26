@@ -197,10 +197,64 @@ public static class ReadinessHealthExtensions
     public static IServiceCollection AddFlowLedgerReadinessChecks(this IServiceCollection services)
     {
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<HealthCacheStore>();
+        // /ready and /health are anonymous and each check opens a connection, so results are cached briefly: a flood of probes
+        // costs at most one database round trip per check per window (#184 review).
         services.AddHealthChecks()
-            .AddCheck<PostgresReadinessCheck>("postgres", tags: [HealthTags.Ready])
-            .AddCheck<RedisReadinessCheck>("redis", tags: [HealthTags.Ready])
-            .AddCheck<BackupFreshnessCheck>("backup", tags: [HealthTags.Ready]);
+            .Add(new HealthCheckRegistration("postgres",
+                sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<PostgresReadinessCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("postgres")),
+                failureStatus: null, tags: [HealthTags.Ready]))
+            .Add(new HealthCheckRegistration("redis",
+                sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<RedisReadinessCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("redis")),
+                failureStatus: null, tags: [HealthTags.Ready]))
+            .Add(new HealthCheckRegistration("backup",
+                sp => new CachedHealthCheck(ActivatorUtilities.CreateInstance<BackupFreshnessCheck>(sp), CachedHealthCheck.TtlFrom(sp.GetRequiredService<IConfiguration>()), sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<HealthCacheStore>().For("backup")),
+                failureStatus: null, tags: [HealthTags.Ready]));
         return services;
+    }
+}
+
+/// <summary>Shared (singleton) cache state per check name; health check instances are created per request, the cache must outlive them.</summary>
+public sealed class HealthCacheStore
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HealthCacheState> _states = new();
+
+    public HealthCacheState For(string name) => _states.GetOrAdd(name, _ => new HealthCacheState());
+}
+
+public sealed class HealthCacheState
+{
+    internal SemaphoreSlim Gate { get; } = new(1, 1);
+    internal HealthCheckResult Last { get; set; }
+    internal DateTimeOffset At { get; set; } = DateTimeOffset.MinValue;
+}
+
+/// <summary>Memoises the last result of an inner health check for a short time (includes failures, so an outage is not hammered).</summary>
+public sealed class CachedHealthCheck(IHealthCheck inner, TimeSpan ttl, TimeProvider time, HealthCacheState state) : IHealthCheck
+{
+    public static readonly TimeSpan DefaultTtl = TimeSpan.FromSeconds(5);
+
+    /// <summary>Health:CacheSeconds (default 5, 0 disables caching).</summary>
+    public static TimeSpan TtlFrom(IConfiguration configuration)
+        => int.TryParse(configuration["Health:CacheSeconds"], out var seconds) && seconds >= 0 ? TimeSpan.FromSeconds(seconds) : DefaultTtl;
+
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        await state.Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (time.GetUtcNow() - state.At < ttl)
+            {
+                return state.Last;
+            }
+
+            state.Last = await inner.CheckHealthAsync(context, cancellationToken);
+            state.At = time.GetUtcNow();
+            return state.Last;
+        }
+        finally
+        {
+            state.Gate.Release();
+        }
     }
 }
