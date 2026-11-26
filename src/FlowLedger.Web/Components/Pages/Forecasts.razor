@@ -5,34 +5,31 @@
 
 <PageTitle>Forecasts — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
-    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Forecasts</MudText>
-    <div class="d-flex align-center" style="gap:8px">
-        <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_selectedIds" SelectedValuesChanged="OnAccountsChanged"
-                   Label="Accounts" Style="width:min(220px,100%)" Clearable="true"
-                   MultiSelectionTextFunc="@(v => _selectedIds.Count() == 0 ? "Liquid accounts" : $"{_selectedIds.Count()} account(s)")"
-                   aria-label="Accounts to include in forecast">
-            @foreach (var acct in _accounts)
-            {
-                <MudSelectItem T="Guid" Value="@acct.Id">@acct.Name</MudSelectItem>
-            }
-        </MudSelect>
-        <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
-                   aria-label="Forecast horizon in months">
-            <MudSelectItem Value="1">1 month</MudSelectItem>
-            <MudSelectItem Value="3">3 months</MudSelectItem>
-            <MudSelectItem Value="6">6 months</MudSelectItem>
-            <MudSelectItem Value="12">12 months</MudSelectItem>
-        </MudSelect>
-        <MudButton StartIcon="@Icons.Material.Filled.Refresh"
-                   Color="Color.Primary"
-                   Variant="Variant.Outlined"
-                   OnClick="LoadAsync"
-                   aria-label="Run forecast">
-            Run Forecast
-        </MudButton>
-    </div>
-</div>
+<PageHeader Title="Forecasts">
+            <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_selectedIds" SelectedValuesChanged="OnAccountsChanged"
+                       Label="Accounts" Style="width:min(220px,100%)" Clearable="true"
+                       MultiSelectionTextFunc="@(v => _selectedIds.Count() == 0 ? "Liquid accounts" : $"{_selectedIds.Count()} account(s)")"
+                       aria-label="Accounts to include in forecast">
+                @foreach (var acct in _accounts)
+                {
+                    <MudSelectItem T="Guid" Value="@acct.Id">@acct.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect @bind-Value="_horizonMonths" Label="Horizon" Style="width:min(140px,100%)"
+                       aria-label="Forecast horizon in months">
+                <MudSelectItem Value="1">1 month</MudSelectItem>
+                <MudSelectItem Value="3">3 months</MudSelectItem>
+                <MudSelectItem Value="6">6 months</MudSelectItem>
+                <MudSelectItem Value="12">12 months</MudSelectItem>
+            </MudSelect>
+            <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       Variant="Variant.Outlined"
+                       OnClick="LoadAsync"
+                       aria-label="Run forecast">
+                Run Forecast
+            </MudButton>
+</PageHeader>
 
 @if (_error is not null)
 {

@@ -101,3 +101,95 @@ jobs:
       - name: Tear down stack
         if: always()
         run: docker compose --profile full down -v
+
+  ui-a11y:
+    name: UI accessibility (axe, keyboard)
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci_test_password
+      API__KEY: ci-integration-key-not-for-production-0123456789
+      # The ephemeral CI stack has no identity provider.
+      AUTH__ALLOWANONYMOUS: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore packages
+        run: dotnet restore
+
+      - name: Build solution (Release)
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Start full stack
+        run: docker compose --profile full up --build -d
+
+      - name: Wait for API health
+        run: |
+          echo "Waiting for API /alive..."
+          timeout 120 bash -c 'until curl -sf http://localhost:5001/alive > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "API healthy."
+
+      - name: Wait for Web health
+        run: |
+          echo "Waiting for Web UI..."
+          timeout 90 bash -c 'until curl -sf http://localhost:5002/ > /dev/null; do echo "  still waiting..."; sleep 3; done'
+          echo "Web healthy."
+
+      - name: Install Playwright browsers (Chromium only)
+        run: |
+          # Build puts playwright.ps1 next to the test dll
+          pwsh tests/FlowLedger.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      # Fails the job on any serious or critical axe violation, console error, or horizontal page scroll on a phone.
+      - name: Run accessibility sweep (headless, CI-only)
+        run: >
+          dotnet test tests/FlowLedger.E2E.Tests
+          --no-build
+          --configuration Release
+          --filter "Category=A11y"
+          --logger "trx;LogFileName=a11y-results.trx"
+          --results-directory ./artifacts/tests
+        env:
+          # Once the E2E base class honours this (tracked in #138), a missing E2E_BASE_URL throws
+          # instead of silently skipping.
+          E2E_REQUIRED: "true"
+          E2E_BASE_URL: http://localhost:5002
+          E2E_API_URL: http://localhost:5001
+          E2E_API_KEY: ci-integration-key-not-for-production-0123456789
+          E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+
+      # Guard against a green run with no E2E tests discovered or executed (e.g. a renamed trait/filter).
+      # Note: tests that return early via ShouldSkip are still reported as Passed; fixing that needs a
+      # change in tests/FlowLedger.E2E.Tests/E2ETestBase.cs (#138).
+      - name: Require executed accessibility tests
+        run: python3 eng/ci/check-trx.py "artifacts/tests/**/a11y-results.trx" --min-executed 20
+
+      - name: Publish E2E test results
+        if: always()
+        uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3
+        with:
+          name: UI Accessibility Results
+          path: artifacts/tests/**/*.trx
+          reporter: dotnet-trx
+
+      - name: Upload Playwright traces / screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-a11y-artifacts
+          path: test-results/
+          if-no-files-found: ignore
+
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose --profile full logs --tail=100
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose --profile full down -v

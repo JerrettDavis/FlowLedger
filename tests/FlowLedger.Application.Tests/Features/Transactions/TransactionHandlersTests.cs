@@ -136,4 +136,18 @@ public sealed class TransactionHandlersTests
 
         results.Should().ContainSingle().Which.Description.Should().Be("Coffee Shop");
     }
+
+    [Fact]
+    public async Task CountAsync_ignores_paging_and_respects_filters()
+    {
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Shop" });
+        await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Beans" });
+        await createHandler.HandleAsync(ValidRequest() with { Description = "Rent" });
+
+        var listHandler = new ListTransactionsHandler(_repo);
+
+        (await listHandler.CountAsync(new ListTransactionsQuery(Take: 1))).Should().Be(3);
+        (await listHandler.CountAsync(new ListTransactionsQuery(Search: "coffee", Take: 1))).Should().Be(2);
+    }
 }

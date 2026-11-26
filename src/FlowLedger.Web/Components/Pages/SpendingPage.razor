@@ -7,30 +7,27 @@
 
 <PageTitle>Spending — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4" style="flex-wrap:wrap;gap:8px">
-    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Spending &amp; Trends</MudText>
-    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
-        <MudSelect T="string" Value="_period" ValueChanged="OnPeriodChanged" Label="Period" Style="width:min(170px,100%)" Dense="true">
-            @foreach (var p in Periods)
+<PageHeader Title="Spending & Trends">
+            <MudSelect T="string" Value="_period" ValueChanged="OnPeriodChanged" Label="Period" Style="width:min(170px,100%)" Dense="true">
+                @foreach (var p in Periods)
+                {
+                    <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_period == "Custom")
             {
-                <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+                <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)" Style="width:min(150px,100%)" />
+                <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)" Style="width:min(150px,100%)" />
             }
-        </MudSelect>
-        @if (_period == "Custom")
-        {
-            <MudDatePicker Label="From" Date="_from.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, true)" Style="width:min(150px,100%)" />
-            <MudDatePicker Label="To" Date="_to.ToDateTime(TimeOnly.MinValue)" DateChanged="d => OnCustomDate(d, false)" Style="width:min(150px,100%)" />
-        }
-        <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_accountIds" SelectedValuesChanged="OnAccountsChanged"
-                   Label="Accounts" Style="width:min(210px,100%)" Clearable="true"
-                   MultiSelectionTextFunc="@(v => _accountIds.Count == 0 ? "All accounts" : $"{_accountIds.Count} account(s)")">
-            @foreach (var a in _accounts)
-            {
-                <MudSelectItem T="Guid" Value="@a.Id">@a.Name</MudSelectItem>
-            }
-        </MudSelect>
-    </div>
-</div>
+            <MudSelect T="Guid" MultiSelection="true" SelectedValues="@_accountIds" SelectedValuesChanged="OnAccountsChanged"
+                       Label="Accounts" Style="width:min(210px,100%)" Clearable="true"
+                       MultiSelectionTextFunc="@(v => _accountIds.Count == 0 ? "All accounts" : $"{_accountIds.Count} account(s)")">
+                @foreach (var a in _accounts)
+                {
+                    <MudSelectItem T="Guid" Value="@a.Id">@a.Name</MudSelectItem>
+                }
+            </MudSelect>
+</PageHeader>
 
 <div class="d-flex align-center mb-4" style="gap:16px;flex-wrap:wrap">
     <MudToggleGroup T="bool" Value="_income" ValueChanged="OnIncomeChanged" Color="Color.Primary">

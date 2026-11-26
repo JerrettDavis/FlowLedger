@@ -6,12 +6,10 @@
 
 <PageTitle>Integrations — FlowLedger</PageTitle>
 
-<div class="d-flex align-center flex-wrap gap-3 mb-1">
-    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Integrations</MudText>
-    <MudSpacer />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenFormAsync(null))"
-               Disabled="@(_state is null || _state.Integrations.Count >= _state.Limit)">Add integration</MudButton>
-</div>
+<PageHeader Title="Integrations">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenFormAsync(null))"
+                   Disabled="@(_state is null || _state.Integrations.Count >= _state.Limit)">Add integration</MudButton>
+</PageHeader>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Connect FlowLedger to other services: call a <strong>REST</strong> API, call a <strong>SOAP</strong> service from its WSDL, or push
     signed <strong>webhook</strong> events when an import or sync finishes. Credentials are stored encrypted and never shown again.

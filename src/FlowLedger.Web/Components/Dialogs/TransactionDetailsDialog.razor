@@ -1,0 +1,62 @@
+@namespace FlowLedger.Web.Components.Dialogs
+
+@* A right-hand details panel for one transaction: every field the grid may hide on narrow screens, plus the row actions.
+   Closing with an action name tells the page which editor to open next. *@
+<MudDialog aria-labelledby="tx-details-title">
+    <TitleContent>
+        <MudText Typo="Typo.h6" id="tx-details-title">Transaction details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <dl class="fl-details">
+            <dt>Merchant</dt>
+            <dd>@(string.IsNullOrWhiteSpace(Transaction.MerchantName) ? Transaction.SuggestedName ?? "–" : Transaction.MerchantName)</dd>
+            <dt>Description</dt>
+            <dd>@Transaction.Description</dd>
+            <dt>Date</dt>
+            <dd>@Format.FullDate(Transaction.EffectiveDate)@(Transaction.PostedDate is { } posted ? $" (posted {Format.FullDate(posted)})" : "")</dd>
+            <dt>Amount</dt>
+            <dd class="fl-num">@Format.Signed(Transaction.Amount, Transaction.Direction == "Credit")</dd>
+            <dt>Status</dt>
+            <dd>@Transaction.Status</dd>
+            <dt>Account</dt>
+            <dd>@(AccountName ?? "–")</dd>
+            <dt>Category</dt>
+            <dd>@(CategoryName ?? "Uncategorized")</dd>
+            @if (!string.IsNullOrWhiteSpace(Transaction.Notes))
+            {
+                <dt>Note</dt>
+                <dd>@Transaction.Notes</dd>
+            }
+            @if (Transaction.Tags is { Count: > 0 })
+            {
+                <dt>Tags</dt>
+                <dd>@string.Join(", ", Transaction.Tags)</dd>
+            }
+            @if (Transaction.Splits is { Count: > 0 })
+            {
+                <dt>Split</dt>
+                <dd>@Transaction.Splits.Count parts</dd>
+            }
+        </dl>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => Close(Rename))" StartIcon="@Icons.Material.Filled.Edit">Rename merchant</MudButton>
+        <MudButton OnClick="@(() => Close(Note))" StartIcon="@Icons.Material.Outlined.NoteAdd">Note</MudButton>
+        <MudButton OnClick="@(() => Close(Split))" StartIcon="@Icons.Material.Filled.CallSplit">Split</MudButton>
+        <MudButton OnClick="@(() => MudDialog.Cancel())" Color="Color.Primary" Variant="Variant.Filled">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    public const string Rename = "rename";
+    public const string Note = "note";
+    public const string Split = "split";
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public FlowLedger.Contracts.TransactionDto Transaction { get; set; } = default!;
+    [Parameter] public string? AccountName { get; set; }
+    [Parameter] public string? CategoryName { get; set; }
+
+    private void Close(string action) => MudDialog.Close(DialogResult.Ok(action));
+}
