@@ -1,3 +1,4 @@
+using FlowLedger.Api;
 using FlowLedger.Api.Auth;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Api.Jobs;
@@ -14,6 +15,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Quartz;
+
+// One-shot schema migration (`dotnet FlowLedger.Api.dll --migrate`): the compose `migrate` service runs this and exits, so the
+// long-running API need not auto-migrate in production (#195).
+if (args.Contains(MigrateCommand.Flag))
+{
+    Environment.ExitCode = await MigrateCommand.RunAsync(args);
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

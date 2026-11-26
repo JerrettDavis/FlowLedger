@@ -11,7 +11,7 @@
 1. Read the CHANGELOG entry for breaking changes and new required settings.
 2. Take and verify a backup: `./eng/scripts/backup.sh` (or `backup.ps1`), then `./eng/scripts/restore.sh <dir>` to prove it restores.
 3. Pull/build the new version: `git fetch --tags && git checkout vX.Y.Z && docker compose --profile full build`.
-4. Start it: `docker compose --profile full up -d`. The API applies pending migrations at start-up (`Database__MigrateOnStartup=true`), serialized by a Postgres advisory lock so two starters never migrate concurrently, and the app takes a verified pre-migration snapshot first when data exists.
+4. Start it: `docker compose --profile full up -d`. The one-shot `migrate` service runs first and the api/worker wait for it (`docker compose logs migrate` shows the result; if it fails nothing else starts and the database is untouched beyond the verified snapshot). The api does not migrate by itself unless `DATABASE__MIGRATEONSTARTUP=true`. Migration is serialized by a Postgres advisory lock so two starters never migrate concurrently, and the app takes a verified pre-migration snapshot first when data exists.
 5. Check `/alive`, the Data page (backup status) and one manual sync.
 
 ## Rolling back
