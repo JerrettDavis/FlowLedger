@@ -43,7 +43,22 @@ internal static class DataAdminGate
                 : new Result(true);
         }
 
-        if (config.GetValue("DataAdmin:AllowRemote", false) || IsDirectLoopback(http))
+        if (config.GetValue("DataAdmin:AllowRemote", false))
+        {
+            return new Result(true); // explicit operator opt-out
+        }
+
+        // #139: outside Development an address is not a credential. A configured DataAdmin:Key is required; the loopback shortcut
+        // remains for local development only (and for contexts that carry no host environment, such as unit tests).
+        var environment = http.RequestServices?.GetService<IHostEnvironment>();
+        if (environment is not null && !environment.IsDevelopment())
+        {
+            return Deny(
+                "Data administration requires an admin key",
+                "Set DataAdmin:Key (32+ characters) on the API and the web app; callers send it as X-Admin-Token.");
+        }
+
+        if (IsDirectLoopback(http))
         {
             return new Result(true);
         }

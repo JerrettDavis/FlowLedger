@@ -88,7 +88,7 @@ Status: first version, not externally reviewed. The pre-onboarding audit in
 
 | Threat | Existing control | Gap / note |
 |---|---|---|
-| Remote bulk export/import | `GET /api/data/export`, `POST /api/data/import`, `POST /api/data/backup-now` accept loopback callers only unless `DataAdmin__AllowRemote=true` | Behind a reverse proxy on the same host, requests can appear as loopback; do not route these paths through the proxy |
+| Remote bulk export/import | `/api/data/*` admin routes require the household tenant AND `DataAdmin__Key` / `X-Admin-Token` outside Development (loopback is accepted only in Development; `DataAdmin__AllowRemote=true` is an explicit opt-out) | Behind a reverse proxy on the same host, requests can appear as loopback; do not route these paths through the proxy |
 | Import abuse | Import only into an empty database, hash and row-count verification, 8 GB expansion cap | |
 
 ## Top residual risks
