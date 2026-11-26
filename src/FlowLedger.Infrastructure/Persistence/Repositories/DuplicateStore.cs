@@ -13,7 +13,7 @@ internal sealed class DuplicateStore(FlowLedgerDbContext db, ITenantContext tena
 {
     public async Task<IReadOnlyList<Transaction>> LoadTrackedAsync(int max, CancellationToken ct = default)
         => await db.Transactions
-            .Where(t => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped)
+            .Where(TransactionStatusExtensions.RealTransaction)
             .OrderByDescending(t => t.EffectiveDate).ThenBy(t => t.Id)
             .Take(max)
             .ToListAsync(ct);
