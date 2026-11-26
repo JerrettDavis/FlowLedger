@@ -6,9 +6,6 @@ using FlowLedger.SharedKernel;
 
 namespace FlowLedger.Application.Features.Categories;
 
-/// <summary>A user-defined rule: a transaction whose description/merchant contains <see cref="Pattern"/> gets category <see cref="CategoryPath"/>.</summary>
-public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
-
 public interface ICategoryRuleStore
 {
     Task<IReadOnlyList<CategoryRuleDto>> ListAsync(CancellationToken ct = default);

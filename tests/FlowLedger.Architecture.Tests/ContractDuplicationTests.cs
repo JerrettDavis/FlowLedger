@@ -10,18 +10,11 @@ public sealed class ContractDuplicationTests
         a.GetExportedTypes().Where(t => !t.IsNested && !t.IsGenericTypeDefinition).Select(t => t.Name);
 
     private static readonly string[] Allowlist = [
-        "CategoryRuleDto",
-        "DuplicateSideDto",
-        "DuplicateSuggestionDto",
-        "ImportSummaryDto",
-        "MerchantGroupDto",
         "PanelResultDto",
         "QuerySchemaDto",
         "RunReportResultDto",
         "SavedReportDto",
         "SaveReportRequest",
-        "SimilarTransactionDto",
-        "SyncResult",
     ];
 
     [Fact]

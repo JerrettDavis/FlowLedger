@@ -25,13 +25,6 @@ public interface IDuplicateStore
 
 public sealed record MergeLogEntry(Guid DuplicateId, Guid SurvivorId, DateTimeOffset MergedUtc, bool Auto, string Reason, string SnapshotJson);
 
-public sealed record DuplicateSideDto(
-    Guid Id, Guid AccountId, string Description, string? MerchantName, decimal Amount, string Direction, string Status,
-    DateOnly EffectiveDate, Guid? CategoryId, string CategorySource, string? Notes, bool BankSynced);
-
-public sealed record DuplicateSuggestionDto(
-    string Key, string Confidence, double Score, int DaysApart, string Reason, DuplicateSideDto Keep, DuplicateSideDto Remove);
-
 public sealed record DuplicateScanResult(int Total, int AutoMergeable, IReadOnlyList<DuplicateSuggestionDto> Suggestions);
 
 public sealed record AutoMergeResult(int Merged, int Suggested);
