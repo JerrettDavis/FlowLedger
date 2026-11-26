@@ -90,7 +90,7 @@ else
 // Security headers on every response; full CSP outside Development (hot reload / WASM debugging inject scripts).
 app.UseFlowLedgerSecurityHeaders(enableCsp: !app.Environment.IsDevelopment());
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseStatusCodePagesWithReExecute("/status/{0}", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

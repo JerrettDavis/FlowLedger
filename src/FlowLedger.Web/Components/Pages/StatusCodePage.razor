@@ -1,0 +1,30 @@
+@page "/status/{Code:int}"
+@layout MainLayout
+
+@* Target of UseStatusCodePagesWithReExecute: the original status code is kept, this only picks the message. *@
+@switch (Code)
+{
+    case 401:
+    case 403:
+        <PageTitle>No access</PageTitle>
+        <StatusMessage Icon="@Icons.Material.Filled.Lock"
+                       Title="You don't have access to this"
+                       Description="Your account isn't allowed to view this page. If you think that's a mistake, ask whoever manages your household." />
+        break;
+    case 404:
+        <PageTitle>Page not found</PageTitle>
+        <StatusMessage Icon="@Icons.Material.Filled.SearchOff"
+                       Title="Page not found"
+                       Description="The page you're looking for doesn't exist or has moved." />
+        break;
+    default:
+        <PageTitle>Something went wrong</PageTitle>
+        <StatusMessage Icon="@Icons.Material.Filled.ErrorOutline" IconColor="Color.Error"
+                       Title="Something went wrong"
+                       Description="@($"The server responded with status {Code}. Try again, or head back to the dashboard.")" />
+        break;
+}
+
+@code {
+    [Parameter] public int Code { get; set; }
+}
