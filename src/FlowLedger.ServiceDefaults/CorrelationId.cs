@@ -53,7 +53,7 @@ public static partial class CorrelationId
                 Activity.Current?.SetTag("correlation.id", id);
 
                 var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("FlowLedger.Correlation");
-                using (logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = id }))
+                using (logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = new string(id.Where(c => !char.IsControl(c)).ToArray()) }))
                 {
                     await nxt(context);
                 }
