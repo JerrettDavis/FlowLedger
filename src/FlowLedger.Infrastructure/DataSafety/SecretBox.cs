@@ -70,16 +70,29 @@ internal static class SecretBox
     public static byte[] Aad(Guid tenantId, string purpose, Guid? rowId = null) =>
         System.Text.Encoding.UTF8.GetBytes($"flowledger.secret.v2|{tenantId:D}|{purpose}|{rowId:D}");
 
-    public static string SealV2(string plain, SecretKeyRing ring, byte[] aad)
+    public static string SealV2(string plain, SecretKeyRing ring, byte[] aad) => SealV2(System.Text.Encoding.UTF8.GetBytes(plain), ring, aad);
+
+    public static string SealV2(byte[] data, SecretKeyRing ring, byte[] aad)
     {
         var key = ring.Current ?? throw new InvalidOperationException("No encryption key is configured.");
         var nonce = RandomNumberGenerator.GetBytes(12);
-        var data = System.Text.Encoding.UTF8.GetBytes(plain);
         var cipher = new byte[data.Length];
         var tag = new byte[16];
         using var gcm = new AesGcm(key, 16);
         gcm.Encrypt(nonce, data, cipher, tag, aad);
         return $"v2:{KeyId(key)}:" + Convert.ToBase64String([.. nonce, .. tag, .. cipher]);
+    }
+
+    /// <summary>Opens a v2 envelope to raw bytes (key chosen by id, AAD enforced). Null when it cannot be opened.</summary>
+    public static byte[]? OpenV2Bytes(string stored, SecretKeyRing ring, byte[] aad)
+    {
+        if (!stored.StartsWith("v2:", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var parts = stored.Split(':', 3);
+        return parts.Length == 3 && ring.Find(parts[1]) is { } key ? OpenCoreBytes(parts[2], key, aad) : null;
     }
 
     /// <summary>Opens a v2 value (key chosen by id, AAD enforced) or a v1 value (every ring key tried, no AAD). Null when it cannot be opened.</summary>
@@ -111,6 +124,9 @@ internal static class SecretBox
         => Open(stored, ring, aad) is { } plain ? SealV2(plain, ring, aad) : null;
 
     private static string? OpenCore(string b64, byte[] key, byte[] aad)
+        => OpenCoreBytes(b64, key, aad) is { } plain ? System.Text.Encoding.UTF8.GetString(plain) : null;
+
+    private static byte[]? OpenCoreBytes(string b64, byte[] key, byte[] aad)
     {
         try
         {
@@ -118,7 +134,7 @@ internal static class SecretBox
             var plain = new byte[raw.Length - 28];
             using var gcm = new AesGcm(key, 16);
             gcm.Decrypt(raw.AsSpan(0, 12), raw.AsSpan(28), raw.AsSpan(12, 16), plain, aad);
-            return System.Text.Encoding.UTF8.GetString(plain);
+            return plain;
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException or ArgumentException)
         {

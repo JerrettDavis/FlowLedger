@@ -15,7 +15,7 @@ namespace FlowLedger.Infrastructure.Storage;
 /// S3/MinIO can be substituted by replacing this registration in
 /// <c>DependencyInjection.cs</c> — no callers are affected.
 /// </summary>
-internal sealed class LocalDiskObjectStorage : IObjectStorage
+internal sealed class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBrowser
 {
     private readonly string _rootPath;
     private readonly ILogger<LocalDiskObjectStorage> _logger;
@@ -82,6 +82,32 @@ internal sealed class LocalDiskObjectStorage : IObjectStorage
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<StoredObject> ListAsync(
+        string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // The prefix is validated like any key (no rooted path, no "..", must resolve inside the root) before the directory is walked.
+        var start = ResolveAndValidatePath(prefix.TrimEnd('/', '\\'));
+        if (!Directory.Exists(start))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(start, "*", SearchOption.AllDirectories))
+        {
+            ct.ThrowIfCancellationRequested();
+            var full = Path.GetFullPath(file);
+            if (!full.StartsWith(_rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var key = Path.GetRelativePath(_rootPath, full).Replace('\\', '/');
+            yield return new StoredObject(key, new DateTimeOffset(File.GetLastWriteTimeUtc(full), TimeSpan.Zero));
+            await Task.Yield();
+        }
     }
 
     // ── Path validation ────────────────────────────────────────────────────────

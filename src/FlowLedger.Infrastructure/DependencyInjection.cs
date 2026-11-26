@@ -437,8 +437,16 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
             .Validate(o => !string.IsNullOrWhiteSpace(o.RootPath), "ObjectStorage:RootPath must not be empty.")
             .ValidateOnStart();
-        services.AddSingleton<IObjectStorage, LocalDiskObjectStorage>();
+        services.AddSingleton<LocalDiskObjectStorage>();
+        services.AddSingleton<IObjectStorage>(sp => sp.GetRequiredService<LocalDiskObjectStorage>());
+        services.AddSingleton<IObjectStorageBrowser>(sp => sp.GetRequiredService<LocalDiskObjectStorage>());
+        // Raw archive (#142): tenant-partitioned keys; sealing and retention are opt-in (Storage:EncryptionKey, Storage:RawArchiveRetentionDays).
+        services.AddSingleton(RawArchiveSettings.From(configuration));
         services.AddSingleton<IRawPayloadArchive, ObjectStorageRawPayloadArchive>();
+        services.AddSingleton(sp => new RawArchiveMaintenance(
+            sp.GetRequiredService<IObjectStorage>(), sp.GetRequiredService<IObjectStorageBrowser>(), sp.GetRequiredService<RawArchiveSettings>()));
+        services.AddSingleton<FlowLedger.Integrations.Abstractions.IRawPayloadDecryptor>(sp => sp.GetRequiredService<RawArchiveMaintenance>());
+        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantFileEraser>(sp => sp.GetRequiredService<RawArchiveMaintenance>());
 
         // Readiness probes (/ready): Postgres + migrations, Redis (if configured), backup freshness.
         FlowLedger.Infrastructure.Health.ReadinessHealthExtensions.AddFlowLedgerReadinessChecks(services);

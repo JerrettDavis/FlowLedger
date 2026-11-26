@@ -114,7 +114,8 @@ internal static class MxEndpoints
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
-            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+            var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
+            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
 
             ProviderWebhookEvent evt;
             try
