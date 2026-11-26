@@ -19,6 +19,7 @@ public static class AdHocSchema
         NpgsqlProviderCallLedger.CreateSqlText,
         BackupRunStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
+        NpgsqlTenantRegistry.CreateSqlText,
     ];
 
     public static string AllSql => string.Join("\n", Scripts);
