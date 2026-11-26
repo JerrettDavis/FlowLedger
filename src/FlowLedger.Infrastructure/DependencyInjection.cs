@@ -183,26 +183,26 @@ public static class DependencyInjection
         if (simpleFinEnabled)
         {
             services.AddSimpleFinProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true, FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", !FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits));
         }
 
         if (mxOptions.Enabled)
         {
             services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", SharedCredentials: true, FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", !FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits));
         }
 
         if (quilttEnabled)
         {
             services.AddQuilttProvider(configuration, registerAsDefault: connectors.Count == 0);
             // Per-user profiles: Quiltt isolates each tenant itself, so unlike SimpleFIN/MX it is not tied to the household tenant.
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", SharedCredentials: false, FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", !FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits));
         }
 
         if (simulatedEnabled)
         {
             services.AddSimulatedProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false, FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", !FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits));
         }
 
         services.AddScoped<FlowLedger.Application.Abstractions.IHouseholdTenantAccess, HouseholdTenantAccess>();
