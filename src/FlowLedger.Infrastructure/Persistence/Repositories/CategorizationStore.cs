@@ -33,8 +33,7 @@ internal sealed class CategorizationStore(FlowLedgerDbContext db) : ICategorizat
             .ToListAsync(ct);
 
     public async Task<bool> AnyUncategorizedAsync(CancellationToken ct = default)
-        => await db.Transactions.AnyAsync(t => t.CategoryId == null
-            && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped, ct);
+        => await db.Transactions.Where(TransactionStatusExtensions.RealTransaction).AnyAsync(t => t.CategoryId == null, ct);
 
     public async Task SaveAsync(CancellationToken ct = default) => await db.SaveChangesAsync(ct);
 

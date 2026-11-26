@@ -19,7 +19,7 @@ public sealed class TransactionEnrichmentService(ICategorizationStore store)
         var changedRows = new List<FlowLedger.Domain.Aggregates.Transaction>();
         foreach (var t in await store.LoadAsync(Max, ct))
         {
-            if (t.Status is TransactionStatus.Planned or TransactionStatus.Skipped)
+            if (!t.Status.IsReal())
             {
                 continue;
             }

@@ -99,7 +99,7 @@ public sealed class CategoryRuleService(
             {
                 foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
                 {
-                    if (t.Id == target.Id || t.Status is TransactionStatus.Planned or TransactionStatus.Skipped
+                    if (t.Id == target.Id || !t.Status.IsReal()
                         || AutoCategorizer.MerchantKey(t.MerchantName, t.Description) != key)
                     {
                         continue;
@@ -148,7 +148,7 @@ public sealed class CategoryRuleService(
         var changedRows = new List<Transaction>();
         foreach (var t in await transactions.LoadAsync(Max, ct))
         {
-            if (t.Status is TransactionStatus.Planned or TransactionStatus.Skipped)
+            if (!t.Status.IsReal())
             {
                 continue;
             }

@@ -40,7 +40,7 @@ public sealed class LocalAiService(
             "Custom", embedder.ModelId, embedder.Dimensions, embedder.IsSemantic, true, null, embedder.ModelId,
             false, false, false, null, string.Empty, false, []);
 
-    private static bool IsReal(Transaction t) => t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped;
+    private static bool IsReal(Transaction t) => t.Status.IsReal();
 
     /// <summary>The transactions whose descriptor is most similar to the given one (merchant-name similarity, not amount).</summary>
     public async Task<IReadOnlyList<SimilarTransactionDto>> SimilarAsync(Guid transactionId, int top, CancellationToken ct = default)

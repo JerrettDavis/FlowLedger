@@ -38,8 +38,7 @@ public interface ICategorizationStore
 
     /// <summary>True when some real (not Planned/Skipped) transaction has no category.</summary>
     async Task<bool> AnyUncategorizedAsync(CancellationToken ct = default)
-        => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).Any(t => t.CategoryId is null
-            && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped);
+        => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).Any(t => t.CategoryId is null && t.Status.IsReal());
 }
 
 public sealed record CategorizationResult(
@@ -337,7 +336,7 @@ public sealed class CategorizationService(
             var candidates = await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct);
             foreach (var t in candidates.Where(t => t.Id != target.Id
                          && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
-                         && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped
+                         && t.Status.IsReal()
                          && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key))
             {
                 t.Categorize(id, null, CategorySource.Auto);
