@@ -1,3 +1,4 @@
+using FlowLedger.ServiceDefaults;
 using System.Globalization;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Auth;
@@ -55,27 +56,13 @@ builder.Services.AddHttpClient<FlowLedgerApiClient>(client =>
 .AddHttpMessageHandler<ApiAuthHeaderHandler>()
 .AddServiceDiscovery();
 
-// Opt-in: behind a TLS-terminating reverse proxy, honour X-Forwarded-Proto/Host so the OIDC redirect_uri is https.
-// Only enable when the Web port is reachable solely through that proxy (otherwise clients could spoof the headers).
-var trustForwardedHeaders = builder.Configuration.GetValue("ForwardedHeaders:Enabled", false);
-if (trustForwardedHeaders)
-{
-    builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
-    {
-        o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
-            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-            | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
-        o.KnownIPNetworks.Clear();
-        o.KnownProxies.Clear();
-    });
-}
+// Opt-in: behind a TLS-terminating reverse proxy, honour X-Forwarded-Proto/For (and Host when AllowedHosts is restricted) so the OIDC
+// redirect_uri is https. Requires ForwardedHeaders:KnownProxies / KnownNetworks: startup fails if enabled without them.
+var trustForwardedHeaders = builder.AddFlowLedgerForwardedHeaders();
 
 var app = builder.Build();
 
-if (trustForwardedHeaders)
-{
-    app.UseForwardedHeaders();
-}
+app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
