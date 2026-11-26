@@ -14,15 +14,17 @@ public sealed record PastWhatIfRequest(
 /// <summary>Loads the user's ledger, reduces it to <see cref="StrategyInputs"/>, and runs the engine and simulators.</summary>
 public sealed class StrategyService(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories, IMarketRateProvider rateProvider,
-    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, ILocalLlm? llm = null)
+    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, ILocalLlm? llm = null, TimeProvider? time = null)
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     private const int MaxTransactions = 50_000;
     private const int TransferPadDays = 14;
 
     public async Task<StrategyReport> GetReportAsync(CancellationToken ct = default)
     {
         var data = await LoadAsync(12, ct);
-        var report = StrategyEngine.Analyze(data, DateTimeOffset.UtcNow);
+        var report = StrategyEngine.Analyze(data, _time.GetUtcNow());
         var trajectory = CashTrajectoryProjector.Project(data.Months, report.LiquidCash, report.AvgMonthlySpend);
         var coach = await StrategyCoach.PlanAsync(report, llm, ct);
         return report with { Coach = coach, Trajectory = trajectory };
@@ -79,7 +81,7 @@ public sealed class StrategyService(
 
     private async Task<StrategyInputs> LoadAsync(int months, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime);
         var firstOfThisMonth = new DateOnly(today.Year, today.Month, 1);
         var from = firstOfThisMonth.AddMonths(-months);
         var to = firstOfThisMonth.AddDays(-1); // complete months only
