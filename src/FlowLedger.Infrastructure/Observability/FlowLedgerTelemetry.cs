@@ -19,6 +19,14 @@ public static class FlowLedgerTelemetry
     /// <summary>Wall-clock duration of a job run, tagged <c>job</c> and <c>outcome</c>.</summary>
     public static readonly Histogram<double> JobDuration = Meter.CreateHistogram<double>("flowledger.job.duration", "s", "Background job run duration.");
 
+    /// <summary>Outbound financial-provider API calls, tagged <c>provider</c> and <c>status</c> (HTTP status class, or "error").</summary>
+    public static readonly Counter<long> ProviderCalls = Meter.CreateCounter<long>("flowledger.provider.calls", "{call}", "Provider API calls by outcome.");
+
+    public static void RecordProviderCall(string provider, int? statusCode, bool failed)
+        => ProviderCalls.Add(1,
+            new KeyValuePair<string, object?>("provider", provider),
+            new KeyValuePair<string, object?>("status", failed || statusCode is null ? "error" : $"{statusCode / 100}xx"));
+
     private static readonly ConcurrentDictionary<string, DateTimeOffset> LastSuccess = new();
 
     static FlowLedgerTelemetry()

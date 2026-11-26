@@ -26,6 +26,8 @@ public static class Extensions
 
         builder.AddDefaultHealthChecks();
 
+        builder.Services.AddCorrelationIds(); // X-Correlation-Id in/out + log scope (see CorrelationId)
+
         builder.Services.AddServiceDiscovery();
 
         builder.Services.ConfigureHttpClientDefaults(http =>

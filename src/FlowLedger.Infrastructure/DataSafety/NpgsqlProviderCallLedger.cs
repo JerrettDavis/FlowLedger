@@ -32,6 +32,8 @@ public sealed class NpgsqlProviderCallLedger : IProviderCallLedger
 
     public async Task RecordAsync(ProviderCallRecord call, CancellationToken ct = default)
     {
+        // Metric first: it must count even when the ledger write below fails.
+        FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordProviderCall(call.Provider, call.StatusCode, call.Error is not null);
         await using var conn = await OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(
             "INSERT INTO provider_api_calls (provider, method, path, status_code, duration_ms, response_bytes, occurred_utc, error) " +
