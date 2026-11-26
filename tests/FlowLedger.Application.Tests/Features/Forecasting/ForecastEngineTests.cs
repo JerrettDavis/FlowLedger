@@ -2,6 +2,7 @@ using System.Diagnostics;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Forecasting;
@@ -29,17 +30,10 @@ public sealed class ForecastEngineTests
         DateOnly? flowEnd = null,
         string? name = null)
     {
-        return new ForecastFlowInput
-        {
-            FlowId = RecurringFlowId.New(),
-            AccountId = accountId,
-            Amount = new Money(amount, new Currency("USD")),
-            Direction = direction,
-            Pattern = pattern,
-            FlowStart = flowStart,
-            FlowEnd = flowEnd,
-            Name = name ?? "Flow"
-        };
+        var builder = ForecastFlowBuilder.A()
+            .OnAccount(accountId).WithAmount(amount).Recurring(pattern)
+            .From(flowStart).Until(flowEnd).Named(name ?? "Flow");
+        return (direction == TransactionDirection.Credit ? builder.Credit() : builder.Debit()).Build();
     }
 
     private static ForecastRequest SimpleRequest(
@@ -211,17 +205,10 @@ public sealed class ForecastEngineTests
         };
 
         // Actual transaction for $195 (real amount), linked back to occurrence
-        var actual = new ForecastTransactionInput
-        {
-            TransactionId = actualTxId,
-            AccountId = Checking,
-            Amount = new Money(195m, new Currency("USD")),
-            Direction = TransactionDirection.Debit,
-            EffectiveDate = new DateOnly(2025, 1, 10),
-            Status = TransactionStatus.Matched,
-            MatchedOccurrenceId = occurrenceId,
-            Description = "Utility bill"
-        };
+        var actual = ForecastTransactionBuilder.A()
+            .WithId(actualTxId).OnAccount(Checking).WithAmount(195m).Debit().On(new DateOnly(2025, 1, 10))
+            .WithStatus(TransactionStatus.Matched).MatchedTo(occurrenceId).Described("Utility bill")
+            .Build();
 
         // Recurring flow that would re-expand Jan 10 if not suppressed
         var flow = new ForecastFlowInput
@@ -557,15 +544,9 @@ public sealed class ForecastEngineTests
         var end = new DateOnly(2025, 1, 31);
 
         // Account balance in USD but flow in GBP
-        var gbpFlow = new ForecastFlowInput
-        {
-            FlowId = RecurringFlowId.New(),
-            AccountId = Checking,
-            Amount = new Money(100m, new Currency("GBP")),  // ← wrong currency
-            Direction = TransactionDirection.Debit,
-            Pattern = RecurrencePattern.Monthly(5),
-            FlowStart = asOf
-        };
+        var gbpFlow = ForecastFlowBuilder.A()
+            .OnAccount(Checking).WithAmount(100m).InCurrency("GBP") // wrong currency
+            .Recurring(RecurrencePattern.Monthly(5)).From(asOf).Build();
 
         var request = new ForecastRequest
         {

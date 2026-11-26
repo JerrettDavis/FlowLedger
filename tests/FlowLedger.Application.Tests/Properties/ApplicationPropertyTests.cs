@@ -6,6 +6,7 @@ using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Properties;
@@ -29,8 +30,10 @@ public sealed class ApplicationPropertyTests
     };
 
     private static TransactionDto Tx(Guid id, Guid account, decimal amount, string currency, string direction, int day, string status, string desc) =>
-        new(id, account, amount, currency, direction, desc, status, "Import",
-            new DateOnly(2026, 3, 1).AddDays(day), new DateOnly(2026, 3, 1).AddDays(day), null, null, null, null, new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+        TransactionDtoBuilder.A()
+            .WithId(id).OnAccount(account).WithAmount(amount).InCurrency(currency).Described(desc).WithStatus(status).OnDay(day)
+            .With(b => direction == "Credit" ? b.Credit() : b.Debit())
+            .Build();
 
     private static readonly Gen<List<TransactionDto>> TransactionBatch =
         Gen.Select(Gen.Int[0, 3], Gen.Int[0, 3], Gen.Bool, Gen.Int[0, 12], Gen.Int[0, 9], Gen.Int[0, 9], Gen.Guid,
