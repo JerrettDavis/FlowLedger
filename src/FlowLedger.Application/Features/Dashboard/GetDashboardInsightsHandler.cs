@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Query;
 
@@ -12,8 +13,8 @@ public sealed class GetDashboardInsightsHandler(RunQueryHandler query, TimeProvi
     public async Task<DashboardInsightsDto> HandleAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
     {
         // Optional window (default: this month for spending, last 6 months for cash flow, all history for net worth).
-        var fromS = from?.ToString("yyyy-MM-dd");
-        var toS = to?.ToString("yyyy-MM-dd");
+        var fromS = from?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var toS = to?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var toClause = toS is null ? "" : $" and date <= \"{toS}\"";
         // Transfers between the user's own accounts are never spending or income.
         var spending = await query.HandleAsync(
@@ -69,7 +70,7 @@ public sealed class GetDashboardInsightsHandler(RunQueryHandler query, TimeProvi
 
     private static string Str(object? v) => v switch
     {
-        DateOnly d => d.ToString("yyyy-MM-dd"),
+        DateOnly d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         null => "",
         _ => v.ToString() ?? "",
     };
