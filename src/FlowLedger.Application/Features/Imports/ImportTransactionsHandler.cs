@@ -46,14 +46,17 @@ public sealed class ImportTransactionsHandler
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;
     private readonly ITenantContext _tenant;
     private readonly MatchingEngine _matcher;
+    private readonly TimeProvider? _clock;
 
     public ImportTransactionsHandler(
         ITransactionRepository txRepo,
         IAccountRepository accountRepo,
         IPlannedOccurrenceRepository occurrenceRepo,
         ITenantContext tenant,
-        MatchingEngine matcher)
+        MatchingEngine matcher,
+        TimeProvider? clock = null)
     {
+        _clock = clock;
         _txRepo = txRepo;
         _accountRepo = accountRepo;
         _occurrenceRepo = occurrenceRepo;
@@ -94,7 +97,8 @@ public sealed class ImportTransactionsHandler
         var batchId = Guid.NewGuid();
 
         var rowErrors = new List<RowErrorDto>();
-        var uniqueTransactions = new List<(Transaction Tx, string Fp)>();
+        var uniqueTransactions = new List<(Transaction Tx, string Fp, string? LegacyFp)>();
+        var seenProviderIds = new HashSet<string>(StringComparer.Ordinal);
         // Identical same-day rows are genuine repeats (two transit fares), so each repeat gets an occurrence ordinal.
         var occurrences = new Dictionary<string, int>();
         int inFileDupCount = 0;
@@ -112,9 +116,9 @@ public sealed class ImportTransactionsHandler
 
             try
             {
-                var (tx, fp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences);
+                var (tx, fp, legacyFp) = ParseRow(fields, rowNumber, tenantId, accountId, account.CurrentBalance.Currency, mapping, dateFormats, occurrences, seenProviderIds, _clock);
 
-                uniqueTransactions.Add((tx, fp));
+                uniqueTransactions.Add((tx, fp, legacyFp));
             }
             catch (Exception ex)
             {
@@ -131,10 +135,16 @@ public sealed class ImportTransactionsHandler
         }
 
         // Against-DB dedup
-        var allFps = uniqueTransactions.Select(x => x.Fp).ToList();
+        // A row anchored to a bank id (OFX FITID) is also a duplicate when the same transaction was imported earlier under the
+        // description-based fingerprint (files imported before the id was used), so re-importing an old file adds nothing (#128).
+        var allFps = uniqueTransactions.Select(x => x.Fp)
+            .Concat(uniqueTransactions.Where(x => x.LegacyFp is not null).Select(x => x.LegacyFp!))
+            .Distinct().ToList();
         var existingFps = await _txRepo.GetExistingFingerprintsAsync(allFps, ct);
 
-        var toInsert = uniqueTransactions.Where(x => !existingFps.Contains(x.Fp)).ToList();
+        var toInsert = uniqueTransactions
+            .Where(x => !existingFps.Contains(x.Fp) && (x.LegacyFp is null || !existingFps.Contains(x.LegacyFp)))
+            .Select(x => (x.Tx, x.Fp)).ToList();
         int dbDuplicates = uniqueTransactions.Count - toInsert.Count;
         int totalDuplicates = inFileDupCount + dbDuplicates;
 
@@ -230,7 +240,7 @@ public sealed class ImportTransactionsHandler
 
     private delegate bool TryParseDelegate<T>(string raw, out T result);
 
-    private static (Transaction Tx, string FingerprintValue) ParseRow(
+    private static (Transaction Tx, string FingerprintValue, string? LegacyFingerprintValue) ParseRow(
         List<string> fields,
         int rowNumber,
         TenantId tenantId,
@@ -238,7 +248,9 @@ public sealed class ImportTransactionsHandler
         Currency currency,
         CsvColumnMapping mapping,
         string[] dateFormats,
-        Dictionary<string, int> occurrences)
+        Dictionary<string, int> occurrences,
+        HashSet<string> seenProviderIds,
+        TimeProvider? clock)
     {
         // Date
         bool TryParseDateForCoalesce(string raw, out DateOnly d) =>
@@ -307,12 +319,21 @@ public sealed class ImportTransactionsHandler
         var baseKey = TransactionFingerprint.FromRawDescription(accountId, date, absAmount.Amount, description).Value;
         occurrences.TryGetValue(baseKey, out var occurrence);
         occurrences[baseKey] = occurrence + 1;
-        var fingerprint = TransactionFingerprint.FromRawDescription(
+        var legacyFingerprint = TransactionFingerprint.FromRawDescription(
             accountId,
             date,
             absAmount.Amount,
             description,
             occurrence: occurrence);
+
+        // A bank-assigned id (OFX FITID) is the stable identity: it survives a changed description and tells two genuine
+        // identical rows apart. A bank that repeats an id inside one file cannot be trusted, so repeats fall back to the
+        // description fingerprint rather than colliding on the unique index (#128).
+        var providerId = mapping.ProviderIdColumnIndex is { } pidIdx ? GetShifted(pidIdx) : string.Empty;
+        var useProviderId = !string.IsNullOrWhiteSpace(providerId) && seenProviderIds.Add(providerId);
+        var fingerprint = useProviderId
+            ? TransactionFingerprint.FromRawDescription(accountId, date, absAmount.Amount, description, providerTransactionId: "ofx:" + providerId)
+            : legacyFingerprint;
 
         var tx = Transaction.RecordActual(
             tenantId,
@@ -323,14 +344,15 @@ public sealed class ImportTransactionsHandler
             effectiveDate: date,
             postedDate: date,
             source: TransactionSource.CsvImport,
-            fingerprint: fingerprint);
+            fingerprint: fingerprint,
+            time: clock);
 
         if (!string.IsNullOrWhiteSpace(merchant))
         {
             tx.SetMerchantName(merchant);
         }
 
-        return (tx, fingerprint.Value);
+        return (tx, fingerprint.Value, useProviderId ? legacyFingerprint.Value : null);
     }
 
     private static bool TryParseDate(string raw, string[] formats, out DateOnly result)

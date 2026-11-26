@@ -83,6 +83,7 @@ internal static class MxEndpoints
             IWebhookTenantResolver tenantResolver,
             IWebhookReplayStore? replayStore,
             ILoggerFactory loggers,
+            IConfiguration configuration,
             CancellationToken ct) =>
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
@@ -144,6 +145,13 @@ internal static class MxEndpoints
                     detail: ex.Message,
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Malformed webhook payload");
+            }
+
+            // Only events that mean transactions/accounts changed are worth a billable sync (#120); the rest are acknowledged and ignored.
+            if (provider is MxFinancialDataProvider
+                && !MxWebhookEvents.IsSyncTrigger(evt.EventType, MxWebhookEvents.FromConfiguration(configuration)))
+            {
+                return Results.Accepted(value: new { ignored = evt.EventType });
             }
 
             // Enqueue a background sync via Quartz so the heavy work runs off the request path.

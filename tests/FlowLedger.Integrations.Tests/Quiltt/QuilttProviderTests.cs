@@ -153,6 +153,135 @@ public sealed class QuilttProviderTests
         calls.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Accounts_WithoutACurrency_AreSkippedNotBookedAsUsd_AndRowsInheritTheAccountCurrency()
+    {
+        const string accounts = """
+            {"data":{"accounts":[
+              {"id":"acc_1","name":"Euro","kind":"DEPOSITORY","state":"OPEN","currencyCode":"EUR","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}},
+              {"id":"acc_2","name":"Mystery","kind":"DEPOSITORY","state":"OPEN","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}}
+            ]}}
+            """;
+        var day = FlowLedger.TestSupport.TestClock.Today.AddDays(-2).ToString("yyyy-MM-dd");
+        var stub = new Stub((req, body) =>
+            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            : body.Contains("FlowLedgerAccounts") ? Json(accounts)
+            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day + "\",\"description\":\"X\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}},"
+                + "{\"id\":\"t2\",\"date\":\"" + day + "\",\"description\":\"Y\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_2\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
+        var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", InitialHistoryDays = 36_500 });
+
+        var mapped = await p.GetAccountsAsync("p_1");
+        mapped.Should().ContainSingle().Which.CurrencyCode.Should().Be("EUR");
+
+        (await p.GetTransactionsAsync("acc_1", SyncCursor.Initial)).Items.Should().ContainSingle()
+            .Which.Amount.Currency.Code.Should().Be("EUR");
+        var unknown = await p.GetTransactionsAsync("acc_2", SyncCursor.Initial);
+        unknown.Items.Should().BeEmpty("no currency can be inherited, and USD is never assumed");
+        unknown.SkippedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Transactions_AccountWithOnlyPendingRows_AdvancesItsCursor()
+    {
+        var day = FlowLedger.TestSupport.TestClock.Today.AddDays(-4);
+        var stub = new Stub((req, body) =>
+            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            : body.Contains("FlowLedgerAccounts") ? Json(AccountsJson)
+            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day.ToString("yyyy-MM-dd") + "\",\"description\":\"HOLD\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"PENDING\",\"account\":{\"id\":\"acc_1\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
+        var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", InitialHistoryDays = 36_500 });
+        await p.GetAccountsAsync("p_1");
+
+        var page = await p.GetTransactionsAsync("acc_1", SyncCursor.Initial);
+
+        page.NextCursor.Value.Should().Be(day.AddDays(-1).ToString("yyyy-MM-dd"));
+    }
+
+    [Fact]
+    public async Task Transactions_HittingMaxPages_ContinueInTheSyncLoopInsteadOfFailing()
+    {
+        // Five days of rows, one per day, two rows per page and a one-page bound: the read is cut every time.
+        var d0 = FlowLedger.TestSupport.TestClock.Today.AddDays(-10);
+        var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
+        var stub = new Stub((req, body) =>
+        {
+            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
+            var from = DateOnly.Parse(System.Text.RegularExpressions.Regex.Match(body, "\"from\":\"([0-9-]+)\"").Groups[1].Value);
+            var remaining = rows.Where(r => r.Date >= from).ToList();
+            var nodes = string.Join(",", remaining.Take(2).Select(r =>
+                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd") + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}}"));
+            return Json("{\"data\":{\"transactions\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + (remaining.Count > 2 ? "true" : "false") + ",\"endCursor\":\"c\"}}}}");
+        });
+        var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", MaxPages = 1, PageSize = 2, OverlapDays = 3, InitialHistoryDays = 36_500 });
+        await p.GetAccountsAsync("p_1");
+
+        // The loop FinancialSyncService runs: persist the cursor, call again while HasMore.
+        var cursor = SyncCursor.Initial;
+        var seen = new List<string>();
+        var guard = 0;
+        bool more;
+        do
+        {
+            var page = await p.GetTransactionsAsync("acc_1", cursor);
+            seen.AddRange(page.Items.Select(i => i.ProviderId!));
+            cursor = page.NextCursor;
+            more = page.HasMore;
+            (++guard).Should().BeLessThan(20, "the continuation must make progress");
+        }
+        while (more);
+
+        seen.Distinct().Should().BeEquivalentTo(rows.Select(r => r.Id), "every row is delivered even though one read never holds them all");
+        guard.Should().BeGreaterThan(1, "the bound forced at least one continuation");
+    }
+
+    [Fact]
+    public async Task Transactions_HittingMaxPages_ContinueForEveryAccountWithoutRereadingTheChain()
+    {
+        // Five days of rows, one per day, two rows per page and a one-page bound: the read is cut every time.
+        var d0 = FlowLedger.TestSupport.TestClock.Today.AddDays(-10);
+        var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
+        var stub = new Stub((req, body) =>
+        {
+            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
+            var from = DateOnly.Parse(System.Text.RegularExpressions.Regex.Match(body, "\"from\":\"([0-9-]+)\"").Groups[1].Value);
+            var remaining = rows.Where(r => r.Date >= from).ToList();
+            var nodes = string.Join(",", remaining.Take(2).Select(r =>
+                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd") + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"" + (r.Id == "t1" ? "acc_2" : "acc_1") + "\"}}"));
+            return Json("{\"data\":{\"transactions\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + (remaining.Count > 2 ? "true" : "false") + ",\"endCursor\":\"c\"}}}}");
+        });
+        var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", MaxPages = 1, PageSize = 2, OverlapDays = 3, InitialHistoryDays = 36_500 });
+        await p.GetAccountsAsync("p_1");
+
+        // The loop FinancialSyncService runs per account: persist the cursor, call again while HasMore.
+        async Task<List<string>> Drain(string account)
+        {
+            var cursor = SyncCursor.Initial;
+            var seen = new List<string>();
+            var guard = 0;
+            bool more;
+            do
+            {
+                var page = await p.GetTransactionsAsync(account, cursor);
+                seen.AddRange(page.Items.Select(i => i.ProviderId!));
+                cursor = page.NextCursor;
+                more = page.HasMore;
+                (++guard).Should().BeLessThan(20, "the continuation must make progress");
+            }
+            while (more);
+            return seen;
+        }
+
+        var first = await Drain("acc_1");
+        var requestsAfterFirstAccount = stub.Calls.Count(c => c.Body.Contains("FlowLedgerTransactions"));
+        var second = await Drain("acc_2");
+
+        first.Concat(second).Distinct().Should().BeEquivalentTo(rows.Select(r => r.Id), "every row is delivered even though one read never holds them all");
+        requestsAfterFirstAccount.Should().BeGreaterThan(1, "the bound forced at least one continuation");
+        stub.Calls.Count(c => c.Body.Contains("FlowLedgerTransactions")).Should().Be(requestsAfterFirstAccount,
+            "the second account walks the same continuation chain from cache, not N more GraphQL reads");
+    }
+
     [Theory]
     [InlineData("connection.synced.successful", true)]
     [InlineData("connection.synced.successful.initial", true)]

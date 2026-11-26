@@ -111,6 +111,11 @@ public sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
         {
             _weights?.Dispose();
             _weights = null;
+            if (!_models.VerifyIntegrity(model))
+            {
+                throw new InvalidDataException("A model file does not match its catalog checksum; remove the model and download it again.");
+            }
+
             var path = Path.Combine(_models.Directory, model.Files[0].Name);
             _params = new ModelParams(path)
             {

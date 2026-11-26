@@ -87,7 +87,8 @@ public sealed class RecurringFlow : AggregateRoot
         DateOnly? endDate = null,
         AmountModel amountModel = AmountModel.Fixed,
         CategoryId? categoryId = null,
-        string? counterparty = null)
+        string? counterparty = null,
+        TimeProvider? time = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -108,9 +109,9 @@ public sealed class RecurringFlow : AggregateRoot
             new DateOnlyRange(startDate, endDate),
             categoryId,
             counterparty?.Trim(),
-            DateTimeOffset.UtcNow);
+            Now(time));
 
-        flow.RaiseEvent(new RecurringFlowCreated(flow.RecurringFlowId, flow.TenantId, flow.AccountId, direction));
+        flow.RaiseEvent(new RecurringFlowCreated(flow.RecurringFlowId, flow.TenantId, flow.AccountId, direction), flow.CreatedAt);
         return flow;
     }
 

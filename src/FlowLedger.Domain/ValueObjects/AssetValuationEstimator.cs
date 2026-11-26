@@ -30,7 +30,7 @@ public static class AssetValuationEstimator
             _ => anchor.Amount,
         };
 
-        return new Money(Math.Max(0m, Math.Round(amount, 2, MidpointRounding.AwayFromZero)), anchor.Currency);
+        return new Money(Math.Max(0m, MoneyRounding.Round(amount)), anchor.Currency);
     }
 
     private static decimal StraightLine(Asset asset, decimal anchor, decimal years)

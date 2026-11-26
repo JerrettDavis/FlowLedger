@@ -28,4 +28,13 @@ public interface ISyncCursorStore
         string providerAccountId,
         string cursorValue,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Stamps the accounts' cursors as successfully synced now (#120). Called once, after a whole sync completed; the throttle
+    /// window and the "last synced" display read this, never the cursor-write time, which also advances on a failed sync.
+    /// </summary>
+    Task MarkSuccessfulAsync(
+        string providerName,
+        IReadOnlyCollection<string> providerAccountIds,
+        CancellationToken ct = default);
 }
