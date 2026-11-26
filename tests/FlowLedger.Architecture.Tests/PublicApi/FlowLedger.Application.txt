@@ -25,11 +25,13 @@ interface FlowLedger.Application.Abstractions.IHouseholdTenantAccess
 interface FlowLedger.Application.Abstractions.ILocalAiModels
 interface FlowLedger.Application.Abstractions.ILocalAiRuntime
 interface FlowLedger.Application.Abstractions.ILocalLlm
+interface FlowLedger.Application.Abstractions.IOutbox
 interface FlowLedger.Application.Abstractions.IPlannedOccurrenceRepository
 interface FlowLedger.Application.Abstractions.IProviderAccountCatalog
 interface FlowLedger.Application.Abstractions.IProviderConnectionStore
 interface FlowLedger.Application.Abstractions.IRecurringFlowRepository
 interface FlowLedger.Application.Abstractions.IReferenceValidator
+interface FlowLedger.Application.Abstractions.IRowVersionGuard
 interface FlowLedger.Application.Abstractions.ISavedReportStore
 interface FlowLedger.Application.Abstractions.ISheetAutoMarker
 interface FlowLedger.Application.Abstractions.ISyncCursorStore

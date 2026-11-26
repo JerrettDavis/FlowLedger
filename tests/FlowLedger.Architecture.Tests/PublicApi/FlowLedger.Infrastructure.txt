@@ -29,6 +29,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.MoveProviderAccountCatalo
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRecurringDismissalsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRulesAndAliasesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveSuspiciousDismissalsToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.RowVersionOnTransactionsFlowsCategoriesBudgetsGoals
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
 enum FlowLedger.Infrastructure.Sync.SyncTrigger
@@ -63,6 +64,7 @@ sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContextFactory
 sealed class FlowLedger.Infrastructure.Persistence.NoOpDomainEventDispatcher
 sealed class FlowLedger.Infrastructure.Persistence.UnscopedTenantContext
 sealed class FlowLedger.Infrastructure.Storage.RawArchiveMaintenance
+sealed class FlowLedger.Infrastructure.Sync.OutboxPublishingSyncService
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptDecision
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptGate
 sealed class FlowLedger.Infrastructure.Sync.SyncRetryDecision
@@ -78,6 +80,7 @@ static class FlowLedger.Infrastructure.DependencyInjection
 static class FlowLedger.Infrastructure.Health.HealthTags
 static class FlowLedger.Infrastructure.Health.ReadinessHealthExtensions
 static class FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry
+static class FlowLedger.Infrastructure.Persistence.ConcurrencyRetry
 static class FlowLedger.Infrastructure.Persistence.DatabaseMigrationExtensions
 static class FlowLedger.Infrastructure.Sync.ProviderIssueMapping
 static class FlowLedger.Infrastructure.TenancySettings
