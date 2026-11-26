@@ -26,7 +26,7 @@ public sealed class CategoryRuleService(
     ICategoryRepository categories,
     ITenantContext tenant)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
     public const int MaxLength = 200;
     public const int MaxRules = 1000;
     public const int MaxNoteLength = 1000;

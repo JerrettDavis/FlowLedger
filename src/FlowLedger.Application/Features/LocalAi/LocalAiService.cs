@@ -32,7 +32,7 @@ public sealed class LocalAiService(
     ITextEmbedder embedder,
     LocalAiOptions options)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public LocalAiRuntimeStatus Status() => embedder is ILocalAiRuntime runtime
         ? runtime.GetStatus()

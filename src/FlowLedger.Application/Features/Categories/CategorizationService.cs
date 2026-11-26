@@ -17,7 +17,7 @@ public interface ICategorizationStore
 
     /// <summary>One tracked transaction by id (null when absent). Default falls back to a full load for simple stores.</summary>
     async Task<Transaction?> FindTrackedAsync(Guid id, CancellationToken ct = default)
-        => (await LoadTrackedAsync(50_000, ct)).FirstOrDefault(t => t.Id == id);
+        => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).FirstOrDefault(t => t.Id == id);
 
     /// <summary>Tracked real transactions that are uncategorized or auto-categorized (callers still filter precisely).</summary>
     async Task<IReadOnlyList<Transaction>> LoadTrackedUncategorizedOrAutoAsync(int max, CancellationToken ct = default)
@@ -29,7 +29,7 @@ public interface ICategorizationStore
 
     /// <summary>True when some real (not Planned/Skipped) transaction has no category.</summary>
     async Task<bool> AnyUncategorizedAsync(CancellationToken ct = default)
-        => (await LoadTrackedAsync(50_000, ct)).Any(t => t.CategoryId is null
+        => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).Any(t => t.CategoryId is null
             && t.Status != TransactionStatus.Planned && t.Status != TransactionStatus.Skipped);
 }
 
@@ -70,7 +70,7 @@ public sealed class CategorizationService(
     private readonly CategorizationOptions _options = options ?? new CategorizationOptions();
     private readonly LocalAiOptions _localAi = localAi ?? new LocalAiOptions();
 
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public Task<CategorizationResult> RunAsync(CancellationToken ct = default) => RunAsync(false, ct);
 
