@@ -76,7 +76,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private void EnsureTenantMayUseProvider()
     {
         if (_householdTenantId is { } household
-            && _provider.ProviderName is not ("Simulated" or "Quiltt") // Quiltt keeps one profile per tenant
+            && _provider.ProviderName is not (ConnectorIds.Simulated or ConnectorIds.Quiltt) // Quiltt keeps one profile per tenant
             && _tenant.TenantId != household)
         {
             throw new NeedsUserActionProviderException(
@@ -221,14 +221,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
-        if (_provider.ProviderName == "Quiltt"
-            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == "Quiltt", ct))
+        if (_provider.ProviderName == ConnectorIds.Quiltt
+            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == ConnectorIds.Quiltt, ct))
         {
             return new SyncResult(0, 0, 0, 0); // this tenant has not linked a bank through the Quiltt Connector yet
         }
 
         var memberRef = await GetOrProvisionConnectionAsync(
-            tenantId, ct, allowProvision: _provider.ProviderName is "Simulated" or "SimpleFIN"); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
+            tenantId, ct, allowProvision: _provider.ProviderName is ConnectorIds.Simulated or ConnectorIds.SimpleFin); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
 
         // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
         if (_provider is IMemberIdResolver resolver)
@@ -853,7 +853,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     /// reports what you owe. The sign is kept: an overpaid card stays a negative debt (a credit), never flipped.
     /// </summary>
     private decimal ToOwed(decimal providerAmount) =>
-        _provider.ProviderName is "SimpleFIN" or "Quiltt" ? -providerAmount : providerAmount;
+        _provider.ProviderName is ConnectorIds.SimpleFin or ConnectorIds.Quiltt ? -providerAmount : providerAmount;
 
     /// <summary>Maps a canonical provider type token; false (no change) when the type is unknown/unmapped.</summary>
     private static bool TryMapProviderAccountType(string providerType, out AccountType type)

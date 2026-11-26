@@ -163,4 +163,30 @@ public sealed class SourceRuleTests
 
         Assert.True(offenders.Count == 0, $"Sync-over-async in: {string.Join(", ", offenders)}");
     }
+
+    // ── 6. Connector identity comes from ConnectorIds (#89) ──────────────────
+
+    /// <summary>Files that still hold a bare connector literal (OpenAPI tag text or a private const). Shrink only.</summary>
+    private static readonly HashSet<string> ConnectorLiteralAllowlist =
+    [
+        "src/FlowLedger.Api/Endpoints/DataEndpoints.cs",
+        "src/FlowLedger.Infrastructure/DependencyInjection.cs", // display names in the descriptor list
+        "src/FlowLedger.Api/Endpoints/ConnectorEndpoints.cs",     // display names in the descriptor list
+        "src/FlowLedger.Api/Endpoints/MxEndpoints.cs",
+        "src/FlowLedger.Api/Endpoints/QuilttEndpoints.cs",
+    ];
+
+    [Fact]
+    public void Infrastructure_and_Api_use_ConnectorIds_not_bare_connector_names()
+    {
+        var literal = new Regex("\"(Simulated|SimpleFIN|MX|Quiltt)\"");
+        var offenders = new[] { "FlowLedger.Infrastructure", "FlowLedger.Api" }
+            .SelectMany(SourceFiles)
+            .Where(f => literal.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .Where(f => !ConnectorLiteralAllowlist.Contains(f))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Use ConnectorIds instead of bare names in: {string.Join(", ", offenders)}");
+    }
 }

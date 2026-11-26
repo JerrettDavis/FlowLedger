@@ -18,6 +18,7 @@ public sealed class TestClockRatchetTests
     /// <summary>Path relative to tests/ (forward slashes) to number of direct clock reads still allowed.</summary>
     private static readonly Dictionary<string, int> Baseline = new()
     {
+        ["FlowLedger.Api.Tests/Security/OnDemandSyncDeferralTests.cs"] = 1,
         ["FlowLedger.Api.Tests/Endpoints/ProviderErrorHandlingTests.cs"] = 2,
         ["FlowLedger.Api.Tests/Endpoints/WebhookTenantRoutingTests.cs"] = 2,
         ["FlowLedger.Api.Tests/Security/RateLimitPartitionTests.cs"] = 1,

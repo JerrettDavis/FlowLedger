@@ -115,7 +115,7 @@ internal static class QuilttEndpoints
                     return Results.Accepted(value: new { duplicate = true });
                 }
 
-                await archive.ArchiveAsync("Quiltt", "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
 
                 ProviderWebhookEvent evt;
                 try
