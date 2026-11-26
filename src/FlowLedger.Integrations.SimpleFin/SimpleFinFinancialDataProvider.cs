@@ -117,7 +117,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             }
             else
             {
-                _logger.LogWarning("Skipping SimpleFIN account {AccountId}: no usable ISO currency reported.", SimpleFinMapper.AccountId(a));
+                _logger.LogWarning("Skipping a SimpleFIN account: no usable ISO currency reported.");
             }
         }
     }
