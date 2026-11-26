@@ -111,7 +111,16 @@ else
                             <tbody>
                             @foreach (var l in c.Connections)
                             {
-                                <tr><td>@l.Institution</td><td title="@l.UpdatedAt.ToLocalTime().ToString("g")">@l.Status</td><td class="fl-hide-lg">@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
+                                <tr><td>@l.Institution</td><td title="@l.UpdatedAt.ToLocalTime().ToString("g")">
+                                    @if (l.Issue is not null)
+                                    {
+                                        <ConnectionHealthBadge Issue="l.Issue" Provider="@c.Id" Institution="@l.Institution" OnRepaired="LoadAsync" />
+                                    }
+                                    else
+                                    {
+                                        @l.Status
+                                    }
+                                </td><td class="fl-hide-lg">@l.UpdatedAt.ToLocalTime().ToString("g")</td></tr>
                             }
                             </tbody>
                         </MudSimpleTable>
