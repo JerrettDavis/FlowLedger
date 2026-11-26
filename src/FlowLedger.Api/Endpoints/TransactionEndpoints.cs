@@ -58,10 +58,10 @@ internal static class TransactionEndpoints
         .WithName("ExportTransactionsCsv")
         .WithSummary("Download transactions (filtered like the list) as CSV");
 
-        group.MapGet("/{id:guid}", async (Guid id, GetTransactionHandler handler, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, GetTransactionHandler handler, HttpResponse response, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("GetTransaction")
         .WithSummary("Get a single transaction by ID");

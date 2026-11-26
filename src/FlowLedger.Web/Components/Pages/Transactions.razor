@@ -403,16 +403,24 @@
             }
 
             var previous = tx.CategoryId;
-            var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, applyToMerchant);
+
+            // Send the version the user last saw (If-Match); a 409 means the row changed elsewhere (another tab or a sync).
+            uint? savedVersion = null;
+            var changed = await ApiClient.SetTransactionCategoryAsync(
+                tx.Id, category.Id, applyToMerchant, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v);
             if (changed == 1 && previous is { } before)
             {
                 // A single-row change can be reverted exactly; bulk changes were already confirmed with their count.
+                var versionAfterSet = savedVersion;
                 Snackbar.AddWithUndo($"Set to {category.Path}", async () =>
                 {
-                    await ApiClient.SetTransactionCategoryAsync(tx.Id, before, applyToMerchant: false);
+                    // The undo is itself a versioned write against the row as this change left it.
+                    uint? undoVersion = null;
+                    await ApiClient.SetTransactionCategoryAsync(
+                        tx.Id, before, applyToMerchant: false, expectedVersion: versionAfterSet, newVersion: v => undoVersion = v);
                     await InvokeAsync(() =>
                     {
-                        PatchRow(tx.Id, t => t with { CategoryId = before });
+                        PatchRow(tx.Id, t => t with { CategoryId = before, Version = undoVersion ?? t.Version });
                         StateHasChanged();
                     });
                 });
@@ -428,12 +436,16 @@
             }
             else
             {
-                PatchRow(tx.Id, t => t with { CategoryId = category.Id });
+                PatchRow(tx.Id, t => t with { CategoryId = category.Id, Version = savedVersion ?? t.Version });
             }
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 
@@ -508,13 +520,18 @@
 
         try
         {
-            await ApiClient.SetTransactionNoteAsync(tx.Id, note);
+            uint? savedVersion = null;
+            await ApiClient.SetTransactionNoteAsync(tx.Id, note, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v);
             Snackbar.Add(note.Length == 0 ? "Note removed" : "Note saved", Severity.Success);
-            PatchRow(tx.Id, t => t with { Notes = note.Length == 0 ? null : note });
+            PatchRow(tx.Id, t => t with { Notes = note.Length == 0 ? null : note, Version = savedVersion ?? t.Version });
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 
@@ -536,13 +553,18 @@
 
         try
         {
-            await ApiClient.SetTransactionSplitsAsync(tx.Id, splits);
+            uint? savedVersion = null;
+            await ApiClient.SetTransactionSplitsAsync(tx.Id, splits, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v);
             Snackbar.Add(splits.Count == 0 ? "Split removed" : "Split saved", Severity.Success);
-            PatchRow(tx.Id, t => t with { Splits = splits.Count == 0 ? null : splits });
+            PatchRow(tx.Id, t => t with { Splits = splits.Count == 0 ? null : splits, Version = savedVersion ?? t.Version });
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 

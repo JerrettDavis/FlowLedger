@@ -25,15 +25,22 @@ public sealed partial class FlowLedgerApiClient
     }
 
     /// <summary>Sets a transaction's category; optionally applies it to every uncategorized transaction of the same merchant.</summary>
-    public async Task<int> SetTransactionCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
+    public async Task<int> SetTransactionCategoryAsync(
+        Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         return await ExecuteAsync("set category", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/category",
-                new { categoryId, applyToMerchant }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/category",
+                new { categoryId, applyToMerchant }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't set category (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            if (ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
             }
 
             var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
@@ -42,15 +49,22 @@ public sealed partial class FlowLedgerApiClient
     }
 
     /// <summary>Recategorizes one transaction, or (applyToAll) every transaction of the same merchant plus future syncs. Returns how many changed.</summary>
-    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null)
+    public async Task<int> RecategorizeAsync(
+        Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null, uint? expectedVersion = null, Action<uint>? newVersion = null)
     {
         return await ExecuteAsync("recategorize", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/transactions/{transactionId}/recategorize",
-                new { categoryId, applyToAll, note }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/transactions/{transactionId}/recategorize",
+                new { categoryId, applyToAll, note }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "transaction");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't recategorize (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            if (ReadVersion(response) is { } version)
+            {
+                newVersion?.Invoke(version);
             }
 
             var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);

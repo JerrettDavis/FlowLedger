@@ -13,14 +13,12 @@ public sealed class AccountTests
     private static readonly Money ThousandUsd = new(1000m, "USD");
 
     [Fact]
-    public void Create_valid_account_raises_AccountConnected_event()
+    public void Create_valid_account_records_tenant_and_type()
     {
         var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
 
-        account.DomainEvents.Should().ContainSingle(e => e is AccountConnected);
-        var evt = (AccountConnected)account.DomainEvents[0];
-        evt.TenantId.Should().Be(TenantId);
-        evt.AccountType.Should().Be(AccountType.Checking);
+        account.TenantId.Should().Be(TenantId);
+        account.AccountType.Should().Be(AccountType.Checking);
     }
 
     [Fact]
@@ -38,17 +36,13 @@ public sealed class AccountTests
     }
 
     [Fact]
-    public void UpdateBalance_raises_AccountBalanceUpdated_event()
+    public void UpdateBalance_sets_the_balance()
     {
         var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
-        account.ClearDomainEvents();
 
         account.UpdateBalance(ThousandUsd);
 
-        account.DomainEvents.Should().ContainSingle(e => e is AccountBalanceUpdated);
-        var evt = (AccountBalanceUpdated)account.DomainEvents[0];
-        evt.PreviousBalance.Should().Be(ZeroUsd);
-        evt.NewBalance.Should().Be(ThousandUsd);
+        account.CurrentBalance.Should().Be(ThousandUsd);
     }
 
     [Fact]
@@ -79,7 +73,6 @@ public sealed class AccountTests
         account.ApplyProviderBalance(new Money(-35m, "USD"));
 
         account.CurrentBalance.Amount.Should().Be(-35m);
-        account.DomainEvents.Should().Contain(e => e is AccountBalanceUpdated);
     }
 
     [Fact]
@@ -130,15 +123,6 @@ public sealed class AccountTests
     {
         var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
         account.TenantId.Should().Be(TenantId);
-    }
-
-    [Fact]
-    public void ClearDomainEvents_empties_event_list()
-    {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
-        account.DomainEvents.Should().NotBeEmpty();
-        account.ClearDomainEvents();
-        account.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]

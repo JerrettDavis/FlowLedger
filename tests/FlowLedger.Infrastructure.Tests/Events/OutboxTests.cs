@@ -31,10 +31,10 @@ public sealed class OutboxTests : IAsyncLifetime
         public void Advance(TimeSpan by) => _now += by;
     }
 
-    private sealed class Handler(string name, List<string> log, Func<int, bool> fails) : IDomainEventHandler<AccountConnected>
+    private sealed class Handler(string name, List<string> log, Func<int, bool> fails) : IDomainEventHandler<SyncCompleted>
     {
         public int Calls;
-        public Task HandleAsync(AccountConnected domainEvent, CancellationToken ct = default)
+        public Task HandleAsync(SyncCompleted domainEvent, CancellationToken ct = default)
         {
             Calls++;
             if (fails(Calls))
@@ -52,16 +52,16 @@ public sealed class OutboxTests : IAsyncLifetime
     }
 
     // Distinct types so each has its own completion key.
-    private sealed class HandlerA(List<string> log, Func<int, bool> fails) : IDomainEventHandler<AccountConnected>
+    private sealed class HandlerA(List<string> log, Func<int, bool> fails) : IDomainEventHandler<SyncCompleted>
     {
         private readonly Handler _inner = new("A", log, fails);
-        public Task HandleAsync(AccountConnected e, CancellationToken ct = default) => _inner.HandleAsync(e, ct);
+        public Task HandleAsync(SyncCompleted e, CancellationToken ct = default) => _inner.HandleAsync(e, ct);
     }
 
-    private sealed class HandlerB(List<string> log, Func<int, bool> fails) : IDomainEventHandler<AccountConnected>
+    private sealed class HandlerB(List<string> log, Func<int, bool> fails) : IDomainEventHandler<SyncCompleted>
     {
         private readonly Handler _inner = new("B", log, fails);
-        public Task HandleAsync(AccountConnected e, CancellationToken ct = default) => _inner.HandleAsync(e, ct);
+        public Task HandleAsync(SyncCompleted e, CancellationToken ct = default) => _inner.HandleAsync(e, ct);
     }
 
     private OutboxProcessor Processor(TestTenantContext tenant, List<string> log, Func<int, bool> aFails, Func<int, bool> bFails, OutboxOptions? options = null)
@@ -70,8 +70,8 @@ public sealed class OutboxTests : IAsyncLifetime
         // Singletons so failure counters persist across polls (the real handlers are scoped but stateless).
         var a = new HandlerA(log, aFails);
         var b = new HandlerB(log, bFails);
-        services.AddSingleton<IDomainEventHandler<AccountConnected>>(a);
-        services.AddSingleton<IDomainEventHandler<AccountConnected>>(b);
+        services.AddSingleton<IDomainEventHandler<SyncCompleted>>(a);
+        services.AddSingleton<IDomainEventHandler<SyncCompleted>>(b);
         var provider = services.BuildServiceProvider();
         return new OutboxProcessor(_fixture.CreateProductionStyleContext(tenant), provider,
             NullLogger<OutboxProcessor>.Instance, options ?? new OutboxOptions(), _time);
@@ -82,8 +82,12 @@ public sealed class OutboxTests : IAsyncLifetime
         await using var ctx = _fixture.CreateProductionStyleContext(tenant);
         var account = Account.Create(TenantId.From(tenant.TenantId), "Checking", AccountType.Checking, new Money(0m, Currency.Usd));
         ctx.Accounts.Add(account);
+        Stage(ctx, tenant);
         await ctx.SaveChangesAsync();
     }
+
+    private static void Stage(FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext ctx, TestTenantContext tenant) =>
+        new EfOutbox(ctx, tenant).Enqueue(new SyncCompleted(TenantId.From(tenant.TenantId), 1, 2, 0));
 
     private async Task<(int Attempts, bool Processed, bool Dead, string? Error)[]> RowsAsync()
     {
@@ -102,7 +106,7 @@ public sealed class OutboxTests : IAsyncLifetime
     }
 
     [DockerFact]
-    public async Task Saving_an_aggregate_writes_the_event_to_the_outbox_in_the_same_transaction()
+    public async Task Saving_writes_the_staged_event_to_the_outbox_in_the_same_transaction_as_the_data()
     {
         var tenant = TestTenantContext.New();
         await RaiseAsync(tenant);
@@ -118,6 +122,7 @@ public sealed class OutboxTests : IAsyncLifetime
         await using var ctx = _fixture.CreateProductionStyleContext(tenant);
         var account = Account.Create(TenantId.From(tenant.TenantId), "Dup", AccountType.Checking, new Money(0m, Currency.Usd));
         ctx.Accounts.Add(account);
+        Stage(ctx, tenant);
         // Cross-tenant mutation is rejected before commit: nothing may be recorded.
         ctx.Accounts.Add(Account.Create(TenantId.From(Guid.NewGuid()), "Other", AccountType.Checking, new Money(0m, Currency.Usd)));
         var act = () => ctx.SaveChangesAsync();
@@ -247,26 +252,5 @@ public sealed class OutboxTests : IAsyncLifetime
         _time.Advance(TimeSpan.FromMinutes(5));
         (await processor.ProcessBatchAsync()).Should().Be(1);
         log.Should().BeEquivalentTo(["A", "B"]);
-    }
-
-    [Fact]
-    public void Every_domain_event_round_trips_through_the_outbox_serializer_with_its_event_id()
-    {
-        var tenant = TenantId.From(Guid.NewGuid());
-        var usd = Currency.Usd;
-        var events = new FlowLedger.SharedKernel.IDomainEvent[]
-        {
-            new AccountConnected(AccountId.From(Guid.NewGuid()), tenant, AccountType.Checking),
-            new AccountBalanceUpdated(AccountId.From(Guid.NewGuid()), tenant, new Money(1m, usd), new Money(2.5m, usd)),
-            new TransactionImported(TransactionId.From(Guid.NewGuid()), tenant, AccountId.From(Guid.NewGuid()), new Money(9.99m, usd),
-                TransactionDirection.Debit, TransactionSource.Manual),
-        };
-
-        foreach (var e in events)
-        {
-            var back = OutboxEventSerializer.Deserialize(OutboxEventSerializer.TypeName(e), OutboxEventSerializer.Serialize(e));
-            back.Should().Be(e, "records compare by value, so every field and the original EventId and OccurredAt survive");
-            back.EventId.Should().Be(e.EventId);
-        }
     }
 }

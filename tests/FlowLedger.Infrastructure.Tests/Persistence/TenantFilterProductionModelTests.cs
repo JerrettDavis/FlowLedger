@@ -117,21 +117,23 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
     }
 
     [DockerFact]
-    public async Task A_failed_save_leaves_domain_events_on_the_aggregate()
+    public async Task A_failed_save_keeps_the_staged_outbox_event_so_a_retry_still_records_it()
     {
-        // #92: events used to be cleared before SaveChanges, so a failed save lost them for good.
+        // #92: an event must never be lost because the save that should carry it failed.
         var t = TestTenantContext.New();
         await using var db = _fixture.CreateProductionStyleContext(t);
-        var account = Account.Create(TenantId.From(t.TenantId), "Evt", AccountType.Checking, new Money(1m, Currency.Usd));
-        account.DomainEvents.Should().NotBeEmpty("precondition: creating an account raises an event");
-        var before = account.DomainEvents.Count;
-        db.Accounts.Add(account);
+        db.Accounts.Add(Account.Create(TenantId.From(t.TenantId), "Evt", AccountType.Checking, new Money(1m, Currency.Usd)));
+        new FlowLedger.Infrastructure.Events.EfOutbox(db, t).Enqueue(
+            new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0));
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var act = () => db.SaveChangesAsync(cts.Token);
-
         await act.Should().ThrowAsync<OperationCanceledException>();
-        account.DomainEvents.Count.Should().Be(before, "a save that did not commit must not consume the events");
+
+        await db.SaveChangesAsync();
+
+        await using var check = _fixture.CreateProductionStyleContext(t);
+        (await check.OutboxMessages.CountAsync()).Should().Be(1);
     }
 }

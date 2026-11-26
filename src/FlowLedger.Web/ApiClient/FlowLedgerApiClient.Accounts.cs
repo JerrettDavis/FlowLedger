@@ -116,8 +116,17 @@ public sealed partial class FlowLedgerApiClient
 
     /// <summary>PUT with an <c>If-Match</c> precondition carrying the account's version (its ETag) when the caller has one.</summary>
     private Task<HttpResponseMessage> PutAccountAsync(string url, object body, uint? expectedVersion, CancellationToken ct)
+        => SendVersionedAsync(HttpMethod.Put, url, body, expectedVersion, ct);
+
+    /// <summary>Sends a write with an <c>If-Match</c> precondition carrying the row's version (its ETag) when the caller has one (#157).</summary>
+    private Task<HttpResponseMessage> SendVersionedAsync(HttpMethod method, string url, object? body, uint? expectedVersion, CancellationToken ct)
     {
-        var message = new HttpRequestMessage(HttpMethod.Put, url) { Content = JsonContent.Create(body, options: JsonOptions) };
+        var message = new HttpRequestMessage(method, url);
+        if (body is not null)
+        {
+            message.Content = JsonContent.Create(body, options: JsonOptions);
+        }
+
         if (expectedVersion is { } version)
         {
             message.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
@@ -126,14 +135,21 @@ public sealed partial class FlowLedgerApiClient
         return _http.SendAsync(message, ct);
     }
 
+    /// <summary>The new version a write returned in its <c>ETag</c>, so the caller can chain its next write.</summary>
+    private static uint? ReadVersion(HttpResponseMessage response)
+        => uint.TryParse(response.Headers.ETag?.Tag.Trim('"'), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+
     /// <summary>A 409 means someone (another tab, a sync) changed the row after it was loaded; say so instead of a status code.</summary>
-    private static void ThrowIfChangedElsewhere(HttpResponseMessage response)
+    private static void ThrowIfChangedElsewhere(HttpResponseMessage response, string noun = "account")
     {
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            throw new ApiClientException(ChangedElsewhereMessage, response.StatusCode);
+            throw new ApiClientException(ChangedElsewhereFor(noun), response.StatusCode);
         }
     }
+
+    public static string ChangedElsewhereFor(string noun)
+        => $"This {noun} was changed elsewhere (another tab or a sync). Reload to see the latest version, then try again.";
 
     public const string ChangedElsewhereMessage = "This account was changed elsewhere (another tab or a sync). Reload to see the latest version, then try again.";
 
