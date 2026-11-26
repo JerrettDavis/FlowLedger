@@ -62,7 +62,7 @@
 
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    [Parameter] public FlowLedger.Web.ApiClient.AccountDto Account { get; set; } = default!;
+    [Parameter] public FlowLedger.Contracts.AccountDto Account { get; set; } = default!;
     [Parameter] public List<FlowLedger.Web.ApiClient.ConnectorDto> Connectors { get; set; } = [];
     [Parameter] public string? CurrentConnector { get; set; }
     [Parameter] public string? CurrentProviderAccountId { get; set; }

@@ -71,7 +71,7 @@
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter, EditorRequired] public string Path { get; set; } = "";
-    [Parameter] public List<FlowLedger.Web.ApiClient.CategoryDto> Categories { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.CategoryDto> Categories { get; set; } = [];
 
     private string? _newPath;
     private string? _error;

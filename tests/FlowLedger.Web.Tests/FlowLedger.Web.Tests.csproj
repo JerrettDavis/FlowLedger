@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="FlowLedger.Contracts" />
     <ProjectReference Include="..\..\src\FlowLedger.Web\FlowLedger.Web.csproj" />
   </ItemGroup>
 

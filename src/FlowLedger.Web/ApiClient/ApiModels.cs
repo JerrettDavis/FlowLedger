@@ -1,138 +1,8 @@
 namespace FlowLedger.Web.ApiClient;
 
-// ── Account ───────────────────────────────────────────────────────────────────
-
-public sealed record AccountDto(
-    Guid Id,
-    string Name,
-    string AccountType,
-    decimal BalanceAmount,
-    string BalanceCurrency,
-    string? Institution,
-    string? ExternalAccountRef,
-    bool IsActive,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? LastBalanceConfirmedAt,
-    bool TypeLockedByUser = false,
-    string Mode = "Standard",
-    bool HideTransactions = false,
-    uint Version = 0);
-
-public sealed record AccountSettingsRequest(bool IsActive, string Mode, bool HideTransactions);
-
-public sealed record ChangeAccountTypeRequest(string AccountType);
-
-public sealed record CreateAccountRequest(
-    string Name,
-    string AccountType,
-    decimal StartingBalance,
-    string Currency,
-    string? Institution,
-    decimal? CreditLimit);
-
-public sealed record UpdateAccountRequest(string Name);
-
 // ── Transaction ───────────────────────────────────────────────────────────────
 
-public sealed record TransactionDto(
-    Guid Id,
-    Guid AccountId,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string Description,
-    string Status,
-    string Source,
-    DateOnly EffectiveDate,
-    DateOnly? PostedDate,
-    Guid? CategoryId,
-    string? MerchantName,
-    string? Notes,
-    string? Fingerprint,
-    DateTimeOffset CreatedAt,
-    string? SuggestedName = null,
-    List<string>? Tags = null,
-    List<TransactionSplitDto>? Splits = null);
-
-public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);
-
-public sealed record FlaggedTransactionDto(TransactionDto Transaction, List<string> Reasons);
-
-public sealed record DashboardActivityDto(
-    List<TransactionDto> RecentPosted,
-    List<TransactionDto> Pending,
-    decimal PendingNetAmount,
-    List<TransactionDto> Large,
-    decimal LargeThreshold,
-    List<FlaggedTransactionDto> Suspicious,
-    decimal MoneyInLast30Days,
-    decimal MoneyOutLast30Days,
-    int TransfersExcluded = 0);
-
-public sealed record CreateTransactionRequest(
-    Guid AccountId,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string Description,
-    DateOnly EffectiveDate,
-    DateOnly? PostedDate,
-    Guid? CategoryId,
-    string? MerchantName,
-    string? Notes);
-
-// ── Category ──────────────────────────────────────────────────────────────────
-
-public sealed record CategoryDto(
-    Guid Id,
-    string Path,
-    string DisplayName,
-    bool IsSystem,
-    Guid? ParentId);
-
 // ── RecurringFlow ─────────────────────────────────────────────────────────────
-
-public sealed record RecurringFlowDto(
-    Guid Id,
-    Guid AccountId,
-    string Name,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string AmountModel,
-    string RecurrenceFrequency,
-    int? DayOfMonth,
-    int? SecondDayOfMonth,
-    int? IntervalWeeks,
-    string? AnchorDayOfWeek,
-    DateOnly StartDate,
-    DateOnly? EndDate,
-    Guid? CategoryId,
-    string? Counterparty,
-    bool IsActive,
-    DateTimeOffset CreatedAt,
-    decimal MonthlyAmount = 0m);
-
-public sealed record CreateRecurringFlowRequest(
-    Guid AccountId,
-    string Name,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string AmountModel,
-    string RecurrenceFrequency,
-    int? DayOfMonth,
-    int? SecondDayOfMonth,
-    int? IntervalWeeks,
-    string? AnchorDayOfWeek,
-    DateOnly StartDate,
-    DateOnly? EndDate,
-    Guid? CategoryId,
-    string? Counterparty);
-
-public sealed record UpdateRecurringFlowRequest(
-    decimal Amount,
-    string AmountModel);
 
 // ── Forecast (flattened API surface) ──────────────────────────────────────────
 
@@ -273,15 +143,6 @@ public sealed record DebtPlanDto(PayoffPlanDto Avalanche, PayoffPlanDto Snowball
 
 public sealed record AlertDto(string Severity, string Title, string Detail);
 
-public sealed record CategoryRuleDto(string Pattern, string CategoryPath);
-
-public sealed record DuplicateSideDto(
-    Guid Id, Guid AccountId, string Description, string? MerchantName, decimal Amount, string Direction, string Status,
-    DateOnly EffectiveDate, Guid? CategoryId, string CategorySource, string? Notes, bool BankSynced);
-
-public sealed record DuplicateSuggestionDto(
-    string Key, string Confidence, double Score, int DaysApart, string Reason, DuplicateSideDto Keep, DuplicateSideDto Remove);
-
 public sealed record DuplicateScanDto(int Total, int AutoMergeable, List<DuplicateSuggestionDto> Suggestions);
 
 public sealed record AutoMergeDto(int Merged, int Suggested);
@@ -295,109 +156,7 @@ public sealed record AccountPerformanceDto(Guid AccountId, string Name, decimal 
 
 public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
-public sealed record SyncResult(int AccountsUpserted, int TransactionsAdded, int TransactionsSkipped, int RecurringFlowsAdded);
-
 // ── Assets ────────────────────────────────────────────────────────────────────
-
-public sealed record AssetValuationDto(Guid Id, decimal Amount, DateOnly AsOf, string Source, string? Note, DateTimeOffset RecordedAt);
-
-public sealed record AssetDto(
-    Guid Id,
-    string Name,
-    string Category,
-    string? Manufacturer,
-    string? Model,
-    string? SerialNumber,
-    string? Notes,
-    DateOnly? PurchaseDate,
-    decimal? PurchasePrice,
-    string Currency,
-    decimal CurrentValue,
-    DateOnly ValuedOn,
-    decimal EstimatedValue,
-    string ValuationMethod,
-    decimal AnnualRate,
-    decimal? SalvageValue,
-    int? UsefulLifeYears,
-    Guid? LinkedAccountId,
-    string? LinkedAccountName,
-    decimal? LinkedLiability,
-    decimal? Equity,
-    decimal? GainLoss,
-    Dictionary<string, string> Attributes,
-    bool IsActive,
-    DateTimeOffset CreatedAt,
-    List<AssetValuationDto>? Valuations,
-    ValuationSpreadDto? Spread = null);
-
-public sealed record ValuationSpreadDto(decimal Low, decimal High, decimal Median, decimal Average, int SourceCount, int WindowDays);
-
-public sealed record CreateAssetRequest(
-    string Name,
-    string Category,
-    decimal CurrentValue,
-    string Currency,
-    DateOnly? ValuedOn,
-    DateOnly? PurchaseDate,
-    decimal? PurchasePrice,
-    string? Manufacturer,
-    string? Model,
-    string? SerialNumber,
-    string? Notes,
-    string? ValuationMethod,
-    decimal? AnnualRate,
-    decimal? SalvageValue,
-    int? UsefulLifeYears,
-    Guid? LinkedAccountId,
-    Dictionary<string, string>? Attributes);
-
-public sealed record UpdateAssetRequest(
-    string Name,
-    string Category,
-    DateOnly? PurchaseDate,
-    decimal? PurchasePrice,
-    string? Manufacturer,
-    string? Model,
-    string? SerialNumber,
-    string? Notes,
-    string? ValuationMethod,
-    decimal? AnnualRate,
-    decimal? SalvageValue,
-    int? UsefulLifeYears,
-    Guid? LinkedAccountId,
-    Dictionary<string, string>? Attributes);
-
-public sealed record RecordValuationRequest(decimal Amount, DateOnly? AsOf, string? Source, string? Note);
-
-public sealed record AssetCategoryTemplateDto(
-    string Category,
-    string Label,
-    string DefaultMethod,
-    decimal DefaultAnnualRate,
-    int? DefaultUsefulLifeYears,
-    List<string> SuggestedFields);
-
-public sealed record AssetCategoryBreakdownDto(string Category, int Count, decimal Value);
-
-public sealed record NetWorthDto(
-    decimal AccountAssets,
-    decimal AccountLiabilities,
-    decimal PhysicalAssets,
-    decimal NetWorth,
-    decimal CarriedByAccounts);
-
-public sealed record AssetSummaryDto(
-    int AssetCount,
-    decimal TotalValue,
-    decimal TotalCost,
-    decimal UnrealizedGainLoss,
-    decimal LinkedLiabilities,
-    decimal TotalEquity,
-    List<AssetCategoryBreakdownDto> ByCategory,
-    List<AssetDto> TopAssets,
-    NetWorthDto NetWorth);
-
-public sealed record AssetRefreshResultDto(bool Updated, string Message, AssetDto? Asset);
 
 // Query & reports -------------------------------------------------------------
 
@@ -429,61 +188,6 @@ public sealed record QuerySchemaDto(List<DatasetInfoDto> Datasets, List<string> 
 public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int Position);
 
 // Bill sheet (spreadsheet mode) ------------------------------------------------
-
-public sealed record SheetSlotDto(int Slot, DateOnly? Due, bool Paid, decimal? Amount, DateOnly? PaidOn, string? Source);
-
-public sealed record SheetCellDto(bool Paid, decimal? Amount, DateOnly? PaidOn, string Source, int PaidCount = 0, int Expected = 1);
-
-public sealed record SheetRowDto(
-    Guid Id, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
-    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRefMasked, string? MatchText,
-    bool NeedsMatchText, Dictionary<string, SheetCellDto> Cells,
-    string Frequency = "Monthly", int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null,
-    Dictionary<string, List<SheetSlotDto>>? Slots = null, decimal MonthlyEstimated = 0m);
-
-public sealed record SheetTotalsLine(decimal Total, decimal Optional, decimal Required, decimal Personal, decimal Business);
-
-public sealed record SheetTotalsDto(SheetTotalsLine Estimated, SheetTotalsLine Actual);
-
-public sealed record SheetSectionDto(string Name, List<SheetRowDto> Rows, SheetTotalsDto Totals);
-
-public sealed record SheetMonthSummaryDto(string Month, int PaidCount, int TotalCount, decimal PaidAmount, decimal RemainingEstimated);
-
-public sealed record SheetViewDto(
-    List<string> Months, string SelectedMonth, List<SheetSectionDto> Sections, SheetTotalsDto GrandTotals, SheetMonthSummaryDto Summary);
-
-public sealed record SaveBillRequest(
-    string Section, string Name, string? Payer, bool IsDebt, bool IsPerpetual, bool IsOptional, bool IsBusiness, bool AutoPay,
-    int? DueDay, decimal Estimated, decimal? Actual, string? Service, string? AccountRef, string? MatchText,
-    string? Frequency = null, int? IntervalWeeks = null, DateOnly? AnchorDate = null, int? SecondDueDay = null);
-
-public sealed record SetPaymentRequest(bool Paid, decimal? Amount, int Slot = 0);
-
-public sealed record ImportSheetRequest(string Csv, bool Replace);
-
-public sealed record SheetImportResult(int Sections, int Bills, int PaidMarks);
-
-public sealed record SheetRefreshResult(int Marked, int Cleared, int Added = 0);
-
-public sealed record RecurringSuggestionDto(
-    string Key,
-    Guid AccountId,
-    string AccountName,
-    string Name,
-    string Direction,
-    decimal Amount,
-    string Currency,
-    string AmountModel,
-    string Frequency,
-    int? DayOfMonth,
-    int? SecondDayOfMonth,
-    int? IntervalWeeks,
-    string? AnchorDayOfWeek,
-    DateOnly LastSeen,
-    DateOnly NextExpected,
-    int Occurrences,
-    double Confidence,
-    bool WouldAutoAdd);
 
 public sealed record AutoAddResultDto(int Added, List<string> Names);
 
@@ -601,18 +305,12 @@ public sealed record LocalAiStatusDto(
     string EmbeddingModelId, bool LlmEnabled, bool LlmModelInstalled, bool LlmLoaded, string? LlmNote,
     string ModelDirectory, bool DownloadsAllowed, List<LocalAiModelDto> Models, LocalAiDownloadDto? Download);
 
-public sealed record MerchantOccurrenceDto(string Raw, int Count);
-public sealed record MerchantGroupDto(string Canonical, List<MerchantOccurrenceDto> Members, int TotalCount, double MinSimilarity, string SuggestedName = "");
 public sealed record MerchantGroupsDto(string Embedder, bool Semantic, double Threshold, List<MerchantGroupDto> Groups);
 
 public sealed record EvalPointDto(double Threshold, int Predicted, int Correct, double Coverage, double Precision);
 public sealed record EvalMethodDto(string Name, double Accuracy, List<EvalPointDto> Curve);
 public sealed record EvaluationDto(string Embedder, bool Semantic, int Merchants, int Labels, int Folds, long Milliseconds, string Note, List<EvalMethodDto> Methods);
 
-public sealed record SimilarTransactionDto(Guid Id, DateOnly Date, string? Merchant, string Description, decimal Amount, string Direction, string? CategoryPath, double Similarity);
-
 public sealed record ImportFormatDto(string Id, string Name);
-
-public sealed record ImportSummaryDto(Guid ImportBatchId, int ImportedCount, int DuplicateCount, int FailedRowCount, int MatchedToPlanCount);
 
 public sealed record AutoImportResultDto(string FormatId, string FormatName, List<string> Warnings, ImportSummaryDto Summary);

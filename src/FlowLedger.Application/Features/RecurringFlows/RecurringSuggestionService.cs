@@ -15,27 +15,6 @@ public interface IRecurringDismissalStore
     Task AddAsync(string key, CancellationToken ct = default);
 }
 
-/// <summary>A detected recurring pattern, as shown to the user.</summary>
-public sealed record RecurringSuggestionDto(
-    string Key,
-    Guid AccountId,
-    string AccountName,
-    string Name,
-    string Direction,
-    decimal Amount,
-    string Currency,
-    string AmountModel,
-    string Frequency,
-    int? DayOfMonth,
-    int? SecondDayOfMonth,
-    int? IntervalWeeks,
-    string? AnchorDayOfWeek,
-    DateOnly LastSeen,
-    DateOnly NextExpected,
-    int Occurrences,
-    double Confidence,
-    bool WouldAutoAdd);
-
 public sealed record AutoAddResult(int Added, IReadOnlyList<string> Names);
 
 /// <summary>

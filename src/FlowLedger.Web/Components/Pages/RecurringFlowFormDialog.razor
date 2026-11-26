@@ -76,8 +76,8 @@
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
-    [Parameter] public FlowLedger.Web.ApiClient.RecurringFlowDto? Flow { get; set; }
-    [Parameter] public List<FlowLedger.Web.ApiClient.AccountDto> Accounts { get; set; } = [];
+    [Parameter] public FlowLedger.Contracts.RecurringFlowDto? Flow { get; set; }
+    [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
 
     private MudForm _form = default!;
     private string _name = "";
@@ -112,7 +112,7 @@
         object result;
         if (Flow is null)
         {
-            result = new FlowLedger.Web.ApiClient.CreateRecurringFlowRequest(
+            result = new FlowLedger.Contracts.CreateRecurringFlowRequest(
                 AccountId: _accountId,
                 Name: _name,
                 Amount: _amount,
@@ -131,7 +131,7 @@
         }
         else
         {
-            result = new FlowLedger.Web.ApiClient.UpdateRecurringFlowRequest(_amount, _amountModel);
+            result = new FlowLedger.Contracts.UpdateRecurringFlowRequest(_amount, _amountModel);
         }
 
         MudDialog.Close(DialogResult.Ok(result));
