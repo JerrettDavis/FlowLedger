@@ -85,14 +85,14 @@ internal static class MxEndpoints
         {
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
-            if (request.ContentLength > MaxWebhookBodyBytes)
+            if (request.ContentLength > WebhookBody.MaxBytes)
             {
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
             }
 
             // Read the raw body bytes — required for exact HMAC verification. Bounded read: chunked bodies
             // carry no Content-Length, so stop as soon as the cap is exceeded.
-            var rawBody = await ReadBoundedAsync(request.Body, MaxWebhookBodyBytes, ct);
+            var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
             if (rawBody is null)
             {
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
@@ -178,25 +178,5 @@ internal static class MxEndpoints
         return app;
     }
 
-    /// <summary>MX webhook payloads are small JSON events; anything larger is refused before signature work.</summary>
-    internal const int MaxWebhookBodyBytes = 1024 * 1024;
-
     /// <summary>Reads at most <paramref name="limit"/> bytes; returns null as soon as the body exceeds it.</summary>
-    private static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
-    {
-        using var ms = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        int read;
-        while ((read = await body.ReadAsync(buffer, ct)) > 0)
-        {
-            if (ms.Length + read > limit)
-            {
-                return null;
-            }
-
-            ms.Write(buffer, 0, read);
-        }
-
-        return ms.ToArray();
-    }
 }

@@ -13,8 +13,6 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class QuilttEndpoints
 {
-    internal const int MaxWebhookBodyBytes = 1024 * 1024;
-
     internal static IEndpointRouteBuilder MapQuilttEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/integrations/quiltt").WithTags("Quiltt");
@@ -85,12 +83,12 @@ internal static class QuilttEndpoints
                 }
 
                 var provider = connectors.Resolve(QuilttFinancialDataProvider.Name);
-                if (request.ContentLength > MaxWebhookBodyBytes)
+                if (request.ContentLength > WebhookBody.MaxBytes)
                 {
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
-                var rawBody = await ReadBoundedAsync(request.Body, MaxWebhookBodyBytes, ct);
+                var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
                 if (rawBody is null)
                 {
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
@@ -158,21 +156,4 @@ internal static class QuilttEndpoints
         return app;
     }
 
-    private static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
-    {
-        using var ms = new MemoryStream();
-        var buffer = new byte[16 * 1024];
-        int read;
-        while ((read = await body.ReadAsync(buffer, ct)) > 0)
-        {
-            if (ms.Length + read > limit)
-            {
-                return null;
-            }
-
-            ms.Write(buffer, 0, read);
-        }
-
-        return ms.ToArray();
-    }
 }
