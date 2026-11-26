@@ -116,18 +116,6 @@ public sealed record AskQueryAnswer(string Question, string? Query, string? Erro
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
-public sealed record CategorySpendDto(string Category, decimal Amount);
-
-public sealed record MonthCashFlowDto(string Month, decimal Income, decimal Spending);
-
-public sealed record NetWorthPointDto(string Date, decimal Value);
-
-public sealed record DashboardInsightsDto(
-    List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth,
-List<MerchantSpendDto>? TopMerchants = null, List<CategoryMoverDto>? Movers = null, string? PreviousLabel = null);
-public sealed record MerchantSpendDto(string Merchant, decimal Amount, int Visits);
-public sealed record CategoryMoverDto(string Category, decimal Current, decimal Previous, decimal Change);
-
 public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
@@ -161,32 +149,8 @@ public sealed record EnvironmentInfo(string Environment, bool IsProduction);
 
 // Query & reports -------------------------------------------------------------
 
-public sealed record QueryColumnDto(string Name, string Type);
-
-public sealed record QueryResultDto(List<QueryColumnDto> Columns, List<List<System.Text.Json.JsonElement>> Rows, bool Truncated, long ElapsedMs);
-
-public sealed record VizSpecDto(string Kind, string? X = null, List<string>? Y = null, string? SeriesBy = null, bool Stacked = false);
-
-public sealed record ReportPanelDto(string Title, string Query, VizSpecDto Viz);
-
-public sealed record SavedReportDto(
-    string Id, string Name, string? Description, string Kind, bool IsPreset,
-    List<ReportPanelDto> Panels, DateTimeOffset? CreatedAt, DateTimeOffset? UpdatedAt);
-
-public sealed record SaveReportRequest(string Name, string? Description, string Kind, List<ReportPanelDto> Panels);
-
-public sealed record PanelResultDto(string Title, string Query, VizSpecDto Viz, QueryResultDto? Result, string? Error);
-
-public sealed record RunReportResultDto(string Id, string Name, string? Description, string Kind, List<PanelResultDto> Panels);
-
-public sealed record DatasetColumnInfoDto(string Name, string Type, string Description);
-
-public sealed record DatasetInfoDto(string Name, string Description, List<DatasetColumnInfoDto> Columns);
-
-public sealed record QuerySchemaDto(List<DatasetInfoDto> Datasets, List<string> Functions, List<string> Aggregates, List<string> Operators);
-
 /// <summary>Outcome of running a query: a result, or a user-readable error with its character offset.</summary>
-public sealed record QueryRunOutcome(QueryResultDto? Result, string? Error, int Position);
+public sealed record QueryRunOutcome(QueryResult? Result, string? Error, int Position);
 
 // Bill sheet (spreadsheet mode) ------------------------------------------------
 

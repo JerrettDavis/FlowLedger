@@ -51,6 +51,9 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     {
         public string ProviderName => name;
         public ProviderCapabilities Capabilities => ProviderCapabilities.Accounts;
+        public ConnectorTraits Traits => name == "Simulated"
+            ? ConnectorTraits.PerTenantAccess | ConnectorTraits.ProvisionsLocally | ConnectorTraits.SeedsDemoData
+            : ConnectorTraits.ProvisionsLocally | ConnectorTraits.ReportsHoldingsSign;
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default)
             => Task.FromResult(new ProviderMemberRef("m-" + name, name + " bank", ConnectionStatus.Connected));
         public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default)

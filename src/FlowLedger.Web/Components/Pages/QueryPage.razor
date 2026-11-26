@@ -210,7 +210,7 @@
         """;
 
     private string _query = "transactions\n| where direction == \"Debit\" and date >= ago(90d)\n| summarize total = sum(amount), n = count() by category\n| sort by total desc\n| take 12";
-    private QueryResultDto? _result;
+    private QueryResult? _result;
     private QuerySchemaDto? _schema;
     private List<SavedReportDto> _reports = [];
     private string? _error;
@@ -416,7 +416,7 @@
         await LoadPanelAsync(r.Panels[0], r.Name);
     }
 
-    private async Task LoadPanelAsync(ReportPanelDto panel, string title)
+    private async Task LoadPanelAsync(ReportPanel panel, string title)
     {
         await SetQueryAsync(panel.Query);
         _loadedTitle = title;
@@ -428,7 +428,7 @@
         await RunCoreAsync(keepViz: true);
     }
 
-    private VizSpecDto CurrentViz() => new(_kind, _x, _y.ToList(), _seriesBy, _stacked);
+    private VizSpec CurrentViz() => new(_kind, _x, _y.ToList(), _seriesBy, _stacked);
 
     private static readonly string[] DatasetNames = ["transactions", "accounts", "assets"];
 
@@ -500,15 +500,15 @@
     private static string Snippet(string q, int pos)
         => q.Substring(pos, Math.Min(20, q.Length - pos)).Replace('\n', ' ');
 
-    private IReadOnlyCollection<string> DefaultY(QueryResultDto r)
+    private IReadOnlyCollection<string> DefaultY(QueryResult r)
         => r.Columns.Where(c => c.Type == "number" && c.Name != _x).Take(1).Select(c => c.Name).ToList();
 
     /// <summary>Picks a sensible default display for a fresh result: time on X becomes a line, small categorical a column.</summary>
-    private void AutoViz(QueryResultDto r)
+    private void AutoViz(QueryResult r)
     {
         _seriesBy = null;
         _stacked = false;
-        var xIndex = r.Columns.FindIndex(c => c.Type != "number");
+        var xIndex = r.Columns.ToList().FindIndex(c => c.Type != "number");
         if (xIndex < 0)
         {
             xIndex = 0;
@@ -523,7 +523,7 @@
             : timeLike ? "line" : r.Rows.Count <= 20 ? "column" : "table";
     }
 
-    private ReportPanelDto CurrentPanel(string title) => new(title, _query, CurrentViz());
+    private ReportPanel CurrentPanel(string title) => new(title, _query, CurrentViz());
 
     private async Task SaveViewAsync()
     {

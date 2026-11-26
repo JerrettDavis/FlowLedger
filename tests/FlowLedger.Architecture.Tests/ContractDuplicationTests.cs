@@ -1,7 +1,7 @@
 namespace FlowLedger.Architecture.Tests;
 
 /// <summary>
-/// #96: the Web client hand-copies API contract types. Until a shared Contracts project exists, no NEW public type name may be
+/// #96: the Web client hand-copies API contract types. Shared DTOs live in FlowLedger.Contracts; no public type name may be
 /// defined in both Application and Web; existing duplicates sit on a shrink-only allow-list.
 /// </summary>
 public sealed class ContractDuplicationTests
@@ -9,13 +9,7 @@ public sealed class ContractDuplicationTests
     private static IEnumerable<string> PublicTypeNames(System.Reflection.Assembly a) =>
         a.GetExportedTypes().Where(t => !t.IsNested && !t.IsGenericTypeDefinition).Select(t => t.Name);
 
-    private static readonly string[] Allowlist = [
-        "PanelResultDto",
-        "QuerySchemaDto",
-        "RunReportResultDto",
-        "SavedReportDto",
-        "SaveReportRequest",
-    ];
+    private static readonly string[] Allowlist = [];
 
     [Fact]
     public void No_new_public_type_name_is_defined_in_both_Application_and_Web()

@@ -10,10 +10,20 @@ namespace FlowLedger.Web.Shared;
 /// <summary>One plotted series; <c>Values[i]</c> aligns with <c>ChartModel.Categories[i]</c> (null = no data).</summary>
 public sealed record ChartSeries(string Name, double?[] Values);
 
-/// <summary>Chart-ready shape derived from a tabular query result and a <see cref="VizSpecDto"/>.</summary>
+/// <summary>Chart-ready shape derived from a tabular query result and a <see cref="VizSpec"/>.</summary>
 public sealed record ChartModel(IReadOnlyList<string> Categories, IReadOnlyList<ChartSeries> Series, bool XIsTime, string? Problem)
 {
     public const int MaxSeries = 8;
+
+    /// <summary>Result cells arrive as <see cref="JsonElement"/> boxes (the shared contract types them as object); anything else is normalised first.</summary>
+    public static JsonElement ToElement(object? cell) => cell switch
+    {
+        JsonElement e => e,
+        null => default,
+        _ => JsonSerializer.SerializeToElement(cell),
+    };
+
+    public static string CellText(object? cell) => CellText(ToElement(cell));
 
     public static string CellText(JsonElement e) => e.ValueKind switch
     {
@@ -25,10 +35,12 @@ public sealed record ChartModel(IReadOnlyList<string> Categories, IReadOnlyList<
         _ => e.ToString(),
     };
 
+    public static double? CellNumber(object? cell) => CellNumber(ToElement(cell));
+
     public static double? CellNumber(JsonElement e)
         => e.ValueKind == JsonValueKind.Number ? (double)e.GetDecimal() : null;
 
-    public static ChartModel Build(QueryResultDto result, VizSpecDto viz)
+    public static ChartModel Build(QueryResult result, VizSpec viz)
     {
         if (result.Rows.Count == 0)
         {
@@ -57,8 +69,8 @@ public sealed record ChartModel(IReadOnlyList<string> Categories, IReadOnlyList<
             return new ChartModel([], [], false, "Charts need at least one numeric column besides the X axis.");
         }
 
-        var xIsTime = result.Columns[xi].Type == "date" || (result.Rows[0][xi].ValueKind == JsonValueKind.String
-            && System.Text.RegularExpressions.Regex.IsMatch(result.Rows[0][xi].GetString() ?? "", @"^\d{4}-(\d{2}|Q\d)"));
+        var xIsTime = result.Columns[xi].Type == "date" || (ToElement(result.Rows[0][xi]) is { ValueKind: JsonValueKind.String } first
+            && System.Text.RegularExpressions.Regex.IsMatch(first.GetString() ?? "", @"^\d{4}-(\d{2}|Q\d)"));
 
         var categories = new List<string>();
         var catIndex = new Dictionary<string, int>();

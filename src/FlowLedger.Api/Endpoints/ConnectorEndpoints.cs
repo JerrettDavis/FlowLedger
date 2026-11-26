@@ -12,7 +12,7 @@ internal static class ConnectorEndpoints
 {
     private sealed record Descriptor(
         string Id, string DisplayName, string Kind, string Description,
-        string[] ConfigKeys, Func<IConfiguration, bool> IsEnabled, Func<IConfiguration, bool> HasCredentials);
+        string[] ConfigKeys, Func<IConfiguration, bool> IsEnabled, Func<IConfiguration, bool> HasCredentials, ConnectorTraits Traits = ConnectorTraits.None);
 
     private static bool Has(IConfiguration c, string key) => !string.IsNullOrWhiteSpace(c[key]);
 
@@ -30,7 +30,8 @@ internal static class ConnectorEndpoints
             "MX Platform API with the hosted connect widget. Billable per call; honours daily/monthly budgets and a kill switch.",
             ["Mx:Enabled", "Mx:ApiKey", "Mx:ClientId", "Mx:BaseUrl", "Mx:WebhookSecret"],
             c => bool.TryParse(c["Mx:Enabled"], out var on) && on,
-            c => Has(c, "Mx:ApiKey") && Has(c, "Mx:ClientId") && Has(c, "Mx:BaseUrl") && Has(c, "Mx:WebhookSecret")),
+            c => Has(c, "Mx:ApiKey") && Has(c, "Mx:ClientId") && Has(c, "Mx:BaseUrl") && Has(c, "Mx:WebhookSecret"),
+            FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits),
         new(ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)",
             "In-app bank linking: each user links institutions inside FlowLedger through the Quiltt Connector (one Quiltt profile per tenant).",
             ["Quiltt:Enabled", "Quiltt:ApiKeySecret", "Quiltt:ConnectorId", "Quiltt:WebhookSecret"],
@@ -87,7 +88,7 @@ internal static class ConnectorEndpoints
                     var isPrimary = string.Equals(d.Id, primary.ProviderName, StringComparison.OrdinalIgnoreCase);
                     var usage = await status.GetUsageAsync(d.Id, ct);
                     var lastSync = await status.LastSyncedAtAsync(d.Id, ct);
-                    var isMx = d.Id == ConnectorIds.Mx;
+                    var isMx = d.Traits.HasFlag(ConnectorTraits.BillablePerCall);
                     items.Add(new
                     {
                         id = d.Id,

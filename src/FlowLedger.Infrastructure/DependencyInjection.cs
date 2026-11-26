@@ -183,27 +183,29 @@ public static class DependencyInjection
         if (simpleFinEnabled)
         {
             services.AddSimpleFinProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", !FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits));
         }
 
         if (mxOptions.Enabled)
         {
             services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", !FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits));
         }
 
         if (quilttEnabled)
         {
             services.AddQuilttProvider(configuration, registerAsDefault: connectors.Count == 0);
             // Per-user profiles: Quiltt isolates each tenant itself, so unlike SimpleFIN/MX it is not tied to the household tenant.
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", !FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits));
         }
 
         if (simulatedEnabled)
         {
             services.AddSimulatedProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", !FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits));
         }
+
+        services.AddScoped<FlowLedger.Application.Abstractions.IHouseholdTenantAccess, HouseholdTenantAccess>();
 
         services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
@@ -277,7 +279,7 @@ public static class DependencyInjection
             }
 
             // Real connectors default to 30 min between syncs; the free Simulated provider is unthrottled.
-            var defaultMinutes = usable.Any(c => c.Id != FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated) ? 30 : 0;
+            var defaultMinutes = usable.Any(c => !c.Traits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.SeedsDemoData)) ? 30 : 0;
             var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
             var db = sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>();
             var connectorIds = usable.Select(c => c.Id).ToArray();

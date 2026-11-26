@@ -13,14 +13,6 @@ public sealed class QueryTable(IReadOnlyList<string> columns, List<object?[]> ro
     public bool InputTruncated { get; init; }
 }
 
-public sealed record QueryColumn(string Name, string Type);
-
-public sealed record QueryResult(
-    IReadOnlyList<QueryColumn> Columns,
-    IReadOnlyList<IReadOnlyList<object?>> Rows,
-    bool Truncated,
-    long ElapsedMs);
-
 internal readonly record struct DurationValue(int Amount, string Unit)
 {
     public DateOnly SubtractFrom(DateOnly d) => Unit switch

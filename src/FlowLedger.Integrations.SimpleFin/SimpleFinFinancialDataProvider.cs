@@ -41,6 +41,11 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
     public ProviderCapabilities Capabilities =>
         ProviderCapabilities.Accounts | ProviderCapabilities.IncrementalTransactions;
 
+    /// <summary>Operator-held access URL (household tenant only), connection is a local record, balances use the holdings sign.</summary>
+    public const ConnectorTraits DeclaredTraits = ConnectorTraits.ProvisionsLocally | ConnectorTraits.ReportsHoldingsSign;
+
+    public ConnectorTraits Traits => DeclaredTraits;
+
     public Task<ProviderMemberRef> BeginConnectionAsync(TenantId tenantId, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
