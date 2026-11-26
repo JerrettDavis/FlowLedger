@@ -7,13 +7,14 @@ internal static class DataEndpoints
 {
     internal static IEndpointRouteBuilder MapDataEndpoints(this IEndpointRouteBuilder app)
     {
+        // Resolved once at registration (not a handler parameter): the backup root is host configuration, never request input.
+        var settings = app.ServiceProvider.GetRequiredService<BackupSettings>();
         // Every /api/data endpoint reports on or acts on the WHOLE database (all tenants): household tenant only.
         var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api")
             .AddEndpointFilter(HouseholdTenantOnlyAsync);
 
         group.MapGet("/status", async (
             BackupRunStore store,
-            BackupSettings settings,
             NpgsqlProviderCallLedger ledger,
             IJobRunStore jobRuns,
             DataEnvironmentState env,
@@ -81,7 +82,7 @@ internal static class DataEndpoints
         .RequireRateLimiting("write");
 
         group.MapGet("/export", async (
-            IConfiguration cfg, BackupSettings settings, FlowLedger.SharedKernel.ITenantContext tenant, string? scope, Guid? tenantId, CancellationToken ct) =>
+            IConfiguration cfg, FlowLedger.SharedKernel.ITenantContext tenant, string? scope, Guid? tenantId, CancellationToken ct) =>
         {
             // Default stays the whole database (disaster recovery). scope=tenant exports only the caller's tenant; tenantId=<id> exports that tenant (#139).
             if (scope is not null && !scope.Equals("all", StringComparison.OrdinalIgnoreCase) && !scope.Equals("tenant", StringComparison.OrdinalIgnoreCase))
@@ -101,7 +102,7 @@ internal static class DataEndpoints
         .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); all tenants by default, scope=tenant or tenantId=<id> for one")
         .RequireRateLimiting("write");
 
-        group.MapPost("/import", async (HttpRequest request, IConfiguration cfg, BackupSettings settings, CancellationToken ct) =>
+        group.MapPost("/import", async (HttpRequest request, IConfiguration cfg, CancellationToken ct) =>
         {
             if (!request.HasFormContentType || request.Form.Files.Count != 1)
             {
