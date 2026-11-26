@@ -461,6 +461,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // otherwise be inserted again and hit the unique (tenant, fingerprint) index.
         var insertedByFingerprint = new Dictionary<string, Transaction>();
 
+        // Pending fingerprints the provider (re)reported during this sync; only the others can be considered stale.
+        var seenPending = new HashSet<string>(StringComparer.Ordinal);
+
         bool hasMore = true;
         while (hasMore)
         {
@@ -510,6 +513,11 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 var settled = 0;
                 foreach (var x in fingerprintMap)
                 {
+                    if (x.ProviderTx.IsPending)
+                    {
+                        seenPending.Add(x.Fingerprint.Value);
+                    }
+
                     if (mergedAway.Contains(x.Fingerprint.Value))
                     {
                         continue;
@@ -553,9 +561,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                                 .ToList()
                             : [];
                         var pending = matches.Count == 1 ? matches[0] : null;
-                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint))
+                        var finalAmount = (Money?)null;
+                        if (pending is null && matches.Count == 0)
                         {
-                            bucket!.Remove(pending);
+                            // Posted total differs from the authorization (a tip): absorb one unambiguous pending row
+                            // of the same merchant whose amount is within tolerance below the posted total (#104).
+                            var tolerant = FindTipSettleCandidate(settleCandidates, direction, amount, x.ProviderTx);
+                            if (tolerant is not null)
+                            {
+                                pending = tolerant;
+                                finalAmount = new Money(amount, x.ProviderTx.Amount.Currency);
+                            }
+                        }
+
+                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount))
+                        {
+                            RemoveSettleCandidate(settleCandidates, pending);
                             settled++;
                             continue;
                         }
@@ -591,7 +612,63 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             await _cursorStore.SetAsync(_provider.ProviderName, providerAccountId, cursor.Value, ct);
         }
 
+        // Authorizations the provider never settled or re-reported (cancelled holds, fuel pre-auths) must not count as
+        // spend forever. Anything still pending after the TTL that this sync did not just receive is retired.
+        var staleBefore = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-StalePendingDays);
+        foreach (var list in settleCandidates.Values)
+        {
+            foreach (var stale in list.Where(t => t.Status == TransactionStatus.Pending && t.EffectiveDate < staleBefore
+                         && (t.Fingerprint is null || !seenPending.Contains(t.Fingerprint.Value))).ToList())
+            {
+                if (stale.AbandonPending())
+                {
+                    _logger.LogInformation("Retired stale pending transaction on {Account} (pending since {Date}).", providerAccountId, stale.EffectiveDate);
+                }
+            }
+        }
+
         return (added, skipped);
+    }
+
+    /// <summary>Largest amount a posted total may exceed its authorization by (restaurant/ride-share tips).</summary>
+    internal const decimal TipTolerance = 0.30m;
+
+    /// <summary>Pending authorizations older than this that the provider never settled are retired (#104).</summary>
+    internal const int StalePendingDays = 14;
+
+    private static Transaction? FindTipSettleCandidate(
+        Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup,
+        TransactionDirection direction, decimal postedAmount, ProviderTransaction posted)
+    {
+        var found = lookup
+            .Where(kv => kv.Key.Item1 == direction && kv.Key.Item2 < postedAmount && postedAmount <= kv.Key.Item2 * (1m + TipTolerance))
+            .SelectMany(kv => kv.Value)
+            .Where(t => t.Status == TransactionStatus.Pending
+                && t.Amount.Currency == posted.Amount.Currency
+                && t.EffectiveDate <= posted.PostedDate
+                && t.EffectiveDate >= posted.PostedDate.AddDays(-7)
+                && SharesMerchantToken(t.Description, posted.RawDescription))
+            .Take(2)
+            .ToList();
+        return found.Count == 1 ? found[0] : null;
+    }
+
+    private static bool SharesMerchantToken(string a, string b)
+    {
+        static HashSet<string> Tokens(string s) => s
+            .Split([' ', '*', '#', '-', '/', '.', ','], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 3 && !w.All(char.IsDigit))
+            .Select(w => w.ToUpperInvariant())
+            .ToHashSet();
+        return Tokens(a ?? string.Empty).Overlaps(Tokens(b ?? string.Empty));
+    }
+
+    private static void RemoveSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)
+    {
+        foreach (var list in lookup.Values)
+        {
+            list.Remove(t);
+        }
     }
 
     private static void AddSettleCandidate(Dictionary<(TransactionDirection, decimal), List<Transaction>> lookup, Transaction t)

@@ -60,6 +60,52 @@ public sealed class PendingSettlementTests : IAsyncLifetime
         (await RunAsync(tenant, Tx("posted-1", false, Today.AddDays(2)))).Should().Be((0, 1));
     }
 
+    private static ProviderTransaction TxAmount(string id, bool pending, DateOnly date, decimal amount, string desc = "RIVERSIDE GRILL")
+        => new(id, "acct-1", date, pending, new Money(-amount, new Currency("USD")), desc, desc, null);
+
+    [DockerFact]
+    public async Task Posted_tip_total_absorbs_the_pending_authorization_instead_of_double_counting()
+    {
+        // #104: $20.00 authorization (P1) posts as $24.00 under a new id (P2) and P1 is never returned again.
+        var tenant = TestTenantContext.New();
+        await RunAsync(tenant, TxAmount("P1", true, Today, 20.00m));
+
+        var second = await RunAsync(tenant, TxAmount("P2", false, Today.AddDays(1), 24.00m));
+
+        second.Rows.Should().Be(1, "exactly one row must remain for the meal");
+        await using var v = _fixture.CreateDbContext(tenant);
+        var row = await v.Transactions.SingleAsync();
+        row.Status.Should().Be(TransactionStatus.Posted);
+        row.Amount.Amount.Should().Be(24.00m);
+    }
+
+    [DockerFact]
+    public async Task Pending_row_the_provider_stopped_returning_is_excluded_after_the_ttl()
+    {
+        var tenant = TestTenantContext.New();
+        var old = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-20);
+        await RunAsync(tenant, TxAmount("HOLD", true, old, 100m, "FUEL PREAUTH"));
+
+        // The hold vanished: later syncs return something unrelated.
+        await RunAsync(tenant, TxAmount("OTHER", false, DateOnly.FromDateTime(DateTime.UtcNow), 5m, "UNRELATED"));
+
+        await using var v = _fixture.CreateDbContext(tenant);
+        var hold = await v.Transactions.SingleAsync(t => t.Description == "FUEL PREAUTH");
+        hold.Status.Should().Be(TransactionStatus.Skipped, "stale pending holds must not count as spend");
+    }
+
+    [DockerFact]
+    public async Task Recent_pending_row_is_left_alone()
+    {
+        var tenant = TestTenantContext.New();
+        var recent = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2);
+        await RunAsync(tenant, TxAmount("HOLD2", true, recent, 100m, "HOTEL HOLD"));
+        await RunAsync(tenant, TxAmount("OTHER2", false, DateOnly.FromDateTime(DateTime.UtcNow), 5m, "UNRELATED"));
+
+        await using var v = _fixture.CreateDbContext(tenant);
+        (await v.Transactions.SingleAsync(t => t.Description == "HOTEL HOLD")).Status.Should().Be(TransactionStatus.Pending);
+    }
+
     private sealed class ScriptedProvider(ProviderTransaction[] txs) : IFinancialDataProvider
     {
         public string ProviderName => "Simulated";
