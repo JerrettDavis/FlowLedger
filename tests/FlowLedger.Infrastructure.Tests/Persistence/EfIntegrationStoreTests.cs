@@ -56,7 +56,7 @@ public sealed class EfIntegrationStoreTests(IntegrationTestFixture fixture) : IA
             await using var cmd = new NpgsqlCommand("SELECT secrets FROM integrations WHERE tenant_id = @t AND id = @i", conn);
             cmd.Parameters.AddWithValue("t", a.TenantId);
             cmd.Parameters.AddWithValue("i", integ.Id);
-            ((string)(await cmd.ExecuteScalarAsync())!).Should().StartWith("v1:").And.NotContain("sign-1");
+            ((string)(await cmd.ExecuteScalarAsync())!).Should().StartWith("v2:").And.NotContain("sign-1");
         }
 
         var other = Store(b, Key);
