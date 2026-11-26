@@ -112,6 +112,11 @@ public static class SnapshotImport
     {
         // Only the file name is honoured: the directory is whatever the caller extracted into.
         var full = Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileName(path));
+        var name = Path.GetFileName(path);
+        if (string.IsNullOrEmpty(name) || name is "." or ".." || !string.Equals(name, entry.Name, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("Bundle contains an unexpected entry name.");
+        }
 
         using var source = entry.Open();
         using var target = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None);
