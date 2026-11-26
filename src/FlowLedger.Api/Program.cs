@@ -35,6 +35,7 @@ builder.Services.AddOpenApi();
 // Non-Development: HeaderTenantContext fails closed (throws TenantResolutionException
 // → 401) when no valid X-Tenant-Id header is supplied.
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<FlowLedger.Api.Tenancy.TenantOverride>();
 // Tenancy:RequireTenantHeader=true makes even Development fail closed (no demo-tenant fallback) - set it on any stack with real users.
 if (builder.Environment.IsDevelopment()
     && !builder.Configuration.GetValue("Tenancy:RequireTenantHeader", false)
