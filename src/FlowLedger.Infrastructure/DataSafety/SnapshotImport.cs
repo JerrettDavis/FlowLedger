@@ -54,7 +54,7 @@ public static class SnapshotImport
 
                     try
                     {
-                        ExtractBounded(entry, Path.Combine(dir, entry.Name), ref written, maxUncompressedBytes);
+                        ExtractBounded(entry, dir, ref written, maxUncompressedBytes);
                     }
                     catch (InvalidDataException ex)
                     {
@@ -108,12 +108,17 @@ public static class SnapshotImport
 
     /// <summary>Extracts one entry, counting the bytes actually written (shared across entries via <paramref name="totalWritten"/>)
     /// and aborting as soon as <paramref name="maxTotalBytes"/> is exceeded, whatever the archive claims about its sizes.</summary>
-    internal static void ExtractBounded(ZipArchiveEntry entry, string path, ref long totalWritten, long maxTotalBytes)
+    internal static void ExtractBounded(ZipArchiveEntry entry, string directory, ref long totalWritten, long maxTotalBytes)
     {
-        // Only the file name is honoured: the directory is whatever the caller extracted into.
-        var full = Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileName(path));
-        var name = Path.GetFileName(path);
-        if (string.IsNullOrEmpty(name) || name is "." or ".." || !string.Equals(name, entry.Name, StringComparison.Ordinal))
+        // Resolve against the trusted extraction directory and refuse anything that lands outside it (zip-slip).
+        var root = Path.GetFullPath(directory);
+        if (!root.EndsWith(Path.DirectorySeparatorChar))
+        {
+            root += Path.DirectorySeparatorChar;
+        }
+
+        var full = Path.GetFullPath(Path.Combine(root, entry.Name));
+        if (entry.Name.Length == 0 || !full.StartsWith(root, StringComparison.Ordinal) || Path.GetDirectoryName(full) + Path.DirectorySeparatorChar != root)
         {
             throw new InvalidDataException("Bundle contains an unexpected entry name.");
         }

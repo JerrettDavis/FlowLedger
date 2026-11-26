@@ -34,7 +34,7 @@ public sealed class SnapshotImportBoundsTests : IDisposable
         using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
         long written = 0;
 
-        var act = () => SnapshotImport.ExtractBounded(archive.Entries[0], Path.Combine(_dir, "big.csv"), ref written, maxTotalBytes: 10_000);
+        var act = () => SnapshotImport.ExtractBounded(archive.Entries[0], _dir, ref written, maxTotalBytes: 10_000);
 
         act.Should().Throw<InvalidDataException>().WithMessage("*expands*");
         written.Should().BeLessThan(500_000, "extraction must stop as soon as the budget is exceeded");
@@ -47,7 +47,7 @@ public sealed class SnapshotImportBoundsTests : IDisposable
         using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
         long written = 0;
 
-        SnapshotImport.ExtractBounded(archive.Entries[0], Path.Combine(_dir, "ok.csv"), ref written, maxTotalBytes: 10_000);
+        SnapshotImport.ExtractBounded(archive.Entries[0], _dir, ref written, maxTotalBytes: 10_000);
 
         written.Should().Be(4_000);
         new FileInfo(Path.Combine(_dir, "ok.csv")).Length.Should().Be(4_000);
