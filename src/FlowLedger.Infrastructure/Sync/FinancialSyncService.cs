@@ -427,6 +427,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         await _db.Accounts.AddAsync(newAccount, ct);
         if (_links is not null)
         {
+            // The link row has a DB-level composite foreign key to the account (#146), so the account is committed first. A crash
+            // between the two leaves an unlinked account, which the next sync finds by Institution and links again (lazy backfill).
+            await _db.SaveChangesAsync(ct);
             await _links.LinkAsync(newAccount.Id, _provider.ProviderName, pa.ProviderId, ct);
         }
 

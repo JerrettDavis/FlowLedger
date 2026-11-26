@@ -84,7 +84,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     {
         _tenants.Add(tenant.TenantId);
         var db = _fixture.CreateDbContext(tenant);
-        var links = new NpgsqlAccountConnectorLinkStore(_fixture.ConnectionString, tenant);
+        var links = new FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore(db, tenant);
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Tenancy:LegacyTenantId"] = householdTenant.ToString() })
             .Build();

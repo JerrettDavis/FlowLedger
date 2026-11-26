@@ -103,6 +103,56 @@ public sealed class RouteAuthorizationSweepTests(FailClosedApiFactory factory)
         failures.Should().BeEmpty("every non-allow-listed route must require the API key");
     }
 
+    /// <summary>
+    /// Routes that stay reachable with a valid API key and no tenant identity, with the reason. Everything else is tenant data and
+    /// must fail closed (#158): a request that cannot name its tenant must never reach a handler that reads or writes rows.
+    /// </summary>
+    private static readonly Dictionary<string, string> TenantlessAllowList = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["GET /api/assets/categories"] = "static category template list, no rows",
+        ["GET /api/environment"] = "host environment flags",
+        ["GET /api/imports/formats"] = "static list of import formats",
+        ["GET /api/integrations/provider"] = "provider kind, no rows",
+        ["GET /api/integrations/quiltt/config"] = "public connector config",
+        ["GET /api/query/schema"] = "static dataset schema",
+        ["GET /api/status"] = "host status",
+        ["POST /api/users/resolve"] = "login bootstrap: maps an external identity to its tenant, so it cannot require one",
+        ["POST /api/debt/plan"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/fire"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/growth"] = "pure calculation on the request body, reads no stored data",
+        ["POST /api/strategies/simulate/refinance"] = "pure calculation on the request body, reads no stored data",
+        // Keyed deletes: the required key is a query-string value, so the bare probe is rejected by parameter binding (400) before any
+        // handler runs. With the key present the request goes through the tenant-scoped store (see TenantIsolationMatrixTests).
+        ["DELETE /api/budgets/"] = "binding rejects the missing key before the handler",
+        ["DELETE /api/category-rules/"] = "binding rejects the missing key before the handler",
+        ["DELETE /api/merchant-aliases/"] = "binding rejects the missing key before the handler",
+    };
+
+    [Fact]
+    public async Task Every_protected_route_fails_closed_for_a_valid_key_without_a_tenant_identity()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {FlowLedgerApiFactory.DevApiKey}");
+
+        var failures = new List<string>();
+        foreach (var route in Routes().Where(r => !AnonymousAllowList.Contains(r.Key) && !TenantlessAllowList.ContainsKey(r.Key)))
+        {
+            using var request = new HttpRequestMessage(new HttpMethod(route.Method), Concrete(route.Pattern));
+            if (route.Method is "POST" or "PUT" or "PATCH")
+            {
+                request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await client.SendAsync(request);
+            if (response.StatusCode is not (HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden))
+            {
+                failures.Add($"{route.Key} returned {(int)response.StatusCode}");
+            }
+        }
+
+        failures.Should().BeEmpty("a valid API key without X-Tenant-Id must not reach tenant data on any route");
+    }
+
     [Fact]
     public async Task Allow_listed_probes_answer_without_credentials()
     {
