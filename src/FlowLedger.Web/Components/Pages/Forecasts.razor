@@ -158,7 +158,8 @@ else if (_forecast is not null)
             <MudCardContent>
                 @if (_forecast.AggregateSeries.Count > 0)
                 {
-                    <div style="max-width:900px;margin:0 auto" role="img" aria-label="Aggregate balance projection chart">
+                    <div style="max-width:900px;margin:0 auto">
+                    <ChartFigure Title="Aggregate balance projection" Summary="@BalanceSummary("Aggregate balance", _forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList())">
                         @SvgChart.BuildBalanceProjection(
                             _forecast.AggregateSeries.Select(p => (p.Date, p.BalanceAmount)).ToList(),
                             zeroLine: 0m,
@@ -166,6 +167,7 @@ else if (_forecast is not null)
                             lowWaterMark: _forecast.AggregateLowWaterMark is not null
                                 ? (_forecast.AggregateLowWaterMark.Date, _forecast.AggregateLowWaterMark.MinBalanceAmount)
                                 : null)
+                    </ChartFigure>
                     </div>
                 }
             </MudCardContent>
@@ -241,10 +243,12 @@ else if (_forecast is not null)
                                Dense="true">
                 @if (chartPts.Count >= 2)
                 {
-                    <div style="max-width:900px;margin:0 auto" role="img" aria-label="@($"{account?.Name} balance projection")">
+                    <div style="max-width:900px;margin:0 auto">
+                    <ChartFigure Title="@($"{account?.Name} balance projection")" Summary="@BalanceSummary($"{account?.Name} balance", chartPts)">
                         @SvgChart.BuildBalanceProjection(chartPts, zeroLine: 0m,
                             breaches: _forecast.OverdraftWarnings.Where(w => w.AccountId == series.AccountId).Select(w => w.FirstBreachDate).ToList(),
                             lowWaterMark: lwm is not null ? (lwm.Date, lwm.MinBalanceAmount) : null)
+                    </ChartFigure>
                     </div>
                 }
                 @if (series.Points.Count == 0)
@@ -287,6 +291,9 @@ else
 }
 
 @code {
+    private static string BalanceSummary(string subject, List<(DateOnly Date, decimal Balance)> pts) =>
+        ChartSummary.Trend(subject, pts.Select(p => (Format.FullDate(p.Date), p.Balance)).ToList(), Format.Money);
+
     /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
     [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
 
