@@ -22,8 +22,8 @@ jobs:
     env:
       FLOWLEDGER_REQUIRE_DOCKER: "true"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: '10.0.x'
       - name: Build
@@ -43,7 +43,7 @@ jobs:
         run: python3 eng/ci/check-trx.py "artifacts/nightly/**/*.trx" --allow-skip "LiveSandbox" --min-executed 500
       - name: Upload TRX results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nightly-trx-suite
           path: artifacts/nightly/**/*.trx
@@ -54,8 +54,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: '10.0.x'
       - name: Build
@@ -68,7 +68,7 @@ jobs:
           --results-directory ./artifacts/perf
       - name: Upload Perf TRX
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nightly-trx-perf
           path: artifacts/perf/**/*.trx
