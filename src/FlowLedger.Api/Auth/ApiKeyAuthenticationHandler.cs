@@ -88,5 +88,5 @@ public sealed class ApiKeyAuthenticationHandler(
     }
 
     // Strips control characters (CR/LF) so a hostile request line cannot forge log entries.
-    private static string Plain(string? value) => new((value ?? string.Empty).Where(c => !char.IsControl(c)).ToArray());
+    private static string Plain(string? value) => (value ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
 }
