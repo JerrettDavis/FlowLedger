@@ -24,6 +24,15 @@ public sealed class ListTransactionsHandler
         var txs = await _repo.ListAsync(accountId, query.From, query.To, query.Skip, query.Take, ct, everydayOnly: !query.IncludeHidden, search: query.Search);
         return txs.Select(TransactionMapper.ToDto).ToList().AsReadOnly();
     }
+
+    /// <summary>Total rows matching the query's filters, ignoring Skip/Take (for server-side paging).</summary>
+    public Task<int> CountAsync(ListTransactionsQuery query, CancellationToken ct = default)
+    {
+        AccountId? accountId = query.AccountId.HasValue
+            ? AccountId.From(query.AccountId.Value)
+            : null;
+        return _repo.CountMatchingAsync(accountId, query.From, query.To, ct, everydayOnly: !query.IncludeHidden, search: query.Search);
+    }
 }
 
 /// <summary>Returns a single transaction by ID.</summary>
