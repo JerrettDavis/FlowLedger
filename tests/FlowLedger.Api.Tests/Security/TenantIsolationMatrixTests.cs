@@ -26,10 +26,10 @@ namespace FlowLedger.Api.Tests.Security;
 [Collection("ApiIntegration")]
 public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : IAsyncLifetime
 {
-    private const string Secret = "ZZ-A-SECRET";
+    internal const string Secret = "ZZ-A-SECRET";
 
-    private static readonly Guid TenantA = Guid.Parse("a0a0a0a0-0000-4000-8000-00000000000a");
-    private static readonly Guid TenantB = Guid.Parse("b0b0b0b0-0000-4000-8000-00000000000b");
+    internal static readonly Guid TenantA = Guid.Parse("a0a0a0a0-0000-4000-8000-00000000000a");
+    internal static readonly Guid TenantB = Guid.Parse("b0b0b0b0-0000-4000-8000-00000000000b");
 
     public Task InitializeAsync() => factory.ResetAsync();
 
@@ -63,7 +63,7 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
         declared.Except(actual).Should().BeEmpty("manifest entries for routes that no longer exist must be removed");
     }
 
-    private sealed record Seeded(Guid Account, Guid Transaction, Guid Category, Guid RecurringFlow, Guid Asset, Guid SheetBill, Guid Report, Guid Goal)
+    internal sealed record Seeded(Guid Account, Guid Transaction, Guid Category, Guid RecurringFlow, Guid Asset, Guid SheetBill, Guid Report, Guid Goal, Guid Transaction2, Guid Integration)
     {
         public Guid For(string resource) => resource switch
         {
@@ -75,10 +75,12 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             "SheetBill" => SheetBill,
             "Report" => Report,
             "Goal" => Goal,
+            "Transaction2" => Transaction2,
+            "Integration" => Integration,
             _ => throw new ArgumentOutOfRangeException(nameof(resource), resource, null),
         };
 
-        public IEnumerable<Guid> All => [Account, Transaction, Category, RecurringFlow, Asset, SheetBill, Report, Goal];
+        public IEnumerable<Guid> All => [Account, Transaction, Category, RecurringFlow, Asset, SheetBill, Report, Goal, Transaction2, Integration];
     }
 
     private static async Task<Guid> CreateAsync(HttpClient c, string url, object body, HttpMethod? method = null)
@@ -92,7 +94,7 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             : throw new InvalidOperationException($"No id in response from {url}: {text}");
     }
 
-    private static async Task<Seeded> SeedTenantAAsync(HttpClient a)
+    internal static async Task<Seeded> SeedTenantAAsync(HttpClient a)
     {
         var account = await CreateAsync(a, "/api/accounts", new CreateAccountRequest($"{Secret} Checking", "Checking", 1234m, "USD", null, null));
         var transaction = await CreateAsync(a, "/api/transactions",
@@ -111,15 +113,34 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
                 [new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))]));
         var goal = await CreateAsync(a, "/api/goals", new { name = $"{Secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
 
+        var transaction2 = await CreateAsync(a, "/api/transactions",
+            new CreateTransactionRequest(account, 50m, "USD", "Debit", $"{Secret} Coffee", new DateOnly(2026, 1, 15), null, null, null, null));
+        var integrationResponse = await a.PostAsJsonAsync("/api/integrations", new
+        {
+            name = $"{Secret} Hook",
+            kind = "Rest",
+            enabled = true,
+            url = "https://nonexistent.invalid/v1",
+            auth = "None",
+            authUser = (string?)null,
+            credential = (string?)null,
+            clearCredential = false,
+            headers = (object?)null,
+            events = (string[]?)null,
+            soapEndpoint = (string?)null,
+        });
+        integrationResponse.IsSuccessStatusCode.Should().BeTrue("seeding the integration failed");
+        var integration = JsonDocument.Parse(await integrationResponse.Content.ReadAsStringAsync()).RootElement.GetProperty("integration").GetProperty("id").GetGuid();
+
         (await a.PutAsJsonAsync("/api/budgets", new { category = $"{Secret}-budget", monthlyLimit = 111m })).IsSuccessStatusCode.Should().BeTrue();
         (await a.PutAsJsonAsync("/api/category-rules", new { pattern = $"{Secret}-rule", categoryPath = "zz-a-secret" })).IsSuccessStatusCode.Should().BeTrue();
         (await a.PutAsJsonAsync("/api/merchant-aliases", new { pattern = $"{Secret}-alias", alias = $"{Secret} Alias" })).IsSuccessStatusCode.Should().BeTrue();
 
-        return new Seeded(account, transaction, category, flow, asset, bill, report, goal);
+        return new Seeded(account, transaction, category, flow, asset, bill, report, goal, transaction2, integration);
     }
 
     /// <summary>Everything tenant A can read, as text: lists plus every seeded row by id. Used before/after B's attacks.</summary>
-    private static async Task<string> SnapshotAsync(HttpClient a, Seeded s)
+    internal static async Task<string> SnapshotAsync(HttpClient a, Seeded s)
     {
         var urls = TenantIsolationManifest.Routes
             .Where(kv => kv.Value.Kind == RouteKind.List && kv.Key.StartsWith("GET ", StringComparison.Ordinal))
@@ -127,7 +148,8 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             .Where(u => !u.Contains("/export") && !u.Contains("/forecast"))
             .Concat([
                 $"/api/accounts/{s.Account}", $"/api/transactions/{s.Transaction}", $"/api/categories/{s.Category}",
-                $"/api/recurring-flows/{s.RecurringFlow}", $"/api/assets/{s.Asset}", $"/api/reports/{s.Report}"])
+                $"/api/recurring-flows/{s.RecurringFlow}", $"/api/assets/{s.Asset}", $"/api/reports/{s.Report}",
+                $"/api/integrations/{s.Integration}/deliveries"])
             .Order(StringComparer.Ordinal);
         var sb = new StringBuilder();
         foreach (var url in urls)

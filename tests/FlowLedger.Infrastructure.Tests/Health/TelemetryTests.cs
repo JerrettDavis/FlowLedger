@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Health;
@@ -30,7 +31,7 @@ public sealed class TelemetryTests
         FlowLedgerTelemetry.RecordProviderCall("telemetry-test", 200, failed: false);
         FlowLedgerTelemetry.RecordProviderCall("telemetry-test", 429, failed: false);
         FlowLedgerTelemetry.RecordProviderCall("telemetry-test", null, failed: true);
-        FlowLedgerTelemetry.RecordJob("telemetry-job", success: false, TimeSpan.FromSeconds(3), DateTimeOffset.UtcNow);
+        FlowLedgerTelemetry.RecordJob("telemetry-job", success: false, TimeSpan.FromSeconds(3), TestClock.Instant);
 
         lock (seen)
         {

@@ -4,11 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- TinyBDD 0.19.23 source generator emits #nullable enable code that has nullable
-         violations (CS8602, CS8625) and an unused catch variable (CS0168). Suppress only
-         these codes so the generator output does not fail the build. Remove once upstream
-         fixes the generator. -->
-    <NoWarn>$(NoWarn);CS8602;CS8625;CS0168</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,6 +42,7 @@
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Mx\FlowLedger.Integrations.Mx.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

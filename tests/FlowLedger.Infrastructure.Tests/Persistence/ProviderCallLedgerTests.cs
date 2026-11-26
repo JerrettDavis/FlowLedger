@@ -1,6 +1,7 @@
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -17,7 +18,7 @@ public sealed class ProviderCallLedgerTests
     {
         var ledger = new NpgsqlProviderCallLedger(_fixture.ConnectionString);
         var provider = "TEST-" + Guid.NewGuid().ToString("N");
-        var now = DateTimeOffset.UtcNow;
+        var now = TestClock.Instant;
 
         await ledger.RecordAsync(new ProviderCallRecord(provider, "GET", "/users", 200, 12, 100, now));
         await ledger.RecordAsync(new ProviderCallRecord(provider, "GET", "/users", 200, 10, 90, now));

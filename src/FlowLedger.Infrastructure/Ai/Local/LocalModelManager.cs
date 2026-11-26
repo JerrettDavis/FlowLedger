@@ -36,6 +36,7 @@ public sealed class LocalModelManager(
     private readonly object _gate = new();
     private LocalAiDownload? _download;
     private bool _running;
+    private Task _completion = Task.CompletedTask;
 
     public string Directory
     {
@@ -47,6 +48,9 @@ public sealed class LocalModelManager(
             return Path.GetFullPath(dir);
         }
     }
+
+    /// <summary>Completes when the most recently started download has finished (done, failed or cancelled) and released the single-download gate. Lets callers and tests await it instead of polling <see cref="Download"/>.</summary>
+    public Task DownloadCompletion { get { lock (_gate) { return _completion; } } }
 
     public LocalAiDownload? Download { get { lock (_gate) { return _download; } } }
 
@@ -89,7 +93,12 @@ public sealed class LocalModelManager(
 
         // The host's ApplicationStopping token cancels the download on shutdown; a stalled read is cut off by the inactivity timeout.
         var shutdown = lifetime?.ApplicationStopping ?? CancellationToken.None;
-        _ = Task.Run(() => RunAsync(model, shutdown));
+        var run = Task.Run(() => RunAsync(model, shutdown));
+        lock (_gate)
+        {
+            _completion = run;
+        }
+
         return true;
     }
 
