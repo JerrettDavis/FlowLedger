@@ -27,3 +27,5 @@ Enforced by `FlowLedgerThemeContrastTests`: every text-role colour must reach 4.
 | Dark | Warning #FBBF24 | 9.61 | 10.69 | 10.63 |
 | Dark | Error #F87171 | 5.80 | 6.45 | 6.41 |
 | Dark | Text secondary #94A3B8 | 6.26 | 6.96 | 6.92 |
+
+`ThemeContrastExtendedTests` also computes, from the same tokens: label text on every filled control (4.5:1), app bar and drawer text and icons, the CSS-only `--fl-text` / `--fl-muted` chart tokens, and input borders (3:1, WCAG 1.4.11). It led to two token changes: dark-mode filled controls use `#0F172A` label text (MudBlazor's default white gave about 2.5:1 on the dark Primary), and input borders are `#7C8BA1` (light) and `#64748B` (dark) instead of near-invisible hairlines.

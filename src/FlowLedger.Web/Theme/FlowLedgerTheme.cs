@@ -36,7 +36,7 @@ public static class FlowLedgerTheme
             Divider = "#E2E8F0",
             DividerLight = "#EEF2F6",
             LinesDefault = "#E2E8F0",
-            LinesInputs = "#CBD5E1",
+            LinesInputs = "#7C8BA1", // 3:1 against white: input boundaries are UI components (WCAG 1.4.11)
             TableLines = "#E2E8F0",
             TableStriped = "rgba(15,23,42,0.02)",
             TableHover = "rgba(30,64,175,0.05)",
@@ -50,6 +50,14 @@ public static class FlowLedgerTheme
             Error = "#F87171",
             Warning = "#FBBF24",
             Info = "#60A5FA",
+            // MudBlazor's default white label text fails AA on these light dark-mode fills (about 2.5:1 on Primary).
+            PrimaryContrastText = "#0F172A",
+            SecondaryContrastText = "#0F172A",
+            TertiaryContrastText = "#0F172A",
+            SuccessContrastText = "#0F172A",
+            ErrorContrastText = "#0F172A",
+            WarningContrastText = "#0F172A",
+            InfoContrastText = "#0F172A",
             Background = "#0F172A",
             BackgroundGray = "#111827",
             Surface = "#192134",
@@ -62,7 +70,7 @@ public static class FlowLedgerTheme
             TextSecondary = "#94A3B8",
             Divider = "rgba(255,255,255,0.08)",
             LinesDefault = "rgba(255,255,255,0.08)",
-            LinesInputs = "rgba(255,255,255,0.15)",
+            LinesInputs = "#64748B", // 3:1 against the dark surface (WCAG 1.4.11)
             TableLines = "rgba(255,255,255,0.08)",
             TableStriped = "rgba(255,255,255,0.02)",
             TableHover = "rgba(96,165,250,0.08)",
