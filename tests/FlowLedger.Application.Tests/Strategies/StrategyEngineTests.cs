@@ -124,7 +124,7 @@ public class SimulatorTests
     public void Growth_compounds_monthly()
     {
         var pts = Simulators.Grow(10_000m, 0m, 12m, 12);
-        pts[^1].Balance.Should().BeApproximately(11_268.25m, 0.05m); // 1%/month for 12 months
+        pts[^1].Balance.Should().BeApproximately(11_200m, 0.05m); // 12% APY: twelve compounding months equal the quoted effective yield
     }
 
     [Fact]

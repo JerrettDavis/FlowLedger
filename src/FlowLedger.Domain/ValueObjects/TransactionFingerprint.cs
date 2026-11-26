@@ -36,7 +36,8 @@ public sealed record TransactionFingerprint
         }
 
         var raw = string.IsNullOrWhiteSpace(providerTransactionId)
-            ? $"{accountId.Value}|{postedDate:O}|{amount:F4}|{normalizedDescription.ToUpperInvariant()}"
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{accountId.Value}|{postedDate:O}|{amount:F4}|{normalizedDescription.ToUpperInvariant()}")
             : $"pid:{providerTransactionId}|{accountId.Value}";
 
         // Occurrence 0 keeps the historical value so stored fingerprints stay valid; the Nth identical

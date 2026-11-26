@@ -41,7 +41,15 @@ public static class LoanMath
 
 public static class Simulators
 {
-    public const int MaxMonths = 600;
+    /// <summary>Longest simulated horizon: 60 years, matching <see cref="FirePlanner.MaxYears"/>.</summary>
+    public const int MaxMonths = 720;
+
+    /// <summary>
+    /// Monthly rate equivalent to an annual rate quoted as an effective yield (APY): (1 + apy)^(1/12) - 1, so twelve
+    /// compounding months land exactly on the quoted APY rather than flattering it.
+    /// </summary>
+    public static decimal MonthlyRate(decimal apyPercent)
+        => (decimal)(Math.Pow(1.0 + (double)apyPercent / 100.0, 1.0 / 12.0) - 1.0);
 
     /// <summary>Monthly-compounded growth of a starting balance plus recurring contributions.</summary>
     public static IReadOnlyList<GrowthPoint> Grow(decimal start, decimal monthlyContribution, decimal annualRatePercent, int months)
@@ -50,7 +58,7 @@ public static class Simulators
         var points = new List<GrowthPoint>(months + 1) { new(0, Math.Round(start, 2), Math.Round(start, 2), 0m) };
         var balance = start;
         var contributed = start;
-        var rate = annualRatePercent / 1200m;
+        var rate = MonthlyRate(annualRatePercent);
         for (var m = 1; m <= months; m++)
         {
             balance += balance * rate;
@@ -81,7 +89,7 @@ public static class Simulators
     {
         var points = new List<PastPoint>();
         decimal wealth = 0, saved = 0;
-        var growth = growthRatePercent / 1200m;
+        var growth = MonthlyRate(growthRatePercent);
         var spread = idleCash * (toRate - fromRate) / 1200m;
         foreach (var (month, extra) in extraByMonth)
         {

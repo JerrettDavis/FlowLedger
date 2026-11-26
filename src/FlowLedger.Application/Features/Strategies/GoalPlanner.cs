@@ -27,7 +27,7 @@ public static class GoalPlanner
     {
         var path = new List<decimal>(months + 1) { start };
         var bal = start;
-        var rate = apy / 1200m;
+        var rate = Simulators.MonthlyRate(apy);
         for (var m = 1; m <= months; m++)
         {
             bal += bal * rate + monthly + (m > boostAfter ? boost : 0m);
@@ -45,7 +45,7 @@ public static class GoalPlanner
         }
 
         var bal = start;
-        var rate = apy / 1200m;
+        var rate = Simulators.MonthlyRate(apy);
         for (var m = 1; m <= MaxMonths; m++)
         {
             bal += bal * rate + monthly + (m > boostAfter ? boost : 0m);
@@ -66,7 +66,7 @@ public static class GoalPlanner
             return Math.Max(0, target - start);
         }
 
-        var r = (double)apy / 1200.0;
+        var r = (double)Simulators.MonthlyRate(apy);
         var growth = Math.Pow(1 + r, months);
         var need = (double)target - (double)start * growth;
         if (need <= 0)

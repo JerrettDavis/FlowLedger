@@ -462,10 +462,7 @@ public sealed class ForecastEngine : IForecastEngine
         decimal? requiredMonthly = null;
         if (goal.TargetDate.HasValue && goal.TargetDate.Value > asOf)
         {
-            var monthsLeft = MonthsBetween(asOf, goal.TargetDate.Value);
-            requiredMonthly = monthsLeft > 0
-                ? Math.Round(remaining.Amount / monthsLeft, 2)
-                : null;
+            requiredMonthly = Goals.GoalMath.MonthlyNeeded(remaining.Amount, goal.TargetDate, asOf);
         }
 
         // Find earliest date where the projected account balance exceeds remaining amount
@@ -473,14 +470,21 @@ public sealed class ForecastEngine : IForecastEngine
         DateOnly? affordableBy = null;
         if (linkedSeries is not null)
         {
-            // Walk the series; find first point where balance >= remaining
-            var runningBalance = linkedSeries.StartingBalance;
-            foreach (var point in linkedSeries.Points)
+            if (linkedSeries.StartingBalance >= remaining)
             {
-                if (point.Balance >= remaining)
+                // The linked account already covers the goal as of asOf, with or without any scheduled events.
+                affordableBy = asOf;
+            }
+            else
+            {
+                // Walk the series; find first point where balance >= remaining
+                foreach (var point in linkedSeries.Points)
                 {
-                    affordableBy = point.Date;
-                    break;
+                    if (point.Balance >= remaining)
+                    {
+                        affordableBy = point.Date;
+                        break;
+                    }
                 }
             }
         }
@@ -505,12 +509,4 @@ public sealed class ForecastEngine : IForecastEngine
     /// </summary>
     private static Money SignedDelta(Money amount, TransactionDirection direction) =>
         direction == TransactionDirection.Credit ? amount : amount.Negate();
-
-    private static decimal MonthsBetween(DateOnly from, DateOnly to)
-    {
-        var months = (to.Year - from.Year) * 12 + (to.Month - from.Month);
-        // Add fractional month from day difference
-        var dayFraction = (to.Day - from.Day) / 30m;
-        return Math.Max(0m, months + dayFraction);
-    }
 }

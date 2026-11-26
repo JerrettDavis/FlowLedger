@@ -107,5 +107,5 @@ public sealed record Money
         }
     }
 
-    public override string ToString() => $"{Amount:F2} {Currency.Code}";
+    public override string ToString() => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Amount:F2} {Currency.Code}");
 }
