@@ -27,6 +27,6 @@ public sealed class FlowLedgerDbContextFactory : IDesignTimeDbContextFactory<Flo
         return new FlowLedgerDbContext(
             optionsBuilder.Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext: null);
+            UnscopedTenantContext.Instance);
     }
 }

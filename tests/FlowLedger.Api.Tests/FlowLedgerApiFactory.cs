@@ -123,7 +123,7 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name));
 
         // Null tenant context → no query filters / no tenant resolution required.
-        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), tenantContext: null);
+        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), UnscopedTenantContext.Instance);
     }
 
     private sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher

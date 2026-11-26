@@ -13,7 +13,8 @@ namespace FlowLedger.Infrastructure.Persistence;
 ///
 /// Multi-tenancy (PLAN §13): every aggregate root receives a global query filter keyed off
 /// <see cref="ITenantContext.TenantId"/>. All queries are automatically scoped to the
-/// current tenant. Tests may inject a <c>null</c> tenant context to disable the filter.
+/// current tenant. A tenant context is mandatory; admin, design-time and restore-drill code
+/// passes <see cref="UnscopedTenantContext.Instance"/> explicitly to opt out of the filter.
 ///
 /// Domain events (PLAN §9): on <see cref="SaveChangesAsync"/> all uncommitted domain events
 /// are collected from tracked aggregate roots, then dispatched after the database transaction
@@ -21,10 +22,17 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// </summary>
 public sealed class FlowLedgerDbContext : DbContext
 {
-    private readonly ITenantContext? _tenantContext;
+    private readonly ITenantContext _tenantContext;
 
-    /// <summary>The tenant this context is scoped to (null at design time / in tenant-free contexts).</summary>
-    internal Guid? CurrentTenantId => _tenantContext?.TenantId;
+    /// <summary>True for the explicit admin/design-time scope (<see cref="UnscopedTenantContext"/>).</summary>
+    internal bool IsUnscoped => _tenantContext is UnscopedTenantContext;
+
+    /// <summary>The tenant this context is scoped to; null only for an explicitly unscoped context.</summary>
+    internal Guid? CurrentTenantId => IsUnscoped ? null : _tenantContext.TenantId;
+
+    // Read by the query filters at query time (EF parameterises context members), so the
+    // cached model is identical for every context and never depends on who built it first.
+    private Guid FilterTenantGuid => IsUnscoped ? Guid.Empty : _tenantContext.TenantId;
     private readonly IDomainEventDispatcher _eventDispatcher;
 
     // ── DbSets ────────────────────────────────────────────────────────────────
@@ -49,11 +57,11 @@ public sealed class FlowLedgerDbContext : DbContext
     public FlowLedgerDbContext(
         DbContextOptions<FlowLedgerDbContext> options,
         IDomainEventDispatcher eventDispatcher,
-        ITenantContext? tenantContext = null)
+        ITenantContext tenantContext)
         : base(options)
     {
         _eventDispatcher = eventDispatcher;
-        _tenantContext = tenantContext;
+        _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
     // ── Model building ───────────────────────────────────────────────────────
@@ -76,48 +84,30 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SheetPaymentRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
-        // If _tenantContext is null (design-time or test override), filters are
-        // omitted so migrations and cross-tenant admin queries can work.
-        if (_tenantContext is not null)
-        {
-            // The filter expression is stored as an expression tree. EF Core evaluates
-            // it against the current context instance on each query. Closing over
-            // _tenantContext (an instance field) ensures the correct tenant ID is used
-            // per context — provided service provider caching is disabled so each
-            // context builds its own model (see AddInfrastructure / test fixture).
-            modelBuilder.Entity<Account>()
-                .HasQueryFilter(a => EF.Property<TenantId>(a, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Transaction>()
-                .HasQueryFilter(t => EF.Property<TenantId>(t, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<RecurringFlow>()
-                .HasQueryFilter(rf => EF.Property<TenantId>(rf, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Category>()
-                .HasQueryFilter(c => EF.Property<TenantId>(c, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<Asset>()
-                .HasQueryFilter(a => EF.Property<TenantId>(a, "TenantId") == TenantId.From(_tenantContext!.TenantId));
-
-            modelBuilder.Entity<SyncCursorRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<ProviderConnectionRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<AccountBalanceSnapshotRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SavedReportRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SheetBillRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-
-            modelBuilder.Entity<SheetPaymentRecord>()
-                .HasQueryFilter(r => r.TenantId == _tenantContext!.TenantId);
-        }
+        // Always built (never conditional on the tenant context). The tenant is read from the
+        // context instance at query time, and an explicitly unscoped context bypasses the filter.
+        modelBuilder.Entity<Account>()
+            .HasQueryFilter(a => IsUnscoped || EF.Property<TenantId>(a, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Transaction>()
+            .HasQueryFilter(t => IsUnscoped || EF.Property<TenantId>(t, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<RecurringFlow>()
+            .HasQueryFilter(rf => IsUnscoped || EF.Property<TenantId>(rf, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Category>()
+            .HasQueryFilter(c => IsUnscoped || EF.Property<TenantId>(c, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<Asset>()
+            .HasQueryFilter(a => IsUnscoped || EF.Property<TenantId>(a, "TenantId") == TenantId.From(FilterTenantGuid));
+        modelBuilder.Entity<SyncCursorRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<ProviderConnectionRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<AccountBalanceSnapshotRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SavedReportRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SheetBillRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<SheetPaymentRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 
     // ── SaveChanges ──────────────────────────────────────────────────────────
@@ -165,7 +155,7 @@ public sealed class FlowLedgerDbContext : DbContext
     /// </summary>
     private void StampTenantId()
     {
-        if (_tenantContext is null)
+        if (IsUnscoped)
         {
             return;
         }
