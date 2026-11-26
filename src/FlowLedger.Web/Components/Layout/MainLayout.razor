@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 @inject IDialogService DialogService
 @inject ThemeService ThemeService
+@inject DisplaySettingsService DisplayService
 @inject PersistentComponentState Persisted
 @implements IDisposable
 
@@ -149,6 +150,7 @@
     private string _environment => _status.Environment;
     private string? _backupAlert => _status.BackupAlert;
     private const string StatusStateKey = "fl-layout-status";
+    private const string DisplayStateKey = "fl-display-settings";
     private PersistingComponentStateSubscription _persistSubscription;
     private string? _dismissedBackupAlert;
     private const string DismissKey = "fl-backup-alert-dismissed";
@@ -295,12 +297,27 @@
 
     // ── Connect & Sync ───────────────────────────────────────────────────────
 
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
+        // Display currency/locale: read from the cookie on the prerender request, then carried to the circuit.
+        if (HttpContext is { } http)
+        {
+            DisplayService.Set(DisplayCultureMiddleware.ReadSettings(http));
+        }
+        else if (Persisted.TryTakeFromJson<DisplaySettings>(DisplayStateKey, out var display) && display is not null)
+        {
+            DisplayService.Set(display);
+        }
+
+        DisplayService.ApplyToCurrentThread();
+
         // Prerender loads the status once and hands it to the interactive circuit, so a page load
         // issues one set of API calls (both in parallel) instead of two sequential sets.
         _persistSubscription = Persisted.RegisterOnPersisting(() =>
         {
+            Persisted.PersistAsJson(DisplayStateKey, DisplayService.Current);
             if (_status.IsKnown)
             {
                 Persisted.PersistAsJson(StatusStateKey, _status);
