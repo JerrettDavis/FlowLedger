@@ -21,7 +21,7 @@ public interface IMerchantAliasStore
 /// </summary>
 public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizationStore transactions)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
     public const int MaxLength = 200;
     public const int MaxAliases = 1000;
 

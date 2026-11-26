@@ -11,7 +11,7 @@ public sealed record EnrichmentResult(int Tagged, int Named);
 /// </summary>
 public sealed class TransactionEnrichmentService(ICategorizationStore store)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public async Task<EnrichmentResult> RunAsync(CancellationToken ct = default)
     {

@@ -79,7 +79,7 @@ public sealed class InvestmentPerformanceService(
     ITransactionRepository transactions,
     IBalanceHistoryReader history)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
 
     public async Task<IReadOnlyList<AccountPerformance>> GetAsync(DateOnly today, CancellationToken ct = default, DateOnly? from = null, DateOnly? to = null)
     {
