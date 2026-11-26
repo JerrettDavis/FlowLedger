@@ -12,8 +12,8 @@ operating contract for keeping it safe. Everything below is implemented and cove
 | Scheduled backup | Daily 03:15 (Worker): verified snapshot, **restore drill**, then an encrypted off-site copy via restic. Every run is recorded and shown on **Data & Backups**. | `~/.flowledger/backups/backup-*` |
 | Restore drill | Each backup is restored into a scratch database (migrations applied up to the snapshot's version) and every table's row count is compared with the manifest. | automatic |
 | Portable export | One CSV per table + `manifest.json` (SHA-256 and row counts), as a zip. Importable into an **empty** database only. | UI button / `GET /api/data/export` |
-| `backup.sh` | Linux/macOS twin of `backup.ps1`; CI runs backup -> restore -> row-count compare with it on every push and PR |
-| `restore.sh` | Linux/macOS twin of `restore.ps1` (restores into a scratch database, prints row counts) |
+| `backup.sh` | Linux/macOS twin of `backup.ps1`; CI runs backup -> restore -> row-count compare with it on every push and PR | `eng/scripts/` |
+| `restore.sh` | Linux/macOS twin of `restore.ps1` (restores into a scratch database, prints row counts) | `eng/scripts/` |
 | `backup.ps1` | Independent `pg_dump` + archive copy (uses Docker); still available for manual full dumps. | `eng/scripts/` |
 
 A snapshot is a consistent (single repeatable-read transaction) `COPY ... TO CSV` of every public table. It needs only the
