@@ -54,7 +54,7 @@ FlowLedger combines four traditionally separate tools into one system:
 | Scheduler | Quartz.NET |
 | Identity / Auth | ASP.NET Core Identity + OpenIddict |
 | Testing | xUnit, FluentAssertions, Testcontainers, Playwright E2E, TinyBDD, PatternKit.Core (dogfooded) |
-| Observability | OpenTelemetry, Serilog, Aspire dashboard |
+| Observability | OpenTelemetry, Aspire dashboard |
 | Security | CodeQL, Dependabot, SCA via dotnet list package --vulnerable |
 | CI / CD | GitHub Actions |
 

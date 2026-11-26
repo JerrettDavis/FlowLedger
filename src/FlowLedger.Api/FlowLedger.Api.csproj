@@ -12,8 +12,9 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.AspNetCore" />
-    <!-- Serilog core: provides ILogEventEnricher for SensitivePropertyMaskingEnricher
-         (defense-in-depth log redaction). Full pipeline wiring deferred — see Program.cs. -->
+    <!-- Serilog core: provides ILogEventEnricher for SensitivePropertyMaskingEnricher.
+         NOTE: the enricher is NOT registered in any logging pipeline (the app logs through the default
+         Microsoft logger and OpenTelemetry), so it redacts nothing at runtime. See SECURITY.md. -->
     <PackageReference Include="Serilog" />
   </ItemGroup>
 

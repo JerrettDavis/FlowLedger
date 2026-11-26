@@ -7,10 +7,11 @@ namespace FlowLedger.Api.Logging;
 /// Serilog enricher that walks all log event properties and replaces the values of
 /// properties whose names match known-sensitive patterns with "[REDACTED]".
 ///
-/// Defense-in-depth: callers should avoid logging sensitive values in the first place.
-/// SECURITY convention: any new property whose name contains token / apikey / secret /
-/// password / accountnumber / cardnumber / ssn / authorization / bearertoken / key
-/// will be masked automatically. Do not rely on this as the primary protection.
+/// NOT WIRED: this enricher is not registered in any logging pipeline (the app uses the default
+/// Microsoft logger and OpenTelemetry, not Serilog), so it currently masks nothing at runtime; it
+/// is exercised only by direct unit tests. Callers must avoid logging sensitive values in the first
+/// place. If it is ever wired, properties whose name contains token / apikey / secret / password /
+/// accountnumber / cardnumber / ssn / authorization / bearertoken / key would be masked.
 /// </summary>
 public sealed class SensitivePropertyMaskingEnricher : ILogEventEnricher
 {
