@@ -7,6 +7,7 @@ using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.ServiceDefaults;
 using FlowLedger.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -129,6 +130,10 @@ builder.Services.AddRateLimiter(opts =>
     opts.AddFixedWindowPolicy("webhook", permitLimit: 30, queueLimit: 0); // No queue; reject immediately.
 });
 
+// Opt-in forwarded headers (ForwardedHeaders:Enabled + KnownProxies/KnownNetworks): without it, behind a proxy the rate limiter and
+// the loopback guard see the proxy address.
+var trustForwardedHeaders = builder.AddFlowLedgerForwardedHeaders();
+
 var app = builder.Build();
 
 // A signing key only adds protection if it is strong and distinct from the API key; refuse to start with a useless one.
@@ -179,6 +184,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 app.UseExceptionHandler();
 app.UseSecureHeaders();
 

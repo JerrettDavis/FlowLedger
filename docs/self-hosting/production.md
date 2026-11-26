@@ -247,7 +247,7 @@ more than one web replica each would use a different ring and sign-in would brea
 
 ## Reverse proxy / TLS
 
-If a proxy terminates TLS in front of the Web app, set `ForwardedHeaders__Enabled=true` so the OIDC `redirect_uri` is built as https from `X-Forwarded-Proto`/`Host`. Enable it only when the Web port is reachable solely through that proxy; otherwise clients could spoof those headers.
+If a proxy terminates TLS in front of the Web app (or the API), set `ForwardedHeaders__Enabled=true` **and** name the proxy: `ForwardedHeaders__KnownProxies=<ip>[,<ip>]` and/or `ForwardedHeaders__KnownNetworks=<cidr>[,<cidr>]` (the address the app sees, e.g. the compose bridge gateway `172.18.0.0/16`). The app refuses to start if forwarding is enabled without either, and headers from any other caller are ignored. `X-Forwarded-Host` is honoured only when `AllowedHosts` is restricted (e.g. `AllowedHosts=flowledger.example.com;localhost`); outside Development a startup warning is logged while `AllowedHosts` is `*`. Include `localhost` (or whatever your container health check uses) in `AllowedHosts`.
 
 ## Many tenants
 
