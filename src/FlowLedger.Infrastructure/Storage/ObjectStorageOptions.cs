@@ -4,7 +4,7 @@ namespace FlowLedger.Infrastructure.Storage;
 /// Configuration for the local-disk object storage implementation.
 /// Bind from the "ObjectStorage" configuration section.
 /// </summary>
-public sealed class ObjectStorageOptions
+internal sealed class ObjectStorageOptions
 {
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "ObjectStorage";

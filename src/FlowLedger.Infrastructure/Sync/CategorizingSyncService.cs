@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// <summary>
 /// Runs merchant aliasing, auto-categorization, then name-suggestion + auto-tagging after each successful sync. A failure in either never fails the sync.
 /// </summary>
-public sealed class CategorizingSyncService(
+internal sealed class CategorizingSyncService(
     IFinancialSyncService inner,
     CategorizationService categorizer,
     MerchantAliasService aliases,

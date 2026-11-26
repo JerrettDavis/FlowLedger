@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// they are joined by configured owner identity, by verified email, or by redeeming a link code from a signed-in login.
 /// Everything here is additive: no statement deletes or rewrites tenant data.
 /// </summary>
-public sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantClaim legacy) : IUserDirectory
+internal sealed class NpgsqlUserDirectory(string connectionString, LegacyTenantClaim legacy) : IUserDirectory
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS app_users (

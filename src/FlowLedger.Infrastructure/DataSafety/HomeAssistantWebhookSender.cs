@@ -12,7 +12,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// (<see cref="CreateHandler"/>), and failures are reduced to a short safe summary: neither the URL nor the response body is
 /// ever logged or stored.
 /// </summary>
-public sealed class HomeAssistantWebhookSender(IHttpClientFactory http) : IHomeAssistantSender
+internal sealed class HomeAssistantWebhookSender(IHttpClientFactory http) : IHomeAssistantSender
 {
     public const string HttpClientName = "home-assistant";
 
@@ -78,7 +78,7 @@ public sealed class HomeAssistantWebhookSender(IHttpClientFactory http) : IHomeA
 }
 
 /// <summary>Only the household (operator) tenant may target local-network addresses; every other tenant is public-https only.</summary>
-public sealed class HouseholdHomeAssistantNetworkPolicy(IConfiguration configuration) : IHomeAssistantNetworkPolicy
+internal sealed class HouseholdHomeAssistantNetworkPolicy(IConfiguration configuration) : IHomeAssistantNetworkPolicy
 {
     public bool AllowLocalNetwork(Guid tenantId) => tenantId == TenancySettings.Legacy(configuration).LegacyTenantId;
 }

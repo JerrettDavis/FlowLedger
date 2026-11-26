@@ -5,7 +5,7 @@ using FlowLedger.Application.Features.Query;
 namespace FlowLedger.Infrastructure.Ai;
 
 /// <summary>Settings for the local model server (section "Ai:Ollama"). Nothing here ever points off-machine by default.</summary>
-public sealed class OllamaOptions
+internal sealed class OllamaOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "qwen3:8b";
@@ -17,7 +17,7 @@ public sealed class OllamaOptions
 }
 
 /// <summary>Talks to a local Ollama server. Temperature 0 and thinking off so the same question yields the same query, fast.</summary>
-public sealed class OllamaQueryTranslator(HttpClient http, OllamaOptions options) : IQueryTranslator
+internal sealed class OllamaQueryTranslator(HttpClient http, OllamaOptions options) : IQueryTranslator
 {
     public async Task<string> CompleteAsync(string system, IReadOnlyList<(string Role, string Content)> conversation, CancellationToken ct = default)
     {

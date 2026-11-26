@@ -17,7 +17,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// This is registered via AddDatabaseMigrationService() — call that from the
 /// API/Worker host startup only in Development.
 /// </summary>
-public sealed class DatabaseMigrationService : IHostedService
+internal sealed class DatabaseMigrationService : IHostedService
 {
     /// <summary>Advisory-lock name shared by every process that may apply migrations.</summary>
 

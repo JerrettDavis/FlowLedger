@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// has a row; the user directory keeps it in step (active / orphaned) and erasure marks it deleted but never removes it.
 /// The key column is <c>id</c> (not <c>tenant_id</c>) because this table is the registry itself, not tenant-owned data.
 /// </summary>
-public sealed class NpgsqlTenantRegistry(string connectionString) : ITenantRegistry
+internal sealed class NpgsqlTenantRegistry(string connectionString) : ITenantRegistry
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS tenants (

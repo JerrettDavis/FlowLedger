@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// lists stay current without the user doing anything. Everything less certain waits as a suggestion. A failure here never
 /// fails the sync.
 /// </summary>
-public sealed class RecurringFlowSyncService(
+internal sealed class RecurringFlowSyncService(
     IFinancialSyncService inner,
     RecurringSuggestionService suggestions,
     bool autoAdd,

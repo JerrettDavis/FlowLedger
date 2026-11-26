@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// several concurrent deliveries of the same body (on any instance) is treated as new. Holds hashes and timestamps only, no payload and
 /// no tenant data; old rows are pruned opportunistically.
 /// </summary>
-public sealed class NpgsqlWebhookReplayStore(string connectionString) : IWebhookReplayStore
+internal sealed class NpgsqlWebhookReplayStore(string connectionString) : IWebhookReplayStore
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS webhook_replays (

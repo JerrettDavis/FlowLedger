@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// Native-load or model errors degrade to the fallback and surface in <see cref="GetStatus"/>; they never throw into callers
 /// (except in mode "Onnx", which is explicit about never falling back).
 /// </summary>
-public sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, IDisposable
+internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, IDisposable
 {
     private readonly LocalAiOptions _options;
     private readonly LocalModelManager _models;

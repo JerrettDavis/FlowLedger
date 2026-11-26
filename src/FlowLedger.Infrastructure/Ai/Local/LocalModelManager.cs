@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// Owns the model directory: reports what is installed, downloads catalog models (explicit, owner-initiated, one at a time,
 /// size- and SHA-256-verified, atomically moved into place) and removes them. Nothing downloads at startup.
 /// </summary>
-public sealed class LocalModelManager(
+internal sealed class LocalModelManager(
     LocalAiOptions options,
     IHttpClientFactory http,
     ILogger<LocalModelManager> logger,

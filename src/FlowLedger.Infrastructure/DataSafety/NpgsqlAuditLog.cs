@@ -27,7 +27,7 @@ public interface IAuditLog
 /// Postgres-backed <see cref="IAuditLog"/> (<c>audit_events</c>, created on first use like the other ad hoc tables, so it is part
 /// of every snapshot/backup and needs no EF migration). Rows are only ever inserted by this class.
 /// </summary>
-public sealed class NpgsqlAuditLog(string connectionString) : IAuditLog
+internal sealed class NpgsqlAuditLog(string connectionString) : IAuditLog
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS audit_events (
