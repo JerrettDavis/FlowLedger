@@ -9,6 +9,8 @@
     <!-- High and critical advisories in any dependency (including transitive) fail the build; low/moderate stay warnings. -->
     <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Per-rule severities live in .editorconfig (see the #113 ratchet plan there). -->
+    <AnalysisMode>Recommended</AnalysisMode>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <RootNamespace>$(MSBuildProjectName.Replace('-', '_'))</RootNamespace>
     <Authors>FlowLedger contributors</Authors>
