@@ -83,8 +83,8 @@ See [local-dev.md](../development/local-dev.md) for the full Aspire workflow.
 * **Healthchecks.** The chiseled runtime images have no shell or curl, so the api and web images carry a static
   `healthprobe` binary (built from `scripts/healthprobe`). `docker compose ps` shows `healthy`/`unhealthy` for
   postgres, redis, api (`/health`) and web (`/alive`); web and worker start only after the api is healthy. The worker has
-  no HTTP endpoint and therefore no healthcheck. `/health` only reflects the database once the API registers a database
-  readiness check; until then stopping postgres does not turn the api unhealthy.
+  no HTTP endpoint, so its healthcheck runs `dotnet FlowLedger.Worker.dll --healthcheck` (scheduler heartbeat file).
+  `/health` includes the Postgres readiness check, so stopping postgres turns the api unhealthy.
 * **Containers.** api, web and worker run with `cap_drop: ALL`, `no-new-privileges`, a read-only root filesystem
   (writable: the `objects_data` and `backups_data` volumes and a 128 MiB `/tmp` tmpfs), and `pids_limit`. postgres and redis
   drop all capabilities except those their entrypoints need to chown their data directory and step down to their own user.

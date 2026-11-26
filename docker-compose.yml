@@ -26,8 +26,8 @@
 #   contain /usr/local/bin/healthprobe, a tiny static binary built from
 #   scripts/healthprobe (exit 0 only on a 2xx answer). The api is gated on
 #   /health, web on /alive; web and worker wait for the api to be healthy.
-#   The worker is a Generic Host with no HTTP endpoint, so it has no healthcheck
-#   (restart: unless-stopped only covers a crashed process).
+#   The worker is a Generic Host with no HTTP endpoint; it refreshes a heartbeat file
+#   while its Quartz scheduler runs and is probed with `FlowLedger.Worker.dll --healthcheck`.
 
 # ── Shared environment fragments ──────────────────────────────────────────────
 x-db-env: &db-env
@@ -194,8 +194,8 @@ services:
       redis:
         condition: service_healthy
     # Self-contained probe (no shell/curl in the chiseled image): see scripts/healthprobe.
-    # /health runs every registered health check (becomes a real database readiness
-    # gate once the API registers one). start_period covers EF migrations at startup.
+    # /health runs every registered check (Postgres + migrations, Redis, backup freshness), so a
+    # database outage marks the api unhealthy. start_period covers EF migrations at startup.
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthprobe", "http://127.0.0.1:8080/health", "4"]
       interval: 15s
@@ -270,11 +270,14 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
-    # Worker is a Generic Host — no HTTP server, so there is nothing for a probe to hit.
-    # Liveness is only inferred from the process (restart: unless-stopped); the explicit
-    # disable keeps `docker compose ps` from reporting a misleading status.
+    # Generic Host, no HTTP server: the probe checks the scheduler heartbeat file (refreshed every
+    # 15 s in /tmp, a tmpfs; stale after 60 s). No shell/curl in the chiseled image, hence dotnet.
     healthcheck:
-      disable: true
+      test: ["CMD", "dotnet", "/app/FlowLedger.Worker.dll", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 # Postgres and Redis sit on `backend` only (api + worker); web shares only `frontend` with the api.
 networks:
