@@ -246,9 +246,15 @@ public sealed class FlowLedgerApiClient
         int skip = 0,
         int take = 100,
         CancellationToken ct = default,
-        bool includeHidden = false)
+        bool includeHidden = false,
+        string? search = null)
     {
         var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            qs.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        }
+
         if (includeHidden)
         {
             qs.Add("includeHidden=true");
