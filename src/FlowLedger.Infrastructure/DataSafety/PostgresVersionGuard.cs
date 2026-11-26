@@ -38,7 +38,8 @@ public static class PostgresVersionGuard
 
     public static async Task<int> ReadServerVersionNumAsync(string connectionString, CancellationToken ct)
     {
-        await using var conn = new NpgsqlConnection(connectionString);
+        var builder = new NpgsqlConnectionStringBuilder(connectionString) { Timeout = 10, CommandTimeout = 10 };
+        await using var conn = new NpgsqlConnection(builder.ConnectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand("SHOW server_version_num", conn);
         return int.Parse((string)(await cmd.ExecuteScalarAsync(ct))!, CultureInfo.InvariantCulture);

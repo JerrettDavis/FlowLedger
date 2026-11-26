@@ -11,7 +11,8 @@ Postgres-specific features, and no other provider is referenced).
 | Automated tests (Testcontainers) | `postgres:17-alpine` |
 
 PostgreSQL 17 is the only version the project builds and tests against. Other versions may work but are untested; a managed
-service should be pinned to 17.
+service should be pinned to 17. At startup the api and worker check `server_version_num`: they refuse to start on a
+server older than PostgreSQL 16 (clear error naming the version) and log a warning on any major other than 17.
 
 ## Connecting
 
