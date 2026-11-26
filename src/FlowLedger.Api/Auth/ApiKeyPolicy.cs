@@ -98,11 +98,8 @@ public static class ApiKeyPolicy
             return ApiKeyMatch.None;
         }
 
-        var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(supplied));
-        var current = !string.IsNullOrEmpty(options.Key)
-            && CryptographicOperations.FixedTimeEquals(suppliedHash, SHA256.HashData(Encoding.UTF8.GetBytes(options.Key)));
-        var previous = !string.IsNullOrEmpty(options.PreviousKey)
-            && CryptographicOperations.FixedTimeEquals(suppliedHash, SHA256.HashData(Encoding.UTF8.GetBytes(options.PreviousKey)));
+        var current = FlowLedger.SharedKernel.ConstantTime.SecretEquals(supplied, options.Key);
+        var previous = FlowLedger.SharedKernel.ConstantTime.SecretEquals(supplied, options.PreviousKey);
 
         // Evaluate both before branching so timing does not reveal which key matched.
         return current ? ApiKeyMatch.Current : previous ? ApiKeyMatch.Previous : ApiKeyMatch.None;
