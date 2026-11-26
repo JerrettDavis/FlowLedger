@@ -23,7 +23,8 @@ dotnet test tests/FlowLedger.Api.Tests
 
 ### BDD Tests
 
-TinyBDD + xUnit. Plain-English scenarios in `.feature`-style specs.
+TinyBDD + xUnit. Code-first Given/When/Then scenarios (no Gherkin `.feature` files); see [ADR 0002](../adr/0002-bdd-library.md).
+Every scenario is a `[DockerFact]` and skips without Docker. The suite currently has six scenarios, a small slice of the behaviour.
 
 ```bash
 dotnet test tests/FlowLedger.Bdd.Tests
