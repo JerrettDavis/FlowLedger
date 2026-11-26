@@ -86,6 +86,6 @@ created by another major version, so the container will refuse to start. Use a d
 
 ## Migrations
 
-In compose the API applies pending migrations at startup (`Database__MigrateOnStartup=true`). A verified `premigrate-*` snapshot is taken first for a database that
+In compose a one-shot `migrate` service (`dotnet FlowLedger.Api.dll --migrate`) applies pending migrations before the api and worker start; the api itself does not migrate in Production unless `DATABASE__MIGRATEONSTARTUP=true` (Development always auto-migrates). A verified `premigrate-*` snapshot is taken first for a database that
 already has data, and startup aborts if the snapshot fails (see backups-and-recovery.md). Run only one version of the app against
 a database during an upgrade.
