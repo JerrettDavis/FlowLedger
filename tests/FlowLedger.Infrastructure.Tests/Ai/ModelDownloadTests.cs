@@ -95,6 +95,97 @@ public class ModelDownloadTests : IDisposable
         m.TryStartDownload(ModelCatalog.MiniLm, out _).Should().BeTrue("a failed download must not wedge the manager");
     }
 
+    /// <summary>A body that sends a few bytes then never produces another one (a stalled CDN connection).</summary>
+    private sealed class StalledStream : Stream
+    {
+        private bool _sentFirst;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (!_sentFirst)
+            {
+                _sentFirst = true;
+                buffer.Span[0] = 1;
+                return 1;
+            }
+
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+    }
+
+    [Fact]
+    public async Task Stalled_stream_is_aborted_by_the_inactivity_timeout_and_the_manager_is_not_wedged()
+    {
+        var manager = new LocalModelManager(
+            new LocalAiOptions { ModelDirectory = _dir, DownloadInactivityTimeout = TimeSpan.FromMilliseconds(200) },
+            new Factory(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) }),
+            NullLogger<LocalModelManager>.Instance);
+        manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
+
+        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
+        {
+            await Task.Delay(25);
+        }
+
+        manager.Download!.State.Should().Be("Failed");
+        manager.Download.Error.Should().Contain("stalled");
+        Directory.GetFiles(_dir).Should().BeEmpty("a failed download must not leave a .partial file behind");
+        manager.TryStartDownload(ModelCatalog.MiniLm, out _).Should().BeTrue("the stalled download must release the single-download gate");
+
+        // Let the second (also stalled) attempt finish so its file handle is released before the temp dir is removed.
+        await Task.Delay(50);
+        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
+        {
+            await Task.Delay(25);
+        }
+    }
+
+    [Fact]
+    public async Task Host_shutdown_cancels_the_running_download_and_removes_the_partial_file()
+    {
+        using var lifetime = new FakeLifetime();
+        var manager = new LocalModelManager(
+            new LocalAiOptions { ModelDirectory = _dir, DownloadInactivityTimeout = TimeSpan.FromMinutes(5) },
+            new Factory(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) }),
+            NullLogger<LocalModelManager>.Instance,
+            lifetime);
+        manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
+        await Task.Delay(100);
+
+        lifetime.Stop();
+
+        for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
+        {
+            await Task.Delay(25);
+        }
+
+        manager.Download!.State.Should().Be("Failed");
+        manager.Download.Error.Should().Contain("cancel");
+        Directory.GetFiles(_dir).Should().BeEmpty();
+    }
+
+    private sealed class FakeLifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime, IDisposable
+    {
+        private readonly CancellationTokenSource _stopping = new();
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => _stopping.Token;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() => _stopping.Cancel();
+        public void Stop() => _stopping.Cancel();
+        public void Dispose() => _stopping.Dispose();
+    }
+
     [Fact]
     public void Prompt_text_strips_control_characters_and_caps_length()
     {
