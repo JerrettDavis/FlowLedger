@@ -2,53 +2,6 @@ namespace FlowLedger.Web.ApiClient;
 
 // ── Transaction ───────────────────────────────────────────────────────────────
 
-public sealed record TransactionDto(
-    Guid Id,
-    Guid AccountId,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string Description,
-    string Status,
-    string Source,
-    DateOnly EffectiveDate,
-    DateOnly? PostedDate,
-    Guid? CategoryId,
-    string? MerchantName,
-    string? Notes,
-    string? Fingerprint,
-    DateTimeOffset CreatedAt,
-    string? SuggestedName = null,
-    List<string>? Tags = null,
-    List<TransactionSplitDto>? Splits = null);
-
-public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);
-
-public sealed record FlaggedTransactionDto(TransactionDto Transaction, List<string> Reasons);
-
-public sealed record DashboardActivityDto(
-    List<TransactionDto> RecentPosted,
-    List<TransactionDto> Pending,
-    decimal PendingNetAmount,
-    List<TransactionDto> Large,
-    decimal LargeThreshold,
-    List<FlaggedTransactionDto> Suspicious,
-    decimal MoneyInLast30Days,
-    decimal MoneyOutLast30Days,
-    int TransfersExcluded = 0);
-
-public sealed record CreateTransactionRequest(
-    Guid AccountId,
-    decimal Amount,
-    string Currency,
-    string Direction,
-    string Description,
-    DateOnly EffectiveDate,
-    DateOnly? PostedDate,
-    Guid? CategoryId,
-    string? MerchantName,
-    string? Notes);
-
 // ── RecurringFlow ─────────────────────────────────────────────────────────────
 
 public sealed record RecurringFlowDto(

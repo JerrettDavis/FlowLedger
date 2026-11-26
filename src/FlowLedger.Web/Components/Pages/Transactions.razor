@@ -92,7 +92,7 @@
     </EmptyState>
 }
 
-<MudDataGrid T="FlowLedger.Web.ApiClient.TransactionDto"
+<MudDataGrid T="FlowLedger.Contracts.TransactionDto"
              Items="Visible"
              Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow"
@@ -203,7 +203,7 @@
         </TemplateColumn>
     </Columns>
     <PagerContent>
-        <MudDataGridPager T="FlowLedger.Web.ApiClient.TransactionDto" aria-label="Transactions pager" />
+        <MudDataGridPager T="FlowLedger.Contracts.TransactionDto" aria-label="Transactions pager" />
     </PagerContent>
 </MudDataGrid>
 
@@ -218,7 +218,7 @@
     private bool _loading = true;
     private string? _error;
 
-    private List<FlowLedger.Web.ApiClient.TransactionDto> _transactions = [];
+    private List<FlowLedger.Contracts.TransactionDto> _transactions = [];
     private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private List<FlowLedger.Contracts.CategoryDto> _categories = [];
 
@@ -233,12 +233,12 @@
     private bool _hasMore;
     private int _loadSeq;
 
-    private List<FlowLedger.Web.ApiClient.TransactionDto> _visible = [];
+    private List<FlowLedger.Contracts.TransactionDto> _visible = [];
     private Dictionary<Guid, FlowLedger.Contracts.CategoryDto> _categoryById = [];
     private List<FlowLedger.Contracts.CategoryDto> _sortedCategories = [];
     private Dictionary<Guid, FlowLedger.Contracts.AccountDto> _accountById = [];
 
-    private List<FlowLedger.Web.ApiClient.TransactionDto> Visible => _visible;
+    private List<FlowLedger.Contracts.TransactionDto> Visible => _visible;
 
     private Task OnSearchChanged(string? value)
     {
@@ -256,7 +256,7 @@
     }
 
     /// <summary>Replaces one row in place and refreshes the cached view (avoids a full reload for single-row edits).</summary>
-    private void PatchRow(Guid id, Func<FlowLedger.Web.ApiClient.TransactionDto, FlowLedger.Web.ApiClient.TransactionDto> patch)
+    private void PatchRow(Guid id, Func<FlowLedger.Contracts.TransactionDto, FlowLedger.Contracts.TransactionDto> patch)
     {
         var i = _transactions.FindIndex(t => t.Id == id);
         if (i >= 0)
@@ -344,7 +344,7 @@
 
     private Task OnIncludeHiddenChanged(bool value) { _includeHidden = value; return LoadAsync(); }
 
-    private async Task SetCategory(FlowLedger.Web.ApiClient.TransactionDto tx, FlowLedger.Contracts.CategoryDto category)
+    private async Task SetCategory(FlowLedger.Contracts.TransactionDto tx, FlowLedger.Contracts.CategoryDto category)
     {
         try
         {
@@ -396,7 +396,7 @@
         }
     }
 
-    private async Task EditAlias(FlowLedger.Web.ApiClient.TransactionDto tx)
+    private async Task EditAlias(FlowLedger.Contracts.TransactionDto tx)
     {
         var dialog = await Dialogs.ShowAsync<AliasDialog>("Rename merchant", new DialogParameters<AliasDialog>
         {
@@ -421,7 +421,7 @@
         }
     }
 
-    private async Task EditNote(FlowLedger.Web.ApiClient.TransactionDto tx)
+    private async Task EditNote(FlowLedger.Contracts.TransactionDto tx)
     {
         var dialog = await Dialogs.ShowAsync<NoteDialog>("Transaction note", new DialogParameters<NoteDialog>
         {
@@ -446,7 +446,7 @@
         }
     }
 
-    private async Task EditSplits(FlowLedger.Web.ApiClient.TransactionDto tx)
+    private async Task EditSplits(FlowLedger.Contracts.TransactionDto tx)
     {
         var dialog = await Dialogs.ShowAsync<SplitDialog>("Split transaction", new DialogParameters<SplitDialog>
         {
@@ -457,7 +457,7 @@
             { x => x.Categories, _categories },
         }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
-        if (result is null || result.Canceled || result.Data is not List<FlowLedger.Web.ApiClient.TransactionSplitDto> splits)
+        if (result is null || result.Canceled || result.Data is not List<FlowLedger.Contracts.TransactionSplitDto> splits)
         {
             return;
         }

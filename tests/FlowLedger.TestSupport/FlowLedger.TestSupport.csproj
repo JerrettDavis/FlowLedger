@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="FlowLedger.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Domain\FlowLedger.Domain.csproj" />
   </ItemGroup>
