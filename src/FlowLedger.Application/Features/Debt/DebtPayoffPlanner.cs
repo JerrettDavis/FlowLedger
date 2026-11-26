@@ -1,3 +1,4 @@
+using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Debt;
 
 public sealed record DebtInput(string Name, decimal Balance, decimal AnnualRatePercent, decimal MinimumPayment);
@@ -30,7 +31,7 @@ public static class DebtPayoffPlanner
             month++;
             foreach (var s in live)
             {
-                var interest = Math.Round(s.Balance * s.Input.AnnualRatePercent / 1200m, 2);
+                var interest = MoneyRounding.Round(s.Balance * s.Input.AnnualRatePercent / 1200m, 2);
                 s.Balance += interest;
                 s.Interest += interest;
                 totalInterest += interest;

@@ -191,5 +191,5 @@ internal static class RecurringFlowMapper
         f.Counterparty,
         f.IsActive,
         f.CreatedAt,
-        Math.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
+        MoneyRounding.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Features.Strategies;
 
@@ -166,12 +167,12 @@ public static class CashTrajectoryProjector
             bal += net;
             cum += sigma * sigma;
             var band = 1.28 * Math.Sqrt(cum); // ~80% interval, independent monthly errors
-            points.Add(new TrajectoryPoint(k, Math.Round((decimal)bal, 0), Math.Round((decimal)(bal - band), 0), Math.Round((decimal)(bal + band), 0)));
+            points.Add(new TrajectoryPoint(k, MoneyRounding.Round((decimal)bal, 0), MoneyRounding.Round((decimal)(bal - band), 0), MoneyRounding.Round((decimal)(bal + band), 0)));
         }
 
         var nextNet = (decimal)NetAt(1);
         var direction = slope > 50 ? "improving" : slope < -50 ? "worsening" : "steady";
-        decimal? runway = nextNet < 0 ? Math.Round(liquid / -nextNet, 1) : null;
+        decimal? runway = nextNet < 0 ? MoneyRounding.Round(liquid / -nextNet, 1) : null;
         int? toTarget = null;
         var target = avgSpend * 3;
         if (liquid >= target)
@@ -193,6 +194,6 @@ public static class CashTrajectoryProjector
             : toTarget == 0
                 ? $"Cash flow is {direction}: about {money(nextNet)} a month net; your 3-month emergency target is already covered."
                 : $"Cash flow is {direction}: about {money(nextNet)} a month net" + (toTarget is { } t ? $", reaching a 3-month emergency fund in about {t} months." : ".");
-        return new CashTrajectory(Math.Round((decimal)slope, 2), Math.Round((decimal)yMean, 2), direction, runway, toTarget, points, summary);
+        return new CashTrajectory(MoneyRounding.Round((decimal)slope, 2), MoneyRounding.Round((decimal)yMean, 2), direction, runway, toTarget, points, summary);
     }
 }

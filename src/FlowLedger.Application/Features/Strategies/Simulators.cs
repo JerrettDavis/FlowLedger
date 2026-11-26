@@ -1,3 +1,4 @@
+using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Strategies;
 
 public sealed record GrowthPoint(int Month, decimal Balance, decimal Contributed, decimal Interest);
@@ -31,11 +32,11 @@ public static class LoanMath
         var r = (double)annualRatePercent / 1200.0;
         if (r == 0)
         {
-            return Math.Round(balance / months, 2);
+            return MoneyRounding.Round(balance / months, 2);
         }
 
         var pow = Math.Pow(1 + r, months);
-        return Math.Round((decimal)((double)balance * r * pow / (pow - 1)), 2);
+        return MoneyRounding.Round((decimal)((double)balance * r * pow / (pow - 1)), 2);
     }
 }
 
@@ -55,7 +56,7 @@ public static class Simulators
     public static IReadOnlyList<GrowthPoint> Grow(decimal start, decimal monthlyContribution, decimal annualRatePercent, int months)
     {
         months = Math.Clamp(months, 0, MaxMonths);
-        var points = new List<GrowthPoint>(months + 1) { new(0, Math.Round(start, 2), Math.Round(start, 2), 0m) };
+        var points = new List<GrowthPoint>(months + 1) { new(0, MoneyRounding.Round(start, 2), MoneyRounding.Round(start, 2), 0m) };
         var balance = start;
         var contributed = start;
         var rate = MonthlyRate(annualRatePercent);
@@ -64,7 +65,7 @@ public static class Simulators
             balance += balance * rate;
             balance += monthlyContribution;
             contributed += monthlyContribution;
-            points.Add(new GrowthPoint(m, Math.Round(balance, 2), Math.Round(contributed, 2), Math.Round(balance - contributed, 2)));
+            points.Add(new GrowthPoint(m, MoneyRounding.Round(balance, 2), MoneyRounding.Round(contributed, 2), MoneyRounding.Round(balance - contributed, 2)));
         }
 
         return points;
@@ -96,11 +97,11 @@ public static class Simulators
             wealth += wealth * growth;
             wealth += extra + spread;
             saved += extra;
-            points.Add(new PastPoint(month, Math.Round(wealth, 2)));
+            points.Add(new PastPoint(month, MoneyRounding.Round(wealth, 2)));
         }
 
-        var total = Math.Round(wealth, 2);
-        return new PastWhatIfResult(points, total, Math.Round(saved, 2), Math.Round(total - saved, 2));
+        var total = MoneyRounding.Round(wealth, 2);
+        return new PastWhatIfResult(points, total, MoneyRounding.Round(saved, 2), MoneyRounding.Round(total - saved, 2));
     }
 
     /// <summary>Refinance break-even: new payment vs current payment over the remaining term, including closing costs.</summary>
@@ -117,8 +118,8 @@ public static class Simulators
         var lifetime = curInterest - newInterest;
         int? breakEven = monthlySavings > 0 && closingCosts > 0 ? (int)Math.Ceiling(closingCosts / monthlySavings) : closingCosts <= 0 && monthlySavings > 0 ? 0 : null;
         var worthwhile = lifetime > 0 && monthlySavings > 0 && (breakEven is null || breakEven <= Math.Min(remainingMonths, newTermMonths));
-        return new RefinanceResult(curPay, newPay, Math.Round(monthlySavings, 2), closingCosts, breakEven,
-            Math.Round(curInterest, 2), Math.Round(newInterest, 2), Math.Round(lifetime, 2), worthwhile);
+        return new RefinanceResult(curPay, newPay, MoneyRounding.Round(monthlySavings, 2), closingCosts, breakEven,
+            MoneyRounding.Round(curInterest, 2), MoneyRounding.Round(newInterest, 2), MoneyRounding.Round(lifetime, 2), worthwhile);
     }
 }
 
@@ -133,11 +134,11 @@ public static class LadderPlanner
         ];
         var each = Math.Floor(amount / spec.Length / 100m) * 100m;
         var rungs = spec.Select(s => new LadderRung(
-            s.Label, s.Months, each, s.Apy, Math.Round(each * s.Apy / 100m * s.Months / 12m, 2))).ToList();
+            s.Label, s.Months, each, s.Apy, MoneyRounding.Round(each * s.Apy / 100m * s.Months / 12m, 2))).ToList();
         var invested = each * spec.Length;
         var annual = spec.Sum(s => each * s.Apy / 100m);
-        var blended = invested > 0 ? Math.Round(annual / invested * 100m, 2) : 0m;
+        var blended = invested > 0 ? MoneyRounding.Round(annual / invested * 100m, 2) : 0m;
         var savingsAnnual = invested * r.Hysa / 100m;
-        return new LadderPlan(rungs, blended, Math.Round(annual, 2), Math.Round(savingsAnnual, 2), Math.Round(annual - savingsAnnual, 2));
+        return new LadderPlan(rungs, blended, MoneyRounding.Round(annual, 2), MoneyRounding.Round(savingsAnnual, 2), MoneyRounding.Round(annual - savingsAnnual, 2));
     }
 }
