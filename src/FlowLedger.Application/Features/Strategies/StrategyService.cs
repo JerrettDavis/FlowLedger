@@ -101,7 +101,7 @@ public sealed class StrategyService(
         foreach (var t in dtos)
         {
             var date = t.PostedDate ?? t.EffectiveDate;
-            if (date < from || date > to || t.Status is "Planned" or "Skipped" || transfers.Contains(t.Id) || investmentAccounts.Contains(t.AccountId))
+            if (date < from || date > to || !FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) || transfers.Contains(t.Id) || investmentAccounts.Contains(t.AccountId))
             {
                 continue;
             }

@@ -92,7 +92,7 @@ public sealed class InvestmentPerformanceService(
         var allAccounts = await accounts.ListAsync(ct);
         var accountTypes = allAccounts.ToDictionary(a => a.Id, a => a.AccountType.ToString());
         var dtos = (await transactions.ListAllAsync(Max, ct))
-            .Where(t => t.Status.ToString() is not ("Planned" or "Skipped"))
+            .Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsReal(t.Status))
             .Select(TransactionMapper.ToDto).ToList();
         var transferIds = TransferDetector.Detect(dtos, accountTypes);
         var points = await history.DailyAccountBalancesAsync(ct);
