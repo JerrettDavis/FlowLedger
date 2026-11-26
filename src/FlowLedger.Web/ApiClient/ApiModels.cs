@@ -315,3 +315,6 @@ public sealed record EvaluationDto(string Embedder, bool Semantic, int Merchants
 public sealed record ImportFormatDto(string Id, string Name);
 
 public sealed record AutoImportResultDto(string FormatId, string FormatName, List<string> Warnings, ImportSummaryDto Summary);
+
+/// <summary>One page of transactions and the total matching the filters, for server-side paging.</summary>
+public sealed record TransactionPage(List<FlowLedger.Contracts.TransactionDto> Items, int? Total);

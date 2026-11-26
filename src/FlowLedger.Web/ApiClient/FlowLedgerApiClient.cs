@@ -278,6 +278,45 @@ public sealed class FlowLedgerApiClient
         bool includeHidden = false,
         string? search = null)
     {
+        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search);
+        var result = await GetJsonAsync<List<TransactionDto>>(url, "load transactions", ct: ct);
+        return result ?? [];
+    }
+
+    /// <summary>One page of transactions plus the total number matching the filters (null when the server did not say).</summary>
+    public async Task<TransactionPage> GetTransactionPageAsync(
+        Guid? accountId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        int skip = 0,
+        int take = 100,
+        CancellationToken ct = default,
+        bool includeHidden = false,
+        string? search = null)
+    {
+        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search);
+        return await ExecuteAsync("load transactions", async () =>
+        {
+            var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Non-success status {StatusCode} during {Operation}", (int)response.StatusCode, "load transactions");
+                throw new ApiClientException(
+                    $"Couldn't load transactions (server returned {(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            int? total = response.Headers.TryGetValues("X-Total-Count", out var values)
+                && int.TryParse(values.FirstOrDefault(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n)
+                ? n
+                : null;
+            var items = await response.Content.ReadFromJsonAsync<List<TransactionDto>>(JsonOptions, ct) ?? [];
+            return new TransactionPage(items, total);
+        });
+    }
+
+    private static string TransactionsUrl(
+        Guid? accountId, DateOnly? from, DateOnly? to, int skip, int take, bool includeHidden, string? search)
+    {
         var qs = new List<string>();
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -314,9 +353,7 @@ public sealed class FlowLedgerApiClient
             qs.Add($"take={take}");
         }
 
-        var url = "/api/transactions" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
-        var result = await GetJsonAsync<List<TransactionDto>>(url, "load transactions", ct: ct);
-        return result ?? [];
+        return "/api/transactions" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
     }
 
     // Bill sheet ---------------------------------------------------------------

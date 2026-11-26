@@ -62,6 +62,31 @@ public sealed class HomePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void Every_failed_insight_card_has_its_own_error_state_and_retry_while_cash_renders()
+    {
+        var cut = RenderHome(FailInsightsAndForecast);
+
+        var errored = cut.FindAll("[data-state=error]");
+        errored.Should().HaveCountGreaterThanOrEqualTo(5, "spending, cash flow, changes, merchants and net worth each report their own failure");
+        errored.Should().OnlyContain(c => c.QuerySelectorAll("button").Any(b => b.TextContent.Contains("Retry")));
+        cut.Find("[aria-label='Cash balance']").TextContent.Should().Contain("$1,234.50");
+    }
+
+    [Fact]
+    public void Failed_activity_feed_shows_an_error_card_not_silence()
+    {
+        var cut = RenderHome(path => path.StartsWith("/api/dashboard/activity", StringComparison.Ordinal) ? HttpStatusCode.InternalServerError : HttpStatusCode.OK);
+
+        System.Net.WebUtility.HtmlDecode(cut.Markup).Should().Contain("Couldn't load recent activity");
+    }
+
+    [Fact]
+    public void Titled_home_cards_all_use_the_shared_dashboard_card()
+    {
+        RepoFiles.Read("Components/Pages/Home.razor").Should().NotContain("<MudCardHeader", "titled cards go through DashboardCard so loading/error/empty look the same (KPI tiles stay bare)");
+    }
+
+    [Fact]
     public void Biggest_changes_caption_follows_the_selected_range_not_a_fixed_30_days()
     {
         RepoFiles.Read("Components/Pages/Home.razor").Should().NotContain("Last 30 days vs the 30 before");
