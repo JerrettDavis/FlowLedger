@@ -83,6 +83,17 @@ public sealed class OnDemandSyncJob : IJob
                 "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.",
                 result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
         }
+        catch (SyncThrottledException ex)
+        {
+            // Not a failure: the minimum-interval guard refused the call. Run once more when the window ends (coalesced).
+            _logger.LogInformation("OnDemandSyncJob: throttled; deferring one sync by {Delay}.", ex.RetryAfter);
+            await DeferAsync(context.Scheduler, tenantId, memberId, eventType, ex.RetryAfter, cancellationToken);
+        }
+        catch (SyncAlreadyRunningException)
+        {
+            _logger.LogInformation("OnDemandSyncJob: a sync is already running; deferring one more run.");
+            await DeferAsync(context.Scheduler, tenantId, memberId, eventType, TimeSpan.FromMinutes(1), cancellationToken);
+        }
         catch (ProviderException ex)
         {
             // Classified and persisted by the sync service; the shared retry policy decides when it is tried again.
@@ -95,5 +106,35 @@ public sealed class OnDemandSyncJob : IJob
             // the scheduled worker sync remains the durable backstop.
             _logger.LogError(ex, "OnDemandSyncJob: webhook-triggered sync faulted.");
         }
+    }
+
+    /// <summary>
+    /// Schedules at most ONE deferred run per tenant: later events inside the window coalesce into the pending trigger
+    /// (the sync fetches everything, so one run covers them all). Returns true when a new trigger was created.
+    /// </summary>
+    public static async Task<bool> DeferAsync(
+        IScheduler scheduler, Guid tenantId, string? memberId, string? eventType, TimeSpan delay, CancellationToken ct = default)
+    {
+        var key = new TriggerKey($"deferred-{tenantId:N}", "FlowLedger");
+        if (await scheduler.GetTrigger(key, ct) is not null)
+        {
+            return false;
+        }
+
+        var map = new JobDataMap
+        {
+            [TenantIdKey] = tenantId.ToString(),
+            [MemberIdKey] = memberId ?? string.Empty,
+            [EventTypeKey] = eventType ?? string.Empty,
+        };
+        // A dedicated, non-durable job per tenant: it disappears after it fires, and its identity makes the coalescing check trivial.
+        var job = JobBuilder.Create<OnDemandSyncJob>().WithIdentity($"deferred-{tenantId:N}", "FlowLedger").Build();
+        var trigger = TriggerBuilder.Create()
+            .WithIdentity(key)
+            .UsingJobData(map)
+            .StartAt(DateTimeOffset.UtcNow + (delay > TimeSpan.Zero ? delay : TimeSpan.FromSeconds(5)) + TimeSpan.FromSeconds(1))
+            .Build();
+        await scheduler.ScheduleJob(job, trigger, default(ScheduleJobOptions), ct);
+        return true;
     }
 }
