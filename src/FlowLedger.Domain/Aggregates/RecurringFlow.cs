@@ -37,6 +37,12 @@ public sealed class RecurringFlow : AggregateRoot
     /// <summary>Occurrences generated for this flow within the current planning horizon.</summary>
     public IReadOnlyList<PlannedFlowOccurrence> Occurrences => _occurrences.AsReadOnly();
 
+    /// <summary>
+    /// Optimistic-concurrency token (Postgres <c>xmin</c>, maintained by the database, no schema column). A write made against a
+    /// stale copy of the row fails instead of silently overwriting a newer change (#157).
+    /// </summary>
+    public uint RowVersion { get; private set; }
+
     private RecurringFlow()
     {
         // EF Core constructor — fields initialised by EF.

@@ -13,6 +13,7 @@ internal sealed class BudgetRecordConfiguration : IEntityTypeConfiguration<Budge
         builder.Property(r => r.TenantId).HasColumnName("tenant_id");
         builder.Property(r => r.Category).HasColumnName("category");
         builder.Property(r => r.MonthlyLimit).HasColumnName("monthly_limit").HasPrecision(18, 2);
+        builder.Property(r => r.RowVersion).HasColumnName("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
         builder.Property(r => r.UpdatedUtc).HasColumnName("updated_utc").HasDefaultValueSql("now()");
     }
 }

@@ -95,6 +95,8 @@ public sealed class MigrationTests : IAsyncLifetime
         {
             // Snapshot-only: maps accounts.RowVersion onto Postgres' xmin system column, so Up and Down have nothing to change (#157).
             "20261126184928_AccountOptimisticConcurrency",
+            // Same again for transactions, recurring flows, categories, budgets and savings goals (#157).
+            "20261126224716_RowVersionOnTransactionsFlowsCategoriesBudgetsGoals",
         };
         using var ctx = OfflineContext();
         var offenders = new List<string>();
