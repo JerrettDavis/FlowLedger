@@ -14,6 +14,10 @@ jobs:
   build-and-test:
     name: Build & Test (.NET 10)
     runs-on: ubuntu-latest
+    env:
+      # Honoured by the Docker availability checks once they are changed to throw instead of skip
+      # (tracked in #151). Until then the TRX skipped-test gate below is the effective guard.
+      FLOWLEDGER_REQUIRE_DOCKER: "true"
 
     steps:
       - name: Checkout
@@ -37,7 +41,7 @@ jobs:
         run: >
           dotnet test --no-build --configuration Release
           --filter "Category!=E2E"
-          --logger "trx;LogFileName=test-results.trx"
+          --logger "trx"
           --collect:"XPlat Code Coverage"
           --settings coverlet.runsettings
           --results-directory ./artifacts/tests
@@ -50,6 +54,11 @@ jobs:
           name: xUnit Test Results
           path: artifacts/tests/**/*.trx
           reporter: dotnet-trx
+
+      # Docker-gated suites skip (rather than fail) when no Docker daemon is reachable. Fail the build
+      # if anything other than the credentialed live-sandbox tests was skipped, or nothing ran.
+      - name: Fail on unexpected skipped tests
+        run: python3 eng/ci/check-trx.py "artifacts/tests/**/*.trx" --allow-skip "LiveSandbox" --min-executed 500
 
       # Renders a line/branch coverage table in the job summary (informational, never fails the build).
       - name: Coverage summary
