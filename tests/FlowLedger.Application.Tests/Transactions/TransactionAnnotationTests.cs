@@ -29,6 +29,7 @@ public sealed class TransactionAnnotationTests
     private sealed class NoHistory : IBalanceHistoryReader
     {
         public Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<BalancePoint>>([]);
+        public Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(DateOnly from, DateOnly? to = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<BalancePoint>>([]);
     }
 
     private readonly FakeTenantContext _tenant = new();

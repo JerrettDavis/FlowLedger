@@ -2,6 +2,7 @@ using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Npgsql;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -63,5 +64,45 @@ public sealed class DataRetentionTests(IntegrationTestFixture fixture) : IAsyncL
 
         result.LinkCodesDeleted.Should().Be(1);
         (await ScalarAsync("SELECT count(*) FROM app_user_link_codes WHERE code_hash = 'fresh'")).Should().Be(1);
+    }
+
+    [DockerFact]
+    public async Task A_pruned_merge_still_blocks_re_creation_of_the_merged_row()
+    {
+        var tenant = TestTenantContext.New();
+        await ExecAsync(
+            "INSERT INTO merged_transactions (tenant_id, duplicate_id, survivor_id, fingerprint, merged_utc, snapshot) VALUES " +
+            $"('{tenant.TenantId}', gen_random_uuid(), gen_random_uuid(), 'fp-merged', now() - interval '400 days', '{{\"description\":\"SECRET\"}}')");
+
+        (await new DataRetention(fixture.ConnectionString).PruneAsync()).SnapshotsBlanked.Should().Be(1);
+
+        await using var db = fixture.CreateDbContext(tenant);
+        var tombstoned = await DuplicateStore.TombstonedAsync(db, ["fp-merged", "fp-other"], CancellationToken.None);
+        tombstoned.Should().BeEquivalentTo(["fp-merged"], "sync and import consult the tombstone, which retention never deletes");
+    }
+
+    [DockerFact]
+    public async Task Configured_ages_drive_the_prune()
+    {
+        await ExecAsync(
+            "INSERT INTO merged_transactions (tenant_id, duplicate_id, survivor_id, fingerprint, merged_utc, snapshot) VALUES " +
+            "(gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'fp-10d', now() - interval '10 days', '{\"d\":1}')");
+        var settings = RetentionSettings.From(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Retention:MergeSnapshotDays"] = "7" }).Build());
+
+        var result = await new DataRetention(fixture.ConnectionString, settings).PruneAsync();
+
+        result.SnapshotsBlanked.Should().Be(1, "10 days is older than the configured 7");
+    }
+
+    [Fact]
+    public void Settings_default_when_missing_or_non_positive()
+    {
+        RetentionSettings.From(new ConfigurationBuilder().Build()).Should().Be(RetentionSettings.Default);
+        RetentionSettings.From(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Retention:MergeSnapshotDays"] = "0", ["Retention:LinkCodeGraceHours"] = "-3" })
+            .Build()).Should().Be(RetentionSettings.Default);
+        RetentionSettings.Default.MergeSnapshotAge.Should().Be(TimeSpan.FromDays(90));
+        RetentionSettings.Default.LinkCodeAge.Should().Be(TimeSpan.FromHours(24));
     }
 }

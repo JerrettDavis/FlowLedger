@@ -34,8 +34,8 @@ public sealed class ScheduledBackupJob : IJob
 
         try
         {
-            // Merge snapshots are only needed for undo; keep 90 days. Spent link codes are removed a day after expiry.
-            var pruned = await _retention.PruneAsync(TimeSpan.FromDays(90), TimeSpan.FromHours(24), cancellationToken);
+            // Merge snapshots are only needed for undo; spent link codes go shortly after expiry (Retention:* configuration, defaults 90 days / 24 hours).
+            var pruned = await _retention.PruneAsync(cancellationToken);
             if (pruned.SnapshotsBlanked > 0 || pruned.LinkCodesDeleted > 0)
             {
                 _logger.LogInformation("Retention: blanked {Snapshots} merge snapshots, deleted {Codes} link codes.", pruned.SnapshotsBlanked, pruned.LinkCodesDeleted);

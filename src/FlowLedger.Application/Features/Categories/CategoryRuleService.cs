@@ -26,7 +26,7 @@ public sealed class CategoryRuleService(
     ICategoryRepository categories,
     ITenantContext tenant)
 {
-    private const int Max = 50_000;
+    private const int Max = TransactionQuota.ProcessingCap;
     public const int MaxLength = 200;
     public const int MaxRules = 1000;
     public const int MaxNoteLength = 1000;
@@ -99,7 +99,7 @@ public sealed class CategoryRuleService(
             {
                 foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
                 {
-                    if (t.Id == target.Id || t.Status is TransactionStatus.Planned or TransactionStatus.Skipped
+                    if (t.Id == target.Id || !t.Status.IsReal()
                         || AutoCategorizer.MerchantKey(t.MerchantName, t.Description) != key)
                     {
                         continue;
@@ -145,9 +145,10 @@ public sealed class CategoryRuleService(
         var changed = 0;
         var createdCategory = false;
 
-        foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
+        var changedRows = new List<Transaction>();
+        foreach (var t in await transactions.LoadAsync(Max, ct))
         {
-            if (t.Status is TransactionStatus.Planned or TransactionStatus.Skipped)
+            if (!t.Status.IsReal())
             {
                 continue;
             }
@@ -177,6 +178,7 @@ public sealed class CategoryRuleService(
             }
 
             t.Categorize(category.CategoryId, null, CategorySource.Auto);
+            changedRows.Add(t);
             changed++;
         }
 
@@ -187,7 +189,7 @@ public sealed class CategoryRuleService(
 
         if (changed > 0)
         {
-            await transactions.SaveAsync(ct);
+            await transactions.SaveChangedAsync(changedRows, ct);
         }
 
         return changed;
