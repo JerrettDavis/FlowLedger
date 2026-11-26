@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Budgets — FlowLedger</PageTitle>
 
@@ -147,6 +148,11 @@ else
 
     private async Task Remove(string category)
     {
+        if (!await DialogService.ConfirmAsync("Remove budget", $"Remove the {category} budget? Spending in that category is not affected.", "Remove"))
+        {
+            return;
+        }
+
         try
         {
             await ApiClient.DeleteBudgetAsync(category);

@@ -4,6 +4,7 @@
 @inject FlowLedgerApiClient ApiClient
 @implements IDisposable
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Strategies — FlowLedger</PageTitle>
 
@@ -490,6 +491,11 @@ else
 
     private async Task ClearRate(RateRow row)
     {
+        if (!await DialogService.ConfirmAsync("Clear rate", "Clear the saved interest rate for this account? Suggestions will fall back to market averages.", "Clear"))
+        {
+            return;
+        }
+
         await Safe(async () =>
         {
             await ApiClient.RemoveAccountRateAsync(row.Id);

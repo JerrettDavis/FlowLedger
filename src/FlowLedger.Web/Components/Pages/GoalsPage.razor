@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Goals — FlowLedger</PageTitle>
 
@@ -125,6 +126,11 @@ else
 
     private async Task Remove(FlowLedger.Web.ApiClient.GoalDto g)
     {
+        if (!await DialogService.ConfirmAsync("Remove goal", $"Remove the goal \"{g.Name}\"? Its saved progress is discarded.", "Remove"))
+        {
+            return;
+        }
+
         try
         {
             await ApiClient.DeleteGoalAsync(g.Id);

@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Local AI — FlowLedger</PageTitle>
 
@@ -304,6 +305,11 @@ else
 
     private async Task RemoveAsync(string id)
     {
+        if (!await DialogService.ConfirmAsync("Remove model", "Remove this downloaded model? You can download it again later.", "Remove"))
+        {
+            return;
+        }
+
         if (await ApiClient.RemoveLocalAiModelAsync(id))
         {
             Snackbar.Add("Model removed.", Severity.Success);

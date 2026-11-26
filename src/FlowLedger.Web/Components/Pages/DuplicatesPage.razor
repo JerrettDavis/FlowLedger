@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Duplicates — FlowLedger</PageTitle>
 
@@ -96,7 +97,15 @@ else
         }
     }
 
-    private Task Merge(Guid keep, Guid remove) => Run(() => ApiClient.MergeDuplicateAsync(keep, remove), "Merged.");
+    private async Task Merge(Guid keep, Guid remove)
+    {
+        if (!await DialogService.ConfirmAsync("Merge duplicates", "Merge these transactions? The duplicate is removed and cannot be restored.", "Merge"))
+        {
+            return;
+        }
+
+        await Run(() => ApiClient.MergeDuplicateAsync(keep, remove), "Merged.");
+    }
 
     private Task Dismiss(Guid a, Guid b) => Run(() => ApiClient.DismissDuplicateAsync(a, b), "Marked as separate transactions.");
 

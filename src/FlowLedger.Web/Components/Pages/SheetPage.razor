@@ -392,6 +392,11 @@
                     await ApiClient.SaveSheetBillAsync(row?.Id, req);
                     break;
                 case string s when s == SheetBillDialog.DeleteResult && row is not null:
+                    if (!await DialogService.ConfirmAsync("Delete bill", $"Delete \"{row.Name}\" from the sheet?", "Delete"))
+                    {
+                        return;
+                    }
+
                     await ApiClient.DeleteSheetBillAsync(row.Id);
                     break;
             }

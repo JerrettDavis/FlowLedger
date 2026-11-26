@@ -4,6 +4,7 @@
 @using FlowLedger.Web.Components.Shared
 @inject FlowLedgerApiClient ApiClient
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>@(_report?.Name ?? "Report") — FlowLedger</PageTitle>
 
@@ -128,6 +129,11 @@
     private async Task RemovePanelAsync(int index)
     {
         if (_report is null || _report.IsPreset || _report.Panels.Count <= 1)
+        {
+            return;
+        }
+
+        if (!await DialogService.ConfirmAsync("Remove panel", "Remove this panel from the report?", "Remove"))
         {
             return;
         }
