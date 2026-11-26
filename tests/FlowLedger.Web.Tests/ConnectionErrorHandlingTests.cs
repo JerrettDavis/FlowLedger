@@ -200,7 +200,7 @@ public sealed class ConnectionErrorHandlingTests
         ProblemToast.From(Problem("Internal", false, false), "Sync", Now).Severity.Should().Be(Severity.Error);
         var plain = ProblemToast.From(new InvalidOperationException("boom"), "Connect", Now);
         plain.Severity.Should().Be(Severity.Error);
-        plain.Message.Should().Be("Connect failed: boom");
+        plain.Message.Should().Be($"Connect failed: {FlowLedger.Web.Shared.SnackbarExtensions.GenericFailure}");
     }
 
     // ---- auto-sync policy ----

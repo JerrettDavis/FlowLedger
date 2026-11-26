@@ -62,6 +62,7 @@ public sealed class SnackbarProblemTests : BunitContext, IAsyncLifetime
             var text = File.ReadAllText(file);
             text.Should().NotContain("Snackbar.Add(ex.Message", $"{Path.GetFileName(file)} must use Snackbar.AddProblem");
             text.Should().NotContain("{ex.Message}\", Severity.Error", $"{Path.GetFileName(file)} must use Snackbar.AddProblem");
+            text.Should().NotContain("ex.Message", $"{Path.GetFileName(file)} must map exceptions via SnackbarExtensions.ProblemText");
         }
     }
 

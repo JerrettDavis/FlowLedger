@@ -240,7 +240,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Asset operation failed");
-            Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : "Something went wrong. Please try again.", Severity.Error);
+            Snackbar.AddFailure(ex, fallback: "Something went wrong. Please try again.");
         }
     }
 }

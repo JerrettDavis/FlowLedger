@@ -190,7 +190,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = SnackbarExtensions.ProblemText(ex);
         }
         finally
         {

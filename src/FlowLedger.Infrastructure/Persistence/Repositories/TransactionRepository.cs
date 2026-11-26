@@ -22,7 +22,8 @@ internal sealed class TransactionRepository : ITransactionRepository
         int skip = 0,
         int take = 100,
         CancellationToken ct = default,
-        bool everydayOnly = false)
+        bool everydayOnly = false,
+        string? search = null)
     {
         var query = _db.Transactions.AsNoTracking();
 
@@ -44,6 +45,14 @@ internal sealed class TransactionRepository : ITransactionRepository
         if (to.HasValue)
         {
             query = query.Where(t => t.EffectiveDate <= to.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(t => t.Description.ToLower().Contains(term)
+                || (t.MerchantName != null && t.MerchantName.ToLower().Contains(term))
+                || (t.Notes != null && t.Notes.ToLower().Contains(term)));
         }
 
         return await query

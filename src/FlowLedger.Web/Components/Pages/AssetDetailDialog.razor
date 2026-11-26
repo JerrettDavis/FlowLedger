@@ -158,7 +158,7 @@
     private void Fail(Exception ex, string fallback)
     {
         Logger.LogError(ex, "Asset dialog operation failed");
-        Snackbar.Add(ex is FlowLedger.Web.ApiClient.ApiClientException ? ex.Message : fallback, Severity.Error);
+        Snackbar.AddFailure(ex, fallback: fallback);
     }
 
     private void Close() => MudDialog.Close(_changed ? DialogResult.Ok(true) : DialogResult.Cancel());

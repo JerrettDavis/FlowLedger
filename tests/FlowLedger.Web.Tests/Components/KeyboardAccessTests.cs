@@ -22,6 +22,20 @@ public sealed class KeyboardAccessTests
     }
 
     [Fact]
+    public void Click_handlers_on_non_interactive_elements_are_keyboard_operable()
+    {
+        var re = new System.Text.RegularExpressions.Regex(@"<(div|span|tr|td|li|MudPaper|MudCard)\b[^<]*?@onclick(?!:)[^<]*?(?=\r?\n\s*<|$)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        foreach (var file in RepoFiles.Razor())
+        {
+            foreach (System.Text.RegularExpressions.Match m in re.Matches(File.ReadAllText(file)))
+            {
+                m.Value.Should().Contain("role=\"button\"", $"{Path.GetFileName(file)} has a pointer-only click target");
+                m.Value.Should().Contain("tabindex=\"0\"").And.Contain("@onkeydown");
+            }
+        }
+    }
+
+    [Fact]
     public void Global_css_hides_the_skip_link_until_it_is_focused()
     {
         var css = RepoFiles.Read("wwwroot/app.css");
