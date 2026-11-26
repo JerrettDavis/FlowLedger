@@ -25,6 +25,7 @@
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\FlowLedger.Worker\FlowLedger.Worker.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Application\FlowLedger.Application.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 using System.Net;
 using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Infrastructure.Ai.Local;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -40,10 +41,8 @@ public class ModelDownloadTests : IDisposable
         manager.TryStartDownload(ModelCatalog.MiniLm, out var error).Should().BeTrue(error);
         async Task Wait()
         {
-            for (var i = 0; i < 200 && manager.Download?.State == "Downloading"; i++)
-            {
-                await Task.Delay(25);
-            }
+            // LocalModelManager runs the download fire-and-forget and exposes no completion signal, so poll its state.
+            await Eventually.WaitAsync(() => manager.Download?.State != "Downloading", "the model download to leave the Downloading state");
         }
 
         await Wait();

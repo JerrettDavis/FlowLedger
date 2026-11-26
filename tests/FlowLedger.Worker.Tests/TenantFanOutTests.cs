@@ -58,22 +58,38 @@ public sealed class TenantFanOutTests
         seen.Should().Equal(A, B, C);
     }
 
+    private static ServiceProvider ParallelProvider(int maxParallel, params Guid[] tenants)
+    {
+        var cfg = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = maxParallel.ToString() }).Build();
+        var services = new ServiceCollection();
+        services.AddSingleton<IUserDirectory>(new FakeDirectory(tenants));
+        services.AddSingleton<IConfiguration>(cfg);
+        services.AddScoped(_ => new ConfiguredTenantContext(Guid.Empty));
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<ConfiguredTenantContext>());
+        return services.BuildServiceProvider();
+    }
+
+    // The WaitAsync timeouts below are only a hang guard so a regression fails instead of blocking CI; they never gate a pass.
+    private static readonly TimeSpan HangGuard = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task Parallel_mode_runs_every_tenant_in_its_own_scope_and_isolates_failures()
     {
-        var cfg = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = "3" }).Build();
-        var services = new ServiceCollection();
-        services.AddSingleton<IUserDirectory>(new FakeDirectory(A, B, C));
-        services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(cfg);
-        services.AddScoped(_ => new ConfiguredTenantContext(Guid.Empty));
-        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<ConfiguredTenantContext>());
-        await using var sp = services.BuildServiceProvider();
+        await using var sp = ParallelProvider(3, A, B, C);
         var seen = new System.Collections.Concurrent.ConcurrentBag<(Guid Asked, Guid Active)>();
+        var arrived = 0;
+        var allArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         await TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, async (scope, t) =>
         {
-            await Task.Delay(20);
+            // Rendezvous: no tenant may finish until all three are in flight, which only parallel execution can satisfy.
+            if (Interlocked.Increment(ref arrived) == 3)
+            {
+                allArrived.SetResult();
+            }
+
+            await allArrived.Task.WaitAsync(HangGuard);
             seen.Add((t, scope.GetRequiredService<ConfiguredTenantContext>().TenantId));
             if (t == B)
             {
@@ -83,6 +99,53 @@ public sealed class TenantFanOutTests
 
         seen.Should().HaveCount(3);
         seen.Should().OnlyContain(x => x.Asked == x.Active, "each tenant gets its own scope with that tenant active");
+    }
+
+    [Fact]
+    public async Task MaxParallelTenants_bounds_concurrency_without_timing()
+    {
+        const int limit = 2;
+        var tenants = Enumerable.Range(1, 6).Select(i => new Guid(i, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1])).ToArray();
+        await using var sp = ParallelProvider(limit, tenants);
+        var inFlight = 0;
+        var maxInFlight = 0;
+        var started = 0;
+        var firstWaveFull = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var run = TenantFanOut.ForEachTenantAsync(sp, NullLogger.Instance, async (_, _) =>
+        {
+            var now = Interlocked.Increment(ref inFlight);
+            InterlockedMax(ref maxInFlight, now);
+            if (Interlocked.Increment(ref started) == limit)
+            {
+                firstWaveFull.SetResult();
+            }
+
+            await release.Task.WaitAsync(HangGuard);
+            Interlocked.Decrement(ref inFlight);
+        }, CancellationToken.None);
+
+        // The bound is reached (not just respected) ...
+        await firstWaveFull.Task.WaitAsync(HangGuard);
+        release.SetResult();
+        await run.WaitAsync(HangGuard);
+
+        // ... every tenant ran, and concurrency never exceeded it.
+        started.Should().Be(tenants.Length);
+        maxInFlight.Should().Be(limit);
+    }
+
+    private static void InterlockedMax(ref int target, int value)
+    {
+        int current;
+        while (value > (current = Volatile.Read(ref target)))
+        {
+            if (Interlocked.CompareExchange(ref target, value, current) == current)
+            {
+                return;
+            }
+        }
     }
 
     [Fact]
