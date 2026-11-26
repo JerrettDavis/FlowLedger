@@ -37,7 +37,7 @@ internal static class MxEndpoints
             }
 
             // With several connectors enabled the primary provider may not be MX: use the MX connector when it is on.
-            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
+            var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             if (provider is not MxFinancialDataProvider mx)
             {
                 return Results.Problem(
@@ -83,7 +83,7 @@ internal static class MxEndpoints
             IWebhookTenantResolver tenantResolver,
             CancellationToken ct) =>
         {
-            var provider = connectors.IsEnabled("MX") ? connectors.Resolve("MX") : primary;
+            var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             // Anonymous endpoint: bound the body BEFORE buffering it or doing any HMAC work.
             if (request.ContentLength > MaxWebhookBodyBytes)
             {
@@ -120,7 +120,7 @@ internal static class MxEndpoints
             // Signature verified: retain the exact body before doing anything else with it.
             // (Unverified bodies are not archived — the endpoint is anonymous, so doing so would
             // let anyone fill the disk. A failed archive write surfaces as 500 so MX redelivers.)
-            await archive.ArchiveAsync("MX", "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
+            await archive.ArchiveAsync(ConnectorIds.Mx, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200), ct);
 
             ProviderWebhookEvent evt;
             try

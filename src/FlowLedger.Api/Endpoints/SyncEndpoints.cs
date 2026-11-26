@@ -22,7 +22,7 @@ internal static class SyncEndpoints
             }
 
             var memberId = await syncService.ConnectAsync(ct);
-            return Results.Ok(new { memberId, provider = "Simulated" });
+            return Results.Ok(new { memberId, provider = ConnectorIds.Simulated });
         })
         .WithName("Connect")
         .WithSummary("Begin a provider connection (simulated by default) for the current tenant")
@@ -62,7 +62,7 @@ internal static class SyncEndpoints
                     }
                 }
 
-                var anyReal = connectors.Enabled.Any(c => c.Id != "Simulated");
+                var anyReal = connectors.Enabled.Any(c => c.Id != ConnectorIds.Simulated);
                 var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : (anyReal ? 30 : 0);
                 return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = primary.ProviderName });
             })

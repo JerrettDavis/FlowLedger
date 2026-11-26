@@ -18,20 +18,20 @@ internal static class ConnectorEndpoints
 
     private static readonly Descriptor[] Catalog =
     [
-        new("Simulated", "Simulated demo data", "Demo",
+        new(ConnectorIds.Simulated, "Simulated demo data", "Demo",
             "Deterministic fake accounts and transactions. No credentials, no cost. Used when no real connector is enabled.",
             [], _ => true, _ => true),
-        new("SimpleFIN", "SimpleFIN Bridge", "Aggregator (personal)",
+        new(ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)",
             "Personal bank aggregation through a SimpleFIN Bridge access URL. Institutions are linked at the Bridge, not in FlowLedger.",
             ["SimpleFin:Enabled", "SimpleFin:AccessUrl"],
             c => bool.TryParse(c["SimpleFin:Enabled"], out var on) && on,
             c => Has(c, "SimpleFin:AccessUrl")),
-        new("MX", "MX", "Aggregator (widget)",
+        new(ConnectorIds.Mx, "MX", "Aggregator (widget)",
             "MX Platform API with the hosted connect widget. Billable per call; honours daily/monthly budgets and a kill switch.",
             ["Mx:Enabled", "Mx:ApiKey", "Mx:ClientId", "Mx:BaseUrl", "Mx:WebhookSecret"],
             c => bool.TryParse(c["Mx:Enabled"], out var on) && on,
             c => Has(c, "Mx:ApiKey") && Has(c, "Mx:ClientId") && Has(c, "Mx:BaseUrl") && Has(c, "Mx:WebhookSecret")),
-        new("Quiltt", "Quiltt", "Aggregator (embedded)",
+        new(ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)",
             "In-app bank linking: each user links institutions inside FlowLedger through the Quiltt Connector (one Quiltt profile per tenant).",
             ["Quiltt:Enabled", "Quiltt:ApiKeySecret", "Quiltt:ConnectorId", "Quiltt:WebhookSecret"],
             c => bool.TryParse(c["Quiltt:Enabled"], out var on) && on,
@@ -87,7 +87,7 @@ internal static class ConnectorEndpoints
                     var isPrimary = string.Equals(d.Id, primary.ProviderName, StringComparison.OrdinalIgnoreCase);
                     var usage = await status.GetUsageAsync(d.Id, ct);
                     var lastSync = await status.LastSyncedAtAsync(d.Id, ct);
-                    var isMx = d.Id == "MX";
+                    var isMx = d.Id == ConnectorIds.Mx;
                     items.Add(new
                     {
                         id = d.Id,
