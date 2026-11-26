@@ -1,6 +1,7 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Strategies;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Application.Tests.Strategies;
 
@@ -26,7 +27,7 @@ public class StrategyCoachTests
         new(id, SuggestionKind.Cash, sev, title, "summary", impact, 0.8, ["e"], ["do it"], ["a"]);
 
     private static StrategyReport Report(params Suggestion[] s) =>
-        new(DateTimeOffset.UtcNow, MarketRates.Defaults(new DateOnly(2026, 11, 24)), 10_000, 3000, 6000, 0.5, 3.3, s, "d");
+        new(TestClock.Instant, MarketRates.Defaults(new DateOnly(2026, 11, 24)), 10_000, 3000, 6000, 0.5, 3.3, s, "d");
 
     [Fact]
     public async Task Without_a_model_the_highest_scoring_suggestion_is_first()

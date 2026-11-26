@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Strategies;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Application.Tests.Strategies;
 
@@ -16,7 +17,7 @@ public class StrategyEngineTests
 
     private static StrategyReport Run(IReadOnlyList<AccountSnapshot> accts, IReadOnlyList<MonthFlow> months,
         Dictionary<string, IReadOnlyDictionary<string, decimal>>? cats = null, MarketRates? rates = null) =>
-        StrategyEngine.Analyze(new StrategyInputs(accts, months, cats ?? [], rates ?? Rates, Today), DateTimeOffset.UtcNow);
+        StrategyEngine.Analyze(new StrategyInputs(accts, months, cats ?? [], rates ?? Rates, Today), TestClock.Instant);
 
     [Fact]
     public void Large_checking_balance_yields_idle_cash_suggestion_with_impact()
@@ -195,7 +196,7 @@ public class StrategyEngineRealRateTests
     private static List<MonthFlow> Flows() => Enumerable.Range(1, 6).Select(i => new MonthFlow($"2026-{i:00}", 6000, 3000)).ToList();
 
     private static StrategyReport Run(params AccountSnapshot[] a) =>
-        StrategyEngine.Analyze(new StrategyInputs(a, Flows(), new Dictionary<string, IReadOnlyDictionary<string, decimal>>(), Rates, Today), DateTimeOffset.UtcNow);
+        StrategyEngine.Analyze(new StrategyInputs(a, Flows(), new Dictionary<string, IReadOnlyDictionary<string, decimal>>(), Rates, Today), TestClock.Instant);
 
     [Fact]
     public void Account_already_at_market_yield_is_not_flagged()

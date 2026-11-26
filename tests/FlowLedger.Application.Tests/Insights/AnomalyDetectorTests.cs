@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Application.Tests.Insights;
 
@@ -11,7 +12,7 @@ public sealed class AnomalyDetectorTests
     private static readonly IReadOnlyDictionary<Guid, string> Cats = new Dictionary<Guid, string> { [Dining] = "Food/Dining" };
 
     private static TransactionDto Tx(string merchant, decimal amount, DateOnly date, Guid? cat = null, string dir = "Debit") =>
-        new(Guid.NewGuid(), Acct, amount, "USD", dir, merchant, "Posted", "Import", date, date, cat, null, null, null, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), Acct, amount, "USD", dir, merchant, "Posted", "Import", date, date, cat, null, null, null, TestClock.Instant);
 
     private static List<TransactionDto> Monthly(string merchant, decimal amount, int count, DateOnly last) =>
         Enumerable.Range(0, count).Select(i => Tx(merchant, amount, last.AddDays(-30 * (count - i)))).ToList();
