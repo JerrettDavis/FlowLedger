@@ -25,7 +25,7 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
     {
         var tenantCtx = TestTenantContext.New();
         var tenant = TenantId.From(tenantCtx.TenantId);
-        var acct = AccountId.New();
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
         var day = new DateOnly(2026, 11, 10);
         var survivor = Tx(tenant, acct, "SQ *COFFEE HOUSE TULSA OK", day, "TRN-9");
         var duplicate = Tx(tenant, acct, "Coffee House Tulsa", day.AddDays(1), null);
@@ -54,17 +54,19 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
     {
         var tenantCtx = TestTenantContext.New();
         var tenant = TenantId.From(tenantCtx.TenantId);
-        var acct = AccountId.New();
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
         var day = new DateOnly(2026, 11, 10);
         var bank = Tx(tenant, acct, "SQ *COFFEE HOUSE TULSA OK", day, "TRN-9");
         var csv = Tx(tenant, acct, "Coffee House Tulsa", day.AddDays(1), null);
-        var cat = CategoryId.New();
+        var category = Category.Create(tenant, new CategoryPath("Food/Coffee"), "Coffee");
+        var cat = CategoryId.From(category.Id);
         csv.Categorize(cat, null, CategorySource.Manual);
         csv.AppendNote("team lunch");
         var bankFingerprint = bank.Fingerprint!.Value;
 
         await using (var seed = fixture.CreateDbContext(tenantCtx))
         {
+            seed.Categories.Add(category);
             seed.Transactions.AddRange(bank, csv);
             await seed.SaveChangesAsync();
         }
@@ -97,7 +99,7 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
     {
         var tenantCtx = TestTenantContext.New();
         var tenant = TenantId.From(tenantCtx.TenantId);
-        var acct = AccountId.New();
+        var acct = await fixture.SeedAccountAsync(tenantCtx);
         var day = new DateOnly(2026, 11, 10);
         var a = Tx(tenant, acct, "365 VEND DDA PIN POS", day, "TRN-1");
         var b = Tx(tenant, acct, "365 VEND DDA PIN POS", day, "TRN-2");

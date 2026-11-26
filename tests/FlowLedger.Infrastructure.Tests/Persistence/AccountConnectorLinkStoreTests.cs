@@ -23,9 +23,10 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Links_are_one_per_account_and_one_account_per_provider_account()
     {
-        var store = Store(TestTenantContext.New());
-        var a = Guid.NewGuid();
-        var b = Guid.NewGuid();
+        var tenant = TestTenantContext.New();
+        var store = Store(tenant);
+        var a = (await _fixture.SeedAccountAsync(tenant)).Value;
+        var b = (await _fixture.SeedAccountAsync(tenant)).Value;
 
         (await store.LinkAsync(a, "SimpleFIN", "ACT-1")).Should().BeTrue();
         (await store.LinkAsync(b, "SimpleFIN", "ACT-1")).Should().BeFalse("a provider account feeds only one account");
@@ -41,9 +42,10 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Pinned_manual_accounts_and_unlink_and_tenant_isolation()
     {
-        var store = Store(TestTenantContext.New());
+        var tenant = TestTenantContext.New();
+        var store = Store(tenant);
         var other = Store(TestTenantContext.New());
-        var a = Guid.NewGuid();
+        var a = (await _fixture.SeedAccountAsync(tenant)).Value;
 
         await store.PinManualAsync(a);
         (await store.FindByAccountAsync(a))!.ConnectorId.Should().Be(AccountConnectorLinks.Manual);
@@ -54,5 +56,19 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
         (await store.UnlinkAsync(a)).Should().BeTrue();
         (await store.UnlinkAsync(a)).Should().BeFalse();
         (await store.FindByAccountAsync(a)).Should().BeNull();
+    }
+
+    [DockerFact]
+    public async Task A_link_to_another_tenants_or_a_missing_account_is_rejected_by_the_database()
+    {
+        var a = TestTenantContext.New();
+        var b = TestTenantContext.New();
+        var foreignAccount = (await _fixture.SeedAccountAsync(b)).Value;
+
+        var linkForeign = () => Store(a).LinkAsync(foreignAccount, "SimpleFIN", "ACT-1");
+        await linkForeign.Should().ThrowAsync<Exception>("composite tenant FK (#146): the account belongs to tenant B");
+
+        var linkMissing = () => Store(a).LinkAsync(Guid.NewGuid(), "SimpleFIN", "ACT-2");
+        await linkMissing.Should().ThrowAsync<Exception>();
     }
 }

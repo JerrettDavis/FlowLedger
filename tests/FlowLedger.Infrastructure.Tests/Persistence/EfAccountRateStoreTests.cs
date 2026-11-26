@@ -17,7 +17,7 @@ public sealed class EfAccountRateStoreTests(IntegrationTestFixture fixture) : IA
     {
         var a = TestTenantContext.New();
         var b = TestTenantContext.New();
-        var acct = Guid.NewGuid();
+        var acct = (await fixture.SeedAccountAsync(a)).Value;
 
         await using (var db = fixture.CreateProductionStyleContext(a))
         {
