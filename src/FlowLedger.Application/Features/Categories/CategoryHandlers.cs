@@ -98,6 +98,11 @@ public sealed class CreateCategoryHandler
         CategoryId? parentId = request.ParentId.HasValue
             ? CategoryId.From(request.ParentId.Value)
             : null;
+        if (parentId is { } parent && await _repo.GetByIdAsync(parent, ct) is null)
+        {
+            // The repository is tenant-filtered: a parent from another tenant is indistinguishable from a missing one (#146).
+            throw new ReferencedEntityNotFoundException("Category", parent.Value);
+        }
 
         var category = Category.Create(
             TenantId.From(_tenant.TenantId),
