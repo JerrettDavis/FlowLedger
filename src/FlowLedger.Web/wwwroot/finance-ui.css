@@ -145,8 +145,17 @@ html, body { max-width: 100%; }
   .fl-bar-label { display: none; }
   .fl-appbar .fl-user-name { display: none; }
 }
+/* Phones: share mode, theme and sign out collapse into one overflow menu; wider screens keep them inline. */
+.fl-appbar-overflow { display: none; }
+.fl-inline-form { display: inline; }
+.fl-menu-form-button { all: unset; cursor: pointer; width: 100%; box-sizing: border-box; }
+@media (max-width: 599.98px) {
+  html .fl-appbar-inline { display: none; }
+  .fl-appbar-overflow { display: inline-flex; }
+  .fl-appbar .mud-icon-button, .fl-appbar .mud-button-root { min-width: 44px; min-height: 44px; }
+}
 @media (max-width: 479.98px) {
-  .fl-hide-xs { display: none !important; }
+  html .fl-hide-xs { display: none; }
 }
 
 /* Toolbars: any flex row that holds form controls / buttons wraps rather than overflowing (table-cell action rows keep their nowrap). */
@@ -161,7 +170,7 @@ html, body { max-width: 100%; }
 @media (max-width: 959.98px) {
   .mud-main-content .mud-table-container,
   .mud-main-content .mud-simple-table,
-  .mud-main-content .mud-simple-table .mud-table-container { overflow-x: auto !important; max-width: 100%; }
+  .mud-main-content .mud-simple-table .mud-table-container { overflow-x: auto; max-width: 100%; }
   .mud-main-content .mud-table-root { width: 100%; }
   .mud-main-content table thead th, .mud-main-content table .mud-table-head th { position: static; box-shadow: none; }
   .fl-sheet-wrap { overflow-x: auto; }

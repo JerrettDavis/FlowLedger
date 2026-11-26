@@ -1,0 +1,185 @@
+@namespace FlowLedger.Web.Components.Layout
+@implements IDisposable
+@inject SyncCoordinator Sync
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@inject ILogger<AppBar> Logger
+
+@* The application bar. Below 600px the secondary actions (share mode, theme, sign out) move into one overflow menu so the bar
+   never outgrows a phone; the sync/connect actions stay one tap away as icon buttons. *@
+<MudAppBar Color="Color.Surface" Elevation="0" Class="fl-appbar" aria-label="FlowLedger application bar">
+    <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                   Color="Color.Inherit"
+                   Edge="Edge.Start"
+                   OnClick="OnToggleDrawer"
+                   aria-label="Toggle navigation drawer" />
+    <MudText Typo="Typo.h6" Class="ml-2">FlowLedger</MudText>
+    <MudSpacer />
+    @* Always rendered so assistive tech registers the live region before it changes. *@
+    <span data-testid="sync-status" role="status" aria-live="polite" class="d-inline-flex align-center">
+        @if (Sync.Syncing)
+        {
+            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate="true" Class="mr-2" aria-hidden="true" />
+        }
+        <span class="fl-sr-only">@Sync.Announcement</span>
+    </span>
+    @if (Status.BackupAlert is not null && Status.BackupAlert != _dismissedBackupAlert && Status.Environment == "production")
+    {
+        <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Error" Variant="Variant.Filled" Href="data"
+                 aria-label="Backup warning">@Status.BackupAlert</MudChip>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Inherit"
+                       OnClick="DismissBackupAlertAsync" aria-label="Dismiss backup warning" Class="mr-1" />
+    }
+    @if (Status.Environment is "demo" or "sandbox")
+    {
+        <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="@(Status.Environment == "demo" ? Color.Warning : Color.Info)" Variant="Variant.Outlined"
+                 aria-label="@($"Data environment {Status.Environment}")">@Status.Environment.ToUpperInvariant() DATA</MudChip>
+    }
+    @if (Status.Environment == "production")
+    {
+        @if (IsOwner)
+        {
+            <MudTooltip Text="Link a bank or credit union (opens your provider's secure widget)">
+                <MudButton StartIcon="@Icons.Material.Filled.AccountBalance" Color="Color.Inherit" Variant="Variant.Text"
+                           OnClick="Sync.ConnectBankAsync" Disabled="Sync.Syncing" aria-label="Connect bank">
+                    <span class="fl-bar-label">Connect bank</span>
+                </MudButton>
+            </MudTooltip>
+        }
+        <MudTooltip Text="Fetch new data from your connected institutions">
+            <MudButton StartIcon="@Icons.Material.Filled.CloudSync" Color="Color.Inherit" Variant="Variant.Text"
+                       OnClick="Sync.SyncNowAsync" Disabled="Sync.Syncing" aria-label="Sync now">
+                <span class="fl-bar-label">Sync now</span>
+            </MudButton>
+        </MudTooltip>
+    }
+    else if (!Status.IsKnown)
+    {
+        @* Environment not known yet: reserve the space instead of flashing the wrong action. *@
+        <MudSkeleton Width="120px" Height="36px" Class="mx-2" aria-hidden="true" />
+    }
+    else
+    {
+        <MudTooltip Text="Connect simulated provider and sync demo data">
+            <MudButton StartIcon="@Icons.Material.Filled.CloudSync" Color="Color.Inherit" Variant="Variant.Text"
+                       OnClick="Sync.ConnectAndSyncAsync" Disabled="Sync.Syncing" aria-label="Connect and sync demo data">
+                <span class="fl-bar-label">Connect &amp; Sync</span>
+            </MudButton>
+        </MudTooltip>
+    }
+    <AuthorizeView>
+        <Authorized>
+            @if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst("fl_tenant") is not null)
+            {
+                <MudText Typo="Typo.body2" Class="mx-2 fl-user-name" aria-label="Signed in user">@(context.User.FindFirst("name")?.Value ?? context.User.FindFirst("preferred_username")?.Value ?? context.User.FindFirst("email")?.Value)</MudText>
+                <form method="post" action="/auth/logout" class="fl-appbar-inline fl-inline-form">
+                    <AntiforgeryToken />
+                    <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Logout" aria-label="Sign out"><span class="fl-bar-label">Sign out</span></MudButton>
+                </form>
+            }
+        </Authorized>
+    </AuthorizeView>
+    @if (_share)
+    {
+        <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Info" Variant="Variant.Filled" aria-label="Share mode is on">SHARE MODE</MudChip>
+    }
+    <span class="fl-appbar-inline d-inline-flex">
+        <MudTooltip Text="@(_share ? "Share mode on: amounts hidden. Click to show them again" : "Share mode: hide all amounts, keep charts and categories (safe to screenshot)")">
+            <MudIconButton Icon="@(_share ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.IosShare)"
+                           Color="@(_share ? Color.Info : Color.Inherit)"
+                           OnClick="ToggleShareAsync"
+                           aria-label="Toggle share mode" />
+        </MudTooltip>
+        <MudTooltip Text="@ThemeLabel">
+            <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="OnToggleTheme"
+                           aria-label="@ThemeLabel" />
+        </MudTooltip>
+    </span>
+    <span class="fl-appbar-overflow">
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" AriaLabel="More actions" Dense="true">
+            <MudMenuItem OnClick="ToggleShareAsync" Icon="@(_share ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.IosShare)">
+                @(_share ? "Show amounts" : "Share mode (hide amounts)")
+            </MudMenuItem>
+            <MudMenuItem OnClick="OnToggleTheme" Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)">
+                @(ThemeService.IsDarkMode ? "Light mode" : "Dark mode")
+            </MudMenuItem>
+            <AuthorizeView>
+                <Authorized>
+                    @if (context.User.Identity?.IsAuthenticated == true && context.User.FindFirst("fl_tenant") is not null)
+                    {
+                        <MudMenuItem>
+                            <form method="post" action="/auth/logout">
+                                <AntiforgeryToken />
+                                <button type="submit" class="fl-menu-form-button" aria-label="Sign out">Sign out</button>
+                            </form>
+                        </MudMenuItem>
+                    }
+                </Authorized>
+            </AuthorizeView>
+        </MudMenu>
+    </span>
+</MudAppBar>
+
+@code {
+    private const string DismissKey = "fl-backup-alert-dismissed";
+    private bool _share;
+    private string? _dismissedBackupAlert;
+
+    /// <summary>Environment and backup state from the layout; decides which sync actions exist.</summary>
+    [Parameter, EditorRequired] public LayoutStatus Status { get; set; } = LayoutStatus.Unknown;
+
+    /// <summary>Only the household owner can link banks.</summary>
+    [Parameter] public bool IsOwner { get; set; } = true;
+
+    [Parameter] public EventCallback OnToggleDrawer { get; set; }
+
+    [Parameter] public EventCallback OnToggleTheme { get; set; }
+
+    private string ThemeLabel => ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode";
+
+    protected override void OnInitialized()
+    {
+        Sync.Changed += OnSyncChanged;
+        ThemeService.ThemeChanged += OnSyncChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.get"); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not read share-mode preference"); }
+
+        try { _dismissedBackupAlert = await JS.InvokeAsync<string?>("localStorage.getItem", DismissKey); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not read dismissed backup alert"); }
+
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Sync.Changed -= OnSyncChanged;
+        ThemeService.ThemeChanged -= OnSyncChanged;
+    }
+
+    private void OnSyncChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ToggleShareAsync()
+    {
+        try { _share = await JS.InvokeAsync<bool>("FlowLedgerShare.set", !_share); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not toggle share mode"); }
+    }
+
+    // Dismissal is remembered per alert text, so a different warning (e.g. stale backup) still shows.
+    private async Task DismissBackupAlertAsync()
+    {
+        _dismissedBackupAlert = Status.BackupAlert;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", DismissKey, Status.BackupAlert); }
+        catch (Exception ex) { Logger.LogWarning(ex, "Could not persist backup alert dismissal"); }
+    }
+}
