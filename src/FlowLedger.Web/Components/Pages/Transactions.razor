@@ -30,15 +30,15 @@
 <MudPaper Elevation="0" Class="pa-3 mb-4" Style="border: 1px solid var(--mud-palette-divider);">
     <MudGrid>
         <MudItem xs="12" sm="4" md="3">
-            <MudDatePicker @bind-Date="_fromDate" Label="From" Clearable="true"
+            <MudDatePicker Date="_fromDate" DateChanged="OnFromChanged" Label="From" Clearable="true"
                            aria-label="Filter from date" />
         </MudItem>
         <MudItem xs="12" sm="4" md="3">
-            <MudDatePicker @bind-Date="_toDate" Label="To" Clearable="true"
+            <MudDatePicker Date="_toDate" DateChanged="OnToChanged" Label="To" Clearable="true"
                            aria-label="Filter to date" />
         </MudItem>
         <MudItem xs="12" sm="4" md="3">
-            <MudSelect @bind-Value="_filterAccountId" Label="Account" Clearable="true"
+            <MudSelect T="Guid?" Value="_filterAccountId" ValueChanged="OnAccountChanged" Label="Account" Clearable="true"
                        aria-label="Filter by account">
                 @foreach (var a in _accounts)
                 {
@@ -52,7 +52,7 @@
                           aria-label="Search transactions" />
         </MudItem>
         <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
-            <MudCheckBox T="bool" @bind-Value="_includeHidden" Label="Include hidden accounts" Dense="true"
+            <MudCheckBox T="bool" Value="_includeHidden" ValueChanged="OnIncludeHiddenChanged" Label="Include hidden accounts" Dense="true"
                          aria-label="Include hidden accounts" />
         </MudItem>
         <MudItem xs="12" sm="4" md="3" Class="d-flex align-center">
@@ -64,8 +64,8 @@
                        Variant="Variant.Filled"
                        OnClick="LoadAsync"
                        FullWidth="true"
-                       aria-label="Apply filters">
-                Filter
+                       aria-label="Reload transactions">
+                Reload
             </MudButton>
         </MudItem>
     </MudGrid>
@@ -221,7 +221,7 @@
     private Guid? _filterAccountId;
     private bool _includeHidden;
     private string? _search;
-    private bool _applyToMerchant = true;
+    private bool _applyToMerchant;
     private bool _categorizing;
     private const int TakeLimit = 5000;
 
@@ -318,11 +318,38 @@
         }
     }
 
+    // Filters apply as soon as they change (one reload each), no separate Filter press needed.
+    private Task OnFromChanged(DateTime? value) { _fromDate = value; return LoadAsync(); }
+
+    private Task OnToChanged(DateTime? value) { _toDate = value; return LoadAsync(); }
+
+    private Task OnAccountChanged(Guid? value) { _filterAccountId = value; return LoadAsync(); }
+
+    private Task OnIncludeHiddenChanged(bool value) { _includeHidden = value; return LoadAsync(); }
+
     private async Task SetCategory(FlowLedger.Web.ApiClient.TransactionDto tx, FlowLedger.Web.ApiClient.CategoryDto category)
     {
         try
         {
-            var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, _applyToMerchant);
+            var applyToMerchant = _applyToMerchant;
+            var others = applyToMerchant ? MerchantMatch.CountOthers(_transactions, tx) : 0;
+            if (others > 0)
+            {
+                // Bulk recategorisation must be explicit: say how many rows it touches and let the user narrow it.
+                var choice = await Dialogs.ShowMessageBoxAsync(
+                    "Apply to the same merchant?",
+                    $"Set {others} other loaded transaction{(others == 1 ? "" : "s")} from {MerchantMatch.Key(tx)} to {category.Path} as well? " +
+                    "Rows outside the current list may also match.",
+                    yesText: $"Apply to {others + 1}", noText: "Only this one", cancelText: "Cancel");
+                if (choice is null)
+                {
+                    return;
+                }
+
+                applyToMerchant = choice == true;
+            }
+
+            var changed = await ApiClient.SetTransactionCategoryAsync(tx.Id, category.Id, applyToMerchant);
             Snackbar.Add(changed > 1 ? $"Set {changed} transactions to {category.Path}" : $"Set to {category.Path}", Severity.Success);
             if (changed > 1)
             {
