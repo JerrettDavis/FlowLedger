@@ -47,7 +47,7 @@ public sealed class MigrationLockTests(IntegrationTestFixture fixture)
                 .UseNpgsql(connectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
                 .EnableServiceProviderCaching(false)
                 .Options;
-            return new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), null);
+            return new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), FlowLedger.Infrastructure.Persistence.UnscopedTenantContext.Instance);
         });
         return services.BuildServiceProvider();
     }

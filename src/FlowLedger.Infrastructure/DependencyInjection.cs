@@ -51,7 +51,9 @@ public static class DependencyInjection
         configuration.GetSection(FlowLedger.Application.Features.LocalAi.LocalAiOptions.SectionName).Bind(localAi);
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.LocalAi.LocalAiOptions>(services);
         services.AddSingleton(localAi);
-        services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30));
+        // No auto-redirect + connect-time IP guard (public addresses only): LocalModelManager validates every redirect hop itself.
+        services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30))
+            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler);
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>();
         services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiModels>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>());
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LlamaSharpLocalLlm>();
