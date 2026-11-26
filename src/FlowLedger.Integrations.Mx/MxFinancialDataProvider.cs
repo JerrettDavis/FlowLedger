@@ -258,7 +258,11 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             throw new NeedsUserActionProviderException(
                 "No financial institution connected yet. Use Connect to add one.",
                 userHint: "Connect a bank account using the Connect button.",
-                providerCode: "NoMembers");
+                providerCode: "NoMembers")
+            {
+                // Nothing is wrong with a credential: the user simply has not linked an institution yet.
+                Kind = ProviderIssueKind.Disconnected,
+            };
         }
 
         var ready = members.FirstOrDefault(m => Classify(m) == MemberReadiness.Ready);
@@ -334,10 +338,14 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                 memberGuid, attempt, maxAttempts, current.ConnectionStatus, current.IsBeingAggregated);
         }
 
-        throw new NeedsUserActionProviderException(
+        // The member is healthy, just not finished aggregating. That is retryable, not a reason to ask the user to act.
+        throw new TransientProviderException(
             "Account is still connecting; data will appear shortly.",
-            userHint: "Your bank connection is in progress. Please try syncing again in a moment.",
-            providerCode: "StillAggregating");
+            retryAfter: TimeSpan.FromMinutes(1),
+            providerCode: "StillAggregating")
+        {
+            Kind = ProviderIssueKind.ProviderUnavailable,
+        };
     }
 
     [System.Diagnostics.CodeAnalysis.DoesNotReturn]

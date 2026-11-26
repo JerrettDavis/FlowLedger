@@ -329,10 +329,10 @@ public sealed class MxSyncBehaviorTests : IDisposable
 
     /// <summary>
     /// Aggregation poll cap reached: member never becomes ready within MaxPollAttempts.
-    /// Must throw NeedsUserActionProviderException, not hang forever.
+    /// Must throw a retryable TransientProviderException, not hang forever.
     /// </summary>
     [Fact]
-    public async Task StillAggregatingAfterPollCap_throws_NeedsUserAction()
+    public async Task StillAggregatingAfterPollCap_throws_retryable_transient()
     {
         StubCreateUser();
 
@@ -346,10 +346,14 @@ public sealed class MxSyncBehaviorTests : IDisposable
 
         var act = async () => await provider.BeginConnectionAsync(TestTenant);
 
-        var ex = await act.Should().ThrowAsync<NeedsUserActionProviderException>(
-            "when the poll cap is reached, the provider must give up and surface ActionRequired, not hang");
+        var ex = await act.Should().ThrowAsync<TransientProviderException>(
+            "when the poll cap is reached, the provider must give up and surface a retryable condition, not hang");
 
         ex.Which.Message.ToUpperInvariant().Should().Contain("STILL CONNECTING");
+        ex.Which.RetryAfter.Should().BeGreaterThan(TimeSpan.Zero);
+        var issue = ProviderIssue.FromException(ex.Which);
+        issue.Retryable.Should().BeTrue();
+        issue.RequiresUserAction.Should().BeFalse("a connection that is still aggregating is healthy and must keep being retried");
 
         // Must have polled exactly maxPollAttempts times
         var statusPath = $"/users/{UserGuid}/members/{MemberGuid}/status";
