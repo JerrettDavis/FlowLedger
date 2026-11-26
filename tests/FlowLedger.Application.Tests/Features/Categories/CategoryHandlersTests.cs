@@ -21,6 +21,14 @@ public sealed class CategoryHandlersTests
     }
 
     [Fact]
+    public async Task CreateCategory_with_a_parent_that_is_not_in_the_tenant_is_rejected()
+    {
+        var handler = new CreateCategoryHandler(_repo, _tenant);
+        var act = () => handler.HandleAsync(new CreateCategoryRequest("Food/Groceries", "Groceries", Guid.NewGuid()));
+        await act.Should().ThrowAsync<FlowLedger.Application.Abstractions.ReferencedEntityNotFoundException>();
+    }
+
+    [Fact]
     public async Task GetCategory_ExistingId_ReturnsDto()
     {
         var createHandler = new CreateCategoryHandler(_repo, _tenant);
