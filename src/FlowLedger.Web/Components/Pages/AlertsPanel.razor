@@ -1,6 +1,13 @@
 @inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
 
-@if (_alerts is { Count: > 0 })
+@if (_failed)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4" role="alert">
+        Couldn't load alerts.
+        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit" OnClick="LoadAsync">Retry</MudButton>
+    </MudAlert>
+}
+else if (_alerts is { Count: > 0 })
 {
     <div class="mb-4" role="region" aria-label="Alerts">
         @foreach (var a in _alerts)
@@ -14,17 +21,22 @@
 
 @code {
     private List<FlowLedger.Web.ApiClient.AlertDto>? _alerts;
+    private bool _failed;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
-        // Alerts are supplementary: if the API is unreachable the page should still render, not take the circuit down.
+        // Alerts are supplementary: if the API is unreachable the page still renders, with a retry instead of silence.
         try
         {
             _alerts = await ApiClient.GetAlertsAsync();
+            _failed = false;
         }
         catch (Exception ex) when (ex is FlowLedger.Web.ApiClient.ApiClientException or HttpRequestException or TaskCanceledException)
         {
             _alerts = null;
+            _failed = true;
         }
     }
 }
