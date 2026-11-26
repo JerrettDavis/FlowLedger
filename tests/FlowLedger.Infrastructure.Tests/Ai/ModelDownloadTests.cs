@@ -1,6 +1,7 @@
 using System.Net;
 using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Infrastructure.Ai.Local;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
