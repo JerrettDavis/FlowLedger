@@ -9,7 +9,7 @@ web and API log lines of a request. The W3C `traceparent` header also propagates
 standard HTTP instrumentation, so traces join up in your OTLP backend.
 
 Not done yet: the worker does not start a trace per job run, so worker log lines do not share an id with the request
-that triggered them.
+that triggered them (a Quartz job listener cannot set the ambient activity for the job body; it needs a job wrapper).
 
 ## Metrics
 
@@ -21,6 +21,34 @@ Meter `FlowLedger`, exported when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 | `flowledger.job.duration` (s) | `job`, `outcome` | Run duration. |
 | `flowledger.job.last_success_age` (s) | `job` | Seconds since the last successful run (absent until the first success after a restart). |
 | `flowledger.provider.calls` | `provider`, `status` (2xx, 4xx, 5xx, error) | Outbound provider API calls. |
+| `flowledger.sync.runs` | `outcome` (success, failure, throttled, already_running) | Financial syncs. |
+| `flowledger.sync.duration` (s) | `outcome` | Duration of syncs that actually ran. |
+| `flowledger.outbox.messages` | `outcome` (delivered, retried, dead_lettered) | Outbox deliveries; `dead_lettered` needs a human. |
+| `flowledger.webhook.received` | `provider`, `outcome` (accepted, duplicate, invalid_signature, too_large) | Inbound provider webhooks. A burst of `invalid_signature` is someone probing the endpoint. |
+| `flowledger.audit.events` | `action` | Audit events written. |
+
+The `Npgsql` meter (connection pool and command metrics) and the `Npgsql` trace source are exported too.
+
+## JSON logs
+
+`Logging__Format=json` makes every host write one JSON object per line (timestamp UTC, level, category, message, and the
+scopes, which carry the correlation id). The compose file sets it by default; `LOGGING__FORMAT=simple` restores plain
+console output. Unset, the hosts keep the human-readable console.
+
+## Audit log
+
+Sensitive actions append a row to `audit_events` (created on first use, included in backups and restored with them):
+`occurred_utc, tenant_id, actor, action, target, remote_ip, trace_id, status_code`. `trace_id` is the same W3C trace id that
+appears in the logs, so a row can be joined to the log lines of that request. Audited actions: `connector.link`,
+`connector.unlink`, `connector.connect`, `connector.mx_connect`, `connector.quiltt_session`, `data.export`, `data.import`,
+`data.backup_now`, `home_assistant.save`, `integration.create|update|delete|rotate_secret`, `user.link_code|link|unlink`.
+Failed and denied attempts are recorded as well (`status_code`). The table is append-only by construction (the application has
+no update or delete path), not by a database trigger; restrict the database role if you need it enforced. A failed audit write
+is logged and does not change the response.
+
+```sql
+SELECT occurred_utc, actor, action, target, status_code FROM audit_events ORDER BY id DESC LIMIT 50;
+```
 
 ## Sample alert rules (Prometheus syntax, unverified)
 
@@ -54,6 +82,7 @@ Prometheus, so it commonly becomes `exported_job`); adjust the selectors to matc
 
 ## Not yet implemented
 
-- Append-only audit log of sensitive actions (link/unlink, key changes, export/import/backup-now, destructive edits).
-  It needs a new table, so it is tracked separately from this slice.
-- JSON console logging in Production, Npgsql/EF/Quartz instrumentation, dashboards.
+- Failed API-key authentication attempts are not written to `audit_events` (an anonymous caller could otherwise fill the table);
+  they are visible in the request logs only.
+- Destructive edits of ordinary data (delete a transaction, ...) are not audited, only the actions listed above.
+- EF and Quartz instrumentation, a trace per worker job, dashboards.

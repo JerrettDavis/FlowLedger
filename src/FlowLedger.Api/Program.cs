@@ -213,6 +213,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseRateLimiter(); // after authentication: partitions trust the tenant header only for valid API-key callers
 app.UseAuthorization();
+app.UseMiddleware<FlowLedger.Api.Middleware.AuditMiddleware>(); // append-only audit_events row for sensitive endpoints
 
 // ── Aspire health + liveness endpoints (anonymous, all environments) ─────────
 app.MapDefaultEndpoints();
