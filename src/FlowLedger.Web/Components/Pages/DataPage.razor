@@ -83,9 +83,9 @@ else
                     <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Provider calls are PAUSED (kill switch on).</MudAlert>
                 }
                 <MudText Typo="Typo.body2">Today: @_status.ProviderUsage.CallsToday of @Budget(_status.ProviderUsage.DailyBudget)</MudText>
-                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsToday, _status.ProviderUsage.DailyBudget)" Class="mb-3" />
+                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsToday, _status.ProviderUsage.DailyBudget)" Class="mb-3" aria-label="Provider calls today" />
                 <MudText Typo="Typo.body2">This month: @_status.ProviderUsage.CallsThisMonth of @Budget(_status.ProviderUsage.MonthlyBudget)</MudText>
-                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsThisMonth, _status.ProviderUsage.MonthlyBudget)" Class="mb-3" />
+                <MudProgressLinear Value="@Pct(_status.ProviderUsage.CallsThisMonth, _status.ProviderUsage.MonthlyBudget)" Class="mb-3" aria-label="Provider calls this month" />
                 @if (_status.ProviderUsage.ByEndpoint.Count > 0)
                 {
                     <MudText Typo="Typo.overline" Class="fl-muted">Endpoints this month</MudText>

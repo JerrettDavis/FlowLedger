@@ -140,7 +140,7 @@
                 @foreach (var group in _reports.Where(r => r.Kind == "View").GroupBy(r => r.IsPreset).OrderBy(g => g.Key))
                 {
                     <MudText Typo="Typo.overline" Color="Color.Secondary">@(group.Key ? "Preset views" : "My views")</MudText>
-                    <MudList T="string" Dense="true" Class="pa-0">
+                    <MudList T="string" Dense="true" Class="pa-0" aria-label="@(group.Key ? "Preset views" : "My views")">
                         @foreach (var r in group)
                         {
                             <MudListItem T="string" OnClick="() => LoadViewAsync(r)" Text="@r.Name" Icon="@Icons.Material.Filled.ShowChart" />
