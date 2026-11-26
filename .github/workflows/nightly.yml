@@ -1,0 +1,55 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 2 * * *'   # daily 02:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  repeat-suite:
+    name: Test suite x3 (flake detection)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build --configuration Release
+      - name: Run the unit suite three times
+        run: |
+          for i in 1 2 3; do
+            echo "::group::run $i"
+            dotnet test --no-build --configuration Release \
+              --filter "Category!=E2E" \
+              --logger "trx;LogFileName=run-$i.trx" \
+              --results-directory "./artifacts/nightly/run-$i" || failed=1
+            echo "::endgroup::"
+          done
+          exit "${failed:-0}"
+      - name: Upload TRX results (trend)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-trx
+          path: artifacts/nightly/**/*.trx
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Open or update an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Nightly verification failed"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          body="The nightly suite repeat failed: $RUN_URL"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
