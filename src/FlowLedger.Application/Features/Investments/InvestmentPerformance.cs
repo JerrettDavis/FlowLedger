@@ -95,7 +95,9 @@ public sealed class InvestmentPerformanceService(
             .Where(t => FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsReal(t.Status))
             .Select(TransactionMapper.ToDto).ToList();
         var transferIds = TransferDetector.Detect(dtos, accountTypes);
-        var points = await history.DailyAccountBalancesAsync(ct);
+        var points = from is { } windowStart
+            ? await history.DailyAccountBalancesAsync(windowStart, to, ct)
+            : await history.DailyAccountBalancesAsync(ct);
 
         var list = new List<AccountPerformance>();
         foreach (var a in investment)
