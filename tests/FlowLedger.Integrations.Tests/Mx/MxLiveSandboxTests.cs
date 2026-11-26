@@ -1,15 +1,15 @@
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
+using FlowLedger.TestSupport;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 
 /// <summary>
-/// Opt-in confirmation tests against the REAL MX sandbox. Kept skipped in CI and never require
-/// credentials there. To run against a live MX Sandbox, set the environment variables and remove
-/// the Skip:
+/// Opt-in confirmation tests against the REAL MX sandbox. Skipped unless Mx__ApiKey is set (see LiveFact), so CI never
+/// needs credentials. To run against a live MX Sandbox, set the environment variables:
 ///   set Mx__Enabled=true
 ///   set Mx__ApiKey=&lt;your-key&gt;
 ///   set Mx__ClientId=&lt;your-client-id&gt;
@@ -23,10 +23,6 @@ namespace FlowLedger.Integrations.Tests.Mx;
 [Trait("Category", "LiveMx")]
 public sealed class MxLiveSandboxTests
 {
-    private const string SkipReason =
-        "LiveMx: requires a real MX sandbox key (Mx__ApiKey). Skipped in CI by design — " +
-        "remove Skip and set Mx__* env vars to run against the MX Sandbox.";
-
     private static IServiceProvider BuildProviderFromEnvironment()
     {
         var config = new ConfigurationBuilder()
@@ -40,7 +36,7 @@ public sealed class MxLiveSandboxTests
         return services.BuildServiceProvider();
     }
 
-    [Fact(Skip = SkipReason)]
+    [LiveFact("Mx__ApiKey")]
     public async Task Live_round_trip_connect_accounts_transactions()
     {
         using var sp = (ServiceProvider)BuildProviderFromEnvironment();

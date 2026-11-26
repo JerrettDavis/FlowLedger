@@ -1,0 +1,33 @@
+{
+  "errors": [],
+  "accounts": [
+    {
+      "org": { "domain": "bank.example", "sfin-url": "https://bank.example/simplefin", "name": "Example Credit Union", "url": "https://bank.example", "id": "bank.example" },
+      "id": "ACT-0001",
+      "name": "Everyday Checking",
+      "currency": "USD",
+      "balance": "2412.37",
+      "available-balance": "2312.37",
+      "balance-date": 1795046400,
+      "transactions": [
+        { "id": "TRN-0001", "posted": 1794700800, "amount": "-54.12", "description": "GROCERY MART #123 ANYTOWN ST", "transacted_at": 1794614400 },
+        { "id": "TRN-0002", "posted": 1794787200, "amount": "3200.00", "description": "EXAMPLE EMPLOYER PAYROLL", "transacted_at": 1794787200 },
+        { "id": "TRN-0003", "posted": 1794960000, "amount": "-9.99", "description": "STREAMING SERVICE", "transacted_at": 1794873600 },
+        { "id": "TRN-0004", "posted": 0, "amount": "-18.40", "description": "COFFEE SHOP PENDING", "pending": true, "transacted_at": 1795046400 }
+      ]
+    },
+    {
+      "org": { "domain": "cards.example", "sfin-url": "https://cards.example/simplefin", "name": "Example Card Services", "url": "https://cards.example", "id": "cards.example" },
+      "id": "ACT-0002",
+      "name": "Rewards Visa",
+      "currency": "USD",
+      "balance": "-350.25",
+      "available-balance": "4649.75",
+      "balance-date": 1795046400,
+      "transactions": [
+        { "id": "TRN-0101", "posted": 1794873600, "amount": "-42.00", "description": "ONLINE RETAILER ORDER", "transacted_at": 1794787200 },
+        { "id": "TRN-0102", "posted": 1794960000, "amount": "500.00", "description": "PAYMENT THANK YOU", "transacted_at": 1794960000 }
+      ]
+    }
+  ]
+}
