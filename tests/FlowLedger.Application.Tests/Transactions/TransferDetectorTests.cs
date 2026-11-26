@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
@@ -19,8 +20,11 @@ public sealed class TransferDetectorTests
     };
 
     private static TransactionDto Tx(Guid account, decimal amount, string dir, int day, string desc = "x", string status = "Posted") =>
-        new(Guid.NewGuid(), account, amount, "USD", dir, desc, status, "Import",
-            new DateOnly(2026, 11, day), new DateOnly(2026, 11, day), null, null, null, null, DateTimeOffset.UtcNow);
+        TransactionDtoBuilder.A()
+            .OnAccount(account).WithAmount(amount).Described(desc).WithStatus(status)
+            .On(new DateOnly(2026, 11, day))
+            .With(b => dir == "Credit" ? b.Credit() : b.Debit())
+            .Build();
 
     [Fact]
     public void Opposite_legs_on_different_accounts_are_a_transfer()
