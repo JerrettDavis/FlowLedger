@@ -68,7 +68,7 @@ public sealed class ApiKeyAuthenticationHandler(
             FailureCounter.Add(1);
             Logger.LogWarning(
                 "API key authentication failed for {Method} {Path} from {RemoteIp}",
-                Request.Method, Request.Path.Value, Context.Connection.RemoteIpAddress);
+                Request.Method, Request.Path.Value?.ReplaceLineEndings("").Replace("	", ""), Context.Connection.RemoteIpAddress);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
