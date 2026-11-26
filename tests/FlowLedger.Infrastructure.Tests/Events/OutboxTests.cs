@@ -26,7 +26,7 @@ public sealed class OutboxTests : IAsyncLifetime
 
     private sealed class ManualTime : TimeProvider
     {
-        private DateTimeOffset _now = DateTimeOffset.UtcNow.AddMinutes(1); // ahead of event times so freshly raised events are already due
+        private DateTimeOffset _now = new(2100, 1, 1, 0, 0, 0, TimeSpan.Zero); // far ahead of the wall-clock event times, so freshly raised events are already due
         public override DateTimeOffset GetUtcNow() => _now;
         public void Advance(TimeSpan by) => _now += by;
     }
@@ -236,7 +236,7 @@ public sealed class OutboxTests : IAsyncLifetime
         {
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(
-                "UPDATE outbox_messages SET lock_token = gen_random_uuid(), locked_until_utc = now() + interval '1 minute'", conn);
+                "UPDATE outbox_messages SET lock_token = gen_random_uuid(), locked_until_utc = '2100-01-01T00:01:00Z'", conn);
             await cmd.ExecuteNonQueryAsync();
         }
 
@@ -245,7 +245,6 @@ public sealed class OutboxTests : IAsyncLifetime
         (await processor.ProcessBatchAsync()).Should().Be(0, "a live lease is respected");
 
         _time.Advance(TimeSpan.FromMinutes(5));
-        // The fake clock only moves forward from wall time, so the lease written with now() is already behind it.
         (await processor.ProcessBatchAsync()).Should().Be(1);
         log.Should().BeEquivalentTo(["A", "B"]);
     }
