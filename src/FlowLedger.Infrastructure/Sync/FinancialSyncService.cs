@@ -5,7 +5,6 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Integrations.Abstractions;
-using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -83,7 +82,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private void EnsureTenantMayUseProvider()
     {
         if (_householdTenantId is { } household
-            && _provider.ProviderName is not (ConnectorIds.Simulated or ConnectorIds.Quiltt) // Quiltt keeps one profile per tenant
+            && !_provider.Traits.HasFlag(ConnectorTraits.PerTenantAccess) // e.g. Quiltt keeps one profile per tenant
             && _tenant.TenantId != household)
         {
             throw new NeedsUserActionProviderException(
@@ -228,14 +227,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
         // Step 1: reuse the persisted member (provision only on the very first sync).
-        if (_provider.ProviderName == ConnectorIds.Quiltt
-            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == ConnectorIds.Quiltt, ct))
+        if (_provider.Traits.HasFlag(ConnectorTraits.UserInitiatedLinking)
+            && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == _provider.ProviderName, ct))
         {
             return new SyncResult(0, 0, 0, 0); // this tenant has not linked a bank through the Quiltt Connector yet
         }
 
         var memberRef = await GetOrProvisionConnectionAsync(
-            tenantId, ct, allowProvision: _provider.ProviderName is ConnectorIds.Simulated or ConnectorIds.SimpleFin); // both provision locally, no billable call (SimpleFIN only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
+            tenantId, ct, allowProvision: _provider.Traits.HasFlag(ConnectorTraits.ProvisionsLocally)); // no billable call (a household-only connector only ever reaches here for the household tenant, see EnsureTenantMayUseProvider)
 
         // Persist the real member id once the placeholder resolves, so later syncs skip ListMembers.
         if (_provider is IMemberIdResolver resolver)
@@ -759,8 +758,8 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         TenantId tenantId,
         CancellationToken ct)
     {
-        // Recurring flow seeding is only performed for the simulated provider.
-        if (_provider is not SimulatedFinancialDataProvider)
+        // Only demo-data connectors seed recurring flows.
+        if (_provider is not IRecurringFlowSeedSource seedSource)
         {
             return 0;
         }
@@ -783,7 +782,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             return 0;
         }
 
-        var seeds = SimulatedDataFactory.GetRecurringFlowSeeds(
+        var seeds = seedSource.GetRecurringFlowSeeds(
             checkingEntry.Key,
             creditEntry.Value is not null ? creditEntry.Key : checkingEntry.Key);
 
@@ -846,7 +845,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         return added;
     }
 
-    private static RecurrencePattern BuildRecurrencePattern(SimulatedRecurringFlowSeed seed)
+    private static RecurrencePattern BuildRecurrencePattern(RecurringFlowSeed seed)
     {
         return seed.FrequencyName switch
         {
@@ -879,7 +878,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     /// reports what you owe. The sign is kept: an overpaid card stays a negative debt (a credit), never flipped.
     /// </summary>
     private decimal ToOwed(decimal providerAmount) =>
-        _provider.ProviderName is ConnectorIds.SimpleFin or ConnectorIds.Quiltt ? -providerAmount : providerAmount;
+        _provider.Traits.HasFlag(ConnectorTraits.ReportsHoldingsSign) ? -providerAmount : providerAmount;
 
     /// <summary>Maps a canonical provider type token; false (no change) when the type is unknown/unmapped.</summary>
     private static bool TryMapProviderAccountType(string providerType, out AccountType type)

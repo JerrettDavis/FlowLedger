@@ -54,7 +54,7 @@ public sealed class ProviderConnectionReuseTests : IAsyncLifetime
     {
         var tenant = TestTenantContext.New();
         var inner = new SimulatedFinancialDataProvider(Options.Create(new SimulatedProviderOptions()));
-        var realLike = new CountingProvider(inner, nameOverride: "MX");
+        var realLike = new CountingProvider(inner, nameOverride: "MX", traits: ConnectorTraits.BillablePerCall);
 
         await using var db = _fixture.CreateDbContext(tenant);
         var svc = new FinancialSyncService(
@@ -66,11 +66,12 @@ public sealed class ProviderConnectionReuseTests : IAsyncLifetime
         realLike.BeginConnectionCalls.Should().Be(0, "a scheduler/webhook sync must never create billable provider users or members");
     }
 
-    private sealed class CountingProvider(IFinancialDataProvider inner, string? nameOverride = null) : IFinancialDataProvider
+    private sealed class CountingProvider(IFinancialDataProvider inner, string? nameOverride = null, ConnectorTraits? traits = null) : IFinancialDataProvider
     {
         public int BeginConnectionCalls { get; private set; }
         public string ProviderName => nameOverride ?? inner.ProviderName;
         public ProviderCapabilities Capabilities => inner.Capabilities;
+        public ConnectorTraits Traits => traits ?? inner.Traits;
 
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default)
         {

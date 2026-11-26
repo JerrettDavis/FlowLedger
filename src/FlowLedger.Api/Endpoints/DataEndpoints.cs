@@ -194,7 +194,7 @@ internal static class DataEndpoints
 
     internal sealed record OffboardRequest(Guid ConfirmTenantId);
 
-    private const string MxProvider = "MX";
+    private const string MxProvider = FlowLedger.Integrations.Abstractions.ConnectorIds.Mx;
 
     /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
     internal const long MaxImportBytes = 256L * 1024 * 1024;
