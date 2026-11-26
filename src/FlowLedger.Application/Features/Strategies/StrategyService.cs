@@ -72,8 +72,8 @@ public sealed class StrategyService(
         var recent = data.Months.TakeLast(6).ToList();
         var income = recent.Count > 0 ? recent.Average(m => m.Income) : 0m;
         var spend = recent.Count > 0 ? recent.Average(m => m.Spend) : 0m;
-        var debts = data.Accounts.Where(a => a.IsLiability && a.Rate is > 0 && a.Balance != 0)
-            .Select(a => new GoalDebt(a.Name, Math.Abs(a.Balance), a.Rate!.Value, a.RemainingMonths ?? 60)).ToList();
+        var debts = data.Accounts.Where(a => a.IsLiability && a.Rate is > 0 && a.Balance > 0)
+            .Select(a => new GoalDebt(a.Name, a.Balance, a.Rate!.Value, a.RemainingMonths ?? 60)).ToList();
         return GoalPlanner.Plan(r, new GoalContext(income, spend, debts), data.Rates);
     }
 

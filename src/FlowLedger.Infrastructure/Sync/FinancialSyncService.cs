@@ -282,7 +282,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             await _db.BalanceSnapshots.AddAsync(AccountBalanceSnapshotRecord.Create(
                 _tenant.TenantId, domainAccount.AccountId.Value, _provider.ProviderName, pa.ProviderId,
                 domainAccount.TypeLockedByUser && Account.IsLiabilityType(domainAccount.AccountType)
-                    ? Math.Abs(pa.Balance.Amount)
+                    ? ToOwed(pa.Balance.Amount)
                     : pa.Balance.Amount,
                 pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
 
@@ -361,7 +361,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 && Account.IsLiabilityType(existing.AccountType)
                 && !(TryMapProviderAccountType(pa.AccountType, out var providerType) && Account.IsLiabilityType(providerType)))
             {
-                providerAmount = Math.Abs(providerAmount);
+                providerAmount = ToOwed(providerAmount);
             }
 
             // Update balance if changed (account may carry a stale balance from last sync)
@@ -731,6 +731,14 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // Collapse whitespace, trim, uppercase for stable fingerprinting
         return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
     }
+
+    /// <summary>
+    /// Converts a provider balance to FlowLedger's "owed is positive" convention for a liability the user pinned
+    /// by hand. SimpleFIN and Quiltt report what you HAVE (a card owing 200 is -200), so negate once; MX already
+    /// reports what you owe. The sign is kept: an overpaid card stays a negative debt (a credit), never flipped.
+    /// </summary>
+    private decimal ToOwed(decimal providerAmount) =>
+        _provider.ProviderName is "SimpleFIN" or "Quiltt" ? -providerAmount : providerAmount;
 
     /// <summary>Maps a canonical provider type token; false (no change) when the type is unknown/unmapped.</summary>
     private static bool TryMapProviderAccountType(string providerType, out AccountType type)

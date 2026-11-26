@@ -66,6 +66,17 @@ public sealed class SimpleFinProviderTests
     }
 
     [Fact]
+    public async Task Overpaid_card_keeps_its_sign_as_a_negative_amount_owed()
+    {
+        var json = Json(Today).Replace("\"-350.25\"", "\"200.00\"");
+        var (p, _) = Make(json);
+        var accounts = await p.GetAccountsAsync("simplefin");
+
+        accounts[1].AccountType.Should().Be("CREDIT_CARD");
+        accounts[1].Balance.Amount.Should().Be(-200m); // the bank owes the customer 200
+    }
+
+    [Fact]
     public async Task One_http_call_serves_accounts_and_all_transactions()
     {
         var (p, h) = Make(Json(Today));

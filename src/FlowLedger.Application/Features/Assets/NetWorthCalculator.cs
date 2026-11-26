@@ -32,7 +32,7 @@ public static class NetWorthCalculator
         var accountAssets = activeAccounts.Values
             .Where(a => AssetAccountTypes.Contains(a.AccountType)).Sum(a => a.CurrentBalance.Amount);
         var liabilities = activeAccounts.Values
-            .Where(a => LiabilityAccountTypes.Contains(a.AccountType)).Sum(a => Math.Abs(a.CurrentBalance.Amount));
+            .Where(a => LiabilityAccountTypes.Contains(a.AccountType)).Sum(a => a.CurrentBalance.Amount);
 
         decimal physical = 0m;
         decimal carried = 0m;

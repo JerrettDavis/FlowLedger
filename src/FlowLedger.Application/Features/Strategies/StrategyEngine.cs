@@ -241,17 +241,17 @@ public static class StrategyEngine
     private static void AddDebt(List<Suggestion> list, StrategyInputs input, decimal liquid, decimal avgSpend)
     {
         var r = input.Rates;
-        var cards = input.Accounts.Where(a => a.Type == "CreditCard" && Math.Abs(a.Balance) >= 100).ToList();
-        var owed = cards.Sum(a => Math.Abs(a.Balance));
+        var cards = input.Accounts.Where(a => a.Type == "CreditCard" && a.Balance >= 100).ToList();
+        var owed = cards.Sum(a => a.Balance);
         if (owed <= 0)
         {
             return;
         }
 
         decimal AprOf(AccountSnapshot a) => a.Rate ?? r.CreditCard;
-        var annualInterest = cards.Sum(a => Math.Abs(a.Balance) * AprOf(a) / 100m);
-        var evidence = cards.OrderByDescending(a => Math.Abs(a.Balance)).Take(5)
-            .Select(a => $"{a.Name}: {Money(Math.Abs(a.Balance))} owed at {Pct(AprOf(a))}" + (a.Rate is null ? " (assumed market average)" : " (your rate)")).ToList();
+        var annualInterest = cards.Sum(a => a.Balance * AprOf(a) / 100m);
+        var evidence = cards.OrderByDescending(a => a.Balance).Take(5)
+            .Select(a => $"{a.Name}: {Money(a.Balance)} owed at {Pct(AprOf(a))}" + (a.Rate is null ? " (assumed market average)" : " (your rate)")).ToList();
         evidence.Add($"Fixed-rate personal loans for consolidation average about {Pct(r.PersonalLoan)}.");
         var unknown = cards.Any(a => a.Rate is null);
         var spare = liquid - avgSpend * 3;
@@ -269,7 +269,7 @@ public static class StrategyEngine
         }
         else if (owed >= 1000)
         {
-            var saving = cards.Sum(a => Math.Max(0, Math.Abs(a.Balance) * (AprOf(a) - r.PersonalLoan) / 100m));
+            var saving = cards.Sum(a => Math.Max(0, a.Balance * (AprOf(a) - r.PersonalLoan) / 100m));
             if (saving >= MinAnnualImpact)
             {
                 list.Add(new Suggestion(
@@ -286,9 +286,9 @@ public static class StrategyEngine
     private static void AddHousingAndAuto(List<Suggestion> list, StrategyInputs input)
     {
         var r = input.Rates;
-        foreach (var m in input.Accounts.Where(a => a.Type == "Mortgage" && Math.Abs(a.Balance) >= 20_000))
+        foreach (var m in input.Accounts.Where(a => a.Type == "Mortgage" && a.Balance >= 20_000))
         {
-            var bal = Math.Abs(m.Balance);
+            var bal = m.Balance;
             if (m.Rate is { } rate)
             {
                 // Real numbers: closing costs ~2% of the balance, new 30-year at today's market rate, same remaining horizon for the old loan.
@@ -333,10 +333,10 @@ public static class StrategyEngine
             }
         }
 
-        foreach (var a in input.Accounts.Where(a => a.Type == "Loan" && Math.Abs(a.Balance) >= 3000
+        foreach (var a in input.Accounts.Where(a => a.Type == "Loan" && a.Balance >= 3000
             && (a.Name.Contains("auto", StringComparison.OrdinalIgnoreCase) || a.Name.Contains("car", StringComparison.OrdinalIgnoreCase))))
         {
-            var bal = Math.Abs(a.Balance);
+            var bal = a.Balance;
             if (a.Rate is { } rate && rate > r.Auto48Month + 1m)
             {
                 var months = a.RemainingMonths ?? 48;

@@ -58,8 +58,8 @@ internal static class SimpleFinMapper
         // SimpleFIN reports what you HAVE (liabilities negative). FlowLedger (like MX) stores what you OWE as positive.
         if (type is "CREDIT_CARD" or "LOAN" or "MORTGAGE")
         {
-            balance = Math.Abs(balance);
-            available = available is { } av ? Math.Abs(av) : null;
+            balance = -balance;
+            available = available is { } av ? -av : null;
         }
 
         var org = string.IsNullOrWhiteSpace(a.Org?.Name) ? a.Org?.Domain : a.Org!.Name;

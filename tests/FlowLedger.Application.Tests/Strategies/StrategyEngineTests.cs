@@ -73,7 +73,7 @@ public class StrategyEngineTests
     [Fact]
     public void Card_debt_with_ample_cash_suggests_paying_it_off()
     {
-        var r = Run([Acct("Chk", "Checking", 30_000m), Acct("Visa", "CreditCard", -5_000m, liability: true)], Flows(6000, 3000));
+        var r = Run([Acct("Chk", "Checking", 30_000m), Acct("Visa", "CreditCard", 5_000m, liability: true)], Flows(6000, 3000));
         r.Suggestions.Should().Contain(x => x.Id == "pay-off-cards-with-cash");
     }
 

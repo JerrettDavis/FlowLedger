@@ -17,8 +17,8 @@ internal static class QuilttMapper
         // Quiltt reports what you HAVE (liabilities negative). FlowLedger stores what you OWE as positive.
         if (type is "CREDIT_CARD" or "LOAN" or "MORTGAGE")
         {
-            balance = Math.Abs(balance);
-            available = available is { } av ? Math.Abs(av) : null;
+            balance = -balance;
+            available = available is { } av ? -av : null;
         }
 
         var inst = a.Institution?.Name;
