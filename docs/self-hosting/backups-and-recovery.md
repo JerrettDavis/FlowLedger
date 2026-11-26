@@ -17,6 +17,12 @@ operating contract for keeping it safe. Everything below is implemented and cove
 A snapshot is a consistent (single repeatable-read transaction) `COPY ... TO CSV` of every public table. It needs only the
 app's own Postgres driver, no `pg_dump` on the host.
 
+**Recovery objectives.** These backups are logical, point-in-time snapshots, not continuous. With the default schedule the
+**RPO is up to 24 hours** (anything written since the last 03:15 run is lost on a total loss), and there is no point-in-time
+recovery unless you add WAL archiving (WAL-G / pgBackRest) yourself. The **RTO is a manual restore** (see Disaster recovery
+below) whose duration depends on data size and has not been measured. See [database.md](database.md) for the full table,
+managed-Postgres guidance and the major-version upgrade procedure.
+
 ## Turning on off-site backups (restic → Backblaze B2)
 
 The scheduled job copies each verified snapshot **and** the raw payload archive to a restic repository. Restic encrypts
