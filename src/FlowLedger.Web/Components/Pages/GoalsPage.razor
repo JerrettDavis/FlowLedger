@@ -58,7 +58,8 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(g))" aria-label="@($"Remove {g.Name}")" />
                         </div>
                     </div>
-                    <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1" />
+                    <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1"
+                                       aria-valuetext="@($"{ChartSummary.ProgressText(g.Name, g.PercentComplete, "complete")}{(g.Complete ? ", goal reached" : "")}")" />
                 </div>
             }
         </MudPaper>

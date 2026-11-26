@@ -53,13 +53,15 @@
     var active = _accounts.Where(x => x.IsActive).ToList();
     var gross = active.Sum(x => Math.Abs(x.BalanceAmount));
     var groups = Groups(active).Where(x => x.Items.Count > 0).ToList();
-    <div class="fl-alloc mb-4" role="img" aria-label="Share of balances by account group">
-        @foreach (var g in groups)
+    var shares = groups.Select(g => new AllocationItem(g.Title, g.Tone,
+        gross == 0 ? 0 : (double)(g.Items.Sum(x => Math.Abs(x.BalanceAmount)) / gross * 100))).ToList();
+    <div class="fl-alloc mb-1" aria-hidden="true">
+        @foreach (var s in shares)
         {
-            var pct = gross == 0 ? 0 : (double)(g.Items.Sum(x => Math.Abs(x.BalanceAmount)) / gross * 100);
-            <div class="fl-alloc__seg fl-tone-@g.Tone" style="width:@(pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%" title="@g.Title"></div>
+            <div class="fl-alloc__seg fl-tone-@s.Tone" style="width:@(s.Percent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%" title="@s.Title"></div>
         }
     </div>
+    <AllocationLegend Items="shares" />
 
     @foreach (var g in groups.Append(new AccountGroup("Disabled", "off", _accounts.Where(x => !x.IsActive).ToList())).Where(x => x.Items.Count > 0))
     {

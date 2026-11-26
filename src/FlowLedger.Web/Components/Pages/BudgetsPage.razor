@@ -69,7 +69,8 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(b.Category))" aria-label="@($"Remove budget for {b.Category}")" />
                         </div>
                     </div>
-                    <MudProgressLinear Value="@Math.Min(100, b.PercentUsed)" Color="@(b.Over ? Color.Error : b.PercentUsed >= 80 ? Color.Warning : Color.Success)" Size="Size.Medium" Class="mt-1" />
+                    <MudProgressLinear Value="@Math.Min(100, b.PercentUsed)" Color="@(b.Over ? Color.Error : b.PercentUsed >= 80 ? Color.Warning : Color.Success)" Size="Size.Medium" Class="mt-1"
+                                       aria-valuetext="@($"{ChartSummary.ProgressText(b.Category, b.PercentUsed, "of budget used")}{(b.Over ? ", over budget" : "")}")" />
                 </div>
             }
         </MudPaper>
