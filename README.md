@@ -169,6 +169,16 @@ Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping
 
 - Docker Compose setup: [docs/self-hosting/docker-compose.md](docs/self-hosting/docker-compose.md)
 - Production hardening, TLS, and secret rotation: [docs/self-hosting/production.md](docs/self-hosting/production.md)
+- Upgrading and rolling back: [docs/self-hosting/upgrading.md](docs/self-hosting/upgrading.md)
+- Service objectives and capacity: [docs/self-hosting/slo-and-capacity.md](docs/self-hosting/slo-and-capacity.md)
+- Observability and sample alerts: [docs/self-hosting/observability.md](docs/self-hosting/observability.md)
+
+## Security & privacy
+
+- [Threat model](docs/security/threat-model.md) and [SECURITY.md](./SECURITY.md)
+- [Data inventory, retention and subprocessors](docs/privacy/data-inventory-and-retention.md)
+- Runbooks: [incident response](docs/runbooks/incident-response.md), [key rotation](docs/runbooks/key-rotation.md), [restore](docs/runbooks/restore.md), [provider outage](docs/runbooks/provider-outage.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 
