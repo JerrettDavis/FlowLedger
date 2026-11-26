@@ -172,7 +172,10 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
+                        <ChartFigure Title="Spending by category"
+                                     Summary="@ChartSummary.Categories($"Spending {RangeLabel}", _insights.SpendingByCategory.Select(c => (c.Category, c.Amount)), Format.Money)">
+                            <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_spendSeries" ChartLabels="@_spendLabels" Width="180px" Height="180px" />
+                        </ChartFigure>
                         <MudSimpleTable Dense="true" Elevation="0">
                             <tbody>
                                 @foreach (var c in _insights.SpendingByCategory)
@@ -198,7 +201,11 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                        <ChartFigure Title="Income vs spending by month"
+                                     Summary="@FlowSummary()"
+                                     Rows="@FlowRows()" LabelHeader="Month" ValueHeader="Income / spending / net">
+                            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_flowSeries" ChartLabels="@_flowLabels" Width="100%" Height="220px" />
+                        </ChartFigure>
                         @if (_savingsRate is { } rate)
                         {
                             <div class="d-flex align-center gap-2 mt-2 flex-wrap">
@@ -238,7 +245,8 @@ else
                                     </MudText>
                                 </div>
                                 <MudProgressLinear Value="@(maxChange == 0 ? 0 : Math.Abs((double)m.Change) / maxChange * 100)" Size="Size.Small"
-                                                   Color="@(m.Change > 0 ? Color.Error : Color.Success)" aria-label="@($"{m.Category} change")" />
+                                                   Color="@(m.Change > 0 ? Color.Error : Color.Success)" aria-label="@($"{m.Category} change")"
+                                                   aria-valuetext="@($"{m.Category}: {(m.Change > 0 ? "up" : "down")} {Format.Money(Math.Abs(m.Change))} ({Format.Money(m.Previous)} to {Format.Money(m.Current)})")" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Format.Money(m.Previous) → @Format.Money(m.Current)</MudText>
                             </div>
                         }
@@ -267,7 +275,8 @@ else
                                     <MudText Typo="Typo.body2">@m.Merchant <span class="fl-muted">· @m.Visits×</span></MudText>
                                     <MudText Typo="Typo.body2" Class="fl-num">@Format.Money(m.Amount)</MudText>
                                 </div>
-                                <MudProgressLinear Value="@(topMerchant == 0 ? 0 : (double)m.Amount / topMerchant * 100)" Size="Size.Small" Color="Color.Primary" aria-label="@($"{m.Merchant} spend")" />
+                                <MudProgressLinear Value="@(topMerchant == 0 ? 0 : (double)m.Amount / topMerchant * 100)" Size="Size.Small" Color="Color.Primary" aria-label="@($"{m.Merchant} spend")"
+                                                   aria-valuetext="@($"{m.Merchant}: {Format.Money(m.Amount)} over {m.Visits} visits")" />
                             </div>
                         }
                     </MudCardContent>
@@ -287,7 +296,12 @@ else
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
+                        <ChartFigure Title="Net worth trend"
+                                     Summary="@ChartSummary.Trend("Net worth", _insights.NetWorth.TakeLast(60).Select(p => (p.Date, p.Value)).ToList(), Format.Money)"
+                                     Rows="@_insights.NetWorth.TakeLast(60).Select(p => new ChartRow(p.Date, Format.Money(p.Value))).ToList()"
+                                     LabelHeader="Date" ValueHeader="Net worth">
+                            <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_netWorthSeries" ChartLabels="@_netWorthLabels" Width="100%" Height="220px" />
+                        </ChartFigure>
                     </MudCardContent>
                 </MudCard>
             </div>
@@ -305,13 +319,16 @@ else
                 <MudCardContent>
                     @if (_forecastPoints.Count >= 2)
                     {
-                        <div style="height:220px;overflow:hidden" role="img" aria-label="Balance projection chart">
-                            @((MarkupString)SvgChart.BuildBalanceProjection(
-                                _forecastPoints,
-                                zeroLine: 0m,
-                                breaches: _breachDates,
-                                lowWaterMark: _lwmTuple))
-                        </div>
+                        <ChartFigure Title="Balance projection"
+                                     Summary="@ProjectionSummary()">
+                            <div style="height:220px;overflow:hidden">
+                                @((MarkupString)SvgChart.BuildBalanceProjection(
+                                    _forecastPoints,
+                                    zeroLine: 0m,
+                                    breaches: _breachDates,
+                                    lowWaterMark: _lwmTuple))
+                            </div>
+                        </ChartFigure>
                     }
                     else
                     {
@@ -723,6 +740,41 @@ else
             Logger.LogWarning(ex, "Failed to reload dashboard insights");
             Snackbar.Add("Couldn't load that date range", Severity.Error);
         }
+    }
+
+    private string FlowSummary()
+    {
+        if (_insights is null || _insights.CashFlow.Count == 0)
+        {
+            return "Income vs spending: no data.";
+        }
+
+        var income = _insights.CashFlow.Sum(m => m.Income);
+        var spending = _insights.CashFlow.Sum(m => m.Spending);
+        return $"Income vs spending over {_insights.CashFlow.Count} months: income {Format.Money(income)}, spending {Format.Money(spending)}, net {Format.Money(income - spending)}.";
+    }
+
+    private IReadOnlyList<ChartRow> FlowRows() =>
+        _insights is null ? [] : _insights.CashFlow
+            .Select(m => new ChartRow(m.Month.Length >= 7 ? m.Month[..7] : m.Month,
+                $"{Format.Money(m.Income)} / {Format.Money(m.Spending)} / {Format.Money(m.Income - m.Spending)}"))
+            .ToList();
+
+    private string ProjectionSummary()
+    {
+        var text = ChartSummary.Trend($"Projected cash balance over {_horizonMonths} months",
+            _forecastPoints.Select(p => (Format.FullDate(p.date), p.balance)).ToList(), Format.Money);
+        if (_lwmTuple is { } low)
+        {
+            text += $" Lowest point {Format.Money(low.balance)} on {Format.FullDate(low.date)}.";
+        }
+
+        if (_breachDates is { Count: > 0 })
+        {
+            text += $" Balance goes below zero on {_breachDates.Count} dates, first {Format.FullDate(_breachDates.Min())}.";
+        }
+
+        return text;
     }
 
     private void ApplyInsights()
