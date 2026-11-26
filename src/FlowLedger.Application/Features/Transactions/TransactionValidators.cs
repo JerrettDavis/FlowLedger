@@ -41,5 +41,8 @@ public sealed class ListTransactionsQueryValidator : AbstractValidator<ListTrans
 
         RuleFor(x => x.Skip)
             .GreaterThanOrEqualTo(0).WithMessage("Skip must be zero or positive.");
+
+        RuleFor(x => x.Search)
+            .MaximumLength(100).WithMessage("Search text must be 100 characters or fewer.");
     }
 }
