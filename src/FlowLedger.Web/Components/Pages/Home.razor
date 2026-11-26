@@ -59,6 +59,19 @@
     <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
 }
 
+@if (_partialFailures.Count > 0)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" role="status" aria-live="polite">
+        Some dashboard sections could not be loaded (@string.Join(", ", _partialFailures)). Figures that depend on them
+        may be missing or out of date, not zero. Reload to try again.
+    </MudAlert>
+}
+
+@if (!_loading && _error is null && _accounts.Count == 0)
+{
+    <OnboardingChecklist />
+}
+
 @if (_loading)
 {
     <div aria-label="Loading dashboard">
@@ -317,7 +330,7 @@ else
                     {
                         <EmptyState Icon="@Icons.Material.Outlined.ShowChart"
                                     Title="No forecast yet"
-                                    Description="Click &quot;Connect &amp; Sync&quot; to load demo data." />
+                                    Description="Add an account or import transactions and your balance forecast will appear here." />
                     }
                 </MudCardContent>
             </MudCard>
@@ -625,6 +638,7 @@ else
 
     private bool _loading = true;
     private string? _error;
+    private readonly List<string> _partialFailures = [];
 
     // Configurable ranges: history window for the insight charts, and forward horizon for the projection.
     private static readonly string[] HistoryPresets =
@@ -816,11 +830,11 @@ else
                     _netWorth = _assetSummary.NetWorth.NetWorth;
                 }
             }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset summary"); }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load asset summary"); _partialFailures.Add("assets"); }
 
             // Activity feed is best-effort: a failure here must not blank the rest of the dashboard.
             try { _activity = await activityTask; }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard activity"); }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard activity"); _partialFailures.Add("activity"); }
 
             // Insight widgets are best-effort: a failure must not blank the rest of the dashboard.
             try
@@ -828,7 +842,7 @@ else
                 _insights = await insightsTask;
                 ApplyInsights();
             }
-            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to load dashboard insights"); _partialFailures.Add("spending insights"); }
 
             // Forecast
             var forecast = await forecastTask;
