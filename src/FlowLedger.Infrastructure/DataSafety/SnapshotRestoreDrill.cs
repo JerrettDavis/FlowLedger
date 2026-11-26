@@ -170,7 +170,7 @@ public static class SnapshotRestoreDrill
         var options = new DbContextOptionsBuilder<FlowLedgerDbContext>()
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
             .Options;
-        await using var db = new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), tenantContext: null);
+        await using var db = new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), UnscopedTenantContext.Instance);
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync(targetMigration, ct);
     }

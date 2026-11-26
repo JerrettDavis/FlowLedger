@@ -1,0 +1,92 @@
+using FlowLedger.Domain.Aggregates;
+using FlowLedger.Domain.ValueObjects;
+using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.Infrastructure.Tests.Helpers;
+using FlowLedger.Application.Abstractions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FlowLedger.Infrastructure.Tests.Persistence;
+
+/// <summary>
+/// #141: tenant query filters must not depend on which context built the EF model first.
+/// These tests deliberately build contexts the way production does: the default internal
+/// service provider (caching ON), no per-instance model tricks.
+/// </summary>
+[Collection("Integration")]
+public sealed class TenantFilterProductionModelTests : IAsyncLifetime
+{
+    private readonly IntegrationTestFixture _fixture;
+
+    public TenantFilterProductionModelTests(IntegrationTestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [DockerFact]
+    public async Task UnscopedContextBuiltFirst_DoesNotUnfilterLaterTenantContexts()
+    {
+        var a = TestTenantContext.New();
+        var b = TestTenantContext.New();
+
+        // Seed one account per tenant through an unscoped (admin) context.
+        await using (var admin = _fixture.CreateProductionStyleContext(null))
+        {
+            admin.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd)));
+            admin.Accounts.Add(Account.Create(TenantId.From(b.TenantId), "B-acct", AccountType.Checking, new Money(2m, Currency.Usd)));
+            await admin.SaveChangesAsync();
+            // The unscoped context sees both.
+            Assert.Equal(2, await admin.Accounts.CountAsync());
+        }
+
+        await using var asB = _fixture.CreateProductionStyleContext(b);
+        var names = await asB.Accounts.Select(x => x.Name).ToListAsync();
+        Assert.Equal(["B-acct"], names);
+    }
+
+    [DockerFact]
+    public async Task TenantContextBuiltFirst_DoesNotFilterUnscopedContextIncorrectly()
+    {
+        var a = TestTenantContext.New();
+        var b = TestTenantContext.New();
+
+        await using (var asA = _fixture.CreateProductionStyleContext(a))
+        {
+            asA.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd)));
+            await asA.SaveChangesAsync();
+            Assert.Single(await asA.Accounts.ToListAsync());
+        }
+
+        await using var asB = _fixture.CreateProductionStyleContext(b);
+        Assert.Empty(await asB.Accounts.ToListAsync());
+
+        await using var admin = _fixture.CreateProductionStyleContext(null);
+        Assert.Single(await admin.Accounts.ToListAsync());
+    }
+
+    [DockerFact]
+    public async Task EveryEntityTypeHasAQueryFilter_InTheModelOfAnyContext()
+    {
+        foreach (var tenant in new TestTenantContext?[] { null, TestTenantContext.New() })
+        {
+            await using var ctx = _fixture.CreateProductionStyleContext(tenant);
+            var unfiltered = ctx.Model.GetEntityTypes()
+                .Where(e => !e.IsOwned() && e.BaseType is null && e.GetDeclaredQueryFilters().Count == 0)
+                .Select(e => e.ClrType.Name)
+                .ToList();
+            Assert.True(unfiltered.Count == 0, $"Entity types without a tenant query filter: {string.Join(", ", unfiltered)}");
+        }
+    }
+
+    [Fact]
+    public void ResolvingTheDbContext_WithoutATenantContextRegistration_Fails()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
+        services.AddDbContext<FlowLedgerDbContext>(o => o.UseNpgsql("Host=localhost;Database=x"));
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>());
+    }
+}

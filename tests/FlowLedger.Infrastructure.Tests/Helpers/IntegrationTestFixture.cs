@@ -1,3 +1,4 @@
+using FlowLedger.SharedKernel;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -58,6 +59,21 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Builds a context the way production does: the default internal service provider
+    /// (caching ON), so every context shares one cached model. <c>null</c> = unscoped/admin.
+    /// </summary>
+    public FlowLedgerDbContext CreateProductionStyleContext(TestTenantContext? tenantContext)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FlowLedgerDbContext>();
+        optionsBuilder.UseNpgsql(ConnectionString, npgsql =>
+        {
+            npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
+        });
+
+        return new FlowLedgerDbContext(optionsBuilder.Options, new NoOpDomainEventDispatcher(), (ITenantContext?)tenantContext ?? UnscopedTenantContext.Instance);
+    }
+
+    /// <summary>
     /// Creates a <see cref="FlowLedgerDbContext"/> scoped to the given tenant context.
     /// Pass <c>null</c> for a context with no tenant filter (admin/migration use).
     /// </summary>
@@ -68,16 +84,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             .UseNpgsql(ConnectionString, npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
-            })
-            // Disable model caching so each context instance gets its own model with
-            // the correct tenant filter compiled from _tenantContext at construction time.
-            // Required because the filter expression captures the injected ITenantContext
-            // reference which differs per context instance.
-            .EnableServiceProviderCaching(false);
+            });
 
         return new FlowLedgerDbContext(
             optionsBuilder.Options,
             new NoOpDomainEventDispatcher(),
-            tenantContext);
+            (ITenantContext?)tenantContext ?? UnscopedTenantContext.Instance);
     }
 }
