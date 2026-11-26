@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Application.Tests.Insights;
 
@@ -26,7 +27,7 @@ public sealed class SpendingInsightsAnalyzerTests
     private static TransactionDto Tx(decimal amount, string dir, string date, Guid? cat, Guid? account = null,
         string? merchant = null, string[]? tags = null, string desc = "x") =>
         new(Guid.NewGuid(), account ?? Card, amount, "USD", dir, desc, "Posted", "Manual",
-            DateOnly.Parse(date), DateOnly.Parse(date), cat, merchant, null, null, DateTimeOffset.UtcNow, null, tags);
+            DateOnly.Parse(date), DateOnly.Parse(date), cat, merchant, null, null, TestClock.Instant, null, tags);
 
     private static BreakdownResult Run(IReadOnlyList<TransactionDto> txs, BreakdownQuery q) =>
         SpendingInsightsAnalyzer.Analyze(q, txs, Cats, Names, Types);

@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Dashboard;
 using FlowLedger.Application.Features.Transactions;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Application.Tests.Dashboard;
 
@@ -13,7 +14,7 @@ public sealed class DashboardActivityAnalyzerTests
         string status = "Posted", Guid? account = null) =>
         new(Guid.NewGuid(), account ?? Acct, amount, "USD", dir, merchant, status, "MxAggregation",
             Today.AddDays(-daysAgo), status == "Pending" ? null : Today.AddDays(-daysAgo),
-            null, merchant, null, null, DateTimeOffset.UtcNow);
+            null, merchant, null, null, TestClock.Instant);
 
     [Fact]
     public void Dismissed_transactions_are_not_flagged()

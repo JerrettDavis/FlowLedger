@@ -3,6 +3,7 @@ using FlowLedger.Domain.Events;
 using FlowLedger.Domain.Exceptions;
 using FlowLedger.Domain.ValueObjects;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Domain.Tests.Aggregates;
 
@@ -11,7 +12,7 @@ public sealed class TransactionTests
     private static readonly TenantId TenantId = TenantId.New();
     private static readonly AccountId AccountId = AccountId.New();
     private static readonly Money Fifty = new(50m, "USD");
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    private static readonly DateOnly Today = TestClock.Today;
 
     // ── RecordActual ──────────────────────────────────────────────────────────
 

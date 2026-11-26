@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Quiltt\FlowLedger.Integrations.Quiltt.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.SimpleFin\FlowLedger.Integrations.SimpleFin.csproj" />
     <ProjectReference Include="..\..\src\FlowLedger.Integrations.Simulated\FlowLedger.Integrations.Simulated.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

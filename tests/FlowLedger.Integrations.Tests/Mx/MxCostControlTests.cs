@@ -1,4 +1,5 @@
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 
@@ -27,7 +28,7 @@ public sealed class MxCostControlTests
     [Fact]
     public async Task First_manual_refresh_is_allowed()
     {
-        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var clock = new FakeClock(TestClock.Instant);
         var cooldown = MxWireMockFixture.CreateCooldown(TimeSpan.FromMinutes(15), clock);
 
         var decision = await cooldown.TryBeginManualRefreshAsync(Tenant, MemberId);
@@ -38,7 +39,7 @@ public sealed class MxCostControlTests
     [Fact]
     public async Task Second_manual_refresh_within_window_is_blocked()
     {
-        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var clock = new FakeClock(TestClock.Instant);
         var cooldown = MxWireMockFixture.CreateCooldown(TimeSpan.FromMinutes(15), clock);
 
         await cooldown.TryBeginManualRefreshAsync(Tenant, MemberId);
@@ -53,7 +54,7 @@ public sealed class MxCostControlTests
     [Fact]
     public async Task Manual_refresh_after_window_proceeds()
     {
-        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var clock = new FakeClock(TestClock.Instant);
         var cooldown = MxWireMockFixture.CreateCooldown(TimeSpan.FromMinutes(15), clock);
 
         await cooldown.TryBeginManualRefreshAsync(Tenant, MemberId);
@@ -66,7 +67,7 @@ public sealed class MxCostControlTests
     [Fact]
     public async Task Different_members_have_independent_cooldowns()
     {
-        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var clock = new FakeClock(TestClock.Instant);
         var cooldown = MxWireMockFixture.CreateCooldown(TimeSpan.FromMinutes(15), clock);
 
         await cooldown.TryBeginManualRefreshAsync(Tenant, "USR-1|MBR-A");
@@ -78,7 +79,7 @@ public sealed class MxCostControlTests
     [Fact]
     public async Task Zero_window_disables_cooldown()
     {
-        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var clock = new FakeClock(TestClock.Instant);
         var cooldown = MxWireMockFixture.CreateCooldown(TimeSpan.Zero, clock);
 
         await cooldown.TryBeginManualRefreshAsync(Tenant, MemberId);
