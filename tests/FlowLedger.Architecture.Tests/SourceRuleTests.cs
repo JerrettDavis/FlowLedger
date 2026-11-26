@@ -149,4 +149,18 @@ public sealed class SourceRuleTests
         var open = events.Where(t => !t.IsSealed).Select(t => t.Name).ToList();
         Assert.True(open.Count == 0, $"Unsealed domain events: {string.Join(", ", open)}");
     }
+
+    // ── 5. No sync-over-async in product code (#116) ─────────────────────────
+
+    [Fact]
+    public void Product_code_does_not_block_on_tasks()
+    {
+        var offenders = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+            .SelectMany(d => SourceFiles(Path.GetFileName(d)))
+            .Where(f => File.ReadAllText(f).Contains(".GetAwaiter().GetResult()", StringComparison.Ordinal))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Sync-over-async in: {string.Join(", ", offenders)}");
+    }
 }
