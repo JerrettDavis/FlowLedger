@@ -5,6 +5,7 @@ using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.SharedKernel;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -20,6 +21,11 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
     public Task DisposeAsync() => Task.CompletedTask;
+
+    private sealed class FixedTime : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => TestClock.Instant;
+    }
 
     private sealed class CommandLog : DbCommandInterceptor
     {
@@ -39,7 +45,7 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
         var tenant = TestTenantContext.New();
         var a = await _fixture.SeedAccountAsync(tenant, "A");
         var b = await _fixture.SeedAccountAsync(tenant, "B");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = TestClock.Today;
         await using (var seed = _fixture.CreateDbContext(tenant))
         {
             // 800 days of history per account, two snapshots on the most recent day (the later one must win).
@@ -82,7 +88,7 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
     {
         var tenant = TestTenantContext.New();
         var a = await _fixture.SeedAccountAsync(tenant, "A");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = TestClock.Today;
         await using (var seed = _fixture.CreateDbContext(tenant))
         {
             for (var d = 0; d < 900; d += 3)
@@ -95,7 +101,7 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
         }
 
         await using var db = _fixture.CreateDbContext(tenant);
-        var points = await new BalanceHistoryReader(db).DailyAccountBalancesAsync();
+        var points = await new BalanceHistoryReader(db, new FixedTime()).DailyAccountBalancesAsync();
 
         var oldest = today.AddDays(-IBalanceHistoryReader.DefaultWindowDays);
         points.Count(p => p.Date < oldest).Should().Be(1, "only the anchor lies before the window");

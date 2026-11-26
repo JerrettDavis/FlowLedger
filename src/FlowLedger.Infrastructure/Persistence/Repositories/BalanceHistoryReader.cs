@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FlowLedger.Infrastructure.Persistence.Repositories;
 
-internal sealed class BalanceHistoryReader(FlowLedgerDbContext db) : IBalanceHistoryReader
+internal sealed class BalanceHistoryReader(FlowLedgerDbContext db, TimeProvider? clock = null) : IBalanceHistoryReader
 {
     public Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(CancellationToken ct = default)
-        => DailyAccountBalancesAsync(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-IBalanceHistoryReader.DefaultWindowDays), null, ct);
+        => DailyAccountBalancesAsync(DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime).AddDays(-IBalanceHistoryReader.DefaultWindowDays), null, ct);
 
     public async Task<IReadOnlyList<BalancePoint>> DailyAccountBalancesAsync(DateOnly from, DateOnly? to = null, CancellationToken ct = default)
     {
