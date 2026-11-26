@@ -16,6 +16,44 @@ public static class Format
     public static string Money(decimal v) =>
         v.ToString("C2", UsCulture);
 
+    private static readonly Dictionary<string, string> CurrencySymbols = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["USD"] = "$", ["EUR"] = "€", ["GBP"] = "£", ["JPY"] = "¥", ["CNY"] = "CN¥", ["INR"] = "₹", ["KRW"] = "₩",
+        ["CAD"] = "CA$", ["AUD"] = "A$", ["NZD"] = "NZ$", ["MXN"] = "MX$", ["BRL"] = "R$", ["CHF"] = "CHF",
+    };
+
+    private static readonly HashSet<string> ZeroDecimalCurrencies = new(StringComparer.OrdinalIgnoreCase) { "JPY", "KRW" };
+
+    /// <summary>
+    /// Format an amount in its own currency using <paramref name="culture"/> for separators and symbol placement
+    /// (default en-US). A missing currency keeps the legacy USD rendering; an unknown code is shown as the code,
+    /// never as "$".
+    /// </summary>
+    public static string Money(decimal v, string? currency, CultureInfo? culture = null)
+    {
+        culture ??= UsCulture;
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            return v.ToString("C2", culture.Equals(UsCulture) ? UsCulture : culture);
+        }
+
+        var code = currency.Trim().ToUpperInvariant();
+        var nf = (NumberFormatInfo)culture.NumberFormat.Clone();
+        if (CurrencySymbols.TryGetValue(code, out var symbol))
+        {
+            nf.CurrencySymbol = symbol;
+        }
+        else
+        {
+            nf.CurrencySymbol = code;
+            nf.CurrencyPositivePattern = 3; // "n XYZ"
+            nf.CurrencyNegativePattern = 8; // "-n XYZ"
+        }
+
+        nf.CurrencyDecimalDigits = ZeroDecimalCurrencies.Contains(code) ? 0 : 2;
+        return v.ToString("C", nf);
+    }
+
     /// <summary>
     /// Format a decimal as signed currency (e.g., "+$1,234.56" or "−$1,234.56").
     /// Uses a proper minus sign (−, U+2212) for negative values.
