@@ -145,8 +145,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
-        // A user edit landing between this sync's reads and writes must neither fail the sync nor be overwritten (#157).
-        using var conflicts = new SyncConflictResolver(_db, _logger).Install();
+        using var conflicts = new SyncConflictResolver(_db, _logger).Install(); // a user edit mid-sync neither fails it nor is overwritten (#157)
         SyncResult result;
         try
         {
@@ -228,11 +227,10 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
 
-        // Step 1: reuse the persisted member (provision only on the very first sync).
         if (_provider.Traits.HasFlag(ConnectorTraits.UserInitiatedLinking)
             && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == _provider.ProviderName, ct))
         {
-            return new SyncResult(0, 0, 0, 0); // this tenant has not linked a bank through the Quiltt Connector yet
+            return new SyncResult(0, 0, 0, 0); // a user-initiated connector this tenant has not linked yet: nothing to sync
         }
 
         var memberRef = await GetOrProvisionConnectionAsync(

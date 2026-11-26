@@ -72,10 +72,7 @@ public sealed class Transaction : AggregateRoot
 
     public DateTimeOffset CreatedAt { get; }
 
-    /// <summary>
-    /// Optimistic-concurrency token (Postgres <c>xmin</c>, maintained by the database, no schema column). A write made against a
-    /// stale copy of the row fails instead of silently overwriting a newer change (#157).
-    /// </summary>
+    /// <summary>Optimistic-concurrency token (Postgres <c>xmin</c>, no schema column): a stale write fails instead of overwriting (#157).</summary>
     public uint RowVersion { get; private set; }
 
     private Transaction()
