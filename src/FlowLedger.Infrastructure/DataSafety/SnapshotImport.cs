@@ -14,9 +14,10 @@ public static class SnapshotImport
     // Never imported: schema history (migrations rebuild it) and the environment marker (owned by the startup guard).
     private static readonly string[] NotImported = ["__EFMigrationsHistory", "system_settings"];
 
-    public static async Task<string> ExportZipAsync(string connectionString, string workDir, CancellationToken ct = default)
+    /// <param name="tenantId">Null exports every tenant (disaster recovery); a tenant id exports only that tenant's rows (#139).</param>
+    public static async Task<string> ExportZipAsync(string connectionString, string workDir, CancellationToken ct = default, Guid? tenantId = null)
     {
-        var (dir, _) = await new DatabaseSnapshotService(connectionString).CreateAsync(workDir, "export", "export", ct);
+        var (dir, _) = await new DatabaseSnapshotService(connectionString).CreateAsync(workDir, "export", tenantId is null ? "export" : "export-tenant", ct, tenantId);
         var zip = dir + ".zip";
         ZipFile.CreateFromDirectory(dir, zip, CompressionLevel.Optimal, includeBaseDirectory: false);
         Directory.Delete(dir, recursive: true); // only the zip remains; no loose unencrypted CSV copy is left behind
@@ -71,6 +72,11 @@ public static class SnapshotImport
 
             var manifest = JsonSerializer.Deserialize<SnapshotManifest>(
                 await File.ReadAllTextAsync(Path.Combine(dir, DatabaseSnapshotService.ManifestFileName), ct))!;
+
+            if (manifest.TenantId is not null)
+            {
+                return Fail("This bundle is a single-tenant export: it is for portability and review, not for restoring a database. Use a full export.");
+            }
 
             // Safety: only an empty database may receive an import.
             var existing = await UserRowCountAsync(targetConnectionString, ct);

@@ -83,6 +83,8 @@ x-app-common-env: &app-common-env
   HomeAssistant__EncryptionKey: ${HomeAssistant__EncryptionKey:-}
   Secrets__EncryptionKey: ${Secrets__EncryptionKey:-}
   Secrets__EncryptionKeyPrevious: ${Secrets__EncryptionKeyPrevious:-}
+  # Admin credential for /api/data/* (export, import, backup-now, tenant offboarding). Required outside Development; same value on api and web.
+  DataAdmin__Key: ${DataAdmin__Key:-}
 
 services:
   # ── Infrastructure ────────────────────────────────────────────────────────

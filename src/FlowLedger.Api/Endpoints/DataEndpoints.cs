@@ -67,17 +67,25 @@ internal static class DataEndpoints
         .WithSummary("Run a verified backup (snapshot, restore drill, off-site copy) now")
         .RequireRateLimiting("write");
 
-        group.MapGet("/export", async (IConfiguration cfg, BackupSettings settings, CancellationToken ct) =>
+        group.MapGet("/export", async (
+            IConfiguration cfg, BackupSettings settings, FlowLedger.SharedKernel.ITenantContext tenant, string? scope, Guid? tenantId, CancellationToken ct) =>
         {
+            // Default stays the whole database (disaster recovery). scope=tenant exports only the caller's tenant; tenantId=<id> exports that tenant (#139).
+            if (scope is not null && !scope.Equals("all", StringComparison.OrdinalIgnoreCase) && !scope.Equals("tenant", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Problem(title: "scope must be 'all' or 'tenant'", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            Guid? only = tenantId ?? (string.Equals(scope, "tenant", StringComparison.OrdinalIgnoreCase) ? tenant.TenantId : null);
             var conn = cfg.GetConnectionString("flowledger")!;
-            var zip = await SnapshotImport.ExportZipAsync(conn, Path.Combine(settings.BackupRoot, "exports"), ct);
+            var zip = await SnapshotImport.ExportZipAsync(conn, Path.Combine(settings.BackupRoot, "exports"), ct, only);
             // DeleteOnClose: the unencrypted export zip is removed from the server as soon as it has been sent.
             var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
-            return Results.File(stream, "application/zip", $"flowledger-export-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
+            return Results.File(stream, "application/zip", $"flowledger-export-{(only is null ? "all" : "tenant")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
         })
         .WithName("ExportData")
         .AddEndpointFilter(LoopbackOnlyAsync)
-        .WithSummary("Download ALL data as a portable zip (CSV per table + manifest with hashes)")
+        .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); all tenants by default, scope=tenant or tenantId=<id> for one")
         .RequireRateLimiting("write");
 
         group.MapPost("/import", async (HttpRequest request, IConfiguration cfg, BackupSettings settings, CancellationToken ct) =>
