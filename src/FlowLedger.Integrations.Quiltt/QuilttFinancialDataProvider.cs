@@ -141,7 +141,8 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         string providerAccountId, SyncCursor cursor, int pageSize = 100, CancellationToken cancellationToken = default)
     {
         var session = _session ?? throw new FatalProviderException(
-            "Quiltt accounts must be read before transactions.", "SEQUENCE") { Kind = ProviderIssueKind.Internal };
+            "Quiltt accounts must be read before transactions.", "SEQUENCE")
+        { Kind = ProviderIssueKind.Internal };
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var from = cursor.IsInitial || !DateOnly.TryParse(cursor.Value, out var c)
