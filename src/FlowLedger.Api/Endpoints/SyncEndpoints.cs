@@ -70,15 +70,11 @@ internal static class SyncEndpoints
             .WithName("GetSyncStatus")
             .WithSummary("When the last successful sync finished and the enforced minimum interval");
 
-        group.MapPost("/sync", async (IFinancialSyncService syncService, FlowLedger.Application.Features.Integrations.IntegrationService integrations, HttpContext httpContext, CancellationToken ct) =>
+        group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
             try
             {
                 var result = await syncService.SyncAsync(ct);
-                await integrations.DispatchAsync(
-                    FlowLedger.Application.Features.Integrations.IntegrationEvents.SyncCompleted,
-                    new { accounts = result.AccountsUpserted, transactionsAdded = result.TransactionsAdded },
-                    ct);
                 return Results.Ok(result);
             }
             catch (SyncThrottledException ex)

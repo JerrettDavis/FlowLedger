@@ -20,10 +20,10 @@ internal static class RecurringFlowEndpoints
             .WithName("ListRecurringFlows")
             .WithSummary("List all active recurring flows for the current tenant");
 
-        group.MapGet("/{id:guid}", async (Guid id, GetRecurringFlowHandler handler, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, GetRecurringFlowHandler handler, HttpResponse response, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("GetRecurringFlow")
         .WithSummary("Get a single recurring flow by ID");
@@ -52,6 +52,8 @@ internal static class RecurringFlowEndpoints
             [FromBody] UpdateRecurringFlowRequest request,
             UpdateRecurringFlowHandler handler,
             IValidator<UpdateRecurringFlowRequest> validator,
+            HttpRequest httpRequest,
+            HttpResponse response,
             CancellationToken ct) =>
         {
             var validation = await validator.ValidateAsync(request, ct);
@@ -60,8 +62,14 @@ internal static class RecurringFlowEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var result = await handler.HandleAsync(id, request, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("recurring flow");
+            }
+
+            var result = await handler.HandleAsync(id, request, ct, expected);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("UpdateRecurringFlow")
         .WithSummary("Update amount/model of a recurring flow")
@@ -106,9 +114,15 @@ internal static class RecurringFlowEndpoints
             .WithSummary("Add every high-confidence, fixed-amount pattern as a recurring flow now")
             .RequireRateLimiting("write");
 
-        group.MapDelete("/{id:guid}", async (Guid id, DeactivateRecurringFlowHandler handler, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, DeactivateRecurringFlowHandler handler, HttpRequest httpRequest, CancellationToken ct) =>
         {
-            var found = await handler.HandleAsync(id, ct);
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("recurring flow");
+            }
+
+            var found = await handler.HandleAsync(id, ct, expected);
             return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeactivateRecurringFlow")

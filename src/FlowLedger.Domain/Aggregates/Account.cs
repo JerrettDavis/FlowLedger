@@ -111,11 +111,6 @@ public sealed class Account : AggregateRoot
             account.Mode = AccountMode.Holding;
         }
 
-        account.RaiseEvent(new AccountConnected(
-            account.AccountId,
-            account.TenantId,
-            accountType), account.CreatedAt);
-
         return account;
     }
 
@@ -159,12 +154,8 @@ public sealed class Account : AggregateRoot
 
     private void SetBalance(Money newBalance, TimeProvider? time)
     {
-        var previous = CurrentBalance;
         CurrentBalance = newBalance;
-        var now = Now(time);
-        LastBalanceConfirmedAt = now;
-
-        RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, newBalance), now);
+        LastBalanceConfirmedAt = Now(time);
     }
 
     /// <summary>
@@ -208,9 +199,7 @@ public sealed class Account : AggregateRoot
         var changed = newType != AccountType;
         if (IsLiabilityType(newType) && CurrentBalance.IsNegative)
         {
-            var previous = CurrentBalance;
             CurrentBalance = CurrentBalance.Abs();
-            RaiseEvent(new AccountBalanceUpdated(AccountId, TenantId, previous, CurrentBalance));
         }
 
         AccountType = newType;

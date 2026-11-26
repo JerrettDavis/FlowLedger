@@ -72,16 +72,17 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task<RecurringFlowDto?> UpdateRecurringFlowAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default)
+    public async Task<RecurringFlowDto?> UpdateRecurringFlowAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default, uint? expectedVersion = null)
     {
         return await ExecuteAsync("update recurring flow", async () =>
         {
-            var response = await _http.PutAsJsonAsync($"/api/recurring-flows/{id}", request, JsonOptions, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, $"/api/recurring-flows/{id}", request, expectedVersion, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
 
+            ThrowIfChangedElsewhere(response, "recurring flow");
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Non-success status {StatusCode} updating recurring flow {Id}", (int)response.StatusCode, id);
@@ -94,11 +95,12 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task DeleteRecurringFlowAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteRecurringFlowAsync(Guid id, CancellationToken ct = default, uint? expectedVersion = null)
     {
         await ExecuteAsync("delete recurring flow", async () =>
         {
-            var response = await _http.DeleteAsync($"/api/recurring-flows/{id}", ct);
+            var response = await SendVersionedAsync(HttpMethod.Delete, $"/api/recurring-flows/{id}", null, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "recurring flow");
             if (response.StatusCode != HttpStatusCode.NotFound && !response.IsSuccessStatusCode)
             {
                 _logger.LogError("Non-success status {StatusCode} deleting recurring flow {Id}", (int)response.StatusCode, id);

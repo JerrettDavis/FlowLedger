@@ -87,7 +87,6 @@ public sealed class Asset : AggregateRoot
         var now = Now(time);
         var asset = new Asset(tenantId, name.Trim(), category, currentValue, valuedOn, now);
         asset._valuations.Add(AssetValuation.Create(currentValue.Amount, valuedOn, source, "Initial value", now));
-        asset.RaiseEvent(new AssetAdded(asset.AssetId, tenantId, category), now);
         return asset;
     }
 
@@ -178,11 +177,9 @@ public sealed class Asset : AggregateRoot
 
         if (asOf >= ValuedOn)
         {
-            var previous = CurrentValue;
             var blended = blendWindowDays > 0 ? BlendedValue(asOf, blendWindowDays, value.Currency) : value;
             CurrentValue = blended;
             ValuedOn = asOf;
-            RaiseEvent(new AssetRevalued(AssetId, TenantId, previous, blended), now);
         }
 
         return valuation;

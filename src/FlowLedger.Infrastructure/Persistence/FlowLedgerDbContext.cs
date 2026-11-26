@@ -176,8 +176,37 @@ public sealed class FlowLedgerDbContext : DbContext
 
     // ── SaveChanges ──────────────────────────────────────────────────────────
 
+    /// <summary>Attempts a save makes after a concurrency conflict when a <see cref="ConcurrencyConflictResolver"/> is installed.</summary>
+    internal const int MaxConflictResolutions = 3;
+
+    /// <summary>
+    /// Background pipelines that cannot be re-run (a sync has already paid for the provider calls) install a resolver for their
+    /// duration: it reconciles a lost optimistic-concurrency race (returns true to retry the save, false to rethrow). Without one,
+    /// a conflict throws <see cref="DbUpdateConcurrencyException"/>, which the API maps to 409 (#157).
+    /// </summary>
+    internal Func<DbUpdateConcurrencyException, CancellationToken, Task<bool>>? ConcurrencyConflictResolver { get; set; }
+
     /// <inheritdoc/>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await SaveOnceAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+                when (ConcurrencyConflictResolver is { } resolve && attempt <= MaxConflictResolutions)
+            {
+                if (!await resolve(ex, cancellationToken))
+                {
+                    throw;
+                }
+            }
+        }
+    }
+
+    private async Task<int> SaveOnceAsync(CancellationToken cancellationToken)
     {
         ValidateTenantBoundaries();
         var (outbox, aggregates) = CollectDomainEvents();

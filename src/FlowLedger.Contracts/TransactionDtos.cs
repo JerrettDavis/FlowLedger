@@ -22,7 +22,8 @@ public sealed record TransactionDto(
     IReadOnlyList<TransactionSplitDto>? Splits = null,
     double? CategoryConfidence = null,
     Guid? SuggestedCategoryId = null,
-    double? SuggestedConfidence = null);
+    double? SuggestedConfidence = null,
+    uint Version = 0);
 
 /// <summary>One portion of a split transaction.</summary>
 public sealed record TransactionSplitDto(decimal Amount, Guid? CategoryId, string? Notes);

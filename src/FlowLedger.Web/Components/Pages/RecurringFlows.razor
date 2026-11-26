@@ -386,7 +386,8 @@
         {
             try
             {
-                await ApiClient.UpdateRecurringFlowAsync(flow.Id, updateReq);
+                // If-Match: the version the user last saw; a 409 means the flow changed elsewhere (another tab or a sync).
+                await ApiClient.UpdateRecurringFlowAsync(flow.Id, updateReq, expectedVersion: flow.Version == 0 ? null : flow.Version);
                 Snackbar.Add("Flow updated", Severity.Success);
                 await LoadAsync();
             }
@@ -394,6 +395,10 @@
             {
                 Logger.LogError(ex, "Failed to update recurring flow {FlowId}", flow.Id);
                 Snackbar.AddFailure(ex, fallback: "Couldn't update flow. Please try again.");
+                if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+                {
+                    await LoadAsync(); // pick up the current versions
+                }
             }
         }
     }
@@ -412,7 +417,7 @@
         {
             try
             {
-                await ApiClient.DeleteRecurringFlowAsync(flow.Id);
+                await ApiClient.DeleteRecurringFlowAsync(flow.Id, expectedVersion: flow.Version == 0 ? null : flow.Version);
                 Snackbar.Add("Flow deleted", Severity.Success);
                 await LoadAsync();
             }
@@ -420,6 +425,10 @@
             {
                 Logger.LogError(ex, "Failed to delete recurring flow {FlowId}", flow.Id);
                 Snackbar.AddFailure(ex, fallback: "Couldn't delete flow. Please try again.");
+                if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+                {
+                    await LoadAsync(); // pick up the current versions
+                }
             }
         }
     }
