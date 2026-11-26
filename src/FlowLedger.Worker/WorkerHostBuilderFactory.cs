@@ -22,6 +22,9 @@ public static class WorkerHostBuilderFactory
     /// </summary>
     public static void Configure(IHostApplicationBuilder builder)
     {
+        // Fail fast with every configuration problem listed (bad cron, missing connection string, placeholder secrets).
+        WorkerConfigValidator.ValidateOrThrow(builder.Configuration, builder.Environment.EnvironmentName);
+
         // ── Service defaults (OpenTelemetry, health checks, service discovery) ─
         builder.AddServiceDefaults();
 

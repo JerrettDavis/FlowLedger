@@ -155,6 +155,12 @@ if (!app.Environment.IsDevelopment())
             "Set it via environment variable Api__Key or appsettings.<Env>.local.json.");
     }
 
+    if (ConfigGuards.LooksLikePlaceholder(apiOptions.Key))
+    {
+        throw new InvalidOperationException(
+            "Api:Key still contains a template placeholder (e.g. from .env.example). Generate a strong random key (`openssl rand -hex 32`).");
+    }
+
     const string devDefault = "dev-local-key-not-for-production";
     if (apiOptions.Key.Equals(devDefault, StringComparison.Ordinal))
     {
