@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Transactions;
@@ -10,9 +11,7 @@ public sealed class TransactionValidatorTests
     [Fact]
     public async Task ValidRequest_PassesValidation()
     {
-        var req = new CreateTransactionRequest(
-            Guid.NewGuid(), 100m, "USD", "Debit",
-            "Test merchant", new DateOnly(2026, 1, 1), null, null, null, null);
+        var req = CreateTransactionRequestBuilder.A().Build();
         var result = await _validator.ValidateAsync(req);
         result.IsValid.Should().BeTrue();
     }
@@ -22,9 +21,7 @@ public sealed class TransactionValidatorTests
     [InlineData(-50)]   // negative amount
     public async Task ZeroOrNegativeAmount_FailsValidation(decimal amount)
     {
-        var req = new CreateTransactionRequest(
-            Guid.NewGuid(), amount, "USD", "Debit",
-            "Test", new DateOnly(2026, 1, 1), null, null, null, null);
+        var req = CreateTransactionRequestBuilder.A().WithAmount(amount).Build();
         var result = await _validator.ValidateAsync(req);
         result.IsValid.Should().BeFalse();
     }
@@ -32,9 +29,7 @@ public sealed class TransactionValidatorTests
     [Fact]
     public async Task EmptyDescription_FailsValidation()
     {
-        var req = new CreateTransactionRequest(
-            Guid.NewGuid(), 100m, "USD", "Debit",
-            "", new DateOnly(2026, 1, 1), null, null, null, null);
+        var req = CreateTransactionRequestBuilder.A().Described("").Build();
         var result = await _validator.ValidateAsync(req);
         result.IsValid.Should().BeFalse();
     }
@@ -42,9 +37,7 @@ public sealed class TransactionValidatorTests
     [Fact]
     public async Task InvalidDirection_FailsValidation()
     {
-        var req = new CreateTransactionRequest(
-            Guid.NewGuid(), 100m, "USD", "Transfer",
-            "Test", new DateOnly(2026, 1, 1), null, null, null, null);
+        var req = CreateTransactionRequestBuilder.A().WithDirection("Transfer").Build();
         var result = await _validator.ValidateAsync(req);
         result.IsValid.Should().BeFalse();
     }
@@ -52,9 +45,7 @@ public sealed class TransactionValidatorTests
     [Fact]
     public async Task InvalidCurrency_FailsValidation()
     {
-        var req = new CreateTransactionRequest(
-            Guid.NewGuid(), 100m, "US", "Debit",
-            "Test", new DateOnly(2026, 1, 1), null, null, null, null);
+        var req = CreateTransactionRequestBuilder.A().InCurrency("US").Build();
         var result = await _validator.ValidateAsync(req);
         result.IsValid.Should().BeFalse();
     }
