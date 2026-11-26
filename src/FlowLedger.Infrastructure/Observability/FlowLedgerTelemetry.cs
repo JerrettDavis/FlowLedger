@@ -83,6 +83,12 @@ public static class FlowLedgerTelemetry
         }
     }
 
+    /// <summary>Automatic retries scheduled after a failed job run, tagged <c>job</c>.</summary>
+    public static readonly Counter<long> JobRetries = Meter.CreateCounter<long>("flowledger.job.retries", "{retry}", "Retries scheduled for failed background jobs.");
+
+    public static void RecordJobRetry(string job)
+        => JobRetries.Add(1, new KeyValuePair<string, object?>("job", job));
+
     public static void RecordJobVetoed(string job)
         => JobRuns.Add(1, new KeyValuePair<string, object?>("job", job), new KeyValuePair<string, object?>("outcome", "vetoed"));
 }

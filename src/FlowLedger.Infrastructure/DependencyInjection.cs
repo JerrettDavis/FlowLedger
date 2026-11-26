@@ -351,6 +351,11 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.DataSafety.NpgsqlAuditLog(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        // -- Durable background job run history (ad hoc table; worker writes, API reads) --
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.NpgsqlJobRunStore(
+                configuration.GetConnectionString("flowledger")
+                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
