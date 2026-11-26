@@ -88,7 +88,10 @@ internal sealed class DockerFactAttribute : FactAttribute
 {
     public DockerFactAttribute()
     {
-        if (!DockerAvailability.IsAvailable)
+        // FLOWLEDGER_REQUIRE_DOCKER=true (set in CI) turns the silent skip into a real failure:
+        // the test body runs and fails when the daemon is missing.
+        var required = string.Equals(Environment.GetEnvironmentVariable("FLOWLEDGER_REQUIRE_DOCKER"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!required && !DockerAvailability.IsAvailable)
         {
             Skip = "Docker is not available in this environment. Test skipped.";
         }

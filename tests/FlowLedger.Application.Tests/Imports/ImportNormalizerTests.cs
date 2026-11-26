@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Imports;
 
+[Trait("Invariant", "INV-07")]
 public sealed class ImportNormalizerTests
 {
     private static List<List<string>> Rows(NormalizedImport n) => CsvParser.Parse(n.Csv).Skip(1).ToList();

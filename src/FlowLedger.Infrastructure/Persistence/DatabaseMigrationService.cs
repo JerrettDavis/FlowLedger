@@ -20,7 +20,6 @@ namespace FlowLedger.Infrastructure.Persistence;
 public sealed class DatabaseMigrationService : IHostedService
 {
     /// <summary>Advisory-lock name shared by every process that may apply migrations.</summary>
-    public const string MigrationLockName = "flowledger-migrate";
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DatabaseMigrationService> _logger;
@@ -43,12 +42,6 @@ public sealed class DatabaseMigrationService : IHostedService
     {
         await using var scope = _serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>();
-
-        // Concurrent starters (api + worker, or replicas) must not race on the schema: serialize on a
-        // cross-process advisory lock; whoever waits then finds nothing pending.
-        await using var migrationLock = db.Database.IsNpgsql() && db.Database.GetConnectionString() is { } cs
-            ? await PostgresAdvisoryLock.AcquireAsync(cs, MigrationLockName, TimeSpan.FromMinutes(10), cancellationToken)
-            : null;
 
         try
         {
