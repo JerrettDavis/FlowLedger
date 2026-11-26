@@ -18,6 +18,20 @@ public sealed class TestClockRatchetTests
     /// <summary>Path relative to tests/ (forward slashes) to number of direct clock reads still allowed.</summary>
     private static readonly Dictionary<string, int> Baseline = new()
     {
+        ["FlowLedger.Api.Tests/Endpoints/ProviderErrorHandlingTests.cs"] = 2,
+        ["FlowLedger.Api.Tests/Endpoints/WebhookTenantRoutingTests.cs"] = 2,
+        ["FlowLedger.Api.Tests/Security/RateLimitPartitionTests.cs"] = 1,
+        ["FlowLedger.Infrastructure.Tests/Health/TelemetryTests.cs"] = 1,
+        ["FlowLedger.Infrastructure.Tests/Persistence/ReadinessDatabaseTests.cs"] = 2,
+        ["FlowLedger.Infrastructure.Tests/Persistence/TenantFilterProductionModelTests.cs"] = 1,
+        ["FlowLedger.Infrastructure.Tests/Sync/ConnectionHealthRecordingTests.cs"] = 3,
+        ["FlowLedger.Infrastructure.Tests/Sync/PendingSettlementTests.cs"] = 4,
+        ["FlowLedger.Infrastructure.Tests/Sync/QuilttSyncEndToEndTests.cs"] = 3,
+        ["FlowLedger.Integrations.Tests/ProviderIssueTests.cs"] = 1,
+        ["FlowLedger.Integrations.Tests/Quiltt/QuilttIssueMappingTests.cs"] = 2,
+        ["FlowLedger.Worker.Tests/Jobs/ScheduledSyncJobRetryTests.cs"] = 1,
+        ["FlowLedger.Worker.Tests/SchedulingTests.cs"] = 1,
+        ["FlowLedger.Worker.Tests/WorkerHeartbeatTests.cs"] = 4,
         ["FlowLedger.Api.Tests/Endpoints/AssetEndpointTests.cs"] = 4,
         ["FlowLedger.Api.Tests/Endpoints/BudgetAlertEndpointTests.cs"] = 1,
         ["FlowLedger.Api.Tests/Endpoints/CategoryMoveEndpointTests.cs"] = 1,

@@ -198,7 +198,10 @@ public sealed class ApplicationPropertyTests
         {
             var date = c.AsOf.AddDays(t.DayOffset);
             var isReal = t.Status is not (TransactionStatus.Planned or TransactionStatus.Skipped or TransactionStatus.Ignored or TransactionStatus.NeedsReview);
-            if (isReal && date >= c.AsOf && date <= end)
+            // #117: a non-pending actual dated on/before the as-of date is already inside the opening balance, so it is not re-applied;
+            // a pending one is not yet in the balance and still applies (on day 0 when dated earlier).
+            var alreadyInBalance = date <= c.AsOf && t.Status != TransactionStatus.Pending;
+            if (isReal && !alreadyInBalance && date <= end)
             {
                 expected += t.Credit ? t.Amount : -t.Amount;
             }

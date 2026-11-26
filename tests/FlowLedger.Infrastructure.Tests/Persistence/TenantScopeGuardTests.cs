@@ -97,6 +97,8 @@ public sealed class TenantScopeGuardTests
         ["SnapshotRestoreDrill.cs"] = "whole-database restore drill, never per tenant",
         ["NpgsqlProviderCallLedger.cs"] = "provider API call accounting for the whole host (cost control), no tenant column",
         ["DataEnvironmentGuard.cs"] = "host-wide environment fingerprint in system_settings",
+        ["DataRetention.cs"] = "host-wide maintenance: blanks old merge snapshots and deletes expired link codes across all tenants (#181)",
+        ["ReadinessChecks.cs"] = "host-wide readiness probes (migration history, backup freshness); no tenant data is returned",
     };
 
     /// <summary>Literal fragments that are not complete statements: (file, text in the literal, reason).</summary>
