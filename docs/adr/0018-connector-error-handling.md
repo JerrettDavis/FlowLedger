@@ -1,6 +1,6 @@
 # 0018 - Connector-neutral error handling
 
-Status: accepted (contract merged; implementation in progress)
+Status: accepted (implemented; Quiltt is the reference mapping)
 
 ## Context
 Every connector (SimpleFIN, MX, Quiltt, Simulated, future ones) can fail in the same handful of ways: the user must re-authenticate,
@@ -43,3 +43,22 @@ layers only see `ProviderIssue`, the same handling covers MX, SimpleFIN and any 
 * Contract/taxonomy: `ProviderIssueTests` (Integrations.Tests).
 * Connector mapping: per-connector unit tests with recorded/stubbed wire shapes, plus opt-in live tests (env-var gated) against sandboxes.
 * Shared layers are tested with a fake connector that throws every `ProviderIssueKind`, proving behaviour is connector-independent.
+
+## As implemented
+* **Contract:** `ProviderIssue` (+ `RepairRef`: an opaque, connector-defined handle the UI hands back to that connector's repair flow; for Quiltt the connection id),
+  `ConnectionHealth`, `ProviderException.Kind`, `ProviderCapabilities.ConnectionHealth` (opt-in: only connectors that can report real per-connection state are
+  asked after each sync, because the call can cost an extra provider request).
+* **Persistence:** `provider_connections.issue_*`, `consecutive_failures`, `issue_provider_code`, `issue_repair_ref` via `IProviderConnectionStore.RecordHealthAsync`.
+  A *successful read is not recovery*: connectors with the health capability are asked, so a reconnect-needed connection with readable (stale) data keeps its issue.
+* **Retry:** `SyncRetryPolicy` + `SyncAttemptGate` decide Retry / SkipUntilUserAction / GiveUp from a `ProviderIssue`; scheduled and on-demand jobs consult it.
+* **HTTP:** `ProviderExceptionHandler` (409 user action, 429 rate limit, 503 unavailable, 502 internal/unknown) with `issueKind`, `retryable`, `requiresUserAction`, `retryAfterSeconds`.
+* **UI:** `ConnectionHealthBadge`, pluggable `IConnectionRepairHandler` (Quiltt reconnect mode), `ProblemToast`, `AutoSyncPolicy`; a successful reconnect runs a sync, which clears the issue.
+* **Quiltt:** see `docs/quiltt-sandbox-scenarios.md`. `QuilttIssueMapper` is the only place Quiltt statuses/errors are interpreted; `QuilttSessionCache` keeps minting under
+  Quiltt's 10-sessions/hour/profile limit.
+
+## Known limits
+* The Mock Sandbox Bank's failure logins (aggregator down, invalid credentials, timeouts, internal error, multi-error) fail inside the hosted Connector and leave **no
+  server-visible state**, and `ERROR_INSTITUTION/PROVIDER/SERVICE` were never produced by any sandbox login (mapped from the schema only). Only `ERROR_REPAIRABLE`
+  (via `connectionSimulateError`) and `DISCONNECTED` are reproducible server-side. Capturing the Connector's exit event and reporting it to the API is the remaining gap.
+* Webhook-driven issue updates (`connection.synced.errored.*`) are mapped but untested end to end (no public URL).
+* `FinancialSyncService` still names connectors for tenancy/provisioning rules (not error handling); move to connector descriptors in a follow-up.

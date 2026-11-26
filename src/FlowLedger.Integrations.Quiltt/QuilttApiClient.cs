@@ -49,14 +49,33 @@ internal sealed class QuilttApiClient
     private readonly HttpClient _http;
     private readonly QuilttOptions _options;
 
-    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options)
+    private readonly QuilttSessionCache _sessions;
+
+    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options, QuilttSessionCache? sessions = null)
     {
         _http = http;
         _options = options.Value;
+        _sessions = sessions ?? new QuilttSessionCache();
     }
 
-    /// <summary>Mints a profile session. With no <paramref name="profileId"/> Quiltt creates a new profile.</summary>
+    /// <summary>
+    /// Returns a session for <paramref name="profileId"/>, reusing a cached one while it is comfortably valid. Quiltt rate-limits session
+    /// minting (10/hour, 20/day per profile) and a health check, a sync and the Connector each need one, so minting per call exhausts the
+    /// quota. With no <paramref name="profileId"/> Quiltt creates a new profile (never cached).
+    /// </summary>
     public async Task<QuilttSession> CreateSessionAsync(string? profileId, CancellationToken ct)
+    {
+        if (profileId is not null && _sessions.TryGet(profileId) is { } cached)
+        {
+            return cached;
+        }
+
+        var session = await MintSessionAsync(profileId, ct).ConfigureAwait(false);
+        _sessions.Put(session);
+        return session;
+    }
+
+    private async Task<QuilttSession> MintSessionAsync(string? profileId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKeySecret))
         {

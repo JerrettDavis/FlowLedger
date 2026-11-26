@@ -21,7 +21,7 @@ internal static class QuilttIssueMapper
     {
         var s = (status ?? string.Empty).Trim().ToUpperInvariant();
         var code = QuilttProviderCode.Format(s, connectionId);
-        return s switch
+        var issue = s switch
         {
             "SYNCED" or "SYNCING" or "INITIALIZING" or "UPGRADING" => ProviderIssue.NoIssue,
             "ERROR_REPAIRABLE" => ProviderIssue.Of(ProviderIssueKind.ReauthRequired,
@@ -36,6 +36,9 @@ internal static class QuilttIssueMapper
                 "The bank connection was disconnected. Link the bank again.", providerCode: code),
             _ => ProviderIssue.Of(ProviderIssueKind.Unknown, "Quiltt reported an unrecognised connection status.", providerCode: code),
         };
+
+        // The connection id is what the Connector's reconnect mode needs; it travels as the opaque RepairRef.
+        return issue.Kind == ProviderIssueKind.None || string.IsNullOrWhiteSpace(connectionId) ? issue : issue with { RepairRef = connectionId };
     }
 
     /// <summary>Which of two problems the user should hear about first: things only they can fix, then the rest by severity.</summary>

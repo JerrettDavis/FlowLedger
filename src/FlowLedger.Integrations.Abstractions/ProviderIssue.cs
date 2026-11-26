@@ -44,20 +44,23 @@ public enum ProviderIssueKind
 /// <param name="RequiresUserAction">True when only the user can fix it (re-auth / re-link).</param>
 /// <param name="RetryAfter">Earliest sensible retry time, when the provider said so.</param>
 /// <param name="ProviderCode">The provider's own code/status string, for diagnostics.</param>
+/// <param name="RepairRef">Opaque, connector-defined reference a UI hands back to that connector's repair flow (for example the id of
+/// the exact connection to reconnect). Never interpreted outside the connector that produced it.</param>
 public sealed record ProviderIssue(
     ProviderIssueKind Kind,
     string Message,
     bool Retryable,
     bool RequiresUserAction,
     DateTimeOffset? RetryAfter = null,
-    string? ProviderCode = null)
+    string? ProviderCode = null,
+    string? RepairRef = null)
 {
     /// <summary>The "all good" issue.</summary>
     public static ProviderIssue NoIssue { get; } = new(ProviderIssueKind.None, string.Empty, false, false);
 
     /// <summary>Builds an issue of <paramref name="kind"/> with the retry/user-action defaults that kind implies.</summary>
-    public static ProviderIssue Of(ProviderIssueKind kind, string message, DateTimeOffset? retryAfter = null, string? providerCode = null) =>
-        new(kind, message, IsRetryableByDefault(kind), RequiresUserByDefault(kind), retryAfter, providerCode);
+    public static ProviderIssue Of(ProviderIssueKind kind, string message, DateTimeOffset? retryAfter = null, string? providerCode = null, string? repairRef = null) =>
+        new(kind, message, IsRetryableByDefault(kind), RequiresUserByDefault(kind), retryAfter, providerCode, repairRef);
 
     public static bool IsRetryableByDefault(ProviderIssueKind kind) => kind is
         ProviderIssueKind.InstitutionUnavailable or ProviderIssueKind.ProviderUnavailable

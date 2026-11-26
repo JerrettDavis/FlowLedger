@@ -201,11 +201,91 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
     }
 
     /// <summary>A connector with no identity of its own: succeeds with no accounts, or throws whatever it is told to.</summary>
+    [DockerFact]
+    public async Task A_clean_read_does_not_clear_an_issue_the_connector_still_reports_and_the_repair_ref_round_trips()
+    {
+        var tenant = TestTenantContext.New();
+        var (db, sync, store, provider) = await ArrangeAsync(tenant);
+        await using var _ = db;
+        provider.Health = ConnectionHealth.FromIssue(ProviderIssue.Of(
+            ProviderIssueKind.ReauthRequired, "log in again", providerCode: "STATUS", repairRef: "conn-42"));
+
+        await sync.SyncAsync(); // reads succeed (stale data) - must NOT be recorded as recovery
+
+        var issue = (await store.ListAsync()).Single().Issue;
+        issue.Should().NotBeNull();
+        issue!.Kind.Should().Be(nameof(ProviderIssueKind.ReauthRequired));
+        issue.RepairRef.Should().Be("conn-42");
+        issue.ProviderCode.Should().Be("STATUS");
+        issue.RequiresUserAction.Should().BeTrue();
+
+        provider.Health = ConnectionHealth.Healthy; // the user reconnected
+        await sync.SyncAsync();
+
+        var cleared = await store.ListAsync();
+        cleared.Single().Issue.Should().BeNull();
+        await using var verify = _fixture.CreateDbContext(tenant);
+        var row = await verify.ProviderConnections.AsNoTracking().SingleAsync();
+        row.IssueRepairRef.Should().BeNull();
+        row.IssueProviderCode.Should().BeNull();
+    }
+
+    [DockerFact]
+    public async Task An_issue_reported_after_successful_reads_is_informational_and_never_counts_toward_give_up()
+    {
+        var tenant = TestTenantContext.New();
+        var (db, sync, store, provider) = await ArrangeAsync(tenant);
+        await using var _ = db;
+        // e.g. an extensible vendor status we do not recognise, or one of several connections needing repair.
+        provider.Health = ConnectionHealth.FromIssue(ProviderIssue.Of(ProviderIssueKind.Unknown, "odd status", repairRef: "c1"));
+        var gate = new SyncAttemptGate(store, new SyncRetryPolicy());
+
+        for (var i = 0; i < 10; i++)
+        {
+            await sync.SyncAsync();
+        }
+
+        var issue = (await store.ListAsync()).Single().Issue!;
+        issue.Informational.Should().BeTrue();
+        issue.ConsecutiveFailures.Should().Be(0, "successful syncs are not failed attempts");
+        (await gate.CheckAsync(SyncTrigger.Scheduled)).Allowed.Should().BeTrue("healthy data must keep syncing");
+
+        // A real failure afterwards still counts and blocks as usual.
+        provider.Throw = ExceptionFor(ProviderIssueKind.ReauthRequired);
+        await FluentActions.Awaiting(() => sync.SyncAsync()).Should().ThrowAsync<ProviderException>();
+        var failed = (await store.ListAsync()).Single().Issue!;
+        failed.Informational.Should().BeFalse();
+        failed.ConsecutiveFailures.Should().Be(1);
+        (await gate.CheckAsync(SyncTrigger.Scheduled)).Allowed.Should().BeFalse();
+    }
+
+    [DockerFact]
+    public async Task A_connector_without_the_health_capability_is_never_asked_for_health()
+    {
+        var tenant = TestTenantContext.New();
+        var (db, sync, store, provider) = await ArrangeAsync(tenant);
+        await using var _ = db;
+        provider.Health = null; // capability not advertised
+
+        await sync.SyncAsync();
+
+        (await store.ListAsync()).Single().Issue.Should().BeNull();
+    }
+
     private sealed class FakeProvider : IFinancialDataProvider
     {
         public Exception? Throw { get; set; }
+
+        /// <summary>When set, the connector advertises real per-connection health and reports this after reads.</summary>
+        public ConnectionHealth? Health { get; set; }
+
         public string ProviderName => Vendor;
-        public ProviderCapabilities Capabilities => new SimulatedFinancialDataProvider(Microsoft.Extensions.Options.Options.Create(new SimulatedProviderOptions())).Capabilities;
+        public ProviderCapabilities Capabilities =>
+            new SimulatedFinancialDataProvider(Microsoft.Extensions.Options.Options.Create(new SimulatedProviderOptions())).Capabilities
+            | (Health is null ? ProviderCapabilities.None : ProviderCapabilities.ConnectionHealth);
+
+        public Task<ConnectionHealth> GetConnectionHealthAsync(string m, CancellationToken ct = default)
+            => Task.FromResult(Health ?? ConnectionHealth.Healthy);
 
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default) => Task.FromResult(ConnectionStatus.Healthy);

@@ -24,6 +24,9 @@ internal sealed class ProviderConnectionRecord
     public bool IssueRequiresUserAction { get; private set; }
     public DateTimeOffset? IssueRetryAfter { get; private set; }
     public DateTimeOffset? IssueAt { get; private set; }
+    public string? IssueProviderCode { get; private set; }
+    public string? IssueRepairRef { get; private set; }
+    public bool IssueInformational { get; private set; }
     public int ConsecutiveFailures { get; private set; }
 
     private ProviderConnectionRecord() { }

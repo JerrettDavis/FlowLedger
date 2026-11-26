@@ -150,8 +150,42 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             throw; // never swallow: callers (UI, jobs) still see the original failure
         }
 
-        await RecordHealthSafelyAsync(null, ct);
+        await RecordHealthSafelyAsync(await ReadProviderHealthAsync(ct), ct);
         return result;
+    }
+
+    /// <summary>
+    /// A read can succeed against a connection that still needs repair (stale data), so for connectors that can report real
+    /// per-connection health (<see cref="ProviderCapabilities.ConnectionHealth"/>) ask them; otherwise a clean sync means recovery (null).
+    /// </summary>
+    private async Task<ConnectionIssueInfo?> ReadProviderHealthAsync(CancellationToken ct)
+    {
+        if (!_provider.Capabilities.HasFlag(ProviderCapabilities.ConnectionHealth))
+        {
+            return null;
+        }
+
+        try
+        {
+            var member = await _db.ProviderConnections
+                .Where(c => c.ProviderName == _provider.ProviderName)
+                .Select(c => c.MemberProviderId)
+                .FirstOrDefaultAsync(ct);
+            if (member is null)
+            {
+                return null;
+            }
+
+            var health = await _provider.GetConnectionHealthAsync(member, ct);
+            return health.IsHealthy || health.Issue is null
+                ? null
+                : ProviderIssueMapping.ToInfo(health.Issue, DateTimeOffset.UtcNow, informational: true); // reads succeeded, so never a gate/give-up input
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not read connection health for {Provider}; treating the clean sync as healthy.", _provider.ProviderName);
+            return null;
+        }
     }
 
     /// <summary>Health bookkeeping must never mask the sync outcome: its own failures are logged and dropped.</summary>

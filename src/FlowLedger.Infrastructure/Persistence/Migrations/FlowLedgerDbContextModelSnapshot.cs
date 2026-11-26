@@ -511,6 +511,12 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("issue_at");
 
+                    b.Property<bool>("IssueInformational")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_informational");
+
                     b.Property<string>("IssueKind")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -520,6 +526,16 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("issue_message");
+
+                    b.Property<string>("IssueProviderCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("issue_provider_code");
+
+                    b.Property<string>("IssueRepairRef")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("issue_repair_ref");
 
                     b.Property<bool>("IssueRequiresUserAction")
                         .ValueGeneratedOnAdd()

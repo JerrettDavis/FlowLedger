@@ -281,3 +281,67 @@ public sealed class QuilttIssueMappingTests
         ex.Kind.Should().Be(ProviderIssueKind.ServiceUnavailable);
     }
 }
+
+public sealed class QuilttSessionCacheTests
+{
+    private static QuilttSession Session(string profile, DateTimeOffset? expires) => new("tok-" + profile, profile, expires);
+
+    [Fact]
+    public void ReusesASessionUntilShortlyBeforeItExpires()
+    {
+        var clock = new TestClock(DateTimeOffset.Parse("2026-11-25T12:00:00Z"));
+        var cache = new QuilttSessionCache(clock);
+        cache.Put(Session("p_1", clock.GetUtcNow().AddHours(24)));
+
+        cache.TryGet("p_1").Should().NotBeNull();
+        clock.Advance(TimeSpan.FromMinutes(59));
+        cache.TryGet("p_1").Should().NotBeNull();
+        clock.Advance(TimeSpan.FromMinutes(2)); // past the 1h max age
+        cache.TryGet("p_1").Should().BeNull();
+    }
+
+    [Fact]
+    public void NearExpiryOrUnknownExpiry_IsNeverServed()
+    {
+        var clock = new TestClock(DateTimeOffset.Parse("2026-11-25T12:00:00Z"));
+        var cache = new QuilttSessionCache(clock);
+
+        cache.Put(Session("soon", clock.GetUtcNow().AddMinutes(5)));
+        cache.Put(Session("unknown", null));
+
+        cache.TryGet("soon").Should().BeNull();
+        cache.TryGet("unknown").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ApiClient_MintsOncePerProfile_AcrossManyCalls()
+    {
+        var mints = 0;
+        var handler = new CountingHandler(() => { mints++; return """{"token":"t","userId":"p_1","expiresAt":"2999-01-01T00:00:00Z"}"""; });
+        var client = new QuilttApiClient(new HttpClient(handler),
+            Microsoft.Extensions.Options.Options.Create(new QuilttOptions { ApiKeySecret = "k" }), new QuilttSessionCache());
+
+        for (var i = 0; i < 5; i++)
+        {
+            await client.CreateSessionAsync("p_1", default);
+        }
+
+        mints.Should().Be(1);
+    }
+
+    private sealed class TestClock(DateTimeOffset start) : TimeProvider
+    {
+        private DateTimeOffset _now = start;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan by) => _now += by;
+    }
+
+    private sealed class CountingHandler(Func<string> body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Created)
+            {
+                Content = new StringContent(body(), System.Text.Encoding.UTF8, "application/json"),
+            });
+    }
+}

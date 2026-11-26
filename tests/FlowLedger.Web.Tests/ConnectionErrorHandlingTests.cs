@@ -229,3 +229,30 @@ public sealed class ConnectionErrorHandlingTests
         d.StopUntilUserActs.Should().BeFalse();
     }
 }
+
+public sealed class ConnectExitTests
+{
+    [Theory]
+    [InlineData("success", FlowLedger.Web.Connections.ConnectOutcome.Success)]
+    [InlineData("SUCCESS", FlowLedger.Web.Connections.ConnectOutcome.Success)]
+    [InlineData("cancelled", FlowLedger.Web.Connections.ConnectOutcome.Cancelled)]
+    [InlineData("canceled", FlowLedger.Web.Connections.ConnectOutcome.Cancelled)]
+    [InlineData("error", FlowLedger.Web.Connections.ConnectOutcome.Failed)]
+    [InlineData("", FlowLedger.Web.Connections.ConnectOutcome.Failed)]
+    [InlineData(null, FlowLedger.Web.Connections.ConnectOutcome.Failed)]
+    [InlineData("something-new", FlowLedger.Web.Connections.ConnectOutcome.Failed)]
+    public void Parse_NormalisesAnyWidgetExit(string? status, FlowLedger.Web.Connections.ConnectOutcome expected) =>
+        FlowLedger.Web.Connections.ConnectExit.Parse(status).Should().Be(expected);
+
+    [Fact]
+    public void EveryOutcome_HasADistinctActionableMessage_WithoutVendorNames()
+    {
+        var messages = Enum.GetValues<FlowLedger.Web.Connections.ConnectOutcome>()
+            .Select(o => FlowLedger.Web.Connections.ConnectExit.Message(o)!.Value).ToList();
+
+        messages.Select(m => m.Message).Distinct().Should().HaveCount(3);
+        messages.Should().OnlyContain(m => !m.Message.Contains("Quiltt", StringComparison.OrdinalIgnoreCase));
+        FlowLedger.Web.Connections.ConnectExit.Message(FlowLedger.Web.Connections.ConnectOutcome.Failed)!.Value.Message
+            .Should().Contain("nothing was linked").And.Contain("Try again");
+    }
+}

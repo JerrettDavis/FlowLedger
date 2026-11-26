@@ -47,7 +47,8 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         | ProviderCapabilities.IncrementalTransactions
         | ProviderCapabilities.FullTransactionHistory
         | ProviderCapabilities.WebhookVerification
-        | ProviderCapabilities.WebhookParsing;
+        | ProviderCapabilities.WebhookParsing
+        | ProviderCapabilities.ConnectionHealth;
 
     /// <summary>The public Connector id the browser opens (not a secret).</summary>
     public string? ConnectorId => _options.ConnectorId;
