@@ -354,18 +354,11 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Budgets (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore(
-            configuration.GetConnectionString("flowledger")
-            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Savings goals (per-tenant, ad-hoc table; part of every snapshot/export) --
-        services.AddSingleton(_ => new FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore(
-            configuration.GetConnectionString("flowledger")
-            ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        services.AddSingleton<FlowLedger.Application.Features.Budgets.IBudgetStore>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlBudgetStore>());
-        services.AddSingleton<FlowLedger.Application.Features.Goals.IGoalStore>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlGoalStore>());
+        // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
+        services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
+        services.AddScoped<FlowLedger.Application.Features.Goals.IGoalStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore>();
         // -- Account rates (per-tenant, ad-hoc table; part of every snapshot/export) --
         services.AddScoped<FlowLedger.Application.Features.Strategies.IAccountRateStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfAccountRateStore>();

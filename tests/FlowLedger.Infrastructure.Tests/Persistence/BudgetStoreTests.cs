@@ -1,9 +1,11 @@
 using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
 
+/// <summary>#154: budgets moved from an ad-hoc Npgsql table to EF (migration + tenant filter + tenant guard).</summary>
 [Collection("Integration")]
 public sealed class BudgetStoreTests : IAsyncLifetime
 {
@@ -27,27 +29,54 @@ public sealed class BudgetStoreTests : IAsyncLifetime
     [DockerFact]
     public async Task Budgets_are_per_tenant_upsert_and_removable()
     {
-        var store = new NpgsqlBudgetStore(_fixture.ConnectionString);
-        var a = Guid.NewGuid();
-        var b = Guid.NewGuid();
+        var a = TestTenantContext.New();
+        var b = TestTenantContext.New();
 
-        await store.SetAsync(a, "Food/Groceries", 400m);
-        await store.SetAsync(a, "Food/Groceries", 450m);
-        await store.SetAsync(b, "Food/Groceries", 100m);
+        await using (var db = _fixture.CreateProductionStyleContext(a))
+        {
+            var store = new EfBudgetStore(db, a);
+            await store.SetAsync(a.TenantId, "Food/Groceries", 400m);
+            await store.SetAsync(a.TenantId, "Food/Groceries", 450m);
+        }
 
-        (await store.ListAsync(a)).Should().ContainSingle().Which.MonthlyLimit.Should().Be(450m);
-        (await store.ListAsync(b)).Should().ContainSingle().Which.MonthlyLimit.Should().Be(100m);
+        await using (var db = _fixture.CreateProductionStyleContext(b))
+        {
+            var store = new EfBudgetStore(db, b);
+            await store.SetAsync(b.TenantId, "Food/Groceries", 100m);
+            (await store.ListAsync(b.TenantId)).Should().ContainSingle().Which.MonthlyLimit.Should().Be(100m);
+            await store.RemoveAsync(b.TenantId, "Food/Groceries");
+        }
 
-        await store.RemoveAsync(a, "Food/Groceries");
-        (await store.ListAsync(a)).Should().BeEmpty();
-        (await store.ListAsync(b)).Should().HaveCount(1);
+        await using (var db = _fixture.CreateProductionStyleContext(a))
+        {
+            var store = new EfBudgetStore(db, a);
+            (await store.ListAsync(a.TenantId)).Should().ContainSingle().Which.MonthlyLimit.Should().Be(450m,
+                "tenant B's delete of the same category must not touch tenant A");
+            await store.RemoveAsync(a.TenantId, "Food/Groceries");
+            (await store.ListAsync(a.TenantId)).Should().BeEmpty();
+        }
+    }
+
+    [DockerFact]
+    public async Task Asking_for_another_tenants_budgets_fails_loudly()
+    {
+        var a = TestTenantContext.New();
+        await using var db = _fixture.CreateProductionStyleContext(a);
+        var store = new EfBudgetStore(db, a);
+
+        var act = () => store.ListAsync(Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [DockerFact]
     public async Task Budgets_survive_snapshot_and_restore_drill()
     {
-        var store = new NpgsqlBudgetStore(_fixture.ConnectionString);
-        await store.SetAsync(Guid.NewGuid(), "Housing/Rent", 1500m);
+        var a = TestTenantContext.New();
+        await using (var db = _fixture.CreateProductionStyleContext(a))
+        {
+            await new EfBudgetStore(db, a).SetAsync(a.TenantId, "Housing/Rent", 1500m);
+        }
 
         var (dir, manifest) = await new DatabaseSnapshotService(_fixture.ConnectionString).CreateAsync(_root, "budgets");
         manifest.Tables.Should().Contain(t => t.Table == "budgets" && t.Rows >= 1);
