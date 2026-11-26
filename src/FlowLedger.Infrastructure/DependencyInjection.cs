@@ -31,6 +31,17 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        AddCategorizationAndLocalAi(services, configuration);
+        AddPersistence(services, configuration);
+        AddProvidersAndSync(services, configuration);
+        AddStorageAndHealth(services, configuration);
+
+        return services;
+    }
+
+    /// <summary>ML categorizer tuning and the in-process local AI stack.</summary>
+    private static void AddCategorizationAndLocalAi(IServiceCollection services, IConfiguration configuration)
+    {
         // ML categorizer tuning ("Categorization:MlThreshold" / ":SuggestionFloor"); defaults keep auto-apply off.
         var categorization = new FlowLedger.Application.Features.Categories.CategorizationOptions();
         if (double.TryParse(configuration["Categorization:MlThreshold"], System.Globalization.CultureInfo.InvariantCulture, out var mlThreshold))
@@ -61,7 +72,11 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>();
         services.AddSingleton<FlowLedger.Application.Abstractions.ITextEmbedder>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
         services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiRuntime>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.SwitchingTextEmbedder>());
+    }
 
+    /// <summary>EF Core context, domain-event dispatch, repositories and configuration (#108).</summary>
+    private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".
@@ -128,7 +143,11 @@ public static class DependencyInjection
         {
             services.AddSingleton<IConfiguration>(configuration);
         }
+    }
 
+    /// <summary>Connector registry, provider wiring, asset feeds, sync pipeline, ad-hoc stores and backups (shares the connector list).</summary>
+    private static void AddProvidersAndSync(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Provider wiring ────────────────────────────────────────────────────
         // Provider selection is config-only:
         //   Mx:Enabled = true  → real MX provider (FlowLedger.Integrations.Mx)
@@ -401,6 +420,11 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
             sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
+    }
+
+    /// <summary>Object storage, raw payload archive and readiness checks.</summary>
+    private static void AddStorageAndHealth(IServiceCollection services, IConfiguration configuration)
+    {
         // ── Object storage ──────────────────────────────────────────────────────
         services.AddOptions<ObjectStorageOptions>()
             .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
@@ -411,7 +435,5 @@ public static class DependencyInjection
 
         // Readiness probes (/ready): Postgres + migrations, Redis (if configured), backup freshness.
         FlowLedger.Infrastructure.Health.ReadinessHealthExtensions.AddFlowLedgerReadinessChecks(services);
-
-        return services;
     }
 }
