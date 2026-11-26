@@ -406,6 +406,8 @@ public static class DependencyInjection
     /// <summary>Object storage, raw payload archive and readiness checks.</summary>
     private static void AddStorageAndHealth(IServiceCollection services, IConfiguration configuration)
     {
+        FlowLedger.Infrastructure.Configuration.FlowLedgerOptionsExtensions.AddFlowLedgerTypedOptions(services, configuration);
+
         // ── Object storage ──────────────────────────────────────────────────────
         services.AddOptions<ObjectStorageOptions>()
             .Bind(configuration.GetSection(ObjectStorageOptions.SectionName))
