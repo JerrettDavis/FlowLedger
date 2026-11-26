@@ -203,8 +203,10 @@ public sealed class ObjectStorageWritableCheck(Microsoft.Extensions.Options.IOpt
         try
         {
             var root = Path.GetFullPath(options.Value.RootPath);
-            Directory.CreateDirectory(root);
-            probe = Path.Combine(root, $".healthprobe-{Guid.NewGuid():N}");
+            // A dedicated subdirectory keeps a leftover probe file out of the archive proper.
+            var probeDir = Path.Combine(root, ".health");
+            Directory.CreateDirectory(probeDir);
+            probe = Path.Combine(probeDir, $"probe-{Guid.NewGuid():N}");
             await File.WriteAllTextAsync(probe, "ok", cancellationToken);
             return HealthCheckResult.Healthy("Object storage is writable.");
         }

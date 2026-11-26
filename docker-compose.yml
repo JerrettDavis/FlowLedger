@@ -293,6 +293,8 @@ services:
     stop_grace_period: 120s
     environment:
       <<: [*app-common-env, *db-env, *redis-env, *backup-env]
+      # Same household tenant as the api and web (scheduled sync fans out over every tenant; this is the worker's default scope).
+      Worker__TenantId: ${API__TENANTID:-00000000-0000-0000-0000-000000000001}
     volumes:
       - objects_data:/data/objects
       - backups_data:/data/backups

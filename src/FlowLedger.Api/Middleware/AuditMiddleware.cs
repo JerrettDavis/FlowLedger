@@ -44,17 +44,24 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
             return;
         }
 
+        // The exception handler sits outside this middleware, so on a throw the response status is still 200 here: record 500.
+        int? thrown = null;
         try
         {
             await next(context);
         }
+        catch (Exception)
+        {
+            thrown = StatusCodes.Status500InternalServerError;
+            throw;
+        }
         finally
         {
-            await TryRecordAsync(context, audit, clock, action);
+            await TryRecordAsync(context, audit, clock, action, thrown);
         }
     }
 
-    private async Task TryRecordAsync(HttpContext context, IAuditLog audit, TimeProvider clock, string action)
+    private async Task TryRecordAsync(HttpContext context, IAuditLog audit, TimeProvider clock, string action, int? statusOverride)
     {
         try
         {
@@ -85,7 +92,7 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
                 target,
                 context.Connection.RemoteIpAddress?.ToString(),
                 Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier,
-                context.Response.StatusCode,
+                statusOverride ?? context.Response.StatusCode,
                 clock.GetUtcNow()), CancellationToken.None);
         }
         catch (Exception ex)
