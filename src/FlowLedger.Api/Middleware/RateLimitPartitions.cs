@@ -14,7 +14,7 @@ namespace FlowLedger.Api.Middleware;
 /// header is trusted as a partition key.
 /// <para>
 /// When <c>Api:TenantSigningKey</c> is set the tenant header is only used as a partition key if its signature verifies, so a
-/// caller cannot mint partitions. Either way a <see cref="CreateGlobalLimiter"/> per-IP backstop applies to every request, so
+/// caller cannot mint partitions; without it the header is folded into <see cref="UnverifiedTenantBuckets"/> fixed buckets. Either way a <see cref="CreateGlobalLimiter"/> per-IP backstop applies to every request, so
 /// rotating <c>X-Tenant-Id</c> values cannot exceed the IP-level cap, and failed authentication is throttled per IP.
 /// </para>
 /// </summary>
@@ -24,6 +24,9 @@ public static class RateLimitPartitions
     public const int DefaultFailedAuthPerIpPerMinute = 20;
     public const int DefaultWebhookPerIpPerMinute = 300;
     private const int DefaultRetryAfterSeconds = 60;
+
+    /// <summary>Partition count for tenant headers that were NOT cryptographically verified; bounds limiter memory when a caller rotates <c>X-Tenant-Id</c>.</summary>
+    public const int UnverifiedTenantBuckets = 1024;
 
     public static string KeyFor(HttpContext http) =>
         KeyFor(http, http.RequestServices?.GetService<IOptions<ApiOptions>>()?.Value.TenantSigningKey);
@@ -47,7 +50,11 @@ public static class RateLimitPartitions
                 return IpKey(http);
             }
 
-            return "tenant:" + id.ToString("N");
+            // With a signing key the id is proven, so each tenant gets its own partition. Without one the header is only as
+            // trustworthy as the caller, so fold it into a fixed number of buckets: rotating ids cannot grow the limiter's state.
+            return string.IsNullOrEmpty(signingKey)
+                ? "tenant:b" + (BitConverter.ToUInt32(id.ToByteArray(), 0) % UnverifiedTenantBuckets)
+                : "tenant:" + id.ToString("N");
         }
 
         return IpKey(http);

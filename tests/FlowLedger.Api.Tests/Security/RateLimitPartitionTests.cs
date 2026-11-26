@@ -30,12 +30,23 @@ public sealed class RateLimitPartitionTests
     [Fact]
     public void Authenticated_callers_from_the_same_ip_are_partitioned_per_tenant()
     {
-        var a = RateLimitPartitions.KeyFor(Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString()));
-        var b = RateLimitPartitions.KeyFor(Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString()));
+        var a = RateLimitPartitions.KeyFor(Ctx(ApiKeyAuthenticationHandler.SchemeName, "00000001-0000-0000-0000-000000000000"));
+        var b = RateLimitPartitions.KeyFor(Ctx(ApiKeyAuthenticationHandler.SchemeName, "00000002-0000-0000-0000-000000000000"));
 
         a.Should().StartWith("tenant:");
         b.Should().StartWith("tenant:");
         a.Should().NotBe(b);
+    }
+
+    [Fact]
+    public void Without_a_signing_key_rotating_tenant_ids_cannot_create_more_than_a_fixed_number_of_partitions()
+    {
+        var keys = Enumerable.Range(0, 20_000)
+            .Select(_ => RateLimitPartitions.KeyFor(Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString())))
+            .ToHashSet();
+
+        keys.Count.Should().BeLessThanOrEqualTo(RateLimitPartitions.UnverifiedTenantBuckets);
+        keys.Should().OnlyContain(k => k.StartsWith("tenant:b"));
     }
 
     [Fact]
