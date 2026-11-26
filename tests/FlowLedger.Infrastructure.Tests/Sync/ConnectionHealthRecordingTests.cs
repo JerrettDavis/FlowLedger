@@ -8,6 +8,7 @@ using FlowLedger.Integrations.Simulated;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
 
@@ -32,7 +33,7 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
 
     private static Exception ExceptionFor(ProviderIssueKind kind) => kind switch
     {
-        ProviderIssueKind.RateLimited => new RateLimitedProviderException("throttled", DateTimeOffset.UtcNow.AddMinutes(30)) { Kind = kind },
+        ProviderIssueKind.RateLimited => new RateLimitedProviderException("throttled", TestClock.Instant.AddMinutes(30)) { Kind = kind },
         ProviderIssueKind.ReauthRequired or ProviderIssueKind.InvalidCredentials or ProviderIssueKind.Disconnected
             => new NeedsUserActionProviderException("user must act", "hint") { Kind = kind },
         ProviderIssueKind.Internal or ProviderIssueKind.Unknown => new FatalProviderException("broke") { Kind = kind },
@@ -114,7 +115,7 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
         var tenant = TestTenantContext.New();
         var (db, sync, store, provider) = await ArrangeAsync(tenant);
         await using var _ = db;
-        var until = DateTimeOffset.UtcNow.AddHours(2);
+        var until = TestClock.Instant.AddHours(2);
         provider.Throw = new RateLimitedProviderException("slow down", until);
 
         await FluentActions.Awaiting(() => sync.SyncAsync()).Should().ThrowAsync<RateLimitedProviderException>();
@@ -160,7 +161,7 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
         await using var db = _fixture.CreateDbContext(tenant);
         var store = new EfProviderConnectionStore(db, tenant);
 
-        await store.RecordHealthAsync("Nobody", ProviderIssueMapping.ToInfo(ProviderIssue.Of(ProviderIssueKind.Internal, "x"), DateTimeOffset.UtcNow));
+        await store.RecordHealthAsync("Nobody", ProviderIssueMapping.ToInfo(ProviderIssue.Of(ProviderIssueKind.Internal, "x"), TestClock.Instant));
 
         (await store.ListAsync()).Should().BeEmpty();
     }

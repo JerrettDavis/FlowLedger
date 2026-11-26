@@ -1,5 +1,6 @@
 using FlowLedger.Integrations.Abstractions;
 using FluentAssertions;
+using FlowLedger.TestSupport;
 
 namespace FlowLedger.Integrations.Tests;
 
@@ -31,7 +32,7 @@ public sealed class ProviderIssueTests
         ProviderIssue.FromException(new FatalProviderException("x")).Kind.Should().Be(ProviderIssueKind.Internal);
         ProviderIssue.FromException(new TransientProviderException("x", TimeSpan.FromMinutes(1))).RetryAfter.Should().NotBeNull();
 
-        var limited = ProviderIssue.FromException(new RateLimitedProviderException("x", DateTimeOffset.UtcNow.AddSeconds(30)));
+        var limited = ProviderIssue.FromException(new RateLimitedProviderException("x", TestClock.Instant.AddSeconds(30)));
         limited.Kind.Should().Be(ProviderIssueKind.RateLimited);
         limited.RetryAfter.Should().NotBeNull();
 
