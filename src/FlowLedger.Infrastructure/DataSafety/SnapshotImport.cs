@@ -110,8 +110,14 @@ public static class SnapshotImport
     /// and aborting as soon as <paramref name="maxTotalBytes"/> is exceeded, whatever the archive claims about its sizes.</summary>
     internal static void ExtractBounded(ZipArchiveEntry entry, string path, ref long totalWritten, long maxTotalBytes)
     {
+        var full = Path.GetFullPath(path);
+        if (!full.StartsWith(Path.GetFullPath(Path.GetDirectoryName(path)!) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("Bundle entry resolves outside the extraction directory.");
+        }
+
         using var source = entry.Open();
-        using var target = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var target = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         var buffer = new byte[81920];
         int read;
         while ((read = source.Read(buffer, 0, buffer.Length)) > 0)

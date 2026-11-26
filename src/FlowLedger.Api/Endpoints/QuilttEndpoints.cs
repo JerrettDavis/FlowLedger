@@ -83,11 +83,6 @@ internal static class QuilttEndpoints
                 }
 
                 var provider = connectors.Resolve(QuilttFinancialDataProvider.Name);
-                if (request.ContentLength > WebhookBody.MaxBytes)
-                {
-                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-                }
-
                 var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
                 if (rawBody is null)
                 {

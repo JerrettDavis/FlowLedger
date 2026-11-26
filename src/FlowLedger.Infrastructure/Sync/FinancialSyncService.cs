@@ -396,9 +396,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 var previousType = existing.AccountType;
                 if (existing.ChangeType(mappedType))
                 {
-                    _logger.LogInformation(
-                        "Account {AccountId} reclassified {Previous} -> {Current} from provider data.",
-                        existing.Id, previousType, mappedType);
+                    _logger.LogInformation("Account {AccountId} reclassified from provider data.", existing.Id);
                 }
             }
 
@@ -620,7 +618,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 }
                 if (settled > 0)
                 {
-                    _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
+                    _logger.LogInformation("Settled {Count} pending transactions during sync", settled);
                 }
                 skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
             }
@@ -649,7 +647,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             {
                 if (stale.AbandonPending())
                 {
-                    _logger.LogInformation("Retired stale pending transaction on {Account} (pending since {Date}).", providerAccountId, stale.EffectiveDate);
+                    _logger.LogInformation("Retired a stale pending transaction (pending since {Date}).", stale.EffectiveDate);
                 }
             }
         }
