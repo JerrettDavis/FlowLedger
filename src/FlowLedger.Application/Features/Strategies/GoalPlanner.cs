@@ -1,3 +1,4 @@
+using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Strategies;
 
 public sealed record GoalDebt(string Name, decimal Balance, decimal RatePercent, int RemainingMonths);
@@ -75,7 +76,7 @@ public static class GoalPlanner
         }
 
         var annuity = r == 0 ? months : (growth - 1) / r;
-        return Math.Round((decimal)(need / annuity), 2);
+        return MoneyRounding.Round((decimal)(need / annuity), 2);
     }
 
     public static GoalPlan Plan(GoalRequest q, GoalContext ctx, MarketRates rates)
@@ -118,8 +119,8 @@ public static class GoalPlanner
         var levers = BuildLevers(target, saved, monthly, apy, baseMonths, income, spend, rates, ctx.Debts);
         var callouts = BuildCallouts(q, target, baseMonths, required, shortfall, scMonthly, surplus, income, spend, apy, rates, ctx.Debts, levers);
 
-        return new GoalPlan(target, baseMonths, scMonths, monthsSaved, required, shortfall, Math.Round(surplus, 2), Math.Round(scMonthly, 2),
-            basePath.Select(x => Math.Round(x, 2)).ToList(), scPath.Select(x => Math.Round(x, 2)).ToList(), levers, callouts);
+        return new GoalPlan(target, baseMonths, scMonths, monthsSaved, required, shortfall, MoneyRounding.Round(surplus, 2), MoneyRounding.Round(scMonthly, 2),
+            basePath.Select(x => MoneyRounding.Round(x, 2)).ToList(), scPath.Select(x => MoneyRounding.Round(x, 2)).ToList(), levers, callouts);
     }
 
     private static List<GoalLever> BuildLevers(
@@ -140,7 +141,7 @@ public static class GoalPlanner
 
         if (spend > 0)
         {
-            var cut = Math.Round(spend * 0.10m, 0);
+            var cut = MoneyRounding.Round(spend * 0.10m, 0);
             list.Add(Make("cut-10", $"Trim spending 10% (about {Money(cut)}/mo)",
                 "Start with the largest discretionary categories on the Spending page.",
                 MonthsToReach(target, saved, monthly + cut, apy), cut));
@@ -150,7 +151,7 @@ public static class GoalPlanner
         {
             foreach (var pct in new[] { 5m, 10m })
             {
-                var extra = Math.Round(income * pct / 100m, 0);
+                var extra = MoneyRounding.Round(income * pct / 100m, 0);
                 list.Add(Make($"income-{pct:0}", $"Earn {pct:0}% more (about {Money(extra)}/mo), saving all of it",
                     "A raise, side income or extra shifts. Assumes the whole increase goes to this goal.",
                     MonthsToReach(target, saved, monthly + extra, apy), extra));

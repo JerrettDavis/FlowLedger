@@ -1,4 +1,5 @@
 using System.Globalization;
+using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Features.Strategies;
 
@@ -45,7 +46,7 @@ public static class StrategyEngine
             .OrderByDescending(s => s.Severity)
             .ThenByDescending(s => s.AnnualImpact ?? 0m)
             .ToList();
-        return new StrategyReport(now, rates, liquid, Math.Round(avgSpend, 2), Math.Round(avgIncome, 2), savingsRate, emergencyMonths, ranked, Disclaimer);
+        return new StrategyReport(now, rates, liquid, MoneyRounding.Round(avgSpend, 2), MoneyRounding.Round(avgIncome, 2), savingsRate, emergencyMonths, ranked, Disclaimer);
     }
 
     private static string Money(decimal v) => v.ToString("C0", CultureInfo.GetCultureInfo("en-US"));
@@ -92,7 +93,7 @@ public static class StrategyEngine
             total >= 500 ? SuggestionSeverity.Attention : SuggestionSeverity.Opportunity,
             $"Put {Money(moving)} of idle cash to work",
             $"About {Money(moving)} sits in low-interest accounts. A high-yield savings or money market account holds the same money with the same federal insurance and could earn roughly {Money(total)} more per year.",
-            Math.Round(total, 0), guessed.Count == 0 ? 0.9 : 0.75, evidence,
+            MoneyRounding.Round(total, 0), guessed.Count == 0 ? 0.9 : 0.75, evidence,
             [
                 "Open a high-yield savings or money market account at an FDIC- or NCUA-insured institution.",
                 "Set up an automatic transfer so checking keeps about 1.5 months of expenses and the rest moves over.",
@@ -162,7 +163,7 @@ public static class StrategyEngine
             "cd-ladder", SuggestionKind.Cash, SuggestionSeverity.Opportunity,
             $"Consider a CD ladder with {Money(amount)}",
             $"Splitting {Money(amount)} across {plan.Rungs.Count} CDs that mature at staggered dates blends to about {Pct(plan.BlendedApy)} APY (vs {Pct(r.Hysa)} in savings) while a rung frees up regularly. That is roughly {Money(gain)} more per year.",
-            Math.Round(gain, 0), 0.6, evidence,
+            MoneyRounding.Round(gain, 0), 0.6, evidence,
             [
                 .. plan.Rungs.Select(x => $"{Money(x.Amount)} into a {x.Label} CD at about {Pct(x.Apy)}"),
                 "When a rung matures, reinvest it in the longest term to keep the ladder rolling, or spend it if you need the cash.",
@@ -197,7 +198,7 @@ public static class StrategyEngine
                 "low-savings-rate", SuggestionKind.Budget, SuggestionSeverity.Attention,
                 "Raise your savings rate toward 15%",
                 $"You keep {rate:P0} of income. Reaching 15% means finding about {Money(gap)} per month, {Money(gap * 12)} a year.",
-                Math.Round(gap * 12, 0), 0.75, evidence,
+                MoneyRounding.Round(gap * 12, 0), 0.75, evidence,
                 ["Pick the one or two categories with the largest growth and trim them.", "Automate the saved amount on payday."],
                 ["15% is a common rule of thumb, not a requirement."], "past"));
         }
@@ -231,7 +232,7 @@ public static class StrategyEngine
                 $"category-spike:{cat}", SuggestionKind.Budget, over >= 200 ? SuggestionSeverity.Attention : SuggestionSeverity.Info,
                 $"{cat} spending is up {over / avg:P0}",
                 $"Last month's {cat} was {Money(cur)} against a typical {Money(avg)}. If that persisted it would cost about {Money(over * 12)} more per year.",
-                Math.Round(over * 12, 0), 0.65,
+                MoneyRounding.Round(over * 12, 0), 0.65,
                 [$"{cat}: {Money(cur)} last month vs {Money(avg)} average of the previous {prior.Count} months."],
                 [$"Open Spending and drill into {cat} to see which transactions drove it.", "Decide whether it was one-off or a new habit; set a budget if it is a habit."],
                 ["Compares the last complete month with the average of the months before it."], "past"));
@@ -262,7 +263,7 @@ public static class StrategyEngine
                 "pay-off-cards-with-cash", SuggestionKind.Debt, SuggestionSeverity.Attention,
                 $"Pay off {Money(owed)} of card balances from cash",
                 $"Cash earning about {Pct(r.Hysa)} is sitting beside debt costing about {Money(annualInterest)} a year in interest. Clearing the cards nets roughly {Money(net)} a year and still leaves a 3-month reserve.",
-                Math.Round(net, 0), unknown ? 0.7 : 0.9, evidence,
+                MoneyRounding.Round(net, 0), unknown ? 0.7 : 0.9, evidence,
                 ["Pay the highest-APR card first.", "Keep at least 3 months of expenses in cash.", "Then put one bill on a card and autopay the full balance."],
                 ["If you already pay cards in full each month there is no interest to save; balances here may be statement balances."
                     + (unknown ? " Some APRs are assumed; enter your real APRs for an exact figure." : string.Empty)], "growth"));
@@ -276,7 +277,7 @@ public static class StrategyEngine
                     "consolidate-card-debt", SuggestionKind.Debt, SuggestionSeverity.Opportunity,
                     $"Consolidate {Money(owed)} of card debt",
                     $"Moving card balances to a lower-rate vehicle (a 0% balance-transfer card or a fixed-rate personal loan at about {Pct(r.PersonalLoan)}) could save about {Money(saving)} a year. Pair it with a payoff plan so the balance actually falls.",
-                    Math.Round(saving, 0), unknown ? 0.5 : 0.8, evidence,
+                    MoneyRounding.Round(saving, 0), unknown ? 0.5 : 0.8, evidence,
                     ["Compare a 0% balance-transfer card (note the 3-5% transfer fee and promo end date) with a fixed personal loan.", "Use the Debt Payoff page to choose avalanche or snowball.", "Don't re-run up the cards you pay off."],
                     [unknown ? "Some APRs are assumed from market averages; enter your real APRs for an exact comparison." : "Based on the APRs you entered.", "Qualifying rates depend on your credit."], "debt"));
             }
@@ -293,7 +294,7 @@ public static class StrategyEngine
             {
                 // Real numbers: closing costs ~2% of the balance, new 30-year at today's market rate, same remaining horizon for the old loan.
                 var remaining = m.RemainingMonths ?? 300;
-                var sim = Simulators.Refinance(bal, rate, remaining, r.Mortgage30, 360, Math.Round(bal * 0.02m, 0));
+                var sim = Simulators.Refinance(bal, rate, remaining, r.Mortgage30, 360, MoneyRounding.Round(bal * 0.02m, 0));
                 var evidence = new List<string>
                 {
                     $"{m.Name}: {Money(bal)} at {Pct(rate)} (your rate), {remaining} months left.",
@@ -306,7 +307,7 @@ public static class StrategyEngine
                         $"mortgage-refi:{m.Id}", SuggestionKind.Housing, SuggestionSeverity.Opportunity,
                         $"Refinancing {m.Name} looks worthwhile",
                         $"At {Pct(r.Mortgage30)} versus your {Pct(rate)}, a refinance cuts the payment by about {Money(sim.MonthlySavings)} a month, breaks even in about {sim.BreakEvenMonths} months and saves about {Money(sim.LifetimeSavings)} of interest overall.",
-                        Math.Round(sim.MonthlySavings * 12, 0), 0.7, evidence,
+                        MoneyRounding.Round(sim.MonthlySavings * 12, 0), 0.7, evidence,
                         ["Get 3 written quotes (lender fees, points and APR) and compare against the 2% assumption.", "Only proceed if you'll keep the loan beyond the break-even point.", "Compare lifetime interest, since restarting a 30-year term can raise it."],
                         ["Market rate excludes points and your credit/LTV adjustments.", "Closing costs are estimated at 2% of the balance."], "refinance"));
                 }
@@ -345,7 +346,7 @@ public static class StrategyEngine
                     $"auto-refi:{a.Id}", SuggestionKind.Debt, SuggestionSeverity.Opportunity,
                     $"Refinance {a.Name} at a lower rate",
                     $"Your {Pct(rate)} is above the {Pct(r.Auto48Month)} market average. Refinancing over the same {months} months would save about {Money(sim.MonthlySavings)} a month and {Money(sim.LifetimeSavings)} of interest.",
-                    Math.Round(sim.MonthlySavings * 12, 0), 0.65,
+                    MoneyRounding.Round(sim.MonthlySavings * 12, 0), 0.65,
                     [$"{a.Name}: {Money(bal)} at {Pct(rate)} (your rate)", $"Market car-loan average {Pct(r.Auto48Month)}"],
                     ["Get quotes from a credit union and an online lender.", "Keep the same term; don't extend it just to lower the payment.", "Check the current loan for prepayment penalties."],
                     ["Qualifying rate depends on your credit and the vehicle's age and value."], "refinance"));

@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Shared;
+using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Features.BillSheet;
 
@@ -57,7 +58,7 @@ public static class RecurringDetector
                 label,
                 MatchTextFor(label),
                 dayStable ? medianDay : null,
-                Math.Round(medianAmount, 2),
+                MoneyRounding.Round(medianAmount, 2),
                 latest.Amount));
         }
 
