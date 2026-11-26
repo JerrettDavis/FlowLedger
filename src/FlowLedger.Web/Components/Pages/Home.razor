@@ -647,7 +647,7 @@ else
     private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 6 months").To;
     private int _horizonMonths = 3;
     private int _upcomingDays = 14;
-    private List<FlowLedger.Web.ApiClient.RecurringFlowDto> _flowDefs = [];
+    private List<FlowLedger.Contracts.RecurringFlowDto> _flowDefs = [];
 
     // The activity feed is the recent window the API returns; the History range narrows it further (never widens it).
     private IReadOnlyList<FlowLedger.Contracts.TransactionDto> InHistoryRange(IReadOnlyList<FlowLedger.Contracts.TransactionDto> items) =>
@@ -940,7 +940,7 @@ else
         }
     }
 
-    private static bool IsFlowOnDate(FlowLedger.Web.ApiClient.RecurringFlowDto flow, DateOnly date)
+    private static bool IsFlowOnDate(FlowLedger.Contracts.RecurringFlowDto flow, DateOnly date)
     {
         if (date < flow.StartDate) return false;
         if (flow.EndDate.HasValue && date > flow.EndDate) return false;
