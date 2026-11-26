@@ -68,7 +68,7 @@ public sealed class ApiKeyAuthenticationHandler(
             FailureCounter.Add(1);
             Logger.LogWarning(
                 "API key authentication failed for {Method} {Path} from {RemoteIp}",
-                Request.Method, Request.Path.Value?.ReplaceLineEndings("").Replace("	", ""), Context.Connection.RemoteIpAddress);
+                Plain(Request.Method), Plain(Request.Path.Value), Context.Connection.RemoteIpAddress);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
@@ -86,4 +86,7 @@ public sealed class ApiKeyAuthenticationHandler(
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
+
+    // Strips control characters (CR/LF) so a hostile request line cannot forge log entries.
+    private static string Plain(string? value) => new((value ?? string.Empty).Where(c => !char.IsControl(c)).ToArray());
 }
