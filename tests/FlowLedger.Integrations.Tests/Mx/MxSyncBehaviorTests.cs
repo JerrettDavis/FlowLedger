@@ -2,6 +2,7 @@ using System.Text;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
+using FlowLedger.Integrations.Mx.Mapping;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WireMock.RequestBuilders;
@@ -91,7 +92,7 @@ public sealed class MxSyncBehaviorTests : IDisposable
     /// Builds a provider wired to the WireMock server with poll interval = 0 so status polls
     /// complete immediately.
     /// </summary>
-    private MxFinancialDataProvider CreateProvider(int pollIntervalMs = 0, int maxPollAttempts = 10)
+    private MxFinancialDataProvider CreateProvider(int pollIntervalMs = 0, int maxPollAttempts = 10, int maxPages = 100)
     {
         var http = new HttpClient { BaseAddress = new Uri(_server.Url!, UriKind.Absolute) };
         var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes("test-client:test-key"));
@@ -108,6 +109,7 @@ public sealed class MxSyncBehaviorTests : IDisposable
             DefaultInstitutionCode = "syncbank",
             PollIntervalMs = pollIntervalMs,
             MaxPollAttempts = maxPollAttempts,
+            MaxPages = maxPages,
         });
 
         return new MxFinancialDataProvider(
@@ -441,5 +443,24 @@ public sealed class MxSyncBehaviorTests : IDisposable
 
         (await act.Should().ThrowAsync<NeedsUserActionProviderException>())
             .Which.Message.ToUpperInvariant().Should().Contain("VERIFICATION");
+    }
+
+    [Fact]
+    public async Task Transactions_pass_stops_at_MaxPages_without_writing_a_watermark()
+    {
+        _server.Given(Request.Create().WithPath($"/users/{UserGuid}/accounts/{AccountGuid}/transactions").UsingGet())
+               .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", Vnd)
+                   .WithBody(Obj($"\"transactions\":{Arr([Obj($"\"guid\":\"TXN-1\",\"account_guid\":\"{AccountGuid}\"," +
+                       "\"amount\":42.00,\"currency_code\":\"USD\",\"date\":\"2026-01-15\"," +
+                       "\"description\":\"Coffee Shop\",\"status\":\"POSTED\",\"type\":\"DEBIT\"")])}" +
+                       ",\"pagination\":{\"current_page\":1,\"per_page\":25,\"total_entries\":75,\"total_pages\":3}")));
+
+        var page = await CreateProvider(maxPages: 1)
+            .GetTransactionsAsync($"{UserGuid}|{AccountGuid}", SyncCursor.Initial, 25);
+
+        page.HasMore.Should().BeFalse("the bound ends the pass instead of looping forever");
+        var next = MxCursor.Decode(page.NextCursor, 25, NullLogger.Instance);
+        next.Page.Should().Be(2, "the next sync resumes at the next page; no date watermark may be written on a truncated pass");
+        next.FromDate.Should().BeNull();
     }
 }

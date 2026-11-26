@@ -1,3 +1,4 @@
+using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Forecasting;
 
 /// <summary>The household's typical week of spending that no recurring flow accounts for.</summary>
@@ -51,7 +52,7 @@ public static class ForecastBands
 
         var mean = weeks.Average();
         var variance = weeks.Sum(w => (double)((w - mean) * (w - mean))) / (weeks.Length - 1);
-        return new SpendingProfile(Math.Round(mean, 2), Math.Round((decimal)Math.Sqrt(variance), 2), weeks.Length);
+        return new SpendingProfile(MoneyRounding.Round(mean, 2), MoneyRounding.Round((decimal)Math.Sqrt(variance), 2), weeks.Length);
     }
 
     /// <param name="startingTotal">Combined starting balance, used before the first scheduled event (or when none exist).</param>
@@ -75,7 +76,7 @@ public static class ForecastBands
             var weeksAhead = days / 7.0;
             var expected = balance - profile.MeanWeekly * (decimal)weeksAhead;
             var spread = (decimal)(Z80 * (double)profile.StdWeekly * Math.Sqrt(weeksAhead));
-            points.Add(new ForecastBandPoint(date, Math.Round(expected, 2), Math.Round(expected - spread, 2), Math.Round(expected + spread, 2)));
+            points.Add(new ForecastBandPoint(date, MoneyRounding.Round(expected, 2), MoneyRounding.Round(expected - spread, 2), MoneyRounding.Round(expected + spread, 2)));
         }
 
         return points;

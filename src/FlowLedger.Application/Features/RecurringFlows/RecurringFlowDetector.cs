@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.BillSheet;
+using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Features.RecurringFlows;
 
@@ -424,7 +425,7 @@ public static class RecurringFlowDetector
             AccountId: accountId,
             Name: label,
             Direction: isCredit ? "Credit" : "Debit",
-            Amount: Math.Round(amount, 2),
+            Amount: MoneyRounding.Round(amount, 2),
             AmountModel: isFixed ? "Fixed" : "Estimated",
             Frequency: frequency,
             DayOfMonth: day,

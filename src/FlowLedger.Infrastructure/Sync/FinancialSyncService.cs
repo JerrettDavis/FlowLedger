@@ -481,8 +481,22 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     skipped += zeroAmount;
                 }
 
+                // A row in another currency than its account would be stored with the account's currency semantics lost
+                // (or rejected by the domain); skip it loudly instead of corrupting totals (#124).
+                var accountCurrency = account.CurrentBalance.Currency.Code;
+                var foreignCurrency = page.Items.Count(pt => pt.Amount.Amount != 0m
+                    && !string.Equals(pt.Amount.Currency.Code, accountCurrency, StringComparison.OrdinalIgnoreCase));
+                if (foreignCurrency > 0)
+                {
+                    _logger.LogWarning(
+                        "Skipping {Count} transaction(s) whose currency differs from the account currency {Currency}.",
+                        foreignCurrency, accountCurrency);
+                    skipped += foreignCurrency;
+                }
+
                 var fingerprintMap = page.Items
-                    .Where(pt => pt.Amount.Amount != 0m)
+                    .Where(pt => pt.Amount.Amount != 0m
+                        && string.Equals(pt.Amount.Currency.Code, accountCurrency, StringComparison.OrdinalIgnoreCase))
                     .Select(pt => (
                         ProviderTx: pt,
                         Fingerprint: BuildFingerprint(account.AccountId, pt)))
@@ -606,6 +620,12 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     _logger.LogInformation("Settled {Count} pending transactions on {Account}", settled, providerAccountId);
                 }
                 skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
+            }
+
+            if (page.SkippedCount > 0)
+            {
+                skipped += page.SkippedCount;
+                _logger.LogInformation("The provider dropped {Count} row(s) without a usable date on one account.", page.SkippedCount);
             }
 
             cursor = page.NextCursor;

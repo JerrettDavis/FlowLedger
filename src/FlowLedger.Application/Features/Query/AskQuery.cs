@@ -183,7 +183,7 @@ public static class QueryPrompt
 /// Plain-English question to validated query. The model's output is only ever fed to the read-only in-memory query engine, and
 /// it is parsed AND executed here; on a parse/run error the error is sent back to the model for up to <see cref="MaxAttempts"/> tries.
 /// </summary>
-public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets)
+public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets, TimeProvider? clock = null)
 {
     public const int MaxAttempts = 3;
     public const int MaxQuestionLength = 500;
@@ -202,7 +202,7 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
         }
 
         var tables = await datasets.BuildAsync(ct);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime);
         var system = QueryPrompt.BuildSystem(
             QueryCatalog.Datasets, QueryCatalog.Functions, QueryCatalog.Aggregates,
             Distinct(tables, "transactions | where category != \"\" | distinct category | take 80", today),

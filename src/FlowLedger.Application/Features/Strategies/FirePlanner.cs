@@ -1,3 +1,4 @@
+using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Strategies;
 
 public sealed record FireResult(
@@ -22,7 +23,7 @@ public static class FirePlanner
         }
 
         horizonYears = Math.Clamp(horizonYears, 1, MaxYears);
-        var fireNumber = Math.Round(annualSpend / (withdrawalRatePercent / 100m), 2);
+        var fireNumber = MoneyRounding.Round(annualSpend / (withdrawalRatePercent / 100m), 2);
         var path = Simulators.Grow(invested, monthlyContribution, realReturnPercent, horizonYears * 12);
 
         int? months = null;
@@ -38,7 +39,7 @@ public static class FirePlanner
         var end = path[^1].Balance;
         return new FireResult(
             fireNumber, invested, monthlyContribution, months,
-            months is { } m && currentAge is { } age ? Math.Round(age + m / 12m, 1) : null,
-            end, Math.Round(end * withdrawalRatePercent / 100m, 2), months is not null, path);
+            months is { } m && currentAge is { } age ? MoneyRounding.Round(age + m / 12m, 1) : null,
+            end, MoneyRounding.Round(end * withdrawalRatePercent / 100m, 2), months is not null, path);
     }
 }

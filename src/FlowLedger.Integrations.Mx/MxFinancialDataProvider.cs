@@ -510,6 +510,16 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             ? (response.Transactions?.Count ?? 0) >= position.RecordsPerPage
             : HasMorePages(response.Pagination, position.Page);
 
+        // Bound a runaway pass: stop here WITHOUT a watermark and resume from the next page on the next sync, so a
+        // truncated pass never moves the date watermark past unread history.
+        if (hasMore && position.Page >= Math.Max(1, _options.MaxPages))
+        {
+            _logger.LogWarning(
+                "GetTransactionsAsync: reached MaxPages limit ({MaxPages}) for account {AccountGuid}; resuming on the next sync.",
+                _options.MaxPages, accountGuid);
+            return new TransactionPage(items, position.Next().Encode(), HasMore: false) { SkippedCount = skipped };
+        }
+
         // Mid-pass: advance to the next page (same date window) so a crash resumes here.
         // End of pass: persist a date WATERMARK (page 1, from = today - overlap), never "last page + 1".
         // MX is newest-first, so a parked page cursor would silently skip everything posted later.
