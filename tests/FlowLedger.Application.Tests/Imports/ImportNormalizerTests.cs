@@ -143,6 +143,80 @@ public sealed class ImportNormalizerTests
         CsvParser.Parse(n.Csv)[1][2].Should().Be("Smith, J");
         NormalizedImport.Mapping.DateColumnIndex.Should().Be(0);
     }
+
+    [Fact]
+    public void Transaction_type_label_does_not_flip_signed_amounts()
+    {
+        var n = ImportNormalizer.Normalize(
+            "Date,Description,Amount,Transaction Type\n2024-03-01,Corner Store,-45.10,POS\n2024-03-02,Employer,1200.00,ACH Credit\n");
+        var r = Rows(n);
+        r[0][1].Should().Be("-45.10");
+        r[1][1].Should().Be("1200.00");
+    }
+
+    [Fact]
+    public void Semicolon_file_with_decimal_comma_parses_correctly()
+    {
+        var n = ImportNormalizer.Normalize("Date;Description;Amount\n2024-03-01;Cafe;12,50\n2024-03-02;Rent;-1.234,56\n");
+        var r = Rows(n);
+        r[0][1].Should().Be("12.50");
+        r[1][1].Should().Be("-1234.56");
+        n.Warnings.Should().Contain(w => w.Contains("decimal comma"));
+    }
+
+    [Fact]
+    public void Us_thousands_separators_still_parse()
+    {
+        var n = ImportNormalizer.Normalize("Date,Description,Amount\n2024-03-01,Bonus,\"1,234.56\"\n");
+        Rows(n)[0][1].Should().Be("1234.56");
+    }
+
+    [Fact]
+    public void Ambiguous_semicolon_amounts_require_a_number_format()
+    {
+        var csv = "Date;Description;Amount\n2024-03-01;Cafe;1,234\n";
+        var act = () => ImportNormalizer.Normalize(csv);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*number format*");
+        Rows(ImportNormalizer.Normalize(csv, null, new ImportHints(NumberFormat: "eu")))[0][1].Should().Be("1.23");
+        Rows(ImportNormalizer.Normalize(csv, null, new ImportHints(NumberFormat: "us")))[0][1].Should().Be("1234.00");
+    }
+
+    [Fact]
+    public void Day_first_dates_are_chosen_once_per_file()
+    {
+        var n = ImportNormalizer.Normalize("Date,Description,Amount\n13/04/2025,A,-1.00\n03/04/2025,B,-2.00\n");
+        var r = Rows(n);
+        r[0][0].Should().Be("2025-04-13");
+        r[1][0].Should().Be("2025-04-03");
+    }
+
+    [Fact]
+    public void Month_first_dates_stay_month_first_when_a_day_exceeds_twelve()
+    {
+        var n = ImportNormalizer.Normalize("Date,Description,Amount\n04/13/2025,A,-1.00\n04/03/2025,B,-2.00\n");
+        var r = Rows(n);
+        r[0][0].Should().Be("2025-04-13");
+        r[1][0].Should().Be("2025-04-03");
+    }
+
+    [Fact]
+    public void Generic_file_with_only_ambiguous_dates_needs_a_choice()
+    {
+        var csv = "Date,Description,Amount\n03/04/2025,A,-1.00\n05/06/2025,B,-2.00\n";
+        var act = () => ImportNormalizer.Normalize(csv);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*date format*");
+        Rows(ImportNormalizer.Normalize(csv, null, new ImportHints(DateOrder: "dmy")))[0][0].Should().Be("2025-04-03");
+        Rows(ImportNormalizer.Normalize(csv, null, new ImportHints(DateOrder: "mdy")))[0][0].Should().Be("2025-03-04");
+    }
+
+    [Fact]
+    public void Known_us_format_with_only_ambiguous_dates_defaults_month_first_with_a_warning()
+    {
+        var n = ImportNormalizer.Normalize(
+            "Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags\n03/04/2025,Netflix,Fun,Visa,NETFLIX,,-15.49,\n");
+        Rows(n)[0][0].Should().Be("2025-03-04");
+        n.Warnings.Should().Contain(w => w.Contains("month/day/year"));
+    }
 }
 
 public sealed class ImportNormalizerLimitTests
