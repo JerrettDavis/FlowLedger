@@ -38,4 +38,10 @@ public sealed class SimulatedProviderOptions
     /// 0 means no rate limiting.
     /// </summary>
     public int RateLimitAfter { get; set; } = 0;
+
+    /// <summary>
+    /// HMAC secret used to verify Simulated webhooks. There is deliberately no default: when it is
+    /// unset every webhook is rejected, so the public endpoint cannot be driven with a known secret.
+    /// </summary>
+    public string? WebhookSecret { get; set; }
 }
