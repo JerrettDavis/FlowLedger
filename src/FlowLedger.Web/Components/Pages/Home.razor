@@ -6,8 +6,7 @@
 
 <PageTitle>Dashboard — FlowLedger</PageTitle>
 
-<div class="fl-page-header">
-    <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Dashboard</MudText>
+<PageHeader Title="Dashboard">
     <div class="fl-page-header__actions">
         <DateRangeSelector Label="History" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo"
                            Presets="@HistoryPresets" Changed="OnRangeChanged" />
@@ -19,7 +18,7 @@
             }
         </MudSelect>
     </div>
-</div>
+</PageHeader>
 
 <AlertsPanel />
 

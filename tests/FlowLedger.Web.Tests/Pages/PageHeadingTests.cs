@@ -31,12 +31,23 @@ public sealed class PageHeadingTests
             .Where(f =>
             {
                 var text = File.ReadAllText(f);
-                return !text.Contains("HtmlTag=\"h1\"") && !text.Contains("<h1") && !text.Contains("<StatusMessage");
+                return !text.Contains("<PageHeader") && !text.Contains("<h1") && !text.Contains("<StatusMessage");
             })
             .Select(Path.GetFileName)
             .ToList();
 
         missing.Should().BeEmpty("every page needs an h1 for FocusOnNavigate and the document outline");
+    }
+
+    [Fact]
+    public void No_page_hand_rolls_its_own_header_row()
+    {
+        var offenders = RoutedPages()
+            .Where(f => File.ReadAllText(f).Contains("HtmlTag=\"h1\""))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        offenders.Should().BeEmpty("headings come from PageHeader (title, subtitle, actions) or StatusMessage, never an ad-hoc MudText");
     }
 
     [Fact]

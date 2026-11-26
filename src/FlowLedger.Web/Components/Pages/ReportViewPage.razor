@@ -7,20 +7,21 @@
 
 <PageTitle>@(_report?.Name ?? "Report") — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4 fl-enter">
-    <div>
-        <MudButton Href="reports" StartIcon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" Class="mb-1">All reports</MudButton>
-        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">@(_report?.Name ?? "Report")</MudText>
-        @if (_report?.Description is { Length: > 0 } d)
-        {
-            <MudText Typo="Typo.body2" Color="Color.Secondary">@d</MudText>
-        }
-    </div>
-    <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
-    <DateRangeSelector Label="Date range" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
-    <MudButton OnClick="LoadAsync" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading">Refresh</MudButton>
-    </div>
-</div>
+<PageHeader Title="@((_report?.Name ?? "Report"))">
+    <Lead>
+            <MudButton Href="reports" StartIcon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" Class="mb-1">All reports</MudButton>
+    </Lead>
+    <Description>
+            @if (_report?.Description is { Length: > 0 } d)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@d</MudText>
+            }
+    </Description>
+    <ChildContent>
+        <DateRangeSelector Label="Date range" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
+        <MudButton OnClick="LoadAsync" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading">Refresh</MudButton>
+    </ChildContent>
+</PageHeader>
 
 @if (_loading)
 {

@@ -670,8 +670,10 @@ html.fl-share .fl-user-name { display: none; }
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
 }
+
+.fl-page-header__title { min-width: 0; }
 
 .fl-page-header__actions {
     display: flex;

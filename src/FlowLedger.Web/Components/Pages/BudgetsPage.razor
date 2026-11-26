@@ -5,15 +5,14 @@
 
 <PageTitle>Budgets — FlowLedger</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Budgets</MudText>
-    <div class="d-flex align-center" style="gap:4px" role="group" aria-label="Budget month">
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" OnClick="() => ShiftMonthAsync(-1)" aria-label="Previous month" />
-        <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite" Style="min-width:min(130px,100%);text-align:center">@_month.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" OnClick="() => ShiftMonthAsync(1)" aria-label="Next month" />
-        <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="@(_month == CurrentMonth)" OnClick="() => SetMonthAsync(CurrentMonth)">This month</MudButton>
-    </div>
-</div>
+<PageHeader Title="Budgets">
+        <div class="d-flex align-center" style="gap:4px" role="group" aria-label="Budget month">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" OnClick="() => ShiftMonthAsync(-1)" aria-label="Previous month" />
+            <MudText Typo="Typo.subtitle1" Class="fl-num" aria-live="polite" Style="min-width:min(130px,100%);text-align:center">@_month.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" OnClick="() => ShiftMonthAsync(1)" aria-label="Next month" />
+            <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="@(_month == CurrentMonth)" OnClick="() => SetMonthAsync(CurrentMonth)">This month</MudButton>
+        </div>
+</PageHeader>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Monthly limits per category, tracked against this month's spending. Transfers between your own accounts never count.
     A budget on a parent category (for example Food) covers its sub-categories.

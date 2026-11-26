@@ -7,13 +7,14 @@
 
 <PageTitle>Reports — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4 fl-enter">
-    <div>
-        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Reports</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Saved views and multi-panel reports, plus ready-made presets.</MudText>
-    </div>
-    <MudButton Href="query" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.QueryStats">New query</MudButton>
-</div>
+<PageHeader Title="Reports">
+    <Description>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Saved views and multi-panel reports, plus ready-made presets.</MudText>
+    </Description>
+    <ChildContent>
+        <MudButton Href="query" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.QueryStats">New query</MudButton>
+    </ChildContent>
+</PageHeader>
 
 @if (_loading)
 {

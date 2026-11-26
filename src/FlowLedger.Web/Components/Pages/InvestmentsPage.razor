@@ -3,11 +3,10 @@
 
 <PageTitle>Investments — FlowLedger</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-1" style="gap:12px;flex-wrap:wrap">
-    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Investment performance</MudText>
-    <DateRangeSelector Label="Range" Preset="@_preset" From="@(_from ?? default)" To="@_to"
-                       Presets="@RangePresets" Changed="OnRangeChanged" />
-</div>
+<PageHeader Title="Investment performance">
+        <DateRangeSelector Label="Range" Preset="@_preset" From="@(_from ?? default)" To="@_to"
+                           Presets="@RangePresets" Changed="OnRangeChanged" />
+</PageHeader>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Growth of each investment account, with deposits and withdrawals taken out so moving money in isn't counted as a gain.
     Needs balance history, which builds up with every sync.
