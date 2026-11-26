@@ -79,6 +79,8 @@ x-app-common-env: &app-common-env
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
   ASPNETCORE_HTTP_PORTS: "8080"
   Mx__Enabled: "false"
+  # One JSON object per log line (with correlation/trace id scopes) for log shippers. Set LOGGING__FORMAT=simple for plain console logs.
+  Logging__Format: ${LOGGING__FORMAT:-json}
   # Encrypts the Home Assistant webhook URL at rest (api and worker both read it). Optional; see .env.example.
   HomeAssistant__EncryptionKey: ${HomeAssistant__EncryptionKey:-}
 
