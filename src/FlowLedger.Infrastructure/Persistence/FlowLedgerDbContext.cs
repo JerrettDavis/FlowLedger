@@ -1,6 +1,7 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.Persistence.Configurations;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.SharedKernel;
@@ -16,9 +17,10 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// current tenant. A tenant context is mandatory; admin, design-time and restore-drill code
 /// passes <see cref="UnscopedTenantContext.Instance"/> explicitly to opt out of the filter.
 ///
-/// Domain events (PLAN §9): on <see cref="SaveChangesAsync"/> all uncommitted domain events
-/// are collected from tracked aggregate roots, then dispatched after the database transaction
-/// commits via <see cref="IDomainEventDispatcher"/>.
+/// Domain events (PLAN §9, #92): on <see cref="SaveChangesAsync"/> all uncommitted domain events
+/// are collected from tracked aggregate roots and written to the transactional outbox in the SAME
+/// transaction as the aggregate change. A dispatcher delivers them to handlers afterwards, with retry
+/// (see <c>OutboxProcessor</c>); nothing is dispatched inline.
 /// </summary>
 public sealed class FlowLedgerDbContext : DbContext
 {
@@ -33,7 +35,6 @@ public sealed class FlowLedgerDbContext : DbContext
     // Read by the query filters at query time (EF parameterises context members), so the
     // cached model is identical for every context and never depends on who built it first.
     private Guid FilterTenantGuid => IsUnscoped ? Guid.Empty : _tenantContext.TenantId;
-    private readonly IDomainEventDispatcher _eventDispatcher;
 
     // ── DbSets ────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<HomeAssistantSettingsRecord> HomeAssistantSettings => Set<HomeAssistantSettingsRecord>();
     internal DbSet<ProviderAccountRecord> ProviderAccounts => Set<ProviderAccountRecord>();
     internal DbSet<AccountConnectorLinkRecord> AccountConnectorLinks => Set<AccountConnectorLinkRecord>();
+    internal DbSet<OutboxMessageRecord> OutboxMessages => Set<OutboxMessageRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -71,11 +73,10 @@ public sealed class FlowLedgerDbContext : DbContext
     /// </summary>
     public FlowLedgerDbContext(
         DbContextOptions<FlowLedgerDbContext> options,
-        IDomainEventDispatcher eventDispatcher,
+        IDomainEventDispatcher eventDispatcher, // retained for constructor compatibility; delivery now goes through the outbox
         ITenantContext tenantContext)
         : base(options)
     {
-        _eventDispatcher = eventDispatcher;
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
@@ -112,6 +113,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new IntegrationDeliveryRecordConfiguration());
         modelBuilder.ApplyConfiguration(new MergedTransactionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new DuplicateDismissalRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new OutboxMessageRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
@@ -168,6 +170,8 @@ public sealed class FlowLedgerDbContext : DbContext
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
         modelBuilder.Entity<DuplicateDismissalRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<OutboxMessageRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 
     // ── SaveChanges ──────────────────────────────────────────────────────────
@@ -176,20 +180,30 @@ public sealed class FlowLedgerDbContext : DbContext
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         ValidateTenantBoundaries();
-        var (events, aggregates) = CollectDomainEvents();
+        var (outbox, aggregates) = CollectDomainEvents();
+        OutboxMessages.AddRange(outbox);
 
-        var result = await base.SaveChangesAsync(cancellationToken);
+        int result;
+        try
+        {
+            // Aggregate changes and their outbox rows commit (or roll back) together.
+            result = await base.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // A failed save keeps the events on the aggregates (#92), so a retry re-collects them; drop the unsaved rows so they are not duplicated.
+            foreach (var row in outbox)
+            {
+                Entry(row).State = EntityState.Detached;
+            }
 
-        // Only a committed save consumes the events; if it threw they stay on the aggregates (#92).
+            throw;
+        }
+
+        // Only a committed save consumes the events.
         foreach (var aggregate in aggregates)
         {
             aggregate.ClearDomainEvents();
-        }
-
-        // Dispatch after successful persistence so handlers see committed state.
-        if (events.Count > 0)
-        {
-            await _eventDispatcher.DispatchAsync(events, cancellationToken);
         }
 
         return result;
@@ -245,18 +259,32 @@ public sealed class FlowLedgerDbContext : DbContext
         }
     }
 
-    /// <summary>Collects (without clearing) all uncommitted domain events from tracked aggregate roots.</summary>
-    private (List<IDomainEvent> Events, List<IAggregateRoot> Aggregates) CollectDomainEvents()
+    /// <summary>Collects (without clearing) the uncommitted domain events of tracked aggregate roots as outbox rows.</summary>
+    private (List<OutboxMessageRecord> Rows, List<IAggregateRoot> Aggregates) CollectDomainEvents()
     {
-        var aggregates = ChangeTracker.Entries<IAggregateRoot>()
-            .Where(e => e.Entity.DomainEvents.Count > 0)
-            .Select(e => e.Entity)
-            .ToList();
+        var rows = new List<OutboxMessageRecord>();
+        var aggregates = new List<IAggregateRoot>();
 
-        var events = aggregates
-            .SelectMany(a => a.DomainEvents)
-            .ToList();
+        foreach (var entry in ChangeTracker.Entries<IAggregateRoot>().Where(e => e.Entity.DomainEvents.Count > 0).ToList())
+        {
+            aggregates.Add(entry.Entity);
+            var tenant = entry.Metadata.FindProperty("TenantId") is not null
+                ? entry.Property("TenantId").CurrentValue switch
+                {
+                    TenantId strong => strong.Value,
+                    Guid raw => raw,
+                    _ => CurrentTenantId ?? Guid.Empty,
+                }
+                : CurrentTenantId ?? Guid.Empty;
 
-        return (events, aggregates);
+            foreach (var domainEvent in entry.Entity.DomainEvents)
+            {
+                rows.Add(OutboxMessageRecord.Create(
+                    domainEvent.EventId, tenant, OutboxEventSerializer.TypeName(domainEvent),
+                    OutboxEventSerializer.Serialize(domainEvent), domainEvent.OccurredAt));
+            }
+        }
+
+        return (rows, aggregates);
     }
 }
