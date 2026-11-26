@@ -32,3 +32,7 @@ FlowLedger handles: financial institutions, account balances, transactions, inco
 - Provider tokens (e.g. MX) are stored encrypted; raw credentials are never persisted.
 - No sensitive financial amounts or account numbers are emitted to logs or telemetry.
 - SSRF protections are required on any URL-accepting import or webhook path.
+
+Each claim above, its enforcing control and its known gaps are tracked in [docs/security/threat-model.md](docs/security/threat-model.md);
+data handling is described in [docs/privacy/data-inventory-and-retention.md](docs/privacy/data-inventory-and-retention.md).
+Claims marked "(verify)" there do not yet have a dedicated automated test.
