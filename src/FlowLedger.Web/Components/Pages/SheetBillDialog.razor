@@ -64,7 +64,7 @@
     public const string DeleteResult = "delete";
 
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
-    [Parameter] public FlowLedger.Web.ApiClient.SheetRowDto? Row { get; set; }
+    [Parameter] public FlowLedger.Contracts.SheetRowDto? Row { get; set; }
     [Parameter] public string? RowSection { get; set; }
     [Parameter] public List<string> Sections { get; set; } = [];
 
@@ -120,7 +120,7 @@
         if (!_form.IsValid) return;
         if (_frequency is "Weekly" or "EveryNWeeks" && _anchor is null) return;
         if (_frequency is "Weekly" or "EveryNWeeks") _due = null;
-        MudDialog.Close(DialogResult.Ok(new FlowLedger.Web.ApiClient.SaveBillRequest(
+        MudDialog.Close(DialogResult.Ok(new FlowLedger.Contracts.SaveBillRequest(
             _section, _name, _payer, _debt, _perpetual, _optional, _business, _auto,
             _due, _estimated, _actual, _service, _account, _match,
             _frequency,
