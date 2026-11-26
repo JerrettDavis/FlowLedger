@@ -33,6 +33,10 @@ builder.Services.AddMudServices();
 // Scoped so each circuit (browser tab) gets its own independent theme state.
 builder.Services.AddScoped<ThemeService>();
 
+// ── Connection repair (provider-pluggable Reconnect; add a handler per provider) ──
+builder.Services.AddScoped<FlowLedger.Web.Connections.IConnectionRepairHandler, FlowLedger.Web.Connections.QuilttRepairHandler>();
+builder.Services.AddScoped<FlowLedger.Web.Connections.ConnectionRepairService>();
+
 // ── API auth options (Api:Key + Api:TenantId from config / env vars) ─────────
 builder.Services.Configure<ApiAuthOptions>(
     builder.Configuration.GetSection(ApiAuthOptions.SectionName));

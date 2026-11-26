@@ -18,6 +18,21 @@ window.flowledgerQuiltt = {
         return this._loading;
     },
 
+    // Repairs an existing connection in place (https://www.quiltt.dev/connector/reconnect).
+    async reconnect(scriptUrl, connectorId, token, connectionId) {
+        await this._load(scriptUrl);
+        window.Quiltt.authenticate(token);
+        return await new Promise((resolve) => {
+            const connector = window.Quiltt.reconnect(connectorId, {
+                connectionId,
+                onExitSuccess: (metadata) => resolve({ status: 'success', connectionId: metadata?.connectionId ?? connectionId }),
+                onExitAbort: () => resolve({ status: 'cancelled', connectionId: null }),
+                onExitError: () => resolve({ status: 'error', connectionId: null }),
+            });
+            connector.open();
+        });
+    },
+
     async open(scriptUrl, connectorId, token) {
         await this._load(scriptUrl);
         window.Quiltt.authenticate(token);

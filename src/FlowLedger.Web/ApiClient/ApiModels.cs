@@ -501,7 +501,16 @@ public sealed record QuilttConnectResult(string Status, string? ConnectionId);
 
 public sealed record ConnectorUsageDto(long CallsToday, long CallsThisMonth, int? DailyBudget, int? MonthlyBudget, bool Paused);
 
-public sealed record ConnectorLinkDto(string Institution, string Status, DateTimeOffset LinkedAt, DateTimeOffset UpdatedAt);
+/// <summary>
+/// Connector-neutral health of one connection (ADR 0018). <c>Kind</c> is a ProviderIssueKind name (string, so a newer API
+/// never breaks an older UI). <c>ProviderCode</c> is the provider's own handle for repairing the connection (for Quiltt, the connection id).
+/// </summary>
+public sealed record ConnectionIssueDto(
+    string Kind, string? Message = null, bool Retryable = false, bool RequiresUserAction = false,
+    DateTimeOffset? RetryAfter = null, DateTimeOffset? At = null, int ConsecutiveFailures = 0, string? ProviderCode = null);
+
+public sealed record ConnectorLinkDto(
+    string Institution, string Status, DateTimeOffset LinkedAt, DateTimeOffset UpdatedAt, ConnectionIssueDto? Issue = null);
 
 public sealed record ConnectorAccountDto(Guid AccountId, string Name, string ProviderAccountId);
 
