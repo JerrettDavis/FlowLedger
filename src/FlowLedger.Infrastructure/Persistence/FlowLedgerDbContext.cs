@@ -50,6 +50,7 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<SheetPaymentRecord> SheetPayments => Set<SheetPaymentRecord>();
     internal DbSet<RecurringDismissalRecord> RecurringDismissals => Set<RecurringDismissalRecord>();
     internal DbSet<SuspiciousDismissalRecord> SuspiciousDismissals => Set<SuspiciousDismissalRecord>();
+    internal DbSet<AccountRateRecord> AccountRates => Set<AccountRateRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new SheetPaymentRecordConfiguration());
         modelBuilder.ApplyConfiguration(new RecurringDismissalRecordConfiguration());
         modelBuilder.ApplyConfiguration(new SuspiciousDismissalRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AccountRateRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
@@ -115,6 +117,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.Entity<RecurringDismissalRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
         modelBuilder.Entity<SuspiciousDismissalRecord>()
+            .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
+        modelBuilder.Entity<AccountRateRecord>()
             .HasQueryFilter(r => IsUnscoped || r.TenantId == FilterTenantGuid);
     }
 

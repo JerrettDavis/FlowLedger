@@ -459,6 +459,36 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_balance_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AccountRateRecord", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(7, 3)
+                        .HasColumnType("numeric(7,3)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<int?>("RemainingMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("remaining_months");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("TenantId", "AccountId");
+
+                    b.ToTable("account_rates", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.ProviderConnectionRecord", b =>
                 {
                     b.Property<Guid>("Id")
