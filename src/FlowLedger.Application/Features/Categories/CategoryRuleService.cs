@@ -145,7 +145,8 @@ public sealed class CategoryRuleService(
         var changed = 0;
         var createdCategory = false;
 
-        foreach (var t in await transactions.LoadTrackedAsync(Max, ct))
+        var changedRows = new List<Transaction>();
+        foreach (var t in await transactions.LoadAsync(Max, ct))
         {
             if (t.Status is TransactionStatus.Planned or TransactionStatus.Skipped)
             {
@@ -177,6 +178,7 @@ public sealed class CategoryRuleService(
             }
 
             t.Categorize(category.CategoryId, null, CategorySource.Auto);
+            changedRows.Add(t);
             changed++;
         }
 
@@ -187,7 +189,7 @@ public sealed class CategoryRuleService(
 
         if (changed > 0)
         {
-            await transactions.SaveAsync(ct);
+            await transactions.SaveChangedAsync(changedRows, ct);
         }
 
         return changed;
