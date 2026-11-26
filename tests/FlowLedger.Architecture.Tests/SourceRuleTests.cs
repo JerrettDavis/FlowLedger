@@ -152,7 +152,6 @@ public sealed class SourceRuleTests
     /// <summary>Files that still hold a bare connector literal (OpenAPI tag text or a private const). Shrink only.</summary>
     private static readonly HashSet<string> ConnectorLiteralAllowlist =
     [
-        "src/FlowLedger.Api/Endpoints/DataEndpoints.cs",
         "src/FlowLedger.Infrastructure/DependencyInjection.cs", // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/ConnectorEndpoints.cs",     // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/MxEndpoints.cs",
@@ -171,6 +170,25 @@ public sealed class SourceRuleTests
             .ToList();
 
         Assert.True(offenders.Count == 0, $"Use ConnectorIds instead of bare names in: {string.Join(", ", offenders)}");
+    }
+
+    /// <summary>Sync and Application code asks a connector what it does (<c>ConnectorTraits</c>); it never names a connector (#89).</summary>
+    [Fact]
+    public void Sync_and_Application_branch_on_connector_traits_not_connector_identity()
+    {
+        var connectorProject = new Regex(@"FlowLedger\.Integrations\.(Simulated|Mx|Quiltt|SimpleFin)\b");
+        var connectorId = new Regex(@"ConnectorIds\.|""(Simulated|SimpleFIN|MX|Quiltt)""");
+        var offenders = SourceFiles("FlowLedger.Infrastructure").Where(f => Rel(f).Contains("/Sync/"))
+            .Concat(SourceFiles("FlowLedger.Application"))
+            .Where(f =>
+            {
+                var text = File.ReadAllText(f);
+                return connectorProject.IsMatch(text) || connectorId.IsMatch(text);
+            })
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Declare a ConnectorTraits flag instead of naming a connector in: {string.Join(", ", offenders)}");
     }
 
     // ── 7. One constant-time string comparison (#100) ────────────────────────

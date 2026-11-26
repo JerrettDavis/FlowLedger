@@ -50,6 +50,12 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         | ProviderCapabilities.WebhookParsing
         | ProviderCapabilities.ConnectionHealth;
 
+    /// <summary>One Quiltt profile per tenant, linked by the user inside the app; balances use the holdings sign.</summary>
+    public const ConnectorTraits DeclaredTraits =
+        ConnectorTraits.PerTenantAccess | ConnectorTraits.UserInitiatedLinking | ConnectorTraits.ReportsHoldingsSign;
+
+    public ConnectorTraits Traits => DeclaredTraits;
+
     /// <summary>The public Connector id the browser opens (not a secret).</summary>
     public string? ConnectorId => _options.ConnectorId;
 

@@ -1,7 +1,7 @@
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>An account's data source: which connector feeds it and which provider-side account it mirrors.</summary>
-/// <param name="ConnectorId">A connector id ("SimpleFIN", "MX", ...) or <see cref="AccountConnectorLinks.Manual"/>.</param>
+/// <param name="ConnectorId">A connector id (see the connector registry) or <see cref="AccountConnectorLinks.Manual"/>.</param>
 public sealed record AccountConnectorLink(Guid AccountId, string ConnectorId, string ProviderAccountId, DateTimeOffset LinkedUtc);
 
 public static class AccountConnectorLinks

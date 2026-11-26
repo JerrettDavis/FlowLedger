@@ -81,6 +81,11 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         ProviderCapabilities.WebhookVerification |
         ProviderCapabilities.WebhookParsing;
 
+    /// <summary>Operator-held billable API (household tenant only); balances already report what is owed.</summary>
+    public const ConnectorTraits DeclaredTraits = ConnectorTraits.BillablePerCall;
+
+    public ConnectorTraits Traits => DeclaredTraits;
+
     // ── Connection lifecycle ─────────────────────────────────────────────────────
 
     public async Task<ProviderMemberRef> BeginConnectionAsync(

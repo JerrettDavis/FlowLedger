@@ -87,7 +87,7 @@ internal static class ConnectorEndpoints
                     var isPrimary = string.Equals(d.Id, primary.ProviderName, StringComparison.OrdinalIgnoreCase);
                     var usage = await status.GetUsageAsync(d.Id, ct);
                     var lastSync = await status.LastSyncedAtAsync(d.Id, ct);
-                    var isMx = d.Id == ConnectorIds.Mx;
+                    var isMx = registry.Enabled.Any(c => c.Id == d.Id && c.Traits.HasFlag(ConnectorTraits.BillablePerCall));
                     items.Add(new
                     {
                         id = d.Id,
