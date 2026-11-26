@@ -51,7 +51,7 @@ public sealed class ApplicationPropertyTests
             var byId = batch.ToDictionary(t => t.Id);
             var found = TransferDetector.Detect(batch, AccountTypes);
 
-            found.Should().OnlyContain(id => byId.ContainsKey(id), "never invents ids");
+            found.All(id => byId.ContainsKey(id)).Should().BeTrue("never invents ids");
             foreach (var id in found)
             {
                 var t = byId[id];
