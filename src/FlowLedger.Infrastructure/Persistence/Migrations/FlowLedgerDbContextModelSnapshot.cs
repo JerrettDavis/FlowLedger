@@ -501,6 +501,42 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<int>("ConsecutiveFailures")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("consecutive_failures");
+
+                    b.Property<DateTimeOffset?>("IssueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issue_at");
+
+                    b.Property<string>("IssueKind")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("issue_kind");
+
+                    b.Property<string>("IssueMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("issue_message");
+
+                    b.Property<bool>("IssueRequiresUserAction")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_requires_user_action");
+
+                    b.Property<DateTimeOffset?>("IssueRetryAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issue_retry_after");
+
+                    b.Property<bool>("IssueRetryable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("issue_retryable");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "ProviderName")

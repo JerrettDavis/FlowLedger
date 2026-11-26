@@ -1,4 +1,6 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.Sync;
+using FlowLedger.Integrations.Abstractions;
 using Quartz;
 
 namespace FlowLedger.Api.Jobs;
@@ -49,6 +51,15 @@ public sealed class OnDemandSyncJob : IJob
             memberId, eventType);
 
         await using var scope = _services.CreateAsyncScope();
+        // ADR 0018: honour any back-off window shared with the scheduler. A webhook is itself evidence that a connection waiting
+        // for the user (or given up on) may have changed, so those states get one attempt (SyncTrigger.ProviderEvent).
+        var gate = scope.ServiceProvider.GetService<SyncAttemptGate>();
+        if (gate is not null && await gate.CheckAsync(SyncTrigger.ProviderEvent, cancellationToken) is { Allowed: false, Blocking: { } blocked })
+        {
+            _logger.LogInformation("OnDemandSyncJob: skipped — {Reason}", blocked.Reason);
+            return;
+        }
+
         var syncService = scope.ServiceProvider.GetRequiredService<IFinancialSyncService>();
 
         try
@@ -59,6 +70,12 @@ public sealed class OnDemandSyncJob : IJob
             _logger.LogInformation(
                 "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.",
                 result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+        }
+        catch (ProviderException ex)
+        {
+            // Classified and persisted by the sync service; the shared retry policy decides when it is tried again.
+            _logger.LogWarning("OnDemandSyncJob: webhook-triggered sync failed ({Kind}): {Message}",
+                ProviderIssue.FromException(ex).Kind, ex.Message);
         }
         catch (Exception ex)
         {
