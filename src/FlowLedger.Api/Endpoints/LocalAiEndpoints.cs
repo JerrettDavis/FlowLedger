@@ -11,11 +11,11 @@ internal static class LocalAiEndpoints
 {
     internal static IEndpointRouteBuilder MapLocalAiEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/local-ai/status", (LocalAiService service, HttpContext http) =>
+        app.MapGet("/api/local-ai/status", (LocalAiService service, IHouseholdTenantAccess household) =>
             {
                 var status = service.Status();
                 // Installation-level detail (server paths, exception text) is for the household owner only.
-                return Results.Ok(DataEndpoints.IsHouseholdTenant(http.RequestServices)
+                return Results.Ok(household.IsHouseholdTenant
                     ? status
                     : status with
                     {

@@ -27,11 +27,11 @@ internal static class MxEndpoints
             IConnectorRegistry connectors,
             ITenantContext tenant,
             IProviderConnectionStore connections,
-            HttpContext http,
+            IHouseholdTenantAccess household,
             CancellationToken ct) =>
         {
             // Provisioning MX members is billable on the operator's key; only the household tenant may do it.
-            if (!DataEndpoints.IsHouseholdTenant(http.RequestServices))
+            if (!household.IsHouseholdTenant)
             {
                 return Results.Problem(title: "Bank linking via MX is limited to the household owner", statusCode: StatusCodes.Status403Forbidden);
             }

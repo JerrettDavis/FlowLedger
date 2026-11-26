@@ -116,18 +116,6 @@ public sealed record AskQueryAnswer(string Question, string? Query, string? Erro
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
-public sealed record CategorySpendDto(string Category, decimal Amount);
-
-public sealed record MonthCashFlowDto(string Month, decimal Income, decimal Spending);
-
-public sealed record NetWorthPointDto(string Date, decimal Value);
-
-public sealed record DashboardInsightsDto(
-    List<CategorySpendDto> SpendingByCategory, List<MonthCashFlowDto> CashFlow, List<NetWorthPointDto> NetWorth,
-List<MerchantSpendDto>? TopMerchants = null, List<CategoryMoverDto>? Movers = null, string? PreviousLabel = null);
-public sealed record MerchantSpendDto(string Merchant, decimal Amount, int Visits);
-public sealed record CategoryMoverDto(string Category, decimal Current, decimal Previous, decimal Change);
-
 public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);

@@ -199,11 +199,6 @@ internal static class DataEndpoints
     /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
     internal const long MaxImportBytes = 256L * 1024 * 1024;
 
-    /// <summary>True when the current tenant is the household (operator) tenant that owns the provider credentials.</summary>
-    internal static bool IsHouseholdTenant(IServiceProvider services) =>
-        services.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId
-        == FlowLedger.Infrastructure.TenancySettings.Legacy(services.GetRequiredService<IConfiguration>()).LegacyTenantId;
-
     /// <summary>
     /// Backup state, provider usage, export, import and backup-now are global (they span every tenant), so they are
     /// restricted to the household (legacy) tenant, the same tenant that owns the operator's provider credentials
@@ -212,9 +207,7 @@ internal static class DataEndpoints
     /// </summary>
     internal static async ValueTask<object?> HouseholdTenantOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
-        var services = ctx.HttpContext.RequestServices;
-        var household = FlowLedger.Infrastructure.TenancySettings.Legacy(services.GetRequiredService<IConfiguration>()).LegacyTenantId;
-        if (services.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId != household)
+        if (!ctx.HttpContext.RequestServices.GetRequiredService<FlowLedger.Application.Abstractions.IHouseholdTenantAccess>().IsHouseholdTenant)
         {
             return Results.Problem(
                 title: "Data administration is limited to the household owner",

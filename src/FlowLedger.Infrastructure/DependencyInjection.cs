@@ -205,6 +205,8 @@ public static class DependencyInjection
             connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false, FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits));
         }
 
+        services.AddScoped<FlowLedger.Application.Abstractions.IHouseholdTenantAccess, HouseholdTenantAccess>();
+
         services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
 
