@@ -83,15 +83,6 @@ public sealed class SourceRuleTests
         "src/FlowLedger.Domain/Aggregates/Asset.cs",
         "src/FlowLedger.Domain/Events/DomainEvents.cs",
         "src/FlowLedger.Application/Features/Assets/AssetHandlers.cs",
-        "src/FlowLedger.Application/Features/Integrations/IntegrationService.cs",
-        "src/FlowLedger.Application/Features/HomeAssistant/HomeAssistantService.cs",
-        "src/FlowLedger.Application/Features/Strategies/MarketRates.cs",
-        "src/FlowLedger.Application/Features/Budgets/BudgetHandlers.cs",
-        "src/FlowLedger.Application/Features/Query/QueryHandlers.cs",
-        "src/FlowLedger.Application/Features/BillSheet/BillSheetService.cs",
-        "src/FlowLedger.Application/Features/Dashboard/DashboardActivity.cs",
-        "src/FlowLedger.Application/Features/Query/AskQuery.cs",
-        "src/FlowLedger.Application/Features/Alerts/GetAlertsHandler.cs",
     ];
 
     private static readonly Regex WallClock = new(@"DateTime(Offset)?\.(UtcNow|Now|Today)\b", RegexOptions.Compiled);

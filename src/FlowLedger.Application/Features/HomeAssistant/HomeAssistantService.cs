@@ -24,15 +24,18 @@ public sealed class HomeAssistantService(
     IBudgetStore budgets,
     GetMonthlySpendByCategoryHandler spend,
     GetForecastHandler forecast,
-    ITenantContext tenant)
+    ITenantContext tenant,
+    TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     public const int HorizonDays = 14;
     public const int ForecastRiskDays = 7;
     public const int HistoryDays = 12;
     public const decimal BudgetWarnPercent = 80m;
 
     /// <summary>The single clock for events (server-local date), so a manual send and the scheduled run share dedupe keys.</summary>
-    public static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    public DateOnly Today => DateOnly.FromDateTime(_clock.GetLocalNow().DateTime);
 
     /// <summary>What would be sent now under the saved settings, with amounts and balances always omitted.</summary>
     public async Task<IReadOnlyList<HaEvent>> PreviewAsync(CancellationToken ct = default)
@@ -82,7 +85,7 @@ public sealed class HomeAssistantService(
             await store.RecordResultAsync(tenant.TenantId, lastError, ct);
         }
 
-        await store.PruneAsync(tenant.TenantId, DateTimeOffset.UtcNow.AddDays(-90), ct);
+        await store.PruneAsync(tenant.TenantId, _clock.GetUtcNow().AddDays(-90), ct);
         return new HaRunResult(events.Count, sent, already, failed, lastError);
     }
 

@@ -13,13 +13,16 @@ public sealed class BillSheetService(
     IBillSheetStore store,
     ITransactionRepository transactions,
     IAccountRepository? accounts = null,
-    ICategoryRepository? categories = null) : ISheetAutoMarker
+    ICategoryRepository? categories = null,
+    TimeProvider? clock = null) : ISheetAutoMarker
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     public const int DefaultMonthCount = 6;
     public const string DetectedSection = "Detected";
     private const int TransactionScanLimit = 20_000;
 
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+    private DateOnly Today => DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
 
     // ── View ─────────────────────────────────────────────────────────────────
 
