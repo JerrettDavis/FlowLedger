@@ -44,7 +44,7 @@
     [Parameter] public decimal Total { get; set; }
     [Parameter] public Guid? CurrentCategoryId { get; set; }
     [Parameter] public List<FlowLedger.Web.ApiClient.TransactionSplitDto>? Existing { get; set; }
-    [Parameter] public List<FlowLedger.Web.ApiClient.CategoryDto> Categories { get; set; } = [];
+    [Parameter] public List<FlowLedger.Contracts.CategoryDto> Categories { get; set; } = [];
 
     private sealed class Row
     {

@@ -1,6 +1,4 @@
-using FlowLedger.Domain.Aggregates;
-
-namespace FlowLedger.Application.Features.Accounts;
+namespace FlowLedger.Contracts;
 
 /// <summary>Response DTO for a single account.</summary>
 public sealed record AccountDto(

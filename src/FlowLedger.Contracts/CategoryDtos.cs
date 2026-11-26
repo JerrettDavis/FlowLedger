@@ -1,4 +1,4 @@
-namespace FlowLedger.Application.Features.Categories;
+namespace FlowLedger.Contracts;
 
 /// <summary>Response DTO for a single category.</summary>
 public sealed record CategoryDto(

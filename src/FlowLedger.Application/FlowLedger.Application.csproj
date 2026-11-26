@@ -6,6 +6,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="FlowLedger.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Contracts\FlowLedger.Contracts.csproj" />
     <ProjectReference Include="..\FlowLedger.Domain\FlowLedger.Domain.csproj" />
     <ProjectReference Include="..\FlowLedger.SharedKernel\FlowLedger.SharedKernel.csproj" />
   </ItemGroup>

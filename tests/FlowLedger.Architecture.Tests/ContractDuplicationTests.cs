@@ -10,18 +10,13 @@ public sealed class ContractDuplicationTests
         a.GetExportedTypes().Where(t => !t.IsNested && !t.IsGenericTypeDefinition).Select(t => t.Name);
 
     private static readonly string[] Allowlist = [
-        "AccountDto",
-        "AccountSettingsRequest",
         "AssetCategoryBreakdownDto",
         "AssetCategoryTemplateDto",
         "AssetDto",
         "AssetRefreshResultDto",
         "AssetSummaryDto",
         "AssetValuationDto",
-        "CategoryDto",
         "CategoryRuleDto",
-        "ChangeAccountTypeRequest",
-        "CreateAccountRequest",
         "CreateAssetRequest",
         "CreateRecurringFlowRequest",
         "CreateTransactionRequest",
@@ -57,7 +52,6 @@ public sealed class ContractDuplicationTests
         "SyncResult",
         "TransactionDto",
         "TransactionSplitDto",
-        "UpdateAccountRequest",
         "UpdateAssetRequest",
         "UpdateRecurringFlowRequest",
         "ValuationSpreadDto",

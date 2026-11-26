@@ -1,36 +1,5 @@
 namespace FlowLedger.Web.ApiClient;
 
-// ── Account ───────────────────────────────────────────────────────────────────
-
-public sealed record AccountDto(
-    Guid Id,
-    string Name,
-    string AccountType,
-    decimal BalanceAmount,
-    string BalanceCurrency,
-    string? Institution,
-    string? ExternalAccountRef,
-    bool IsActive,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? LastBalanceConfirmedAt,
-    bool TypeLockedByUser = false,
-    string Mode = "Standard",
-    bool HideTransactions = false);
-
-public sealed record AccountSettingsRequest(bool IsActive, string Mode, bool HideTransactions);
-
-public sealed record ChangeAccountTypeRequest(string AccountType);
-
-public sealed record CreateAccountRequest(
-    string Name,
-    string AccountType,
-    decimal StartingBalance,
-    string Currency,
-    string? Institution,
-    decimal? CreditLimit);
-
-public sealed record UpdateAccountRequest(string Name);
-
 // ── Transaction ───────────────────────────────────────────────────────────────
 
 public sealed record TransactionDto(
@@ -79,15 +48,6 @@ public sealed record CreateTransactionRequest(
     Guid? CategoryId,
     string? MerchantName,
     string? Notes);
-
-// ── Category ──────────────────────────────────────────────────────────────────
-
-public sealed record CategoryDto(
-    Guid Id,
-    string Path,
-    string DisplayName,
-    bool IsSystem,
-    Guid? ParentId);
 
 // ── RecurringFlow ─────────────────────────────────────────────────────────────
 

@@ -135,7 +135,7 @@
 
     private bool _loading = true;
     private string? _error;
-    private List<FlowLedger.Web.ApiClient.AccountDto> _accounts = [];
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private Dictionary<Guid, FlowLedger.Web.ApiClient.AccountConnectorLinkDto> _links = [];
     private List<FlowLedger.Web.ApiClient.ConnectorDto> _connectors = [];
     private bool _household;
@@ -162,11 +162,11 @@
 
     [Inject] private FlowLedger.Web.Auth.OidcOptions Oidc { get; set; } = default!;
 
-    private sealed record AccountGroup(string Title, string Tone, List<FlowLedger.Web.ApiClient.AccountDto> Items);
+    private sealed record AccountGroup(string Title, string Tone, List<FlowLedger.Contracts.AccountDto> Items);
 
-    private static IEnumerable<AccountGroup> Groups(List<FlowLedger.Web.ApiClient.AccountDto> list)
+    private static IEnumerable<AccountGroup> Groups(List<FlowLedger.Contracts.AccountDto> list)
     {
-        List<FlowLedger.Web.ApiClient.AccountDto> Of(params string[] t) => list.Where(a => t.Contains(a.AccountType)).OrderByDescending(a => Math.Abs(a.BalanceAmount)).ToList();
+        List<FlowLedger.Contracts.AccountDto> Of(params string[] t) => list.Where(a => t.Contains(a.AccountType)).OrderByDescending(a => Math.Abs(a.BalanceAmount)).ToList();
         var known = new[] { "Checking", "Savings", "Cash", "CreditCard", "Loan", "Mortgage", "Investment" };
         yield return new AccountGroup("Cash", "cash", Of("Checking", "Savings", "Cash"));
         yield return new AccountGroup("Credit cards", "credit", Of("CreditCard"));
@@ -206,7 +206,7 @@
             ? FlowLedger.Web.Connections.ConnectionHealth.Worst(c.Connections)
             : null;
 
-    private async Task OpenConnectorDialog(FlowLedger.Web.ApiClient.AccountDto account)
+    private async Task OpenConnectorDialog(FlowLedger.Contracts.AccountDto account)
     {
         _links.TryGetValue(account.Id, out var link);
         var dialog = await DialogService.ShowAsync<AccountConnectorDialog>("Data source",
@@ -257,7 +257,7 @@
         var dialog = await DialogService.ShowAsync<AccountFormDialog>("Create Account",
             new DialogParameters<AccountFormDialog> { { x => x.Account, null } });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Web.ApiClient.CreateAccountRequest req })
+        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateAccountRequest req })
         {
             try
             {
@@ -273,7 +273,7 @@
         }
     }
 
-    private async Task OpenEditDialog(FlowLedger.Web.ApiClient.AccountDto account)
+    private async Task OpenEditDialog(FlowLedger.Contracts.AccountDto account)
     {
         var dialog = await DialogService.ShowAsync<AccountFormDialog>("Edit Account",
             new DialogParameters<AccountFormDialog> { { x => x.Account, account } });
@@ -284,12 +284,12 @@
             {
                 if (edit.NewName is not null)
                 {
-                    await ApiClient.UpdateAccountAsync(account.Id, new FlowLedger.Web.ApiClient.UpdateAccountRequest(edit.NewName));
+                    await ApiClient.UpdateAccountAsync(account.Id, new FlowLedger.Contracts.UpdateAccountRequest(edit.NewName));
                 }
 
                 if (edit.NewType is not null)
                 {
-                    await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Web.ApiClient.ChangeAccountTypeRequest(edit.NewType));
+                    await ApiClient.ChangeAccountTypeAsync(account.Id, new FlowLedger.Contracts.ChangeAccountTypeRequest(edit.NewType));
                 }
 
                 if (edit.Settings is not null)
