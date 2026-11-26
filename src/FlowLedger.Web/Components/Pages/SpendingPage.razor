@@ -432,7 +432,7 @@ else if (_result is not null)
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
     }
 
@@ -444,7 +444,7 @@ else if (_result is not null)
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
             return;
         }
 
@@ -509,7 +509,7 @@ else if (_result is not null)
                         }
                         catch (Exception ex)
                         {
-                            Snackbar.Add(ex.Message, Severity.Error);
+                            Snackbar.AddProblem(ex);
                         }
                     };
                 });
@@ -521,7 +521,7 @@ else if (_result is not null)
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
     }
 

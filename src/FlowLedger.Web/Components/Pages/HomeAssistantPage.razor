@@ -161,7 +161,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
         finally
         {
@@ -199,7 +199,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.AddProblem(ex);
         }
         finally
         {
