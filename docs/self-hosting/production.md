@@ -140,8 +140,10 @@ permanently lost.
   never publish the database on a public interface.
 - Restrict the `flowledger` user to the minimum required privileges on the `flowledger`
   database; do not use the PostgreSQL superuser in application connection strings.
-- Enable SSL for the Postgres connection by adding `sslmode=require` to the connection
-  string when the database is not on the same private network as the app.
+- Enable TLS for the Postgres connection (Npgsql syntax: `SSL Mode=VerifyFull`) when the
+  database is not on the same private network as the app. The compose connection string
+  has no TLS option; see [database.md](database.md) for an override example, pool sizing,
+  RPO/RTO and the major-version upgrade procedure.
 
 ## Checklist before going live
 
