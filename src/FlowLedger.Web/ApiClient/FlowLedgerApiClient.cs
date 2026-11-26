@@ -518,7 +518,7 @@ public sealed class FlowLedgerApiClient
             }
 
             await ThrowIfFailedAsync(response, "run query", ct);
-            return new QueryRunOutcome(await response.Content.ReadFromJsonAsync<QueryResultDto>(JsonOptions, ct), null, 0);
+            return new QueryRunOutcome(await response.Content.ReadFromJsonAsync<QueryResult>(JsonOptions, ct), null, 0);
         });
 
     public async Task<List<SavedReportDto>> GetReportsAsync(CancellationToken ct = default)
@@ -1012,22 +1012,22 @@ public sealed class FlowLedgerApiClient
             return result;
         }
 
-        int Col(string n) => r.Columns.FindIndex(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase));
+        int Col(string n) => r.Columns.ToList().FindIndex(c => c.Name.Equals(n, StringComparison.OrdinalIgnoreCase));
         int di = Col("date"), ki = Col(keyColumn), vi = Col(valueColumn);
         if (di < 0 || ki < 0 || vi < 0)
         {
             return result;
         }
 
-        foreach (var g in r.Rows.GroupBy(row => row[ki].ToString()))
+        foreach (var g in r.Rows.GroupBy(row => row[ki]?.ToString() ?? ""))
         {
-            var ordered = g.OrderBy(row => row[di].ToString(), StringComparer.Ordinal).ToList();
+            var ordered = g.OrderBy(row => row[di]?.ToString() ?? "", StringComparer.Ordinal).ToList();
             if (ordered.Count == 0 || g.Key is null)
             {
                 continue;
             }
 
-            decimal V(System.Text.Json.JsonElement e) => e.ValueKind == System.Text.Json.JsonValueKind.Number ? e.GetDecimal() : 0m;
+            decimal V(object? cell) => cell is System.Text.Json.JsonElement { ValueKind: System.Text.Json.JsonValueKind.Number } e ? e.GetDecimal() : 0m;
             result[g.Key] = (V(ordered[0][vi]), V(ordered[^1][vi]));
         }
 
