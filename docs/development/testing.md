@@ -147,3 +147,34 @@ dotnet test FlowLedger.slnx --filter "Category!=E2E" --configuration Release
 The standard CI pipeline (`ci.yml`) runs `--filter "Category!=E2E"` automatically.
 E2E tests run in the separate `e2e.yml` pipeline with the full Docker Compose stack, as
 described above.
+
+## Test infrastructure
+
+### Shared test support (`tests/FlowLedger.TestSupport`)
+
+Not a test project; referenced by the test projects. Contains `Prop` (CsCheck harness), `Gens` (generators),
+`NaiveRecurrence` (day-by-day oracle), builders (`TransactionDtoBuilder`, `ForecastFlowBuilder`,
+`ForecastTransactionBuilder`), `Fake` (seeded Bogus), `TestClock` (fixed 2026-01-31T23:59:59Z), `Eventually`
+(the one sanctioned poll) and `LiveFact` (env-gated live tests).
+
+### Property-based tests
+
+CsCheck, 1000 cases each, fixed start seed, single-threaded. On failure CsCheck prints `Set seed: "..."`; pass it as
+the `seed` argument of `Prop.ForAll(...)` to replay. Files: `Domain.Tests/Properties`, `Application.Tests/Properties`.
+
+### Clocks and sleeps
+
+Tests must not read `DateTime.UtcNow/Now`; `Architecture.Tests/TestClockRatchetTests` fails on new reads and lists the
+remaining ones (code under test with no `TimeProvider` seam). Use gates (`TaskCompletionSource`) not `Task.Delay`.
+
+### Provider fixtures
+
+See `tests/FlowLedger.Integrations.Tests/Fixtures/README.md` (capture, redaction, snapshot regeneration).
+
+### Mutation testing (Stryker.NET)
+
+Tool pinned in `.config/dotnet-tools.json`. Run `pwsh tests/mutation/run-stryker.ps1` (Domain, about 1 minute) or
+`-Target Application` (slow, no baseline yet). **Baseline (Domain, 2026-11-26): 64.40 percent**
+(498 tested mutants: 415 killed, 82 survived, 1 timeout; 148 not covered). `thresholds.break` is 59.
+A scheduled weekly workflow that uploads the HTML report is not yet added. Suggested job:
+checkout, setup-dotnet 10, `pwsh tests/mutation/run-stryker.ps1`, upload `tests/FlowLedger.Domain.Tests/StrykerOutput/**/reports`.
