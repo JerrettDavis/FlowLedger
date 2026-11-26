@@ -8,6 +8,7 @@
 @inject ConnectionRepairService Repair
 @using FlowLedger.Web.Connections
 @inject ThemeService ThemeService
+@inject PersistentComponentState Persisted
 @implements IDisposable
 
 @* ObserveSystemDarkModeChange tells MudBlazor to watch prefers-color-scheme and
@@ -83,6 +84,11 @@
                 </MudButton>
             </MudTooltip>
         }
+        else if (!_status.IsKnown)
+        {
+            @* Environment not known yet: reserve the space instead of flashing the wrong action. *@
+            <MudSkeleton Width="120px" Height="36px" Class="mx-2" aria-hidden="true" />
+        }
         else
         {
             <MudTooltip Text="Connect simulated provider and sync demo data">
@@ -144,8 +150,11 @@
     private bool _drawerOpen = true;
     private bool _syncing = false;
     private bool _share;
-    private string _environment = "unknown";
-    private string? _backupAlert;
+    private LayoutStatus _status = LayoutStatus.Unknown;
+    private string _environment => _status.Environment;
+    private string? _backupAlert => _status.BackupAlert;
+    private const string StatusStateKey = "fl-layout-status";
+    private PersistingComponentStateSubscription _persistSubscription;
     private string? _dismissedBackupAlert;
     private const string DismissKey = "fl-backup-alert-dismissed";
 
@@ -226,12 +235,18 @@
     {
         _autoCts.Cancel();
         _autoCts.Dispose();
+        _persistSubscription.Dispose();
         ThemeService.ThemeChanged -= OnThemeChanged;
     }
 
     // ── Theme helpers ─────────────────────────────────────────────────────────
 
-    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    private void OnThemeChanged() => InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("FlowLedgerTheme.applyScheme", ThemeService.IsDarkMode); }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or JSDisconnectedException) { Logger.LogDebug(ex, "Could not sync data-theme attribute"); }
+    });
 
     /// <summary>
     /// Fired by MudThemeProvider when the OS/browser preference changes at runtime
@@ -288,22 +303,25 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Shell bootstrap: an API hiccup here must never end the circuit (it would take every page down with it).
-        try
+        // Prerender loads the status once and hands it to the interactive circuit, so a page load
+        // issues one set of API calls (both in parallel) instead of two sequential sets.
+        _persistSubscription = Persisted.RegisterOnPersisting(() =>
         {
-            var env = await ApiClient.GetEnvironmentAsync();
-            _environment = env?.Environment ?? "unknown";
-            await RefreshRepairStateAsync();
-            var data = await ApiClient.GetDataStatusAsync();
-            _backupAlert = data is null ? null
-                : data.Backup.Stale ? "No recent successful backup — open Data & Backups"
-                : !data.Backup.OffsiteConfigured && _environment == "production" ? "No off-site backup configured"
-                : null;
-        }
-        catch (Exception ex) when (ex is ApiClientException or HttpRequestException or TaskCanceledException)
+            if (_status.IsKnown)
+            {
+                Persisted.PersistAsJson(StatusStateKey, _status);
+            }
+
+            return Task.CompletedTask;
+        });
+
+        if (Persisted.TryTakeFromJson<LayoutStatus>(StatusStateKey, out var restored) && restored is { IsKnown: true })
         {
-            Logger.LogWarning(ex, "Could not load layout status; continuing without it.");
+            _status = restored;
+            return;
         }
+
+        _status = await LayoutStatusLoader.LoadAsync(ApiClient);
     }
 
     private async Task ConnectBank()
