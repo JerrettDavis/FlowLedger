@@ -24,7 +24,8 @@ dotnet test tests/FlowLedger.Api.Tests
 ### BDD Tests
 
 TinyBDD + xUnit. Code-first Given/When/Then scenarios (no Gherkin `.feature` files); see [ADR 0002](../adr/0002-bdd-library.md).
-Six scenarios are `[DockerFact]` and skip without Docker; the nine in `DomainRuleScenarios` need no database. The suite currently has 15 scenarios, a small slice of the behaviour.
+Eleven scenarios are `[DockerFact]` and skip without Docker (import, matching, sync, tenant isolation); the nine in `DomainRuleScenarios` need no database. The suite currently has 20 scenarios, a small slice of the behaviour.
+CI publishes every scenario's Given/When/Then output (with per-step timings and the failing step) as the `bdd-scenarios` artifact and in the job summary; `eng/ci/bdd-report.py` builds it from the TRX files.
 
 ```bash
 dotnet test tests/FlowLedger.Bdd.Tests
@@ -60,16 +61,19 @@ running.
 
 #### How the gate works
 
-`E2ETestBase` reads `E2E_BASE_URL` at startup. When the variable is not set, every test
-method exits immediately and is recorded as Passed (0 failures) by xUnit. No browser is
-launched. This means the E2E suite is safe to include in a solution-wide test run — it
-produces zero failures rather than errors when the stack is not up.
+E2E tests use `[E2EFact]` / `[E2ETheory]`. When `E2E_BASE_URL` is not set they are
+reported as **Skipped** (with a reason), never as Passed, and no browser is launched, so a
+solution-wide local run is safe and honest about what did not run. CI sets
+`E2E_REQUIRED=true`, which removes the skip: a missing or renamed `E2E_BASE_URL` then
+fails the run (`E2ETestBase.InitializeAsync` throws) instead of going green with no
+assertions. `eng/ci/check-trx.py --min-executed` additionally fails a run that executed
+too few tests.
 
 #### Environment variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `E2E_BASE_URL` | Yes | _(none)_ | Base URL of the Web UI that Playwright navigates. Example: `http://localhost:5002`. When unset, all E2E tests are skipped cleanly — no browser is launched. |
+| `E2E_BASE_URL` | Yes | _(none)_ | Base URL of the Web UI that Playwright navigates. Example: `http://localhost:5002`. When unset, all E2E tests are reported as Skipped (or fail when `E2E_REQUIRED=true`) — no browser is launched. |
 | `E2E_API_URL` | No | `http://localhost:5001` | Base URL of the API service. Used by `AccountsDataTests` and `ScreenshotCaptureTests` to POST `/api/connect` and `/api/sync` for data seeding before assertions. |
 | `E2E_API_KEY` | No | `dev-local-key-not-for-production` | API key sent as `X-Api-Key` in seeding requests. Must match `Api__Key` on the running API service. In CI this is `ci-integration-key-not-for-production-0123456789`, matching the `API__KEY` value passed to `docker compose`. |
 | `E2E_TENANT_ID` | No | `00000000-0000-0000-0000-000000000001` | Tenant ID sent as `X-Tenant-Id` in seeding requests. Must match `Api__TenantId` on the running API service. |

@@ -49,14 +49,9 @@ public class AccountsDataTests : E2ETestBase
     /// This test explicitly asserts that a seeded account name is visible, which can only
     /// happen when the API call succeeds with a valid API key.
     /// </summary>
-    [Fact(DisplayName = "Accounts: seeded data rows appear (proves Web→API auth works)")]
+    [E2EFact(DisplayName = "Accounts: seeded data rows appear (proves Web→API auth works)")]
     public async Task Accounts_SeededDataRowsAppear_ProvesAuthWorks()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         // ── Step 1: Seed via direct API calls (mirrors seed.ps1) ──────────────
         await SeedDataAsync();
 

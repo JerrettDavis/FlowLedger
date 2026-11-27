@@ -1,7 +1,12 @@
 {
-  "_comment": "Line-coverage floors, ratcheted from a measured baseline (Domain 68.6%, Application 74.3% from the Domain.Tests/Application.Tests projects alone, Windows, 2026-11-26). Raise as coverage improves. Issue #134 targets 80% Domain / 70% Application.",
+  "_comment": "Line-coverage gate for check-coverage.py. baseline = measured from the Domain.Tests and Application.Tests projects alone (Domain 83.3%, Application 76.9%, Windows, 2026-11-26); CI merges every project's report so it should read at or above these. A PR fails if an assembly is below its floor or more than ratchetTolerance points below its baseline. Ratchet: when the CI report shows improvement, record it as the new baseline and later raise the floor. Issue #134 targets 80% Domain / 70% Application, which the floors now enforce.",
+  "ratchetTolerance": 1.5,
+  "baseline": {
+    "FlowLedger.Domain": 83.3,
+    "FlowLedger.Application": 76.9
+  },
   "lineFloors": {
-    "FlowLedger.Domain": 65,
-    "FlowLedger.Application": 70
+    "FlowLedger.Domain": 80,
+    "FlowLedger.Application": 74
   }
 }

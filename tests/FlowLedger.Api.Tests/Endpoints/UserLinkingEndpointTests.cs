@@ -53,7 +53,7 @@ public sealed class UserLinkingEndpointTests(FlowLedgerApiFactory factory, AutoL
         var resp = await factory.CreateAuthenticatedClient(alice.TenantId).PostAsync("/api/users/link-code", null);
         var code = (await resp.Content.ReadFromJsonAsync<CodeResponse>())!;
 
-        code.ExpiresUtc.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(15), TimeSpan.FromMinutes(1));
+        code.ExpiresUtc.Should().BeCloseTo(factory.ServerNow.AddMinutes(15), TimeSpan.FromMinutes(1));
     }
 
     [Fact]

@@ -15,7 +15,7 @@ public sealed class OnDemandSyncDeferralTests(FlowLedgerApiFactory factory)
         var scheduler = await factory.Services.GetRequiredService<ISchedulerFactory>().GetScheduler();
         var tenant = Guid.NewGuid();
         var other = Guid.NewGuid();
-        var before = DateTimeOffset.UtcNow;
+        var before = factory.ServerNow;
 
         var first = await OnDemandSyncJob.DeferAsync(scheduler, tenant, "m1", "EVT", TimeSpan.FromMinutes(20));
         var second = await OnDemandSyncJob.DeferAsync(scheduler, tenant, "m1", "EVT2", TimeSpan.FromMinutes(20));

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -24,15 +25,15 @@ public sealed class ForecastBandsEndpointTests(FlowLedgerApiFactory factory) : I
     public async Task Forecast_returns_bands_and_spending_profile_once_there_are_enough_weeks_of_spending()
     {
         var account = (await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 5000m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named("Checking").StartingAt(5000m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         for (var week = 1; week <= 12; week++)
         {
             var date = today.AddDays(-7 * week + 1);
             var amount = 80m + week % 4 * 25m;
             var response = await _client.PostAsJsonAsync("/api/transactions",
-                new CreateTransactionRequest(account.Id, amount, "USD", "Debit", $"Corner Grocer {week}", date, date, null, $"Corner Grocer {week}", null));
+                CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(amount).Described($"Corner Grocer {week}").On(date).PostedOn(date).AtMerchant($"Corner Grocer {week}").Build());
             response.StatusCode.Should().Be(HttpStatusCode.Created);
         }
 
@@ -53,7 +54,7 @@ public sealed class ForecastBandsEndpointTests(FlowLedgerApiFactory factory) : I
     [Fact]
     public async Task Forecast_without_spending_history_has_empty_bands_but_still_succeeds()
     {
-        await _client.PostAsJsonAsync("/api/accounts", new CreateAccountRequest("Checking", "Checking", 1000m, "USD", null, null));
+        await _client.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Checking").StartingAt(1000m).Build());
 
         var forecast = await _client.GetAsync("/api/forecast?months=1");
 
