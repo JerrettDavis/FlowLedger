@@ -14,5 +14,9 @@ internal static class HostWideEntities
         ["audit_events"] = "append-only audit trail (#193); tenant_id is informational and the rows survive tenant erasure as the record",
         ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
         ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
+        ["tenants"] = "the tenant registry itself (#169), keyed by id; erasure keeps its row as the audit record",
+        ["app_users"] = "the login directory: resolves a login to its tenant, so it spans tenants by design",
+        ["system_settings"] = "host-wide key/value settings (the data-environment marker)",
+        ["app_user_link_codes"] = "one-time codes (hashed) that join a login to a tenant; part of the login directory",
     };
 }

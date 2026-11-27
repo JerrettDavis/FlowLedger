@@ -85,8 +85,7 @@ public static class SnapshotImport
                 return Fail($"Refusing to import: the target database already contains {existing} rows. Import is only allowed into an empty database.");
             }
 
-            await SnapshotRestoreDrill.MigrateAsync(targetConnectionString, manifest.AppliedMigrations.LastOrDefault(), ct);
-            await SnapshotRestoreDrill.EnsureAdHocTablesAsync(targetConnectionString, ct);
+            await SnapshotRestoreDrill.MigrateForRestoreAsync(targetConnectionString, manifest, ct);
 
             var problems = new List<string>();
             var toLoad = manifest with { Tables = manifest.Tables.Where(t => !NotImported.Contains(t.Table)).ToList() };

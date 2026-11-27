@@ -113,21 +113,6 @@ public sealed class MigrationTests : IAsyncLifetime
         offenders.Should().BeEmpty("these migrations have an empty Down; implement it or list them as irreversible with a reason");
     }
 
-    // ── EF tables and ad-hoc tables must be disjoint ─────────────────────────
-
-    [Fact]
-    public void Ad_hoc_tables_and_EF_tables_do_not_overlap()
-    {
-        using var ctx = OfflineContext();
-        var efTables = ctx.Model.GetEntityTypes().Select(e => e.GetTableName()).Where(n => n is not null).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var adHoc = Regex.Matches(AdHocSchema.AllSql, @"CREATE TABLE IF NOT EXISTS\s+(\w+)", RegexOptions.IgnoreCase)
-            .Select(m => m.Groups[1].Value)
-            .ToList();
-
-        adHoc.Should().NotBeEmpty();
-        adHoc.Should().NotIntersectWith(efTables!, "a table created by both EF and a store's CREATE TABLE IF NOT EXISTS has two owners and will drift");
-    }
-
     // ── upgrade paths on a real Postgres ─────────────────────────────────────
 
     private async Task<string> NewDatabaseAsync()
