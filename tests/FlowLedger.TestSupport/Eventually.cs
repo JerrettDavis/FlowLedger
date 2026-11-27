@@ -8,11 +8,15 @@ namespace FlowLedger.TestSupport;
 /// </summary>
 public static class Eventually
 {
-    public static async Task WaitAsync(Func<bool> condition, string because, TimeSpan? timeout = null)
+    public static Task WaitAsync(Func<bool> condition, string because, TimeSpan? timeout = null)
+        => WaitAsync(() => Task.FromResult(condition()), because, timeout);
+
+    /// <summary>As <see cref="WaitAsync(Func{bool}, string, TimeSpan?)"/> for a condition that must itself be awaited (a database query, say).</summary>
+    public static async Task WaitAsync(Func<Task<bool>> condition, string because, TimeSpan? timeout = null)
     {
         var limit = timeout ?? TimeSpan.FromSeconds(30);
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        while (!condition())
+        while (!await condition())
         {
             if (clock.Elapsed > limit)
             {
