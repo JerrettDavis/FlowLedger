@@ -22,6 +22,28 @@ Thank you for considering contributing.
 Alternatively open the repo in the dev container (`.devcontainer/`): it provides the .NET SDK,
 Docker-outside-of-Docker and runs `dotnet restore` on creation.
 
+## NuGet lock files (#190)
+
+Every project except `FlowLedger.AppHost` commits a `packages.lock.json` (`RestorePackagesWithLockFile` in `Directory.Build.props`). CI and every
+Dockerfile restore with `--locked-mode` (the Dockerfiles copy the lock files next to each `.csproj` before restoring), so a dependency that
+changes, or is republished with different content, fails the build instead of slipping in. `dotnet restore --locked-mode` is the local check.
+
+Refresh the locks whenever you change `Directory.Packages.props` or any `PackageReference` (otherwise restore fails with NU1004 or NU1403):
+
+```bash
+dotnet restore FlowLedger.slnx --force-evaluate
+```
+
+and commit the changed `packages.lock.json` files with the change. Dependabot's `nuget` ecosystem regenerates lock files in its own PRs.
+Notes:
+
+* `FlowLedger.AppHost` has no lock file: the Aspire dashboard/orchestration packages are chosen per OS, so one file cannot match every machine.
+* `FlowLedger.Web` downloads the Blazor assets pack at the version the installed SDK bundles. `Directory.Build.targets` pins it
+  (`AspNetCoreAssetsPackVersion`) to the aspnet runtime image version so the lock is the same on every SDK; bump it together with the `aspnet`
+  `FROM` line in the Dockerfiles, then refresh the locks.
+* The first line of each Dockerfile (`# syntax=docker/dockerfile:1@sha256:...`) is pinned by digest. To refresh it:
+  `docker buildx imagetools inspect docker/dockerfile:1` and copy the top-level `Digest:`; Dependabot does not update this line.
+
 ## Code style
 
 - C# 14, nullable enabled, implicit usings, treat-warnings-as-errors.

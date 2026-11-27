@@ -5,6 +5,8 @@
     <!-- TargetFramework, LangVersion, Nullable, ImplicitUsings come from Directory.Build.props -->
     <!-- TreatWarningsAsErrors comes from Directory.Build.props -->
     <UserSecretsId>cf350072-2f86-4c25-ae88-a196e6e8b976</UserSecretsId>
+    <!-- No lock file (#190): the Aspire orchestration/dashboard packages are resolved per OS (win-x64 vs linux-x64), so one committed lock cannot match every machine. Dev-only; never shipped. -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>

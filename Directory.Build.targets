@@ -12,4 +12,19 @@
       <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'Microsoft.Gen.Logging' Or '%(Filename)' == 'Microsoft.Gen.Logging.Parsing'" />
     </ItemGroup>
   </Target>
+
+  <!--
+    NuGet lock files (#190): the Web project downloads the Blazor static-assets pack (Microsoft.AspNetCore.App.Internal.Assets) at the
+    version the INSTALLED SDK bundles, and only when the tree contains .razor files. Both would make packages.lock.json differ between the
+    developer SDK, the CI SDK and the Docker restore stage (which restores before the sources are copied). Pin the pack to the
+    ASP.NET runtime image version (see the aspnet FROM line in the Dockerfiles) and require it explicitly so the lock is stable.
+    Bump AspNetCoreAssetsPackVersion together with the aspnet image, then refresh the lock files (CONTRIBUTING.md).
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'FlowLedger.Web'">
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+    <AspNetCoreAssetsPackVersion>10.0.15</AspNetCoreAssetsPackVersion>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'FlowLedger.Web'">
+    <KnownAspNetCorePack Update="Microsoft.AspNetCore.App.Internal.Assets" AspNetCorePackVersion="$(AspNetCoreAssetsPackVersion)" />
+  </ItemGroup>
 </Project>

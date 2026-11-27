@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+# NuGet lock files (#190): implicit restores in build/test steps must match the committed packages.lock.json too.
+env:
+  RestoreLockedMode: true
+
 jobs:
   repeat-suite:
     name: Suite x3 (flake detection)
