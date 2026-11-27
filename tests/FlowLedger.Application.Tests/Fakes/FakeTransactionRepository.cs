@@ -28,7 +28,9 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         int take = 100,
         CancellationToken ct = default,
         bool everydayOnly = false,
-        string? search = null)
+        string? search = null,
+        TransactionSortKey sort = TransactionSortKey.Date,
+        bool descending = true)
     {
         var query = _store.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -51,6 +53,19 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         if (to.HasValue)
         {
             query = query.Where(t => t.EffectiveDate <= to.Value);
+        }
+
+        Func<Transaction, object> key = sort switch
+        {
+            TransactionSortKey.Merchant => t => t.MerchantName ?? t.SuggestedName ?? t.Description,
+            TransactionSortKey.Description => t => t.Description,
+            TransactionSortKey.Amount => t => t.Amount.Amount,
+            _ => t => t.EffectiveDate,
+        };
+        // The default (newest first) keeps insertion order so existing handler tests are unaffected; an explicit sort is applied.
+        if (sort != TransactionSortKey.Date || !descending)
+        {
+            query = descending ? query.OrderByDescending(key) : query.OrderBy(key);
         }
 
         var result = query.Skip(skip).Take(take).ToList();

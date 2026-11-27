@@ -69,7 +69,7 @@
                 <span class="fl-spacer"></span>
                 @if (g.Tone != "off")
                 {
-                    <MudText Typo="Typo.subtitle1" Class="fl-num" Color="@(g.Items.Sum(x => x.BalanceAmount) >= 0 ? Color.Default : Color.Error)">@Format.Money(g.Items.Sum(x => x.BalanceAmount))</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="fl-num" Color="@(g.Items.Sum(x => x.BalanceAmount) >= 0 ? Color.Default : Color.Error)">@GroupTotal(g.Items)</MudText>
                 }
             </div>
             <MudPaper Class="fl-list" Outlined="true">
@@ -127,6 +127,18 @@
 }
 
 @code {
+    /// <summary>
+    /// A group's total in its own currency. Balances in different currencies are not added together (no FX): a mixed
+    /// group says so instead of showing a meaningless sum with a dollar sign.
+    /// </summary>
+    private static string GroupTotal(IReadOnlyList<FlowLedger.Contracts.AccountDto> items)
+    {
+        var currencies = items.Select(x => x.BalanceCurrency).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return currencies.Count > 1
+            ? "Mixed currencies"
+            : Format.Money(items.Sum(x => x.BalanceAmount), currencies.FirstOrDefault());
+    }
+
     /// <summary>Environment from the layout; drives which empty-state instruction is shown.</summary>
     [CascadingParameter] private FlowLedger.Web.Services.LayoutStatus? Status { get; set; }
 

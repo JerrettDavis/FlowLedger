@@ -20,7 +20,9 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <div class="d-flex align-center gap-3 flex-wrap">
             <MudTextField T="string" Immediate="true" @bind-Value="_pattern" Label="If description contains" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
-            <MudTextField T="string" Immediate="true" @bind-Value="_category" Label="Category (e.g. Food/Coffee)" Style="min-width:min(260px,100%)" Margin="Margin.Dense" />
+            <MudAutocomplete T="string" @bind-Value="_category" SearchFunc="SearchCategoriesAsync" CoerceValue="true" CoerceText="true"
+                                 OpenOnFocus="true" MaxItems="30" AdornmentAriaLabel="Show category suggestions" Label="Category (e.g. Food/Coffee)" Style="min-width:min(260px,100%)" Margin="Margin.Dense"
+                                 HelperText="Pick an existing category to avoid typos, or type a new path. Use / for levels." />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save"
                        Disabled="@(FormRules.Rule(_pattern, _category) is not null)" aria-describedby="rule-reason">Save rule</MudButton>
         </div>
@@ -50,6 +52,7 @@ else
     private bool _loading = true;
     private string? _pattern;
     private string? _category;
+    private List<string> _categoryPaths = [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -57,8 +60,32 @@ else
     {
         _loading = true;
         _rules = await ApiClient.GetCategoryRulesAsync();
+        try
+        {
+            // Offer the existing categories (and their parents) so a typo does not silently create a near-duplicate category.
+            _categoryPaths = (await ApiClient.GetCategoriesAsync() ?? [])
+                .SelectMany(c =>
+                {
+                    var segments = c.Path.Split('/');
+                    return Enumerable.Range(1, segments.Length).Select(n => string.Join('/', segments.Take(n)));
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is FlowLedger.Web.ApiClient.ApiClientException or HttpRequestException)
+        {
+            _categoryPaths = []; // suggestions are a convenience: the field still accepts free text
+        }
+
         _loading = false;
     }
+
+    private Task<IEnumerable<string>> SearchCategoriesAsync(string? text, CancellationToken ct) =>
+        Task.FromResult<IEnumerable<string>>(_categoryPaths
+            .Where(p => string.IsNullOrWhiteSpace(text) || p.Contains(text.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Take(30)
+            .ToList());
 
     private async Task Save()
     {

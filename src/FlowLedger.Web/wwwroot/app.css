@@ -709,3 +709,6 @@ html.fl-share .fl-user-name { display: none; }
    severity colour; the words use the primary text colour. */
 :where(.mud-alert-text-error, .mud-alert-text-warning, .mud-alert-text-info, .mud-alert-text-success, .mud-alert-text-normal) .mud-alert-message
 { color: var(--mud-palette-text-primary); }
+
+/* Sortable column headers are buttons (server-side sort, #209): keep the header typography, not the button defaults. */
+.fl-sort-btn { font: inherit; letter-spacing: inherit; text-transform: none; color: inherit; min-width: 0; padding-inline: 4px; }

@@ -154,10 +154,10 @@ else
                                 {
                                     <tr>
                                         <td>@m.Name</td>
-                                        <td style="text-align:right">@m.Accuracy.ToString("P0")</td>
+                                        <td style="text-align:right">@Format.Ratio(m.Accuracy)</td>
                                         @foreach (var p in m.Curve)
                                         {
-                                            <td style="text-align:right">@(p.Predicted == 0 ? "—" : $"{p.Precision:P0} / {p.Coverage:P0}")</td>
+                                            <td style="text-align:right">@(p.Predicted == 0 ? "—" : $"{Format.Ratio(p.Precision)} / {Format.Ratio(p.Coverage)}")</td>
                                         }
                                     </tr>
                                 }

@@ -62,10 +62,7 @@ public sealed partial class FlowLedgerApiClient
             var response = await _http.PostAsJsonAsync("/api/recurring-flows", request, JsonOptions, ct);
             if (!response.IsSuccessStatusCode)
             {
-                LogNonSuccessCreatingRecurringFlow((int)response.StatusCode);
-                throw new ApiClientException(
-                    $"Couldn't create recurring flow (server returned {(int)response.StatusCode}).",
-                    response.StatusCode);
+                await ThrowIfFailedAsync(response, "create recurring flow", ct);
             }
 
             return await response.Content.ReadFromJsonAsync<RecurringFlowDto>(JsonOptions, ct);
