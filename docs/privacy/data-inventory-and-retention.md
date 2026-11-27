@@ -11,7 +11,7 @@ data controller; this project ships software, not a service.
 | Financial records | Accounts, balances, balance snapshots, transactions, splits, categories, recurring flows, assets and valuations, saved reports, bill sheets | PostgreSQL (`accounts`, `transactions`, `account_balance_snapshots`, `transaction_splits`, `categories`, `recurring_flows`, `planned_flow_occurrences`, `assets`, `asset_valuations`, `saved_reports`, `sheet_bills`, `sheet_payments` and others) | No (disk/volume encryption is the operator's job) | Until the database is deleted; balance snapshots are appended on every sync and kept |
 | User identity | OIDC subject, issuer, email | PostgreSQL (`app_users`) | No | Until the database is deleted |
 | Provider connection metadata | Provider name, member/connection id, institution, status; sync cursors | PostgreSQL (`provider_connections`, `sync_cursors`) | No | Until the database is deleted |
-| Raw provider payloads | Full bank API responses and verified webhook bodies, byte-for-byte | Object archive (`ObjectStorage:RootPath`, compose volume `objects_data`) | No | Kept indefinitely; nothing in the code deletes them ([ADR 0007](../adr/0007-raw-payload-retention.md)) |
+| Raw provider payloads | Full bank API responses and verified webhook bodies, byte-for-byte | Object archive (`ObjectStorage:RootPath`, compose volume `objects_data`) | No | Kept indefinitely by default; removed by tenant offboarding or the opt-in `Storage:RawArchiveRetentionDays` sweep ([ADR 0007](../adr/0007-raw-payload-retention.md)) |
 | Integration and Home Assistant secrets | Webhook URLs, signing secrets, credentials | PostgreSQL | Yes, AES-256-GCM with the configured key | Until deleted by the user or the database is deleted |
 | Provider credentials | MX keys, Quiltt keys, SimpleFIN access URL | Configuration / environment only | n/a (not stored in the database) | Operator-managed |
 | Backups and exports | One CSV per table plus manifest; restore-drill scratch data | Local `Backup__Directory` (unencrypted); off-site restic repository (encrypted) | Off-site only | Local: last `Backup__KeepLocalSnapshots` (default 30) snapshots; pruning never touches `premigrate-*` snapshots, and no off-site pruning policy is configured by FlowLedger (set one in restic) |
@@ -48,22 +48,21 @@ Check each provider's own terms for their retention and deletion commitments; th
   encrypted, so destroying the restic password (crypto-shredding) is the only way to make old copies unreadable, and it renders
   all of them unreadable.
 - **What an operator can do today:** for a single-household instance, delete the database volume, the archive volume (`objects_data`),
-  local backup directories and the restic repository, and revoke provider links. Per-user deletion inside a multi-user instance
-  has no supported procedure.
+  local backup directories and the restic repository, and revoke provider links. Per-tenant deletion inside a multi-user instance
+  uses the offboarding endpoint above.
 - **Export:** a full snapshot export exists (`GET /api/data/export`, whole database, loopback only). A per-user export is tracked
   separately.
 
-### Required to meet a deletion SLA (not yet built)
+### Still required to meet a deletion SLA
 
-1. A tenant offboarding operation that removes all rows for the tenant, the tenant's archive objects and the provider connection,
-   and revokes the provider link where the provider supports it.
-2. An archive layout that can be deleted per tenant (the current key is `raw/{provider}/{yyyy}/{MM}/{dd}/...`, not per tenant), or
-   an encryption scheme allowing per-tenant crypto-shredding.
+1. Self-service deletion by the tenant owner (today only the household admin can offboard a tenant) and a stated deletion SLA.
+2. Provider revocation from FlowLedger where the provider offers a revoke endpoint (today it is manual).
 3. A documented backup expiry policy so deleted data ages out of backups within a stated period.
-4. A test proving no tenant rows or objects remain.
 
-[ADR 0007](../adr/0007-raw-payload-retention.md) carries an amendment recording that retention is "keep forever" only until that
-deletion path exists.
+Done: row and file erasure per tenant, a per-tenant archive layout, and tests proving no tenant rows remain
+(`tests/FlowLedger.Infrastructure.Tests/DataSafety/TenantErasureTests.cs`).
+
+[ADR 0007](../adr/0007-raw-payload-retention.md) carries the amendments recording that retention is "keep forever" by default and that offboarding removes a tenant's archive objects.
 
 ## Breach handling
 

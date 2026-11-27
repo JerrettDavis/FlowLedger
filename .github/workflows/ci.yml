@@ -47,6 +47,9 @@ jobs:
       - name: Check formatting
         run: dotnet format --verify-no-changes --no-restore
 
+      - name: Check every invariant has a tagged test
+        run: python3 eng/check-invariants.py
+
       - name: Build (treat warnings as errors)
         run: dotnet build --no-restore --configuration Release
 
@@ -118,7 +121,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq'.[] | select(.body | startswith("<!-- flowledger-coverage-delta -->")) | .id' | head -n 1)
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq '.[] | select(.body | startswith("<!-- flowledger-coverage-delta -->")) | .id' | head -n 1)
           if [ -n "$id" ]; then
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@artifacts/coverage-comment.md
           else
