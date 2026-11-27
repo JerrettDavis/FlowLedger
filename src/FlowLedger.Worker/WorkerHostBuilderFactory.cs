@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Quartz;
 
 namespace FlowLedger.Worker;
@@ -120,6 +122,13 @@ internal static class WorkerHostBuilderFactory
             q.AddJobListener<JobRunListener>();
             q.AddTriggerListener<JobExclusionTriggerListener>();
         });
+
+        // Trace the run itself (JobTrace), Quartz's own firing/execute spans, and the Npgsql command spans that EF Core's queries produce.
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing
+                .AddSource(JobTrace.SourceName)
+                .AddSource(Quartz.Diagnostics.QuartzInstrumentation.ActivitySourceName))
+            .WithMetrics(metrics => metrics.AddMeter(Quartz.Diagnostics.QuartzInstrumentation.MeterName));
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         builder.Services.AddHostedService<WorkerHeartbeat>();

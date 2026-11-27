@@ -7,7 +7,8 @@ namespace FlowLedger.Api.Middleware;
 
 /// <summary>
 /// Writes an <c>audit_events</c> row for every request that reaches one of the sensitive endpoints below (connector link/unlink,
-/// data export/import/backup-now, integration and Home Assistant credential changes, login linking). Keyed by endpoint name so a
+/// data export/import/backup-now, integration and Home Assistant credential changes, login linking, key rotation, tenant offboarding and
+/// destructive edits such as deactivating an account or merging duplicates). Keyed by endpoint name so a
 /// route change cannot silently drop auditing; <c>AuditMiddlewareTests</c> pins that every name still exists.
 /// A failing audit write is logged and never changes the response (the action already happened).
 /// </summary>
@@ -32,6 +33,19 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
         ["CreateLinkCode"] = "user.link_code",
         ["RedeemLinkCode"] = "user.link",
         ["UnlinkLogin"] = "user.unlink",
+
+        // Key rotation and destructive edits (#193).
+        ["ReencryptSecrets"] = "secrets.reencrypt",
+        ["SealRawArchive"] = "archive.seal",
+        ["OffboardTenant"] = "tenant.offboard",
+        ["DeactivateAccount"] = "account.deactivate",
+        ["DeactivateAsset"] = "asset.deactivate",
+        ["DeactivateRecurringFlow"] = "recurring.deactivate",
+        ["DeleteCategory"] = "category.delete",
+        ["MergeDuplicate"] = "transaction.merge_duplicate",
+        ["ClearAutoCategories"] = "category.clear_auto",
+        ["DeleteBudget"] = "budget.delete",
+        ["DeleteGoal"] = "goal.delete",
     };
 
     public async Task InvokeAsync(HttpContext context, IAuditLog audit, TimeProvider clock)
@@ -83,7 +97,8 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
 
             var principal = context.User.Identity is { IsAuthenticated: true, Name: { Length: > 0 } n } ? n : "anonymous";
             var actor = userId == Guid.Empty ? principal : $"{principal}/{userId}";
-            var target = context.Request.Path.Value;
+            // Decoded path: strip control characters so a crafted %0d%0a cannot forge a line in anything that later prints the row.
+            var target = context.Request.Path.Value is { } rawPath ? string.Concat(rawPath.Where(c => !char.IsControl(c))) : null;
 
             await audit.AppendAsync(new AuditEvent(
                 action,
