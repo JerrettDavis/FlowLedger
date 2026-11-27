@@ -28,12 +28,16 @@ internal sealed class HouseholdOperatorRequirement : IAuthorizationRequirement
 {
 }
 
-/// <summary>Succeeds when <see cref="IHouseholdTenantAccess"/> says the current tenant is the household tenant.</summary>
-internal sealed class HouseholdOperatorHandler(IHouseholdTenantAccess access) : AuthorizationHandler<HouseholdOperatorRequirement>
+/// <summary>
+/// Succeeds when <see cref="IHouseholdTenantAccess"/> says the current tenant is the household tenant. The access service is resolved only
+/// when the requirement is evaluated: the framework constructs every registered handler for every request, and resolving the tenant
+/// eagerly would make anonymous probes (/health) fail with a tenant-resolution error.
+/// </summary>
+internal sealed class HouseholdOperatorHandler(IServiceProvider services) : AuthorizationHandler<HouseholdOperatorRequirement>
 {
     protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, HouseholdOperatorRequirement requirement)
     {
-        if (access.IsHouseholdTenant)
+        if (services.GetRequiredService<IHouseholdTenantAccess>().IsHouseholdTenant)
         {
             context.Succeed(requirement);
         }
