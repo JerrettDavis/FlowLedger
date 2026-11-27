@@ -54,7 +54,8 @@ public static class ServiceCollectionExtensions
 
         // ── Distributed cache for cooldown ─────────────────────────────────────────
         // Uses Redis when wired upstream; otherwise this in-memory fallback satisfies the
-        // IDistributedCache contract on a single instance (documented fallback).
+        // IDistributedCache contract on a single instance (documented fallback, #179): with more than one API/Worker replica the
+        // 15-minute refresh cooldown is then per process, so wire a shared IDistributedCache (Redis) upstream before scaling out.
         services.AddDistributedMemoryCache();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<MxRefreshCooldown>();
