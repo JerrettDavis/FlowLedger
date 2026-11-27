@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.SharedKernel;
 using FluentValidation;
@@ -14,7 +15,7 @@ internal static class BudgetEndpoints
 
         group.MapGet("/", async (ListBudgetsHandler handler, string? month, CancellationToken ct) =>
             Results.Ok(await handler.HandleAsync(
-                month is not null && DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", out var m) ? m : null, ct)))
+                month is not null && DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var m) ? m : null, ct)))
         .WithName("ListBudgets")
         .WithSummary("Budgets with this month's spending");
 

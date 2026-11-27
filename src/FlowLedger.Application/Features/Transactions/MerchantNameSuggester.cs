@@ -10,18 +10,18 @@ namespace FlowLedger.Application.Features.Transactions;
 internal static partial class MerchantNameSuggester
 {
     // Payment-processor / channel prefixes that are not part of the merchant name.
-    [GeneratedRegex(@"^(?:sq\s*\*|tst\s*\*|pp\s*\*|paypal\s*\*|pos\s+(?:debit|purchase)?|debit\s+card\s+purchase|purchase\s+authorized\s+on\s+\d{1,2}/\d{1,2}|recurring\s+payment|ach\s+(?:debit|withdrawal)|checkcard|visa\s+purchase)\s*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:sq\s*\*|tst\s*\*|pp\s*\*|paypal\s*\*|pos\s+(?:debit|purchase)?|debit\s+card\s+purchase|purchase\s+authorized\s+on\s+\d{1,2}/\d{1,2}|recurring\s+payment|ach\s+(?:debit|withdrawal)|checkcard|visa\s+purchase)\s*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Prefix();
 
     // Trailing "ST 12345" / "ST" (US state code, optional zip) or a bare zip. The city is deliberately left in:
     // its word count can't be told apart from the merchant name.
-    [GeneratedRegex(@"\s+(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)(?:\s+\d{5}(?:-\d{4})?)?$|\s+\d{5}(?:-\d{4})?$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\s+(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)(?:\s+\d{5}(?:-\d{4})?)?$|\s+\d{5}(?:-\d{4})?$", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex TrailingLocation();
 
-    [GeneratedRegex(@"\s*(?:#\s*\d+|\bstore\s*#?\s*\d+|\bno\.?\s*\d+)\b|\s+\d{3,}\b|\s*\*\s*[A-Z0-9]{5,}\b|\bx{2,}\d+\b|\b\d{1,2}/\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\s*(?:#\s*\d+|\bstore\s*#?\s*\d+|\bno\.?\s*\d+)\b|\s+\d{3,}\b|\s*\*\s*[A-Z0-9]{5,}\b|\bx{2,}\d+\b|\b\d{1,2}/\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Noise();
 
-    [GeneratedRegex(@"\s+")]
+    [GeneratedRegex(@"\s+", RegexOptions.None, 1000)]
     private static partial Regex Spaces();
 
     private static readonly HashSet<string> Keep = new(StringComparer.OrdinalIgnoreCase)

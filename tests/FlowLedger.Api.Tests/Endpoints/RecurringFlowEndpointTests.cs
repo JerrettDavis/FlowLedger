@@ -21,22 +21,7 @@ public sealed class RecurringFlowEndpointTests(FlowLedgerApiFactory factory) : I
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static CreateRecurringFlowRequest ValidRequest(Guid accountId, string name = "Rent") =>
-        new(
-            AccountId: accountId,
-            Name: name,
-            Amount: 1200m,
-            Currency: "USD",
-            Direction: "Debit",
-            AmountModel: "Fixed",
-            RecurrenceFrequency: "Monthly",
-            DayOfMonth: 1,
-            SecondDayOfMonth: null,
-            IntervalWeeks: null,
-            AnchorDayOfWeek: null,
-            StartDate: new DateOnly(2026, 1, 1),
-            EndDate: null,
-            CategoryId: null,
-            Counterparty: "Landlord");
+        CreateRecurringFlowRequestBuilder.A().OnAccount(accountId).Named(name).WithCounterparty("Landlord").Build();
 
     // ── Create ────────────────────────────────────────────────────────────────
 

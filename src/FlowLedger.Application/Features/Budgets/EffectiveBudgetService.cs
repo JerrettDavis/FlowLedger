@@ -16,7 +16,7 @@ public sealed record EffectiveBudget(BudgetRow Row, decimal Carried, decimal Eff
 /// (<see cref="BudgetRollover.EffectiveLimit"/>) is added to the month's limit. The carried amount is worked out once per month, stored on
 /// the budget, and reused, so alerts, Home Assistant and the budgets page all judge spending against the same figure.
 /// </summary>
-public sealed class EffectiveBudgetService(IBudgetStore store, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock)
+internal sealed class EffectiveBudgetService(IBudgetStore store, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock)
 {
     /// <summary>The tenant's budgets for <paramref name="month"/> (null = the current month).</summary>
     public async Task<IReadOnlyList<EffectiveBudget>> ListAsync(DateOnly? month = null, CancellationToken ct = default)

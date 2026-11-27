@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Dashboard;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Dashboard;
@@ -11,10 +12,13 @@ public sealed class DashboardActivityAnalyzerTests
     private static readonly Guid Acct = Guid.NewGuid();
 
     private static TransactionDto Tx(decimal amount, string merchant, int daysAgo, string dir = "Debit",
-        string status = "Posted", Guid? account = null) =>
-        new(Guid.NewGuid(), account ?? Acct, amount, "USD", dir, merchant, status, "MxAggregation",
-            Today.AddDays(-daysAgo), status == "Pending" ? null : Today.AddDays(-daysAgo),
-            null, merchant, null, null, TestClock.Instant);
+        string status = "Posted", Guid? account = null)
+    {
+        var date = Today.AddDays(-daysAgo);
+        var builder = TransactionDtoBuilder.A().OnAccount(account ?? Acct).WithAmount(amount).WithDirection(dir).Described(merchant)
+            .WithStatus(status).FromSource("MxAggregation").WithMerchant(merchant).WithCreatedAt(TestClock.Instant);
+        return (status == "Pending" ? builder.Unposted(date) : builder.On(date)).Build();
+    }
 
     [Fact]
     public void Money_in_and_out_exclude_both_legs_of_a_detected_transfer_but_count_real_activity()

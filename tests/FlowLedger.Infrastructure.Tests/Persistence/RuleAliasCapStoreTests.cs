@@ -1,4 +1,5 @@
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -101,12 +102,12 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         Guid first = default;
         for (var i = 0; i < FlowLedger.Application.Features.Goals.GoalLimits.MaxGoals; i++)
         {
-            var (id, _) = await goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(null, $"G{i}", 100m, 0m, null));
+            var (id, _) = await goals.HandleAsync(SaveGoalRequestBuilder.A().Named($"G{i}").Targeting(100m).Build());
             if (i == 0) { first = id; }
         }
 
-        var overGoal = () => goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(null, "one too many", 100m, 0m, null));
+        var overGoal = () => goals.HandleAsync(SaveGoalRequestBuilder.A().Named("one too many").Targeting(100m).Build());
         await overGoal.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
-        await goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(first, "renamed", 100m, 5m, null));
+        await goals.HandleAsync(SaveGoalRequestBuilder.A().WithId(first).Named("renamed").Targeting(100m).Saved(5m).Build());
     }
 }

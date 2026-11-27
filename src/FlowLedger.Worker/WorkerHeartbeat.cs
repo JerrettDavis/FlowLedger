@@ -1,3 +1,4 @@
+using System.Globalization;
 using Quartz;
 
 namespace FlowLedger.Worker;
@@ -23,7 +24,7 @@ internal sealed partial class WorkerHeartbeat(ISchedulerFactory schedulers, ICon
     {
         try
         {
-            if (!File.Exists(path) || !DateTimeOffset.TryParse(File.ReadAllText(path).Trim(), out var stamp))
+            if (!File.Exists(path) || !DateTimeOffset.TryParse(File.ReadAllText(path).Trim(), CultureInfo.InvariantCulture, out var stamp))
             {
                 return false;
             }

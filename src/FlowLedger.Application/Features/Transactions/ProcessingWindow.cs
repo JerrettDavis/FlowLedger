@@ -9,7 +9,7 @@ namespace FlowLedger.Application.Features.Transactions;
 /// </summary>
 public sealed record ProcessingWindowDto(int StoredTransactions, int ProcessingCap, int QuotaCap, bool Partial);
 
-public sealed class GetProcessingWindowHandler(ITransactionRepository repo)
+internal sealed class GetProcessingWindowHandler(ITransactionRepository repo)
 {
     public async Task<ProcessingWindowDto> HandleAsync(CancellationToken ct = default)
     {

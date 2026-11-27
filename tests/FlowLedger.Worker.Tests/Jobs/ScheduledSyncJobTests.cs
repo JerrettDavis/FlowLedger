@@ -1,5 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,7 +47,12 @@ public sealed class ScheduledSyncJobTests
     public async Task ScheduledSyncJob_invokes_sync_service_once_per_fire()
     {
         // Arrange
-        var syncSpy = new SyncServiceSpy(syncResult: new SyncResult(1, 5, 2, 7));
+        var syncSpy = new SyncServiceSpy(syncResult: SyncResultBuilder.A()
+                                                                 .WithAccountsUpserted(1)
+                                                                 .WithTransactionsAdded(5)
+                                                                 .WithTransactionsSkipped(2)
+                                                                 .WithRecurringFlowsAdded(7)
+                                                                 .Build());
         var job = BuildJob(syncSpy);
 
         // Act
@@ -60,7 +66,7 @@ public sealed class ScheduledSyncJobTests
     public async Task ScheduledSyncJob_respects_disabled_flag()
     {
         // Arrange — job disabled via options
-        var syncSpy = new SyncServiceSpy(syncResult: new SyncResult(0, 0, 0, 0));
+        var syncSpy = new SyncServiceSpy(syncResult: SyncResultBuilder.A().Build());
         var job = BuildJob(syncSpy, enabled: false);
 
         // Act

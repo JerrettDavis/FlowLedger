@@ -18,7 +18,7 @@ namespace FlowLedger.Application.Features.Imports;
 /// 6. Run MatchingEngine over newly imported transactions.
 /// 7. Return ImportSummaryDto with counts and per-row errors.
 /// </summary>
-public sealed class ImportTransactionsHandler
+internal sealed class ImportTransactionsHandler
 {
     // Standard date formats tried in order when the mapping supplies none.
     // Both "MMM d, yyyy" and "MMM d,yyyy" are included: real-world CSV files often split

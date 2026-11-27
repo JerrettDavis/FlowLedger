@@ -111,7 +111,7 @@ internal static class AssetMapper
     }
 }
 
-public sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
+internal sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
 {
     public async Task<IReadOnlyList<AssetDto>> HandleAsync(CancellationToken ct = default)
     {
@@ -121,7 +121,7 @@ public sealed class ListAssetsHandler(IAssetRepository assets, IAccountRepositor
     }
 }
 
-public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider clock)
+internal sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider clock)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, CancellationToken ct = default)
     {
@@ -132,7 +132,7 @@ public sealed class GetAssetHandler(IAssetRepository assets, IAccountRepository 
     }
 }
 
-public sealed class CreateAssetHandler(IAssetRepository assets, IAccountRepository accounts, ITenantContext tenant, TimeProvider clock)
+internal sealed class CreateAssetHandler(IAssetRepository assets, IAccountRepository accounts, ITenantContext tenant, TimeProvider clock)
 {
     public async Task<AssetDto> HandleAsync(CreateAssetRequest r, CancellationToken ct = default)
     {
@@ -157,7 +157,7 @@ public sealed class CreateAssetHandler(IAssetRepository assets, IAccountReposito
     }
 }
 
-public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
+internal sealed class UpdateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, UpdateAssetRequest r, CancellationToken ct = default)
     {
@@ -183,7 +183,7 @@ public sealed class UpdateAssetHandler(IAssetRepository assets, IAccountReposito
 }
 
 /// <summary>Records a new valuation (e.g. an appraisal) and keeps a linked ManualAsset account in step.</summary>
-public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider clock)
+internal sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccountRepository accounts, AssetValuationSettings settings, TimeProvider clock)
 {
     public async Task<AssetDto?> HandleAsync(Guid id, RecordValuationRequest r, CancellationToken ct = default)
     {
@@ -203,7 +203,7 @@ public sealed class RecordAssetValuationHandler(IAssetRepository assets, IAccoun
     }
 }
 
-public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
+internal sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
 {
     public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
     {
@@ -221,7 +221,7 @@ public sealed class DeactivateAssetHandler(IAssetRepository assets, IAccountRepo
 }
 
 /// <summary>Dashboard overview: holdings totals, gain/loss, equity, category breakdown and net worth.</summary>
-public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
+internal sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepository accounts, TimeProvider clock)
 {
     public async Task<AssetSummaryDto> HandleAsync(CancellationToken ct = default)
     {
@@ -256,7 +256,7 @@ public sealed class GetAssetSummaryHandler(IAssetRepository assets, IAccountRepo
 }
 
 /// <summary>Asks a valuation feed for a fresh quote and records it as a new valuation.</summary>
-public sealed class RefreshAssetValuationHandler(
+internal sealed class RefreshAssetValuationHandler(
     IAssetRepository assets,
     IAccountRepository accounts,
     IEnumerable<IAssetValuationFeed> feeds,

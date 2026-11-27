@@ -100,7 +100,12 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         ["POST /api/sheet/import"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sheet/import", ImportSheetRequestBuilder.A().OfCsv(SheetCsv(c.ServerMonth)).Replacing().Build()), HttpStatusCode.OK),
         ["POST /api/reports"] = Case(c => Json(c.B, HttpMethod.Post, "/api/reports",
             SaveReportRequestBuilder.A().Named("B Report").Described("d")
-                .WithPanels(new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build()), HttpStatusCode.Created, HttpStatusCode.OK),
+                .WithPanels(ReportPanelBuilder.A()
+                                                .WithViz(VizSpecBuilder.A()
+                                                                                                                             .WithX("merchant")
+                                                                                                                             .WithY(["t"])
+                                                                                                                             .Build())
+                                                .Build()).Build()), HttpStatusCode.Created, HttpStatusCode.OK),
         ["POST /api/query/run"] = Case(c => Json(c.B, HttpMethod.Post, "/api/query/run", new { query = "transactions | take 100" }), HttpStatusCode.OK),
         ["POST /api/connect"] = Case(c => Json(c.B, HttpMethod.Post, "/api/connect"), HttpStatusCode.OK),
         ["POST /api/sync"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sync"), HttpStatusCode.OK),

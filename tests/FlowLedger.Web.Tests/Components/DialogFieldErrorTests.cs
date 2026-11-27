@@ -25,8 +25,22 @@ public sealed class DialogFieldErrorTests : BunitContext, IAsyncLifetime
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("null", Encoding.UTF8, "application/json") });
     }
 
-    private static readonly AccountDto Checking = new(
-        Guid.NewGuid(), "Checking", "Checking", 10m, "USD", null, null, true, DateTimeOffset.UnixEpoch, null);
+    private sealed class StaticJsonHandler(string json) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+    }
+
+    private static readonly AccountDto Checking = AccountDtoBuilder.A()
+                                                          .WithId(Guid.NewGuid())
+                                                          .WithBalanceAmount(10m)
+                                                          .WithInstitution(null)
+                                                          .WithExternalAccountRef(null)
+                                                          .WithCreatedAt(DateTimeOffset.UnixEpoch)
+                                                          .WithTypeLockedByUser(false)
+                                                          .WithMode("Standard")
+                                                          .WithHideTransactions(false)
+                                                          .Build();
 
     private IRenderedComponent<MudDialogProvider> Provider()
     {
@@ -279,6 +293,39 @@ public sealed class DialogFieldErrorTests : BunitContext, IAsyncLifetime
             provider.Markup.Should().Contain("Amount must be positive.");
             provider.Find("input[aria-label='Amount']").GetAttribute("aria-invalid").Should().Be("true");
         });
+    }
+
+    [Fact]
+    public async Task Split_dialog_amount_inputs_carry_the_display_currency_symbol()
+    {
+        var provider = Provider();
+        _ = Services.GetRequiredService<IDialogService>().ShowAsync<SplitDialog>("Split", new DialogParameters<SplitDialog>
+        {
+            { x => x.Description, "Coffee" },
+            { x => x.Total, 10m },
+        });
+        await provider.WaitForAssertionAsync(() => provider.Markup.Should().Contain("Split transaction"));
+
+        provider.FindAll(".mud-input-adornment-start").Select(a => a.TextContent.Trim()).Should().Contain("$");
+    }
+
+    [Fact]
+    public async Task Asset_detail_valuation_amount_carries_the_display_currency_symbol()
+    {
+        Services.AddMudServices();
+        var assetJson = System.Text.Json.JsonSerializer.Serialize(AssetDtoBuilder.A().Build(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Services.AddSingleton(new FlowLedgerApiClient(
+            new HttpClient(new StaticJsonHandler(assetJson)) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var provider = Render<MudDialogProvider>();
+        _ = Services.GetRequiredService<IDialogService>().ShowAsync<AssetDetailDialog>("Asset", new DialogParameters<AssetDetailDialog>
+        {
+            { x => x.AssetId, Guid.NewGuid() },
+        });
+        await provider.WaitForAssertionAsync(() => provider.Markup.Should().Contain("New valuation amount"));
+
+        provider.Find("input[aria-label='New valuation amount']").ParentElement!.QuerySelector(".mud-input-adornment-start")!
+            .TextContent.Trim().Should().Be("$");
     }
 
     [Fact]

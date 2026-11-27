@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
@@ -74,7 +75,7 @@ public static partial class DependencyInjection
 
         // Real connectors default to 30 min between syncs; the free Simulated provider is unthrottled.
         var defaultMinutes = usable.Any(c => !c.Traits.HasFlag(ConnectorTraits.SeedsDemoData)) ? 30 : 0;
-        var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
+        var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], CultureInfo.InvariantCulture, out var m) ? m : defaultMinutes;
         var db = sp.GetRequiredService<FlowLedgerDbContext>();
         var connectorIds = usable.Select(c => c.Id).ToArray();
 

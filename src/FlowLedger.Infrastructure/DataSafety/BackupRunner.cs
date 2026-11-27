@@ -402,7 +402,7 @@ public sealed partial class BackupRunner
             text = text.Replace(_settings.ResticRepository!, "<repository>", StringComparison.Ordinal);
         }
 
-        return System.Text.RegularExpressions.Regex.Replace(text, @"([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s@]+@", "$1<redacted>@");
+        return System.Text.RegularExpressions.Regex.Replace(text, @"(?<scheme>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s@]+@", "${scheme}<redacted>@", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
     }
 
     private static string LastLine(string s) => s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";

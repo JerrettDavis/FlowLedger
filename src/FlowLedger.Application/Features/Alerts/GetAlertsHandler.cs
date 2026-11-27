@@ -11,7 +11,7 @@ namespace FlowLedger.Application.Features.Alerts;
 /// price increases, new subscriptions, low balances (including the account behind a goal) and goals slipping behind schedule.
 /// A goal linked to an account is judged on that account's balance and 90-day trend (see <see cref="GoalSlipRules"/>).
 /// </summary>
-public sealed class GetAlertsHandler(
+internal sealed class GetAlertsHandler(
     EffectiveBudgetService budgets, IGoalStore goals, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock,
     ITransactionRepository? transactions = null, IAccountRepository? accounts = null)
 {

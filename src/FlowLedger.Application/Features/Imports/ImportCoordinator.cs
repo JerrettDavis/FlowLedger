@@ -9,7 +9,7 @@ public sealed record AutoImportResult(string FormatId, string FormatName, IReadO
 /// webhook, duplicate merge, bill sheet refresh) are not done here: the import records a TransactionsImported event in its own
 /// transaction and the outbox consumers run them (#92).
 /// </summary>
-public sealed class ImportCoordinator(ImportTransactionsHandler handler)
+internal sealed class ImportCoordinator(ImportTransactionsHandler handler)
 {
     /// <summary>Imports already-mapped CSV rows. Throws <see cref="InvalidOperationException"/> when the import is refused.</summary>
     public Task<ImportSummaryDto> ImportAsync(ImportTransactionsCommand command, CancellationToken ct = default)

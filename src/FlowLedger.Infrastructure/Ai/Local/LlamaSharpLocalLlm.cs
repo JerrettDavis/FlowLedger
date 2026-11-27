@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.LocalAi;
@@ -81,7 +82,7 @@ internal sealed partial class LlamaSharpLocalLlm : ILocalLlm, IDisposable
                 sb.Append(piece);
             }
 
-            return int.TryParse(sb.ToString().Trim(), out var n) && n >= 1 && n <= choices.Count ? n - 1 : null;
+            return int.TryParse(sb.ToString().Trim(), CultureInfo.InvariantCulture, out var n) && n >= 1 && n <= choices.Count ? n - 1 : null;
         }
         catch (OperationCanceledException)
         {

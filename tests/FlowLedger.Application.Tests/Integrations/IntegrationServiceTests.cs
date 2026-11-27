@@ -85,10 +85,10 @@ public sealed class IntegrationServiceTests
     }
 
     private static IntegrationSaveRequest Rest(string url = "https://api.example.com/v1", IntegrationAuth auth = IntegrationAuth.None, string? credential = null, string? user = null)
-        => new("Example API", IntegrationKind.Rest, true, url, auth, user, credential, false, null, null, null);
+        => IntegrationSaveRequestBuilder.A().Named("Example API").OfKind(IntegrationKind.Rest).At(url).Authenticating(auth, user, credential).Build();
 
     private static IntegrationSaveRequest Webhook(string[]? events = null)
-        => new("Hook", IntegrationKind.Webhook, true, "https://hooks.example.com/in", IntegrationAuth.None, null, null, false, null, events, null);
+        => IntegrationSaveRequestBuilder.A().Named("Hook").OfKind(IntegrationKind.Webhook).At("https://hooks.example.com/in").ForEvents(events).Build();
 
     // ── definitions ──────────────────────────────────────────────────────────────
 
@@ -227,7 +227,7 @@ public sealed class IntegrationServiceTests
         var saved = await service.SaveAsync(null, Rest() with { Enabled = false });
         var (result, error) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().Build());
         result.Should().BeNull();
-        error.Should().Contain("off");
+        error!.Message.Should().Contain("off");
         transport.Sent.Should().BeEmpty();
     }
 
@@ -332,7 +332,7 @@ public sealed class IntegrationServiceTests
 
         var (none, error) = await service.SoapInvokeAsync(saved.Integration.Id, SoapInvokeRequestBuilder.A().Calling("Nope", "<Nope/>").Build());
         none.Should().BeNull();
-        error.Should().Contain("Nope");
+        error!.Message.Should().Contain("Nope");
     }
 
     [Fact]
@@ -345,7 +345,7 @@ public sealed class IntegrationServiceTests
 
         var (result, error) = await service.SoapInvokeAsync(saved.Integration!.Id, SoapInvokeRequestBuilder.A().Build());
         result.Should().BeNull();
-        error.Should().Contain("isn't allowed");
+        error!.Message.Should().Contain("isn't allowed");
         transport.Sent.Should().OnlyContain(r => r.Method == "GET");
     }
 }

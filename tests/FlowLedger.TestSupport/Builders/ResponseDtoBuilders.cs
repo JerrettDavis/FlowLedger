@@ -78,15 +78,25 @@ public sealed class SavedReportDtoBuilder
 
     private string _id = "r1";
     private string _name = "Monthly";
+    private string? _description = "desc";
+    private string _kind = "Report";
+    private bool _isPreset;
+    private DateTimeOffset? _createdAt = At;
+    private DateTimeOffset? _updatedAt;
     private List<ReportPanel> _panels = [new ReportPanel("Trend", "transactions | take 5", new VizSpec("line", "month", ["income"], "kind", true))];
 
     public static SavedReportDtoBuilder A() => new();
 
     public SavedReportDtoBuilder WithId(string id) { _id = id; return this; }
     public SavedReportDtoBuilder Named(string name) { _name = name; return this; }
+    public SavedReportDtoBuilder WithDescription(string? description) { _description = description; return this; }
+    public SavedReportDtoBuilder OfKind(string kind) { _kind = kind; return this; }
+    public SavedReportDtoBuilder AsPreset(bool isPreset = true) { _isPreset = isPreset; return this; }
+    public SavedReportDtoBuilder CreatedAt(DateTimeOffset? createdAt) { _createdAt = createdAt; return this; }
+    public SavedReportDtoBuilder UpdatedAt(DateTimeOffset? updatedAt) { _updatedAt = updatedAt; return this; }
     public SavedReportDtoBuilder WithPanels(params ReportPanel[] panels) { _panels = [.. panels]; return this; }
 
-    public SavedReportDto Build() => new(_id, _name, "desc", "Report", false, _panels, At, null);
+    public SavedReportDto Build() => new(_id, _name, _description, _kind, _isPreset, _panels, _createdAt, _updatedAt);
 
     public static implicit operator SavedReportDto(SavedReportDtoBuilder builder) => builder.Build();
 }

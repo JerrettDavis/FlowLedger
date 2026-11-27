@@ -6,6 +6,7 @@
   <!-- Build-time analyzers (#113); referenced for every project from Directory.Build.props. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.3.0" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.340" />
   </ItemGroup>
 
   <!-- ============================================================

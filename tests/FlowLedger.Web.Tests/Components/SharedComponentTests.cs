@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Bunit;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components.Shared;
 using FlowLedger.Web.Shared;
@@ -125,11 +126,10 @@ public sealed class SharedComponentTests : IAsyncDisposable
     [Fact]
     public void ResultTable_renders_headers_rows_and_right_aligns_numbers()
     {
-        var result = new QueryResult(
-            [new QueryColumn("Merchant", "text"), new QueryColumn("Total", "number")],
-            [[Json("\"Coffee\""), Json("1234.5")]],
-            false,
-            1);
+        var result = QueryResultBuilder.A()
+                                 .WithColumns([QueryColumnBuilder.A().WithName("Merchant").WithType("text").Build(), QueryColumnBuilder.A().WithName("Total").Build()])
+                                 .WithRows([[Json("\"Coffee\""), Json("1234.5")]])
+                                 .Build();
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result));
 
@@ -142,7 +142,7 @@ public sealed class SharedComponentTests : IAsyncDisposable
     public void ResultTable_caps_rows_and_says_so()
     {
         var rows = Enumerable.Range(0, 5).Select(i => (IReadOnlyList<object?>)new List<object?> { Json(i.ToString(CultureInfo.InvariantCulture)) }).ToList();
-        var result = new QueryResult([new QueryColumn("n", "number")], rows, false, 1);
+        var result = QueryResultBuilder.A().WithColumns([QueryColumnBuilder.A().Build()]).WithRows(rows).Build();
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result).Add(c => c.MaxRows, 2));
 
@@ -153,7 +153,7 @@ public sealed class SharedComponentTests : IAsyncDisposable
     [Fact]
     public void ResultTable_shows_No_rows_for_an_empty_result()
     {
-        var result = new QueryResult([new QueryColumn("n", "number")], [], false, 1);
+        var result = QueryResultBuilder.A().WithColumns([QueryColumnBuilder.A().Build()]).WithRows([]).Build();
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result));
 

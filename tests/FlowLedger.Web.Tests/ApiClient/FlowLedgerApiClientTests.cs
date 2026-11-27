@@ -104,7 +104,12 @@ public sealed class FlowLedgerApiClientTests
         var changed = await client.SetTransactionCategoryAsync(id, category, applyToMerchant: true, restore: r => restore = r);
 
         changed.Should().Be(2);
-        restore.Should().BeEquivalentTo([new CategoryRestoreDto(id, null, true, null), new CategoryRestoreDto(other, category, false, 0.8)]);
+        restore.Should().BeEquivalentTo([CategoryRestoreDtoBuilder.A().WithTransactionId(id).Build(), CategoryRestoreDtoBuilder.A()
+                                                                                                   .WithTransactionId(other)
+                                                                                                   .WithCategoryId(category)
+                                                                                                   .WithManual(false)
+                                                                                                   .WithConfidence(0.8)
+                                                                                                   .Build()]);
     }
 
     [Fact]
@@ -120,7 +125,7 @@ public sealed class FlowLedgerApiClientTests
             Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
         var applied = Guid.NewGuid();
 
-        (await client.RestoreCategoriesAsync(applied, [new CategoryRestoreDto(Guid.NewGuid(), null, true, null)])).Should().Be(3);
+        (await client.RestoreCategoriesAsync(applied, [CategoryRestoreDtoBuilder.A().Build()])).Should().Be(3);
 
         sentBody.Should().Contain(applied.ToString()).And.Contain("\"items\"");
     }

@@ -34,7 +34,7 @@ public static class MonthlySpend
 }
 
 /// <summary>Runs <see cref="MonthlySpend.ByCategoryQuery"/> for the current tenant.</summary>
-public sealed class GetMonthlySpendByCategoryHandler(RunQueryHandler query)
+internal sealed class GetMonthlySpendByCategoryHandler(RunQueryHandler query)
 {
     public async Task<Dictionary<string, decimal>> HandleAsync(CancellationToken ct = default)
         => await HandleAsync(null, ct);

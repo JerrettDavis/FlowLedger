@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -21,14 +22,14 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Put_budget_with_negative_limit_returns_validation_problem_keyed_budget()
+    public async Task Put_budget_with_negative_limit_returns_validation_problem_keyed_to_the_limit()
     {
         var response = await _client.PutAsJsonAsync("/api/budgets", new { category = "Food", monthlyLimit = -1m });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        doc.RootElement.GetProperty("errors").GetProperty("budget")[0].GetString()
-            .Should().Be("A category and a non-negative limit are required.");
+        doc.RootElement.GetProperty("errors").GetProperty("MonthlyLimit")[0].GetString()
+            .Should().Be("The monthly limit must be between 0 and 100,000,000.");
     }
 
     [Fact]
@@ -66,7 +67,7 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
         async Task AddSpendAsync(decimal amount, DateOnly date)
         {
             var created = await _client.PostAsJsonAsync("/api/transactions",
-                new FlowLedger.Contracts.CreateTransactionRequest(accountId, amount, "USD", "Debit", "Rollover Cafe " + date, date, null, null, null, null));
+                CreateTransactionRequestBuilder.A().OnAccount(accountId).WithAmount(amount).Described("Rollover Cafe " + date).On(date).Build());
             created.EnsureSuccessStatusCode();
             var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
             (await _client.PutAsJsonAsync($"/api/transactions/{id}/category", new { categoryId, applyToMerchant = false })).EnsureSuccessStatusCode();
@@ -105,14 +106,14 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     [Fact]
-    public async Task Put_goal_with_zero_target_returns_validation_problem_keyed_goal()
+    public async Task Put_goal_with_zero_target_returns_validation_problem_keyed_to_the_target()
     {
         var response = await _client.PutAsJsonAsync("/api/goals", new { name = "Car", targetAmount = 0m, savedAmount = 0m });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        doc.RootElement.GetProperty("errors").GetProperty("goal")[0].GetString()
-            .Should().Be("A name, a positive target and a non-negative saved amount are required.");
+        doc.RootElement.GetProperty("errors").GetProperty("TargetAmount")[0].GetString()
+            .Should().Be("The target must be greater than 0 and at most 1,000,000,000.");
     }
 
     [Fact]
@@ -216,7 +217,7 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
         {
             var date = factory.ServerToday.AddDays(-daysAgo);
             (await _client.PostAsJsonAsync("/api/transactions",
-                new FlowLedger.Contracts.CreateTransactionRequest(account, amount, "USD", "Credit", "Deposit " + daysAgo, date, null, null, null, null))).EnsureSuccessStatusCode();
+                CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(amount).WithDirection("Credit").Described("Deposit " + daysAgo).On(date).Build())).EnsureSuccessStatusCode();
         }
 
         // 90 days of history: the account gained a little each month, so its own trend is small and far from the goal.

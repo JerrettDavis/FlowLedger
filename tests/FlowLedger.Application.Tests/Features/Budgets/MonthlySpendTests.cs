@@ -18,7 +18,7 @@ public sealed class MonthlySpendTests
     [Fact]
     public void Parse_maps_rows_case_insensitively_and_coerces_numbers()
     {
-        var result = new QueryResult([], [new object?[] { "Food/Groceries", 150m }, new object?[] { null, 5.5d }, new object?[] { "Rent", null }], false, 0);
+        var result = QueryResultBuilder.A().WithElapsedMs(0).Build();
 
         var map = MonthlySpend.Parse(result);
 
@@ -49,15 +49,16 @@ public sealed class MonthlySpendTests
     [InlineData(" ", 10, false)]
     [InlineData("Food", -1, false)]
     [InlineData("Food", 100_000_001, false)]
-    public void Budget_validator_matches_legacy_rules(string category, decimal limit, bool valid)
+    public void Budget_validator_keys_each_failure_to_its_property(string category, decimal limit, bool valid)
     {
         var r = new SetBudgetRequestValidator().Validate(SetBudgetRequestBuilder.A().ForCategory(category).Limit(limit).Build());
 
         r.IsValid.Should().Be(valid);
         if (!valid)
         {
-            r.ToDictionary().Should().ContainKey("budget")
-                .WhoseValue.Should().Equal("A category and a non-negative limit are required.");
+            // Each rule keys to its own property so the API's field errors reach the right input (#211).
+            var errors = r.ToDictionary();
+            errors.Keys.Should().ContainSingle().Which.Should().Be(string.IsNullOrWhiteSpace(category) ? "Category" : "MonthlyLimit");
         }
     }
 
@@ -66,15 +67,15 @@ public sealed class MonthlySpendTests
     [InlineData("", 100, 0, false)]
     [InlineData("Car", 0, 0, false)]
     [InlineData("Car", 100, -1, false)]
-    public void Goal_validator_matches_legacy_rules(string name, decimal target, decimal saved, bool valid)
+    public void Goal_validator_keys_each_failure_to_its_property(string name, decimal target, decimal saved, bool valid)
     {
         var r = new SaveGoalRequestValidator().Validate(SaveGoalRequestBuilder.A().Named(name).Targeting(target).Saved(saved).Build());
 
         r.IsValid.Should().Be(valid);
         if (!valid)
         {
-            r.ToDictionary().Should().ContainKey("goal")
-                .WhoseValue.Should().Equal("A name, a positive target and a non-negative saved amount are required.");
+            var errors = r.ToDictionary();
+            errors.Keys.Should().ContainSingle().Which.Should().Be(name.Length == 0 ? "Name" : target <= 0 ? "TargetAmount" : "SavedAmount");
         }
     }
 }

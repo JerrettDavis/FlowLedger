@@ -21,7 +21,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static CreateAccountRequest ValidRequest(string name = "Test Checking") =>
-        new(name, "Checking", 0m, "USD", null, null);
+        CreateAccountRequestBuilder.A().Named(name).StartingAt(0m).Build();
 
     // ── Create ────────────────────────────────────────────────────────────────
 

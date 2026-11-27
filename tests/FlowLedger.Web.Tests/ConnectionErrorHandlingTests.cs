@@ -1,6 +1,7 @@
 using System.Net;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Connections;
+using FlowLedger.Web.Tests.Builders;
 using FluentAssertions;
 using MudBlazor;
 
@@ -36,7 +37,12 @@ public sealed class ConnectionErrorHandlingTests
     [MemberData(nameof(Kinds))]
     public void Badge_view_for_every_issue_kind(string kind, bool retryable, bool user, ConnectionIssueCategory cat, HealthTone tone, bool reconnect)
     {
-        var view = ConnectionHealth.Describe(new ConnectionIssueDto(kind, "m", retryable, user), Now);
+        var view = ConnectionHealth.Describe(ConnectionIssueDtoBuilder.A()
+                                                         .WithKind(kind)
+                                                         .WithMessage("m")
+                                                         .WithRetryable(retryable)
+                                                         .WithRequiresUserAction(user)
+                                                         .Build(), Now);
 
         view.Category.Should().Be(cat);
         view.Tone.Should().Be(tone);
@@ -54,7 +60,7 @@ public sealed class ConnectionErrorHandlingTests
     [Fact]
     public void Transient_detail_includes_retry_time_when_present()
     {
-        var view = ConnectionHealth.Describe(new ConnectionIssueDto("ProviderUnavailable", Retryable: true, RetryAfter: Now.AddMinutes(10)), Now);
+        var view = ConnectionHealth.Describe(ConnectionIssueDtoBuilder.A().WithRetryAfter(Now.AddMinutes(10)).Build(), Now);
         view.Detail.Should().Contain("in 10 min");
         view.RetryAt.Should().Be(Now.AddMinutes(10));
     }
@@ -71,9 +77,13 @@ public sealed class ConnectionErrorHandlingTests
     {
         var links = new List<ConnectorLinkDto>
         {
-            new("A", "ok", Now, Now, null),
-            new("B", "x", Now, Now, new ConnectionIssueDto("RateLimited", Retryable: true)),
-            new("C", "x", Now, Now, new ConnectionIssueDto("ReauthRequired", RequiresUserAction: true)),
+            ConnectorLinkDtoBuilder.A().WithInstitution("A").LinkedAt(Now).UpdatedAt(Now).Build(),
+            ConnectorLinkDtoBuilder.A().WithInstitution("B").WithStatus("x").LinkedAt(Now).UpdatedAt(Now).WithIssue(ConnectionIssueDtoBuilder.A().WithKind("RateLimited").Build()).Build(),
+            ConnectorLinkDtoBuilder.A().WithInstitution("C").WithStatus("x").LinkedAt(Now).UpdatedAt(Now).WithIssue(ConnectionIssueDtoBuilder.A()
+                                                    .WithKind("ReauthRequired")
+                                                    .WithRetryable(false)
+                                                    .WithRequiresUserAction(true)
+                                                    .Build()).Build(),
         };
         ConnectionHealth.Worst(links)!.Kind.Should().Be("ReauthRequired");
         ConnectionHealth.Worst([links[0]]).Should().BeNull();
@@ -90,7 +100,7 @@ public sealed class ConnectionErrorHandlingTests
             """);
 
         doc.Detail.Should().Be("Sign in again.");
-        doc.Extensions.Should().Be(new ProblemExtensions("ReauthRequired", false, true, 120, "Quiltt"));
+        doc.Extensions.Should().Be(ProblemExtensionsBuilder.A().Build());
         doc.Extensions!.RetryAfter.Should().Be(TimeSpan.FromMinutes(2));
     }
 
@@ -109,7 +119,13 @@ public sealed class ConnectionErrorHandlingTests
     [Fact]
     public void Exception_exposes_typed_extensions()
     {
-        var ex = new ApiClientException("m", HttpStatusCode.TooManyRequests, problem: new ProblemExtensions("RateLimited", true, false, 30, "SimpleFIN"));
+        var ex = new ApiClientException("m", HttpStatusCode.TooManyRequests, problem: ProblemExtensionsBuilder.A()
+                                                                                                  .WithIssueKind("RateLimited")
+                                                                                                  .WithRetryable(true)
+                                                                                                  .WithRequiresUserAction(false)
+                                                                                                  .WithRetryAfterSeconds(30)
+                                                                                                  .WithProvider("SimpleFIN")
+                                                                                                  .Build());
         ex.IssueKind.Should().Be("RateLimited");
         ex.Retryable.Should().BeTrue();
         ex.RequiresUserAction.Should().BeFalse();
@@ -167,7 +183,13 @@ public sealed class ConnectionErrorHandlingTests
     // ---- toast helper ----
 
     private static ApiClientException Problem(string kind, bool retryable, bool user, int? retryAfter = null)
-        => new("server said no", HttpStatusCode.Conflict, problem: new ProblemExtensions(kind, retryable, user, retryAfter, "P"));
+        => new("server said no", HttpStatusCode.Conflict, problem: ProblemExtensionsBuilder.A()
+                                                                               .WithIssueKind(kind)
+                                                                               .WithRetryable(retryable)
+                                                                               .WithRequiresUserAction(user)
+                                                                               .WithRetryAfterSeconds(retryAfter)
+                                                                               .WithProvider("P")
+                                                                               .Build());
 
     [Fact]
     public void Toast_for_user_action_offers_reconnect_as_warning()

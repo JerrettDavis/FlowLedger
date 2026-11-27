@@ -5,6 +5,7 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -212,7 +213,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         var (_, log, db) = await OpenLoggedAsync(tenant);
         await using (db)
         {
-            var pipeline = BuildPipeline(db, tenant, new SyncResult(0, 0, 0, 0, ChangedTransactionIds: []));
+            var pipeline = BuildPipeline(db, tenant, SyncResultBuilder.A().WithChangedTransactionIds([]).Build());
             log.Sql.Clear();
 
             await pipeline.SyncAsync();
@@ -262,7 +263,10 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         var (_, log, db) = await OpenLoggedAsync(tenant);
         await using (db)
         {
-            var pipeline = BuildPipeline(db, tenant, new SyncResult(0, 3, 0, 0, ChangedTransactionIds: newIds));
+            var pipeline = BuildPipeline(db, tenant, SyncResultBuilder.A()
+                                                                     .WithTransactionsAdded(3)
+                                                                     .WithChangedTransactionIds(newIds)
+                                                                     .Build());
             log.Sql.Clear();
 
             await pipeline.SyncAsync();

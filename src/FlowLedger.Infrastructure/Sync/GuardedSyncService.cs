@@ -106,7 +106,7 @@ internal sealed class GuardedSyncService : IFinancialSyncService
 /// <summary>A thread-safe set of keys currently in flight; a key is present only between <see cref="TryAdd"/> and <see cref="Remove"/>.</summary>
 internal sealed class InFlightSet<T> where T : notnull
 {
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly HashSet<T> _items = [];
 
     public int Count

@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.Imports;
 /// <summary>
 /// Returns match suggestions (transactions with NeedsReview status) for the current tenant.
 /// </summary>
-public sealed class ListMatchSuggestionsHandler
+internal sealed class ListMatchSuggestionsHandler
 {
     private readonly ITransactionRepository _txRepo;
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;

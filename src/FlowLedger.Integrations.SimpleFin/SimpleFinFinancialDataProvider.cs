@@ -138,8 +138,8 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
         }
 
         var parts = cursor.Value.Split(BackfillMarker, 2);
-        var days = parts.Length == 2 && int.TryParse(parts[1], out var d) ? d : 0;
-        return (DateOnly.TryParse(parts[0], out var date) ? date : null, days);
+        var days = parts.Length == 2 && int.TryParse(parts[1], CultureInfo.InvariantCulture, out var d) ? d : 0;
+        return (DateOnly.TryParse(parts[0], CultureInfo.InvariantCulture, out var date) ? date : null, days);
     }
 
     private static string FormatCursor(DateOnly? date, int backfilledDays)
@@ -152,7 +152,7 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
     private Task<bool> EnsureBackfilledAsync(SfResponse body, CancellationToken ct)
     {
         var task = _backfill ??= BackfillAsync(body, _fetchedAt, _fetchedDays, Window, CancellationToken.None);
-        task.ContinueWith(t => Interlocked.CompareExchange(ref _backfill, null, t), CancellationToken.None,
+        _ = task.ContinueWith(t => Interlocked.CompareExchange(ref _backfill, null, t), CancellationToken.None,
             TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
         return task.WaitAsync(ct);
     }
@@ -179,7 +179,7 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
         // The shared fetch must not run under the first caller's token: cancelling that caller would otherwise leave a cancelled task
         // cached for every later caller. Each caller waits with its own token instead, and a failed fetch is dropped from the cache (#128).
         var task = _cached ??= FetchCoreAsync(CancellationToken.None);
-        task.ContinueWith(t => Interlocked.CompareExchange(ref _cached, null, t), CancellationToken.None,
+        _ = task.ContinueWith(t => Interlocked.CompareExchange(ref _cached, null, t), CancellationToken.None,
             TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
         return task.WaitAsync(ct);
     }

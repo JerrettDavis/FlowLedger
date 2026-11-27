@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.Imports;
 /// <summary>
 /// Removes a match link between an actual transaction and a planned occurrence.
 /// </summary>
-public sealed class UnmatchTransactionHandler
+internal sealed class UnmatchTransactionHandler
 {
     private readonly ITransactionRepository _txRepo;
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;

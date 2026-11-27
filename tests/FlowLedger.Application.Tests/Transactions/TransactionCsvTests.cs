@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
@@ -6,8 +7,8 @@ namespace FlowLedger.Application.Tests.Transactions;
 public sealed class TransactionCsvTests
 {
     private static TransactionDto Tx(string desc, string? merchant = null, string? notes = null) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), 12.5m, "USD", "Debit", desc, "Posted", "Manual",
-            new DateOnly(2026, 11, 3), null, null, merchant, notes, null, DateTimeOffset.UnixEpoch);
+        TransactionDtoBuilder.A().WithAmount(12.5m).Described(desc).FromSource("Manual").Unposted(new DateOnly(2026, 11, 3))
+            .WithMerchant(merchant).WithNotes(notes).WithCreatedAt(DateTimeOffset.UnixEpoch).Build();
 
     [Fact]
     public void Quotes_commas_and_embedded_quotes()

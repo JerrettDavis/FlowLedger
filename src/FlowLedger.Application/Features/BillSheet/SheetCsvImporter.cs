@@ -152,8 +152,8 @@ internal static class SheetCsvImporter
 
     private static int? DueDay(string s)
     {
-        var m = Regex.Match(s, @"\d+");
-        return m.Success && int.TryParse(m.Value, out var d) && d is >= 1 and <= 31 ? d : null;
+        var m = Regex.Match(s, @"\d+", RegexOptions.None, TimeSpan.FromSeconds(1));
+        return m.Success && int.TryParse(m.Value, CultureInfo.InvariantCulture, out var d) && d is >= 1 and <= 31 ? d : null;
     }
 
     private static decimal? Money(string s)

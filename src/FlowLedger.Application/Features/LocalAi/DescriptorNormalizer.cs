@@ -9,20 +9,20 @@ namespace FlowLedger.Application.Features.LocalAi;
 /// </summary>
 internal static partial class DescriptorNormalizer
 {
-    [GeneratedRegex(@"^\s*(?:(?:sq|tst|pp|paypal|gglpay|google pay|apple pay|amzn mktp|pos|debit|credit|purchase|recurring|checkcard|check card|visa|ach|web|pmt|payment to)\s*[\*\-:#]+\s*|(?:pos|debit|purchase|recurring|checkcard|check card)\s+)+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*(?:(?:sq|tst|pp|paypal|gglpay|google pay|apple pay|amzn mktp|pos|debit|credit|purchase|recurring|checkcard|check card|visa|ach|web|pmt|payment to)\s*[\*\-:#]+\s*|(?:pos|debit|purchase|recurring|checkcard|check card)\s+)+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Prefixes();
 
     // Order/reference codes such as "2K4LP9" mix letters and digits; dropping them whole avoids stray one-letter fragments.
-    [GeneratedRegex(@"\b(?=[a-z]*\d)(?=\d*[a-z])[a-z\d]{5,}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?=[a-z]*\d)(?=\d*[a-z])[a-z\d]{5,}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Codes();
 
-    [GeneratedRegex(@"[\d#\*_/\\\.,;:@!\?\(\)\[\]\{\}\|~`""'<>=+%&\-]+", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"[\d#\*_/\\\.,;:@!\?\(\)\[\]\{\}\|~`""'<>=+%&\-]+", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Noise();
 
-    [GeneratedRegex(@"\b(?:inc|llc|ltd|co|corp|corporation|company|www|com|net|org)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:inc|llc|ltd|co|corp|corporation|company|www|com|net|org)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Suffixes();
 
-    [GeneratedRegex(@"\s+[a-z]{2}\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\s+[a-z]{2}\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex TrailingState();
 
     /// <summary>Lower-case, prefix/digit/punctuation-free, single-spaced text; empty when nothing meaningful is left.</summary>

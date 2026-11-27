@@ -15,7 +15,7 @@ public sealed record GoalStatusRow(
     Guid? LinkedAccountId, string? LinkedAccountName, decimal? AccountMonthlyTrend);
 
 /// <summary>Lists the tenant's goals with their progress resolved against linked accounts (#70).</summary>
-public sealed class GetGoalStatusesHandler(
+internal sealed class GetGoalStatusesHandler(
     IGoalStore store, IAccountRepository accounts, ITransactionRepository transactions, ITenantContext tenant, TimeProvider clock)
 {
     public async Task<IReadOnlyList<GoalStatusRow>> HandleAsync(CancellationToken ct = default)

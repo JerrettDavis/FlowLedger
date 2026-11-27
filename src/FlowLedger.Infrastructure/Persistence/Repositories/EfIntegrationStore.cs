@@ -47,9 +47,9 @@ internal sealed class EfIntegrationStore : IIntegrationStore
     {
         Guard(tenantId);
         // ToLower() is translated to SQL lower() by EF; the culture-aware analyzers do not apply to a server-side expression.
-#pragma warning disable CA1304, CA1311
+#pragma warning disable CA1304, CA1311, MA0011
         var rows = await _db.Integrations.AsNoTracking().OrderBy(r => r.Name.ToLower()).ThenBy(r => r.CreatedUtc).ToListAsync(ct);
-#pragma warning restore CA1304, CA1311
+#pragma warning restore CA1304, CA1311, MA0011
         return rows.Select(Read).ToList();
     }
 

@@ -6,6 +6,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.SharedKernel;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -194,7 +195,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
         var other = TestTenantContext.New();
         var sut = Build(household, other, Connector("SimpleFIN", ["h-1"]));
 
-        (await sut.Service.SyncAsync()).Should().Be(new SyncResult(0, 0, 0, 0));
+        (await sut.Service.SyncAsync()).Should().Be(SyncResultBuilder.A().Build());
         (await sut.Links.ListAsync()).Should().BeEmpty();
 
         var viaConnect = () => sut.Service.ConnectAsync();

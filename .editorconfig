@@ -47,6 +47,34 @@ dotnet_diagnostic.CA1711.severity = suggestion
 dotnet_diagnostic.CA1720.severity = suggestion
 dotnet_diagnostic.CA1001.severity = suggestion
 
+# ---------------------------------------------------------------------------
+# Meziantou.Analyzer (#113): pinned in Directory.Packages.props, referenced for production projects only (Directory.Build.props).
+# A CURATED set. Measured against this tree (3.0.340): the rules below are ON because each protects a runtime property and the tree is
+# clean for them; every other rule is parked at none in eng/meziantou.globalconfig (the package's none.editorconfig plus the ON list), and
+# the rules that actually report here carry their own reason below, which overrides that file. Flip one on only together with its cleanup.
+#   ON  MA0009 regex match timeout (ReDoS)            MA0011 IFormatProvider / culture on Parse and ToLower
+#       MA0023 RegexOptions.ExplicitCapture           MA0054 keep the inner exception when rethrowing
+#       MA0061 override must not change defaults      MA0074 explicit StringComparison on path matching
+#       MA0132 no implicit DateTime -> DateTimeOffset MA0134 observe the result of async calls
+#       MA0158 System.Threading.Lock for lock gates   MA0008 StructLayout on structs
+# ---------------------------------------------------------------------------
+# Task.ConfigureAwait: ASP.NET Core, the Worker and Blazor Server code here do not rely on a SynchronizationContext; ~1,700 sites of noise.
+dotnet_diagnostic.MA0004.severity = none
+# File name must match type name: feature files group a request/response record set with its handler on purpose (~900 sites).
+dotnet_diagnostic.MA0048.severity = none
+# Prefer a collection abstraction in signatures: List/Dictionary on DTOs and records is the serialised contract; changing it changes the API surface.
+dotnet_diagnostic.MA0016.severity = none
+# string == vs String.Equals: ordinal == is intended and clear; churn with no behaviour change.
+dotnet_diagnostic.MA0006.severity = none
+# Missing IEqualityComparer on dictionaries/Contains: keys are ids and ordinal strings; the ordinal default is intended.
+dotnet_diagnostic.MA0002.severity = none
+# Method too long: a size heuristic with no runtime effect, left to review.
+dotnet_diagnostic.MA0051.severity = none
+# TODO comments: tracked as issues, not build failures.
+dotnet_diagnostic.MA0026.severity = none
+# EventHandler<T> for events: the Blazor services expose Action change notifications that components subscribe to; reshaping them touches every component for no behaviour change.
+dotnet_diagnostic.MA0046.severity = none
+
 # EF Core migrations are tool-generated; constant array arguments are the scaffolder's output.
 [**/Migrations/*.cs]
 dotnet_diagnostic.CA1861.severity = none

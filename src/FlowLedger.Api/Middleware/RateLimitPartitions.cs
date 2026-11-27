@@ -151,7 +151,7 @@ public static class RateLimitPartitions
         retryAfter is { } t && t > TimeSpan.Zero ? (int)Math.Ceiling(t.TotalSeconds) : DefaultRetryAfterSeconds;
 
     private static bool IsProbe(HttpContext http) =>
-        http.Request.Path.StartsWithSegments("/health") || http.Request.Path.StartsWithSegments("/alive");
+        http.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase) || http.Request.Path.StartsWithSegments("/alive", StringComparison.OrdinalIgnoreCase);
 
     private static bool PresentedRejectedCredentials(HttpContext http)
     {
@@ -183,7 +183,7 @@ internal sealed class TenantPartitionRegistry
 {
     public static readonly TimeSpan IdleAfter = TimeSpan.FromMinutes(2);
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly Dictionary<string, DateTimeOffset> _lastSeen = new(StringComparer.Ordinal);
 
     public int Count

@@ -7,7 +7,7 @@ using FlowLedger.SharedKernel;
 namespace FlowLedger.Application.Features.Accounts;
 
 /// <summary>Returns all active accounts for the current tenant.</summary>
-public sealed class ListAccountsHandler
+internal sealed class ListAccountsHandler
 {
     private readonly IAccountRepository _repo;
 
@@ -24,7 +24,7 @@ public sealed class ListAccountsHandler
 }
 
 /// <summary>Returns a single account by ID, or null if not found.</summary>
-public sealed class GetAccountHandler
+internal sealed class GetAccountHandler
 {
     private readonly IAccountRepository _repo;
 
@@ -39,7 +39,7 @@ public sealed class GetAccountHandler
 }
 
 /// <summary>Creates a new account for the current tenant.</summary>
-public sealed class CreateAccountHandler
+internal sealed class CreateAccountHandler
 {
     private readonly IAccountRepository _repo;
     private readonly ITenantContext _tenant;
@@ -79,7 +79,7 @@ public sealed class CreateAccountHandler
 }
 
 /// <summary>Renames an existing account.</summary>
-public sealed class UpdateAccountHandler
+internal sealed class UpdateAccountHandler
 {
     private readonly IAccountRepository _repo;
 
@@ -108,7 +108,7 @@ public sealed class UpdateAccountHandler
 /// auto-assigned "Transfer" categories, which are persisted: those are cleared and re-derived so card/loan payments become
 /// (or stop being) transfers under the new type. Categories the user chose by hand are never touched.
 /// </summary>
-public sealed class ChangeAccountTypeHandler
+internal sealed class ChangeAccountTypeHandler
 {
     private readonly IAccountRepository _repo;
     private readonly CategorizationService _categorization;
@@ -143,7 +143,7 @@ public sealed class ChangeAccountTypeHandler
 }
 
 /// <summary>Changes an account's tracking settings: enabled, mode (standard/holding) and hidden transactions.</summary>
-public sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
+internal sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
 {
     public async Task<AccountDto?> HandleAsync(Guid id, AccountSettingsRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
@@ -161,7 +161,7 @@ public sealed class UpdateAccountSettingsHandler(IAccountRepository repo)
 }
 
 /// <summary>Deactivates an account (soft delete).</summary>
-public sealed class DeactivateAccountHandler
+internal sealed class DeactivateAccountHandler
 {
     private readonly IAccountRepository _repo;
 

@@ -89,7 +89,13 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     public async Task Save_update_run_and_delete_a_view()
     {
         var request = SaveReportRequestBuilder.A().Named("Coffee").Described("d")
-            .WithPanels(new ReportPanel("Coffee spend", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build();
+            .WithPanels(ReportPanelBuilder.A()
+                                        .WithTitle("Coffee spend")
+                                        .WithViz(VizSpecBuilder.A()
+                                                                                                                                .WithX("merchant")
+                                                                                                                                .WithY(["t"])
+                                                                                                                                .Build())
+                                        .Build()).Build();
         var created = await _client.PostAsJsonAsync("/api/reports", request);
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var saved = (await created.Content.ReadFromJsonAsync<SavedReportDto>())!;
@@ -107,10 +113,15 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Save_rejects_unparsable_queries_and_multi_panel_views()
     {
-        var bad = SaveReportRequestBuilder.A().Named("Bad").WithPanels(new ReportPanel("p", "transactions | wherr x", new VizSpec("table"))).Build();
+        var bad = SaveReportRequestBuilder.A().Named("Bad").WithPanels(ReportPanelBuilder.A()
+                                                                                   .WithQuery("transactions | wherr x")
+                                                                                   .WithViz(VizSpecBuilder.A()
+                                                                                                                                  .WithKind("table")
+                                                                                                                                  .Build())
+                                                                                   .Build()).Build();
         (await _client.PostAsJsonAsync("/api/reports", bad)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        var panel = new ReportPanel("p", "transactions | take 1", new VizSpec("table"));
+        var panel = ReportPanelBuilder.A().WithQuery("transactions | take 1").WithViz(VizSpecBuilder.A().WithKind("table").Build()).Build();
         var twoPanelView = SaveReportRequestBuilder.A().Named("Two").WithPanels(panel, panel).Build();
         (await _client.PostAsJsonAsync("/api/reports", twoPanelView)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -118,7 +129,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Saved_reports_are_tenant_isolated_and_presets_are_not_deletable()
     {
-        var panel = new ReportPanel("p", "transactions | take 1", new VizSpec("table"));
+        var panel = ReportPanelBuilder.A().WithQuery("transactions | take 1").WithViz(VizSpecBuilder.A().WithKind("table").Build()).Build();
         var saved = (await (await _client.PostAsJsonAsync("/api/reports", SaveReportRequestBuilder.A().Named("Mine").WithPanels(panel).Build()))
             .Content.ReadFromJsonAsync<SavedReportDto>())!;
 

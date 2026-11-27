@@ -51,18 +51,23 @@ Notes:
 - PRs must pass `dotnet format --verify-no-changes` in CI.
 - The build runs the .NET analyzers at `AnalysisMode=Recommended` with warnings as errors, plus unused usings (IDE0005), file-scoped namespaces (IDE0161) and banned APIs (`BannedSymbols.txt`, rule RS0030; every entry states why). Logging goes through `[LoggerMessage]` source-generated methods (CA1848).
 - Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()`, `new XOptions { }` or `?? new XOptions()` anywhere in `src` (an architecture test enforces it; the two allowlisted bootstrap sites say why).
+- Tests build contracts (Contracts DTOs and requests, Application request/DTO records, the Web client DTOs) through the builders in `tests/FlowLedger.TestSupport/Builders` (`tests/FlowLedger.Web.Tests/Builders` for Web-only types), never positionally, so a new field changes one builder file. `PositionalDtoConstructionTests` enforces it; its allow-list may only shrink.
+- Application `*Handler` classes are `internal` (the Api, Worker, Infrastructure and tests see them through `InternalsVisibleTo`); only Contracts and the ports are public. `PublicApiSurfaceTests` pins the public surface and caps the Application public type count.
 - `TimeProvider` is a required argument in Domain and Application (no `TimeProvider.System` there); connectors take one so tests pass `TestClock.Provider`. Tests never read the wall clock (the ratchet baseline is empty).
 
-### Third-party analyzers (#113): measured, not adopted yet
+### Meziantou.Analyzer (#113)
 
-Meziantou.Analyzer 3.0 was measured against the whole solution at its defaults (2026-11): about 3,200 distinct warnings, almost all from rules that
-duplicate or contradict decisions already made: MA0004 (ConfigureAwait, ~1,680), MA0048 (file name equals type name, ~840), MA0016 (collection
-abstractions, ~180), MA0006 and MA0002 (string comparison, ~290, close to CA1309/CA1307/CA1310) and MA0051 (method length, ~96).
-A curated set without those is about 100 warnings (MA0009 regex without a match timeout, 42 sites; MA0011 missing `IFormatProvider`, 29; MA0158
-`System.Threading.Lock`, 8; plus MA0074, MA0061, MA0023, MA0046, MA0134, MA0054), which is under the 200 bar the issue set. It was **not** turned on:
-the build treats warnings as errors, so adopting it means fixing every one of those sites in the same change. MA0009 has no CA equivalent and is the
-one worth having (user-influenced regex input). Next step, owner's call: add `Meziantou.Analyzer` to non-test projects, set the excluded rules above
-(and MA0026/MA0061 noise) to `none` in `.editorconfig`, and fix the roughly 100 sites. Roslynator was not measured.
+`Meziantou.Analyzer` is pinned in `Directory.Packages.props` and referenced for every non-test project from `Directory.Build.props` (tests are excluded:
+fixture code parses ISO literals and builds throwaway regexes). It runs as a curated set, not at its defaults (about 3,200 warnings, almost all from rules
+that duplicate or contradict earlier decisions). The `.editorconfig` block headed "Meziantou.Analyzer (#113)" lists what is on and, for every rule that
+reports in this tree but is parked at `none`, the reason: MA0004 (ConfigureAwait), MA0048 (file name equals type name), MA0016 (collection
+abstractions), MA0006 and MA0002 (string comparison, covered by CA1309/CA1307/CA1310), MA0051 (method length), MA0026 (TODO comments), MA0046
+(event delegate shape).
+
+On, and clean: MA0009 regex match timeout (every `Regex`/`[GeneratedRegex]` takes a one-second timeout), MA0011 `IFormatProvider`/culture on `Parse` and
+`ToLower` (config and wire values parse with `CultureInfo.InvariantCulture`), MA0023 `ExplicitCapture` or named groups, MA0074, MA0061, MA0054, MA0132,
+MA0134, MA0158 (`System.Threading.Lock` for lock gates) and MA0008. Turning another rule on means fixing all of its sites in the same change; a package
+bump that starts reporting a new rule must park it (with a reason) or fix it. Roslynator was not measured.
 
 ### Suppression policy
 

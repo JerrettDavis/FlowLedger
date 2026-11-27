@@ -74,7 +74,7 @@ public sealed record TransactionFingerprint
         return WhitespaceRun.Replace(raw.Trim(), " ").ToUpperInvariant();
     }
 
-    private static readonly System.Text.RegularExpressions.Regex WhitespaceRun = new(@"\s+");
+    private static readonly System.Text.RegularExpressions.Regex WhitespaceRun = new(@"\s+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
 
     public override string ToString() => Value;
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using FlowLedger.Application.Abstractions;
@@ -165,25 +166,25 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
 
     /// <summary>Upper-cases and drops ordinal suffixes ("71st" and "71" both become "71") so names compare equal.</summary>
     internal static string NormalizeStreet(string street) =>
-        OrdinalRegex().Replace(street.ToUpperInvariant(), "$1");
+        OrdinalRegex().Replace(street.ToUpperInvariant(), "${n}");
 
     /// <summary>Reads the headline "$1,234,567" market value that follows the MarketValueHeader icon.</summary>
     internal static decimal? ParseMarketValue(string html)
     {
         var m = MarketValueRegex().Match(html);
-        return m.Success && decimal.TryParse(m.Groups["v"].Value.Replace(",", ""), out var v) ? v : null;
+        return m.Success && decimal.TryParse(m.Groups["v"].Value.Replace(",", ""), CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 
-    [GeneratedRegex(@"\b(\d+)(?:ST|ND|RD|TH)\b")]
+    [GeneratedRegex(@"\b(?<n>\d+)(?:ST|ND|RD|TH)\b", RegexOptions.None, 1000)]
     private static partial Regex OrdinalRegex();
 
-    [GeneratedRegex(@"\b\d{5}\b")]
+    [GeneratedRegex(@"\b\d{5}\b", RegexOptions.None, 1000)]
     private static partial Regex ZipRegex();
 
-    [GeneratedRegex("\"TaxYear\":\\d+,\"AccountNo\":\"(?<acct>[^\"]+)\".*?\"PropertyZipCode\":\"(?<zip>[^\"]*)\".*?\"FullPropertyStreet\":\"(?<street>[^\"]*)\"", RegexOptions.Singleline)]
+    [GeneratedRegex("\"TaxYear\":\\d+,\"AccountNo\":\"(?<acct>[^\"]+)\".*?\"PropertyZipCode\":\"(?<zip>[^\"]*)\".*?\"FullPropertyStreet\":\"(?<street>[^\"]*)\"", RegexOptions.Singleline, 1000)]
     private static partial Regex RowRegex();
 
-    [GeneratedRegex(@"id=""MarketValueHeader""[^>]*></i>\s*\$(?<v>[\d,]+(?:\.\d+)?)")]
+    [GeneratedRegex(@"id=""MarketValueHeader""[^>]*></i>\s*\$(?<v>[\d,]+(?:\.\d+)?)", RegexOptions.None, 1000)]
     private static partial Regex MarketValueRegex();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tulsa assessor skipped: asset has no usable '{Attr}' street address.")]

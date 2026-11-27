@@ -25,7 +25,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static CreateCategoryRequest ValidRequest(string path = "food", string display = "Food") =>
-        new(path, display, null);
+        CreateCategoryRequestBuilder.A().AtPath(path).Named(display).Build();
 
     // ── Create ────────────────────────────────────────────────────────────────
 
