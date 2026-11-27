@@ -254,16 +254,8 @@ public sealed class SourceRuleTests
 
     private const int MaxSourceLines = 500;
 
-    /// <summary>Files over the limit today, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list.</summary>
-    private static readonly Dictionary<string, int> OversizedCeilings = new()
-    {
-        ["src/FlowLedger.Application/Features/Imports/ImportNormalizer.cs"] = 747,
-        ["src/FlowLedger.Integrations.Simulated/SimulatedDataFactory.cs"] = 687,
-        ["src/FlowLedger.Application/Features/Query/QueryParser.cs"] = 611,
-        ["src/FlowLedger.Application/Features/RecurringFlows/RecurringFlowDetector.cs"] = 538,
-        ["src/FlowLedger.Application/Features/Forecasting/ForecastEngine.cs"] = 522,
-        ["src/FlowLedger.Domain/Aggregates/Transaction.cs"] = 503,
-    };
+    /// <summary>Files over the limit, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list. Empty today (#103): keep it empty.</summary>
+    private static readonly Dictionary<string, int> OversizedCeilings = new();
 
     [Fact]
     public void Source_files_stay_under_the_size_limit_or_hold_a_shrinking_ceiling()
