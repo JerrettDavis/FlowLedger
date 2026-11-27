@@ -76,7 +76,7 @@ jobs:
 
       # ── Generate SBOM ────────────────────────────────────────────────────
       - name: Generate SBOM (Syft)
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        uses: anchore/sbom-action@dfcb83b97731532d72be422cbc51ee64adb6fd56 # v0.24.4
         with:
           image:             ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}:${{ steps.meta.outputs.tag }}
           artifact-name:     sbom-${{ matrix.service }}.spdx.json
@@ -124,7 +124,7 @@ jobs:
       # Findings show up under Security > Code scanning (one category per image). Forked PRs get a read-only token, so skip there.
       - name: Upload Trivy SARIF to code scanning
         if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category:   trivy-${{ matrix.service }}
@@ -208,7 +208,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
 
       # Keyless: the signature's certificate binds this workflow run (repo, ref, workflow) via GitHub OIDC; no key to manage.
       - name: Sign image by digest (cosign keyless)
@@ -218,7 +218,7 @@ jobs:
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Generate SBOM of the pushed image
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        uses: anchore/sbom-action@dfcb83b97731532d72be422cbc51ee64adb6fd56 # v0.24.4
         with:
           image:         ghcr.io/${{ steps.owner.outputs.lc }}/${{ matrix.image }}@${{ steps.push.outputs.digest }}
           output-file:   sbom-${{ matrix.service }}.spdx.json
