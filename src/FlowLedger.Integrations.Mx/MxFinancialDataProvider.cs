@@ -27,12 +27,19 @@ public sealed partial class MxFinancialDataProvider : IFinancialDataProvider, IM
     // Account currency by packed account id, so a transaction without its own currency inherits it instead of defaulting to USD (#124).
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _currencyByAccount = new(StringComparer.Ordinal);
 
+    private readonly IReadOnlyList<string>? _webhookSyncEventTypes;
+
+    /// <inheritdoc />
+    public bool IsWebhookSyncTrigger(string? eventType) => MxWebhookEvents.IsSyncTrigger(eventType, _webhookSyncEventTypes);
+
     internal MxFinancialDataProvider(
         MxApiClient client,
         MxWebhookVerifier webhookVerifier,
         IOptions<MxProviderOptions> options,
-        ILogger<MxFinancialDataProvider> logger)
+        ILogger<MxFinancialDataProvider> logger,
+        IReadOnlyList<string>? webhookSyncEventTypes = null)
     {
+        _webhookSyncEventTypes = webhookSyncEventTypes;
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _webhookVerifier = webhookVerifier ?? throw new ArgumentNullException(nameof(webhookVerifier));
         ArgumentNullException.ThrowIfNull(options);

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace FlowLedger.Integrations.Abstractions;
+namespace FlowLedger.Integrations.Mx;
 
 /// <summary>
 /// Configuration section "Mx" — controls whether the real MX provider is active
@@ -9,9 +9,9 @@ namespace FlowLedger.Integrations.Abstractions;
 /// Default state: <see cref="Enabled"/> = false.
 /// In this state no API key is required and the Simulated provider is used.
 /// Setting <see cref="Enabled"/> = true without supplying all required fields
-/// causes a fast-fail at startup via <see cref="FinancialProviderOptionsValidator"/>.
+/// causes a fast-fail at startup via <see cref="MxCredentialsOptionsValidator"/>.
 /// </summary>
-public sealed class FinancialProviderOptions
+public sealed class MxCredentialsOptions
 {
     /// <summary>Configuration section key used by <c>IConfiguration.GetSection</c>.</summary>
     public const string SectionName = "Mx";
@@ -42,13 +42,13 @@ public sealed class FinancialProviderOptions
 }
 
 /// <summary>
-/// Validates <see cref="FinancialProviderOptions"/> at startup.
+/// Validates <see cref="MxCredentialsOptions"/> at startup.
 /// Fails fast ONLY when <c>Enabled = true</c> and a required field is absent.
 /// When disabled, all credential fields are optional.
 /// </summary>
-public sealed class FinancialProviderOptionsValidator : IValidateOptions<FinancialProviderOptions>
+public sealed class MxCredentialsOptionsValidator : IValidateOptions<MxCredentialsOptions>
 {
-    public ValidateOptionsResult Validate(string? name, FinancialProviderOptions options)
+    public ValidateOptionsResult Validate(string? name, MxCredentialsOptions options)
     {
         if (!options.Enabled)
         {
@@ -59,22 +59,22 @@ public sealed class FinancialProviderOptionsValidator : IValidateOptions<Financi
 
         if (string.IsNullOrWhiteSpace(options.ApiKey))
         {
-            failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.ApiKey)} is required when Mx:Enabled is true.");
+            failures.Add($"{MxCredentialsOptions.SectionName}:{nameof(MxCredentialsOptions.ApiKey)} is required when Mx:Enabled is true.");
         }
 
         if (string.IsNullOrWhiteSpace(options.ClientId))
         {
-            failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.ClientId)} is required when Mx:Enabled is true.");
+            failures.Add($"{MxCredentialsOptions.SectionName}:{nameof(MxCredentialsOptions.ClientId)} is required when Mx:Enabled is true.");
         }
 
         if (string.IsNullOrWhiteSpace(options.BaseUrl))
         {
-            failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.BaseUrl)} is required when Mx:Enabled is true.");
+            failures.Add($"{MxCredentialsOptions.SectionName}:{nameof(MxCredentialsOptions.BaseUrl)} is required when Mx:Enabled is true.");
         }
 
         if (string.IsNullOrWhiteSpace(options.WebhookSecret))
         {
-            failures.Add($"{FinancialProviderOptions.SectionName}:{nameof(FinancialProviderOptions.WebhookSecret)} is required when Mx:Enabled is true.");
+            failures.Add($"{MxCredentialsOptions.SectionName}:{nameof(MxCredentialsOptions.WebhookSecret)} is required when Mx:Enabled is true.");
         }
 
         return failures.Count > 0

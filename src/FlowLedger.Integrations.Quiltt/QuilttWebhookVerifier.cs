@@ -59,11 +59,10 @@ internal sealed class QuilttWebhookVerifier
             throw new InvalidWebhookSignatureException("Quiltt webhook timestamp is outside the allowed window.");
         }
 
-        var expected = Encoding.UTF8.GetBytes(Sign(t, rawBody));
+        var expected = Sign(t, rawBody);
         foreach (var candidate in v1)
         {
-            var presented = Encoding.UTF8.GetBytes(candidate);
-            if (presented.Length == expected.Length && CryptographicOperations.FixedTimeEquals(presented, expected))
+            if (HmacWebhookSignature.Matches(expected, candidate))
             {
                 return;
             }
@@ -78,6 +77,6 @@ internal sealed class QuilttWebhookVerifier
         var payload = new byte[prefix.Length + rawBody.Length];
         prefix.CopyTo(payload, 0);
         rawBody.CopyTo(payload.AsSpan(prefix.Length));
-        return Convert.ToBase64String(HMACSHA256.HashData(_secret, payload));
+        return HmacWebhookSignature.ComputeBase64(_secret, payload);
     }
 }

@@ -77,7 +77,7 @@ public sealed class ProviderSelectionWiringTests
             // No ApiKey / ClientId / BaseUrl / WebhookSecret — must fail validation.
         });
 
-        var act = () => sp.GetRequiredService<IOptions<FinancialProviderOptions>>().Value;
+        var act = () => sp.GetRequiredService<IOptions<MxCredentialsOptions>>().Value;
 
         act.Should().Throw<OptionsValidationException>()
             .Which.Message.Should().Contain("ApiKey");

@@ -331,6 +331,9 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
     /// (subscribing to <c>connection.synced.successful</c> also delivers its <c>.initial</c>/<c>.historical</c> children).
     /// Events such as <c>profile.created</c> carry no data, so they must not trigger a sync.
     /// </summary>
+    public bool IsWebhookSyncTrigger(string? eventType) => IsSyncTrigger(eventType);
+
+    /// <summary>Static form of <see cref="IsWebhookSyncTrigger"/>.</summary>
     public static bool IsSyncTrigger(string? eventType) =>
         eventType is not null
         && (eventType.StartsWith("connection.synced.successful", StringComparison.OrdinalIgnoreCase)
