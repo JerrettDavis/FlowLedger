@@ -34,6 +34,7 @@ Docker-outside-of-Docker and runs `dotnet restore` on creation.
 - All new features need tests (see `tests/`).
 - Bug fixes (`fix:` commits) must include a regression test that fails without the fix, or the PR must state why a test is not possible. The PR template asks for the test, the invariants touched and any migration.
 - Follow the vertical slice pattern in `src/FlowLedger.Application/Features/`.
+- Application idiom: one `*Handler` class per operation (a command or query) in the feature folder, registered in `Application/DependencyInjection.cs`, taking a `CancellationToken` on every async method. Do not add new `*Service` classes that bundle several operations; the existing ones (for example `BillSheetService`, `CategorizationService`) are migrated to handlers gradually. Use `ConnectorIds` constants, never bare connector name strings, and `TimeProvider` rather than `DateTime.UtcNow`.
 - Architecture tests in `FlowLedger.Architecture.Tests` must pass.
 - No sensitive data in logs or telemetry.
 
