@@ -74,7 +74,13 @@ internal sealed class EfUserDirectory(HostDb host, LegacyTenantClaim legacy) : I
                 .FirstOrDefaultAsync(ct);
         }
 
-        // 3. Otherwise a brand-new person: a fresh, empty tenant (link it later with a code if it is the same person).
+        // 3. Otherwise a brand-new person: a fresh, empty tenant (link it later with a code if it is the same person),
+        //    unless the sign-up policy (#145) says this login may not create one.
+        if (tenantId is null && !identity.AllowProvisioning)
+        {
+            throw new SignUpClosedException();
+        }
+
         tenantId ??= Guid.NewGuid();
 
         var userId = Guid.NewGuid();

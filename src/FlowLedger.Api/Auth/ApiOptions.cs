@@ -44,6 +44,14 @@ public sealed class ApiOptions
     public string? TenantSigningKey { get; set; }
 
     /// <summary>
+    /// Effective value of <c>Api:RequireSignedTenant</c> (#135): when true every HTTP request must carry a valid <c>X-Tenant-Sig</c> and a missing
+    /// <see cref="TenantSigningKey"/> fails startup. Unset, it defaults to true outside Development when OIDC sign-in is configured on this
+    /// service (<c>Auth:Oidc:Authority</c>/<c>ClientId</c>), because the shared API key then acts for many tenants. Set false to keep the legacy
+    /// unsigned behaviour deliberately. Filled in by a PostConfigure in Program.cs (it needs the environment); deliberately NOT named like the config key: compose passes an unset Api__RequireSignedTenant as an empty string, which the binder cannot parse as bool.
+    /// </summary>
+    public bool EffectiveRequireSignedTenant { get; set; }
+
+    /// <summary>
     /// Optional rotation key (Api:PreviousKey). While set, callers presenting it are still authenticated (and a Warning is logged),
     /// so Api, Web and Worker can be restarted with the new <see cref="Key"/> one at a time. Remove it once rotation is complete.
     /// </summary>
