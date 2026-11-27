@@ -63,9 +63,11 @@ body.fl-col-resizing { cursor: col-resize; user-select: none; }
    Containers must not clip (overflow) or sticky would bind to them instead of the viewport. */
 :root { --fl-sticky-top: 65px; }
 @media (max-width: 599.98px) { :root { --fl-sticky-top: 57px; } }
-.mud-main-content .mud-table-container,
+.mud-main-content .mud-table-container:not([style*="height"]),
 .mud-main-content .mud-simple-table,
 .mud-main-content .mud-simple-table .mud-table-container { overflow: visible !important; }
+/* A grid given a fixed Height (the virtualized Money Plan) scrolls inside its own box: clipping is what lets virtualization and the sticky header work. */
+.mud-main-content .mud-table-container[style*="height"] { overflow: auto; }
 .mud-main-content .mud-dialog .mud-table-container { overflow: auto !important; }
 .mud-main-content table thead th,
 .mud-main-content table .mud-table-head th {
@@ -198,6 +200,17 @@ html, body { max-width: 100%; }
   .mud-main-content .fl-stack tbody td[data-label]::before { content: attr(data-label) ": "; color: var(--mud-palette-text-secondary); font-size: .75rem; }
   .mud-main-content .fl-stack tbody td:has(> .mud-icon-button) { margin-left: auto; }
 }
+/* The stacked-cell rule above beats .fl-hide-xs, so low-priority cells (counts) stayed on a 390px phone and pushed the row action onto its own line. */
+@media (max-width: 479.98px) {
+  .mud-main-content .fl-stack tbody td.fl-hide-xs { display: none; }
+}
+
+/* Phone charts are drawn in a fixed viewBox that scales to about half size, which made axis text about 5px. Enlarge it in viewBox units. */
+@media (max-width: 599.98px) {
+  .mud-chart svg text { font-size: 16px; }
+  .fl-chart-box svg text, .fl-chart-svg text { font-size: 20px; }
+  .fl-chart-dense text { font-size: 13px; }
+}
 
 /* Dialogs render outside .fl-page, so they get the same wrap/shrink rules. */
 .mud-dialog { max-width: calc(100vw - 16px); }
@@ -253,3 +266,28 @@ html, body { max-width: 100%; }
 .fl-account-chip__bal { font-size: 11px; color: var(--mud-palette-text-secondary); }
 
 .fl-wrap-anywhere { overflow-wrap: anywhere; }
+
+/* Transactions filters: one toggle on phones keeps the first rows on screen; tablet and desktop always show the fields. */
+.fl-filters-toggle { display: none; }
+@media (max-width: 599.98px) {
+  .fl-filters-toggle { display: inline-flex; }
+  .fl-filters--closed { display: none; }
+}
+
+/* Sheet on a phone: the pinned name column took more than half the width, so the next column (Due) sat half hidden behind it after the grid scrolled to the current month. */
+@media (max-width: 599.98px) {
+  .fl-sheet .fl-sheet-name { min-width: 120px; max-width: 140px; white-space: normal; }
+}
+
+/* Touch targets: 44px minimum for buttons, icon buttons, clickable chips, checkboxes and list links on phones and coarse pointers.
+   The numeric field's spin buttons stay small (not focusable; typing is the input path). */
+@media (pointer: coarse), (max-width: 599.98px) {
+  .mud-main-content .mud-icon-button, .mud-dialog .mud-icon-button { min-width: 44px; min-height: 44px; }
+  .mud-main-content .mud-button-root.mud-button:not(.mud-input-numeric-spin .mud-button-root), .mud-dialog .mud-button-root.mud-button:not(.mud-input-numeric-spin .mud-button-root) { min-width: 44px; min-height: 44px; }
+  .mud-main-content button.mud-chip, .mud-main-content a.mud-chip, .mud-dialog button.mud-chip { min-height: 44px; }
+  .mud-main-content .mud-checkbox, .mud-dialog .mud-checkbox { min-height: 44px; }
+  .fl-li__link { display: inline-block; padding: 12px 0; margin: -12px 0; }
+  .fl-catchip, .fl-tree-toggle, .fl-sheet-cell, .fl-sheet-link, .fl-sheet-sort { min-height: 44px; }
+  .fl-tree-toggle, .fl-sheet-sort { min-width: 44px; }
+  .fl-sheet-link, .fl-sheet-sort { display: inline-flex; align-items: center; }
+}

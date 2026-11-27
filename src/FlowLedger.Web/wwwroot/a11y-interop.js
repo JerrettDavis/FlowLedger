@@ -13,6 +13,20 @@
         return text || 'Column';
     }
 
+    // A data grid given a fixed Height scrolls inside its own .mud-table-container. axe (scrollable-region-focusable) requires a scrolling
+    // region to be reachable by keyboard so a keyboard user can scroll it; MudBlazor does not render a tabindex there, so add one, plus a
+    // name taken from the grid's own aria-label.
+    function focusScrollRegions() {
+        document.querySelectorAll('.mud-table-container[style*="height"]').forEach((c) => {
+            if (!c.hasAttribute('tabindex')) c.setAttribute('tabindex', '0');
+            if (!c.hasAttribute('role')) c.setAttribute('role', 'region');
+            if (!c.hasAttribute('aria-label') && !c.hasAttribute('aria-labelledby')) {
+                const grid = c.closest('[aria-label]');
+                c.setAttribute('aria-label', ((grid && grid.getAttribute('aria-label')) || 'Scrollable table') + ' (scrollable)');
+            }
+        });
+    }
+
     function label() {
         document.querySelectorAll('.mud-table-head button, thead button').forEach((b) => {
             if (b.hasAttribute('aria-label') || b.hasAttribute('aria-labelledby') || (b.textContent || '').trim()) return;
@@ -28,7 +42,7 @@
     function schedule() {
         if (pending) return;
         pending = true;
-        requestAnimationFrame(() => { pending = false; label(); });
+        requestAnimationFrame(() => { pending = false; label(); focusScrollRegions(); });
     }
 
     function start() {

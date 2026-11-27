@@ -25,17 +25,17 @@ else
         {
             <div class="d-flex align-center gap-3 flex-wrap mb-2">
                 <MudTextField T="string" Immediate="true" @bind-Value="d.Name" Label="Debt" Style="min-width:min(200px,100%)" Margin="Margin.Dense" />
-                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Min="0" Style="max-width:150px" Margin="Margin.Dense"
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Format="@Format.MoneyInputFormat" Min="0" Style="max-width:150px" Margin="Margin.Dense"
                                  Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="@($"Balance for {d.Name}")" />
                 <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Rate" Label="APR %" Min="0" Max="100" Style="max-width:110px" Margin="Margin.Dense" />
-                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Min="0" Style="max-width:150px" Margin="Margin.Dense"
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Format="@Format.MoneyInputFormat" Min="0" Style="max-width:150px" Margin="Margin.Dense"
                                  Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="@($"Minimum payment for {d.Name}")" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => _rows.Remove(d))" aria-label="@($"Remove {d.Name}")" />
             </div>
         }
         <div class="d-flex align-center gap-3 flex-wrap mt-2">
             <MudButton OnClick="AddRow" StartIcon="@Icons.Material.Filled.Add">Add debt</MudButton>
-            <MudNumericField T="decimal" Immediate="true" @bind-Value="_extra" Label="Extra per month" Min="0" Style="max-width:170px" Margin="Margin.Dense"
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_extra" Label="Extra per month" Format="@Format.MoneyInputFormat" Min="0" Style="max-width:170px" Margin="Margin.Dense"
                              Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Extra per month" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Calculate" Disabled="@(FormRules.Debt(_rows.Count) is not null)" aria-describedby="debt-reason">Compare</MudButton>
         </div>
