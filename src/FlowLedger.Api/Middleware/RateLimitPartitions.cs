@@ -70,7 +70,8 @@ public static class RateLimitPartitions
             // Unverifiable tenant (signing key set but signature missing/invalid): the request will be rejected downstream, and
             // must not create a partition of its own.
             if (!string.IsNullOrEmpty(signingKey)
-                && !TenantAssertion.Verify(signingKey, id, http.Request.Headers["X-Tenant-Sig"].ToString(), now))
+                && !TenantAssertion.Check(signingKey, id, http.Request.Headers["X-Tenant-Sig"].ToString(), now, http.Request.Method,
+                    http.Request.PathBase.Add(http.Request.Path).Value ?? string.Empty, acceptLegacy: true, nonces: null))
             {
                 return IpKey(http);
             }

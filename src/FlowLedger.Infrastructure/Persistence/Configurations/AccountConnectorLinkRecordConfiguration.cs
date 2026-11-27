@@ -12,7 +12,7 @@ internal sealed class AccountConnectorLinkRecordConfiguration : IEntityTypeConfi
         builder.HasKey(r => new { r.TenantId, r.AccountId });
         builder.Property(r => r.TenantId).HasColumnName("tenant_id");
         builder.Property(r => r.AccountId).HasColumnName("account_id");
-        builder.Property(r => r.ConnectorId).HasColumnName("connector_id");
+        builder.Property(r => r.ConnectorId).HasColumnName("connector_id").HasConversion(ConnectorIdConverter.Instance);
         builder.Property(r => r.ProviderAccountId).HasColumnName("provider_account_id");
         builder.Property(r => r.LinkedUtc).HasColumnName("linked_utc").HasDefaultValueSql("now()");
         builder.HasIndex(r => new { r.TenantId, r.ConnectorId, r.ProviderAccountId })

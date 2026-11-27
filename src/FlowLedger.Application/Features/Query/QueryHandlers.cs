@@ -3,7 +3,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.Query;
 
-public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportRequest>
+internal sealed class SaveReportRequestValidator : AbstractValidator<SaveReportRequest>
 {
     /// <summary>Cap on the serialized panel JSON of one saved item (#166), so one row cannot be made arbitrarily large.</summary>
     public const int MaxPayloadChars = 65_536;

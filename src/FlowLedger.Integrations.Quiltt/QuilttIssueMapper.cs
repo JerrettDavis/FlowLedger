@@ -129,7 +129,7 @@ internal static class QuilttIssueMapper
     /// (session) or a bad/expired session token (graphql); HTTP 429 <c>{"message":"Too Many Requests",...}</c> with NO Retry-After
     /// header when more than the per-profile hourly session quota is minted. Bodies are never copied into messages.
     /// </summary>
-    public static ProviderException FromHttpFailure(HttpStatusCode status, Endpoint endpoint, TimeSpan? retryAfter, TimeSpan rateLimitFallback)
+    public static ProviderException FromHttpFailure(HttpStatusCode status, Endpoint endpoint, TimeSpan? retryAfter, TimeSpan rateLimitFallback, TimeProvider time)
     {
         var code = (int)status;
         var what = endpoint == Endpoint.Session ? "session" : "graphql";
@@ -149,7 +149,7 @@ internal static class QuilttIssueMapper
                 { Kind = ProviderIssueKind.ReauthRequired };
             case HttpStatusCode.TooManyRequests:
                 var delay = retryAfter ?? rateLimitFallback;
-                return new RateLimitedProviderException($"Quiltt {what} rate limit reached.", DateTimeOffset.UtcNow + delay, "HTTP_429");
+                return new RateLimitedProviderException($"Quiltt {what} rate limit reached.", time.GetUtcNow() + delay, "HTTP_429");
         }
 
         if (status == HttpStatusCode.InternalServerError)
@@ -173,7 +173,7 @@ internal static class QuilttIssueMapper
     /// GraphQL returns HTTP 200 with <c>errors[]</c>; <c>extensions.code</c> carries the machine code (validation failures are
     /// camelCase, e.g. <c>undefinedField</c> / <c>argumentNotAccepted</c>, and mean OUR query is wrong, never the user's bank).
     /// </summary>
-    public static ProviderException FromGraphQlErrors(IReadOnlyList<QGraphQlError> errors, TimeSpan rateLimitFallback)
+    public static ProviderException FromGraphQlErrors(IReadOnlyList<QGraphQlError> errors, TimeSpan rateLimitFallback, TimeProvider time)
     {
         var codes = errors.Select(e => ErrorCode(e)).Where(c => c.Length > 0).Distinct().ToList();
         var joined = codes.Count > 0 ? string.Join(",", codes) : null;
@@ -181,7 +181,7 @@ internal static class QuilttIssueMapper
 
         if (haystack.Contains("RATE_LIMIT") || haystack.Contains("RATELIMIT") || haystack.Contains("TOO MANY"))
         {
-            return new RateLimitedProviderException("Quiltt GraphQL rate limit reached.", DateTimeOffset.UtcNow + rateLimitFallback, joined);
+            return new RateLimitedProviderException("Quiltt GraphQL rate limit reached.", time.GetUtcNow() + rateLimitFallback, joined);
         }
 
         if (haystack.Contains("FORBIDDEN") || haystack.Contains("REPAIRABLE") || haystack.Contains("REAUTH"))

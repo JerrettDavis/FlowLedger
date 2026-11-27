@@ -94,7 +94,7 @@ public sealed class SimulatedFaultInjectionTests
     public async Task RateLimited_exception_has_retry_after_in_the_future()
     {
         var provider = new SimulatedFinancialDataProvider(
-            Options.Create(new SimulatedProviderOptions { RateLimitAfter = 1 }));
+            Options.Create(new SimulatedProviderOptions { RateLimitAfter = 1 }), FlowLedger.TestSupport.TestClock.Provider);
 
         await provider.BeginConnectionAsync(TestTenant); // consume the 1 allowed call
 
@@ -102,8 +102,8 @@ public sealed class SimulatedFaultInjectionTests
             () => provider.BeginConnectionAsync(TestTenant));
 
         ex.RetryAfter.Should().NotBeNull();
-        ex.RetryAfter!.Value.Should().BeAfter(DateTimeOffset.UtcNow.AddSeconds(-1),
-            because: "RetryAfter must be in the near future");
+        ex.RetryAfter!.Value.Should().Be(FlowLedger.TestSupport.TestClock.Instant.AddSeconds(30),
+            because: "RetryAfter is the provider clock plus the simulated back-off");
     }
 
     [Fact]

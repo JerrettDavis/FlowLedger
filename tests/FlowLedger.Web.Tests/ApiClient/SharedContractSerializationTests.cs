@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using FlowLedger.TestSupport.Builders;
 
 namespace FlowLedger.Web.Tests.ApiClient;
 
@@ -51,9 +52,9 @@ public sealed class SharedContractSerializationTests
     [Fact]
     public void Account_requests_serialized_by_Web_are_accepted_by_the_API_binder()
     {
-        var create = new CreateAccountRequest("Savings", "Savings", 100m, "USD", "Bank", null);
+        var create = CreateAccountRequestBuilder.A().Named("Savings").OfType("Savings").StartingAt(100m).At("Bank").Build();
         var settings = new AccountSettingsRequest(false, "Holding", true);
-        var rename = new UpdateAccountRequest("New");
+        var rename = UpdateAccountRequestBuilder.A().Named("New").Build();
         var retype = new ChangeAccountTypeRequest("Credit");
 
         Assert.Equal(create, JsonSerializer.Deserialize<CreateAccountRequest>(JsonSerializer.Serialize(create, WebOptions), ApiOptions));
@@ -87,7 +88,7 @@ public sealed class SharedContractSerializationTests
         Assert.Single(activityBack.RecentPosted);
         Assert.Equal(["big"], activityBack.Suspicious[0].Reasons);
 
-        var create = new CreateTransactionRequest(tx.AccountId, 1m, "USD", "Inflow", "x", new DateOnly(2026, 1, 2), null, null, null, null);
+        var create = CreateTransactionRequestBuilder.A().OnAccount(tx.AccountId).WithAmount(1m).WithDirection("Inflow").Described("x").On(new DateOnly(2026, 1, 2)).Build();
         Assert.Equal(create, JsonSerializer.Deserialize<CreateTransactionRequest>(JsonSerializer.Serialize(create, WebOptions), ApiOptions));
     }
 
@@ -100,7 +101,7 @@ public sealed class SharedContractSerializationTests
         Assert.Equal("""{"id":"22222222-2222-2222-2222-222222222222","path":"Food.Dining","displayName":"Dining","isSystem":false,"parentId":null,"version":0}""", json);
         Assert.Equal(category, JsonSerializer.Deserialize<CategoryDto>(json, WebOptions));
 
-        var create = new CreateCategoryRequest("A.B", "B", Guid.NewGuid());
+        var create = CreateCategoryRequestBuilder.A().AtPath("A.B").Named("B").Under(Guid.NewGuid()).Build();
         Assert.Equal(create, JsonSerializer.Deserialize<CreateCategoryRequest>(JsonSerializer.Serialize(create, WebOptions), ApiOptions));
     }
 }

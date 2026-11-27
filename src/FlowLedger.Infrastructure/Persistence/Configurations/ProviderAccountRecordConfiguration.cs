@@ -11,7 +11,7 @@ internal sealed class ProviderAccountRecordConfiguration : IEntityTypeConfigurat
         builder.ToTable("connector_provider_accounts");
         builder.HasKey(r => new { r.TenantId, r.ConnectorId, r.ProviderAccountId });
         builder.Property(r => r.TenantId).HasColumnName("tenant_id");
-        builder.Property(r => r.ConnectorId).HasColumnName("connector_id");
+        builder.Property(r => r.ConnectorId).HasColumnName("connector_id").HasConversion(ConnectorIdConverter.Instance);
         builder.Property(r => r.ProviderAccountId).HasColumnName("provider_account_id");
         builder.Property(r => r.Name).HasColumnName("name");
         builder.Property(r => r.AccountType).HasColumnName("account_type");

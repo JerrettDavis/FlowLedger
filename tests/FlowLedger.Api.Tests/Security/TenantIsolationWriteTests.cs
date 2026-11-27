@@ -83,7 +83,7 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         // ── Writes that create or act on the caller's own tenant: B's own data must never appear in A's view. ──
         ["POST /api/accounts"] = Case(c => Json(c.B, HttpMethod.Post, "/api/accounts", CreateAccountRequestBuilder.A().Named("B Checking").OfType("Checking").StartingAt(5m).Build()), HttpStatusCode.Created),
         ["POST /api/assets"] = Case(c => Json(c.B, HttpMethod.Post, "/api/assets",
-            new CreateAssetRequest("B Laptop", "Electronics", 10m, "USD", null, new DateOnly(2024, 1, 1), 12m, "Apple", "MBP", null, null, "Manual", null, null, null, null, null)), HttpStatusCode.Created),
+            CreateAssetRequestBuilder.A().Named("B Laptop").Worth(10m).PurchasedOn(new DateOnly(2024, 1, 1), 12m).Build()), HttpStatusCode.Created),
         // Same path as A's category: per-tenant uniqueness, so B must be able to create it and A must still have exactly one.
         ["POST /api/categories"] = Case(c => Json(c.B, HttpMethod.Post, "/api/categories", CreateCategoryRequestBuilder.A().AtPath("zz-a-secret").Named("B Category").Build()), HttpStatusCode.Created),
         ["POST /api/categories/defaults"] = Case(c => Json(c.B, HttpMethod.Post, "/api/categories/defaults"), HttpStatusCode.OK),
@@ -95,11 +95,12 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         ["POST /api/recurring-flows/detect"] = Case(c => Json(c.B, HttpMethod.Post, "/api/recurring-flows/detect"), HttpStatusCode.OK),
         ["POST /api/sheet/refresh"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sheet/refresh"), HttpStatusCode.OK, HttpStatusCode.NoContent),
         ["POST /api/sheet/bills"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sheet/bills",
-            new SaveBillRequest("B", "B Bill", null, false, false, false, false, false, 4, 100m, null, null, null, null)), HttpStatusCode.OK, HttpStatusCode.Created),
+            SaveBillRequestBuilder.A().InSection("B").Named("B Bill").DueOn(4).Build()), HttpStatusCode.OK, HttpStatusCode.Created),
         // Replace=true wipes the CALLER's sheet; it must not wipe A's bill. A real sheet (current and previous month columns), so it must succeed.
         ["POST /api/sheet/import"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sheet/import", ImportSheetRequestBuilder.A().OfCsv(SheetCsv(c.ServerMonth)).Replacing().Build()), HttpStatusCode.OK),
         ["POST /api/reports"] = Case(c => Json(c.B, HttpMethod.Post, "/api/reports",
-            new SaveReportRequest("B Report", "d", "View", [new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))])), HttpStatusCode.Created, HttpStatusCode.OK),
+            SaveReportRequestBuilder.A().Named("B Report").Described("d")
+                .WithPanels(new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build()), HttpStatusCode.Created, HttpStatusCode.OK),
         ["POST /api/query/run"] = Case(c => Json(c.B, HttpMethod.Post, "/api/query/run", new { query = "transactions | take 100" }), HttpStatusCode.OK),
         ["POST /api/connect"] = Case(c => Json(c.B, HttpMethod.Post, "/api/connect"), HttpStatusCode.OK),
         ["POST /api/sync"] = Case(c => Json(c.B, HttpMethod.Post, "/api/sync"), HttpStatusCode.OK),
@@ -129,7 +130,7 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
                 new { appliedCategoryId = categoryId, items = new[] { new { transactionId = c.Seed.Transaction, categoryId = (Guid?)null, manual = true, confidence = (double?)null } } });
         }, "\"restored\":0", HttpStatusCode.OK),
         ["POST /api/recurring-flows"] = Case(c => Json(c.B, HttpMethod.Post, "/api/recurring-flows",
-            new CreateRecurringFlowRequest(c.Seed.Account, "B INTRUDER", 1m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null, new DateOnly(2026, 1, 1), null, null, "B")), HttpStatusCode.NotFound),
+            CreateRecurringFlowRequestBuilder.A().OnAccount(c.Seed.Account).Named("B INTRUDER").WithAmount(1m).WithCounterparty("B").Build()), HttpStatusCode.NotFound),
         ["POST /api/imports"] = Case(c => Json(c.B, HttpMethod.Post, "/api/imports",
             new { accountId = c.Seed.Account, csvContent = "Date,Amount,Description\n2026-01-20,-5.00,B INTRUDER", hasHeaderRow = true }), HttpStatusCode.UnprocessableEntity),
         ["POST /api/imports/auto"] = Case(c => Json(c.B, HttpMethod.Post, "/api/imports/auto",

@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.RecurringFlows;
@@ -92,7 +93,7 @@ public sealed class RecurringFlowHandlersTests
         var created = await createHandler.HandleAsync(MonthlyRentRequest());
 
         var updateHandler = new UpdateRecurringFlowHandler(_repo);
-        var updated = await updateHandler.HandleAsync(created.Id, new UpdateRecurringFlowRequest(1600m, "Fixed"));
+        var updated = await updateHandler.HandleAsync(created.Id, UpdateRecurringFlowRequestBuilder.A().WithAmount(1600m).WithModel("Fixed").Build());
 
         updated.Should().NotBeNull();
         updated!.Amount.Should().Be(1600m);

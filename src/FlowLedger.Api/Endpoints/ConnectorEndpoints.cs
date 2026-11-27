@@ -56,7 +56,7 @@ internal static class ConnectorEndpoints
         app.MapGet("/api/integrations/connections", async (IProviderConnectionStore connections, CancellationToken ct) =>
                 Results.Ok((await connections.ListAsync(ct)).Select(c => new
                 {
-                    provider = c.ProviderName,
+                    provider = c.Connector.Value,
                     institution = c.Institution,
                     status = c.Status,
                     issue = c.Issue is null ? null : ConnectionIssueDto.From(c.Issue),
@@ -118,7 +118,7 @@ internal static class ConnectorEndpoints
                             paused = isMx && cfg.GetValue("Mx:Provider:CallsPaused", false),
                         },
                         connections = linked
-                            .Where(c => string.Equals(c.ProviderName, d.Id, StringComparison.OrdinalIgnoreCase))
+                            .Where(c => c.Connector == d.Id)
                             .Select(c => new
                             {
                                 institution = c.Institution,

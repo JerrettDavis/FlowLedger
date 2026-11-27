@@ -10,7 +10,7 @@ namespace FlowLedger.Integrations.Tests.SimpleFin;
 
 public sealed class SimpleFinProviderTests
 {
-    private static readonly long Today = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    private static readonly long Today = FlowLedger.TestSupport.TestClock.Instant.ToUnixTimeSeconds();
 
     private sealed class StubHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
@@ -34,7 +34,7 @@ public sealed class SimpleFinProviderTests
         var handler = new StubHandler(status, body);
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://bridge.example/simplefin/") };
         var opts = Options.Create(new SimpleFinOptions { Enabled = true, AccessUrl = accessUrl });
-        return (new SimpleFinFinancialDataProvider(http, opts, NullLogger<SimpleFinFinancialDataProvider>.Instance), handler);
+        return (new SimpleFinFinancialDataProvider(http, opts, NullLogger<SimpleFinFinancialDataProvider>.Instance, FlowLedger.TestSupport.TestClock.Provider), handler);
     }
 
     private static string Json(long posted) => $$"""
@@ -55,7 +55,7 @@ public sealed class SimpleFinProviderTests
     private static SimpleFinFinancialDataProvider MakeWith(StubHandler handler, SimpleFinOptions options)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://bridge.example/simplefin/") };
-        return new SimpleFinFinancialDataProvider(http, Options.Create(options), NullLogger<SimpleFinFinancialDataProvider>.Instance);
+        return new SimpleFinFinancialDataProvider(http, Options.Create(options), NullLogger<SimpleFinFinancialDataProvider>.Instance, FlowLedger.TestSupport.TestClock.Provider);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class SimpleFinProviderTests
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://bridge.example/simplefin/") };
         var p = new SimpleFinFinancialDataProvider(http,
             Options.Create(new SimpleFinOptions { Enabled = true, AccessUrl = "https://u:p@bridge.example/simplefin" }),
-            NullLogger<SimpleFinFinancialDataProvider>.Instance);
+            NullLogger<SimpleFinFinancialDataProvider>.Instance, FlowLedger.TestSupport.TestClock.Provider);
 
         using var cts = new CancellationTokenSource();
         var first = p.GetAccountsAsync("simplefin", cts.Token);
@@ -191,10 +191,10 @@ public sealed class SimpleFinProviderTests
     [Fact]
     public async Task Cursor_filters_older_transactions_beyond_overlap()
     {
-        var old = DateTimeOffset.UtcNow.AddDays(-40).ToUnixTimeSeconds();
+        var old = FlowLedger.TestSupport.TestClock.Instant.AddDays(-40).ToUnixTimeSeconds();
         var (p, _) = Make(Json(old));
         var accounts = await p.GetAccountsAsync("simplefin");
-        var cursor = new SyncCursor(DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        var cursor = new SyncCursor(FlowLedger.TestSupport.TestClock.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
         var page = await p.GetTransactionsAsync(accounts[0].ProviderId, cursor);
         page.Items.Should().BeEmpty();

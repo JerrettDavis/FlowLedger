@@ -20,8 +20,11 @@ internal sealed partial class MxApiClient
     private readonly ILogger<MxApiClient> _logger;
     private readonly IRawPayloadArchive _archive;
 
-    public MxApiClient(HttpClient http, ILogger<MxApiClient> logger, IRawPayloadArchive archive)
+    private readonly TimeProvider _time;
+
+    public MxApiClient(HttpClient http, ILogger<MxApiClient> logger, IRawPayloadArchive archive, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _archive = archive ?? throw new ArgumentNullException(nameof(archive));
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -237,7 +240,7 @@ internal sealed partial class MxApiClient
                 LogArchiveErrorBodyFailed(archiveEx, operation);
             }
 
-            var ex = MxErrorMapper.FromResponse(response, operation);
+            var ex = MxErrorMapper.FromResponse(response, operation, _time);
             response.Dispose();
             LogOperationFailed(operation, ex.GetType().Name, ex.ProviderCode);
             throw ex;

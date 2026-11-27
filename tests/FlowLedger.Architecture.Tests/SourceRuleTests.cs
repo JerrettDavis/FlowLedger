@@ -341,22 +341,44 @@ public sealed class SourceRuleTests
             $"Whole-endpoint household access is the registered 'Household' authorization policy: use .RequireAuthorization(HouseholdPolicy.Name) in: {string.Join(", ", offenders)}");
     }
 
-    // ── Options go through IOptions + ValidateOnStart, never new XOptions() in DI (#108) ─
+    // ── Options go through IOptions + ValidateOnStart, never hand-built defaults (#108) ─
+
+    /// <summary>
+    /// The only places that may build one of our own options types with <c>new X()</c> / <c>new X { }</c>: a factory that binds configuration
+    /// into the fresh instance, and a bootstrap that runs before any DI container exists. Everything else takes the bound instance.
+    /// </summary>
+    private static readonly HashSet<string> OptionsConstructionAllowlist = new(StringComparer.Ordinal)
+    {
+        "src/FlowLedger.Infrastructure/Persistence/DatabaseDataSource.cs", // DatabaseConnectionOptions.From(configuration): new + Bind
+        "src/FlowLedger.Web/Auth/AuthSetup.cs", // OIDC options are read from configuration before the host is built
+    };
+
+    private static readonly HashSet<string> FrameworkOptionsTypes = new(StringComparer.Ordinal)
+    {
+        "JsonSerializerOptions", "DialogOptions", "ParallelOptions", "DistributedCacheEntryOptions", "ScheduleJobOptions", "MemoryCacheEntryOptions",
+        "FixedWindowRateLimiterOptions", "FileStreamOptions", "SessionOptions", "HealthCheckOptions",
+    };
 
     [Fact]
-    public void Dependency_injection_files_do_not_construct_options_by_hand()
+    public void Options_are_never_constructed_with_hand_built_defaults_anywhere_in_src()
     {
-        var ctor = new Regex(@"new\s+[\w.]*Options\s*(\(|\{)");
-        var offenders = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+        var sources = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
             .SelectMany(d => SourceFiles(Path.GetFileName(d)))
-            .Where(f => Path.GetFileName(f).StartsWith("DependencyInjection", StringComparison.Ordinal)
-                        || Path.GetFileName(f).StartsWith("ServiceRegistration", StringComparison.Ordinal))
-            .Where(f => ctor.IsMatch(File.ReadAllText(f)))
-            .Select(Rel)
+            .ToDictionary(f => f, File.ReadAllText);
+
+        // Parameterless construction of any *Options type except the framework ones listed here (they are configuration of a call, not bound settings).
+        var ctor = new Regex(@"new\s+(?:[\w.]+\.)?(\w+Options)\s*(?:\(\s*\)|\{)");
+        bool Offends(string text) => ctor.Matches(text).Any(m => !FrameworkOptionsTypes.Contains(m.Groups[1].Value));
+
+        var offenders = sources
+            .Where(kv => Offends(kv.Value) && !OptionsConstructionAllowlist.Contains(Rel(kv.Key)))
+            .Select(kv => Rel(kv.Key))
             .ToList();
+        var stale = OptionsConstructionAllowlist.Where(p => !Offends(File.ReadAllText(Path.Combine(Root, p)))).ToList();
 
         Assert.True(offenders.Count == 0,
-            $"Register options with AddOptions<T>().BindConfiguration(...).ValidateOnStart() instead of new XOptions() in: {string.Join(", ", offenders)}");
+            $"Take the bound options (AddOptions<T>().BindConfiguration(...).ValidateOnStart(), then inject IOptions<T>.Value) instead of new XOptions() / '?? new XOptions()' in: {string.Join(", ", offenders)}");
+        Assert.True(stale.Count == 0, $"These files no longer build options by hand; remove them from the allowlist: {string.Join(", ", stale)}");
     }
 
     // ── Endpoint limits live in ApiLimits (#121) ─────────────────────────────

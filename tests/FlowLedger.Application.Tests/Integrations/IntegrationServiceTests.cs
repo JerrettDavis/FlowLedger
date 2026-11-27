@@ -2,6 +2,7 @@ using System.Text;
 using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Application.Features.Integrations;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Integrations;
@@ -182,7 +183,7 @@ public sealed class IntegrationServiceTests
     {
         var (service, store, transport) = Create();
         var saved = await service.SaveAsync(null, Rest("https://api.example.com/v1", IntegrationAuth.Bearer, "tok"));
-        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, new RestCallRequest("get", "/items", "page=2&token=zzz", null, null, null));
+        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().Using("get").To("/items").WithQuery("page=2&token=zzz").Build());
 
         error.Should().BeNull();
         result!.StatusCode.Should().Be(200);
@@ -202,7 +203,7 @@ public sealed class IntegrationServiceTests
     {
         var (service, _, transport) = Create();
         var saved = await service.SaveAsync(null, Rest());
-        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, new RestCallRequest("GET", path, null, null, null, null));
+        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().To(path).Build());
         result.Should().BeNull();
         error.Should().NotBeNull();
         transport.Sent.Should().BeEmpty();
@@ -214,7 +215,7 @@ public sealed class IntegrationServiceTests
         var (service, store, transport) = Create();
         transport.Respond = _ => new TransportResponse(503, "text/plain", "down", false, null);
         var saved = await service.SaveAsync(null, Rest());
-        var (result, _) = await service.CallRestAsync(saved.Integration!.Id, new RestCallRequest("GET", "/x", null, null, null, null));
+        var (result, _) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().Build());
         result!.Error.Should().Contain("503");
         store.Log.Single().StatusCode.Should().Be(503);
     }
@@ -224,7 +225,7 @@ public sealed class IntegrationServiceTests
     {
         var (service, _, transport) = Create();
         var saved = await service.SaveAsync(null, Rest() with { Enabled = false });
-        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, new RestCallRequest("GET", "/x", null, null, null, null));
+        var (result, error) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().Build());
         result.Should().BeNull();
         error.Should().Contain("off");
         transport.Sent.Should().BeEmpty();
@@ -302,12 +303,12 @@ public sealed class IntegrationServiceTests
         transport.Respond = r => r.Method == "GET"
             ? new TransportResponse(200, "text/xml", Wsdl, false, null)
             : new TransportResponse(200, "text/xml", "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><AddResponse/></s:Body></s:Envelope>", false, null);
-        var saved = await service.SaveAsync(null, new IntegrationSaveRequest("Calc", IntegrationKind.Soap, true, "https://calc.example.com/svc?wsdl", IntegrationAuth.None, null, null, false, null, null, null));
+        var saved = await service.SaveAsync(null, IntegrationSaveRequestBuilder.A().Build());
 
         var ops = await service.SoapOperationsAsync(saved.Integration!.Id);
         ops.Operations.Should().ContainSingle(o => o.Name == "Add");
 
-        var (result, error) = await service.SoapInvokeAsync(saved.Integration.Id, new SoapInvokeRequest("Add", "<Add xmlns=\"http://example.com/calc\"><a>1</a></Add>"));
+        var (result, error) = await service.SoapInvokeAsync(saved.Integration.Id, SoapInvokeRequestBuilder.A().Calling("Add", "<Add xmlns=\"http://example.com/calc\"><a>1</a></Add>").Build());
         error.Should().BeNull();
         result!.Error.Should().BeNull();
         var post = transport.Sent.Last();
@@ -324,12 +325,12 @@ public sealed class IntegrationServiceTests
         transport.Respond = r => r.Method == "GET"
             ? new TransportResponse(200, "text/xml", Wsdl, false, null)
             : new TransportResponse(500, "text/xml", "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><s:Fault><faultcode>s:Server</faultcode><faultstring>Boom</faultstring></s:Fault></s:Body></s:Envelope>", false, null);
-        var saved = await service.SaveAsync(null, new IntegrationSaveRequest("Calc", IntegrationKind.Soap, true, "https://calc.example.com/svc?wsdl", IntegrationAuth.None, null, null, false, null, null, null));
+        var saved = await service.SaveAsync(null, IntegrationSaveRequestBuilder.A().Build());
 
-        var (result, _) = await service.SoapInvokeAsync(saved.Integration!.Id, new SoapInvokeRequest("Add", "<Add/>"));
+        var (result, _) = await service.SoapInvokeAsync(saved.Integration!.Id, SoapInvokeRequestBuilder.A().Build());
         result!.Error.Should().Be("SOAP fault: Boom");
 
-        var (none, error) = await service.SoapInvokeAsync(saved.Integration.Id, new SoapInvokeRequest("Nope", "<Nope/>"));
+        var (none, error) = await service.SoapInvokeAsync(saved.Integration.Id, SoapInvokeRequestBuilder.A().Calling("Nope", "<Nope/>").Build());
         none.Should().BeNull();
         error.Should().Contain("Nope");
     }
@@ -340,9 +341,9 @@ public sealed class IntegrationServiceTests
         var (service, _, transport) = Create();
         var internalWsdl = Wsdl.Replace("https://calc.example.com/svc", "http://169.254.169.254/latest");
         transport.Respond = _ => new TransportResponse(200, "text/xml", internalWsdl, false, null);
-        var saved = await service.SaveAsync(null, new IntegrationSaveRequest("Calc", IntegrationKind.Soap, true, "https://calc.example.com/svc?wsdl", IntegrationAuth.None, null, null, false, null, null, null));
+        var saved = await service.SaveAsync(null, IntegrationSaveRequestBuilder.A().Build());
 
-        var (result, error) = await service.SoapInvokeAsync(saved.Integration!.Id, new SoapInvokeRequest("Add", "<Add/>"));
+        var (result, error) = await service.SoapInvokeAsync(saved.Integration!.Id, SoapInvokeRequestBuilder.A().Build());
         result.Should().BeNull();
         error.Should().Contain("isn't allowed");
         transport.Sent.Should().OnlyContain(r => r.Method == "GET");

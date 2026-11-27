@@ -71,7 +71,7 @@ public sealed class CategoryHandlersTests
         var created = await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("OldPath").Named("Old Name").Build());
 
         var updateHandler = new UpdateCategoryHandler(_repo);
-        var updated = await updateHandler.HandleAsync(created.Id, new UpdateCategoryRequest("NewPath", "New Name"));
+        var updated = await updateHandler.HandleAsync(created.Id, UpdateCategoryRequestBuilder.A().AtPath("NewPath").Named("New Name").Build());
 
         updated.Should().NotBeNull();
         updated!.DisplayName.Should().Be("New Name");

@@ -213,7 +213,7 @@ services:
       <<: [*app-common-env, *db-env, *redis-env, *backup-env]
       # Required; the API refuses to start outside Development with a missing or dev-default key.
       Api__Key: ${API__KEY:?Set API__KEY in .env (openssl rand -hex 32)}
-      Api__TenantId: ${API__TENANTID:-00000000-0000-0000-0000-000000000001}
+      Api__TenantId: ${API__TENANTID:-}
       # Production default: schema changes are applied by the one-shot `migrate` service below, which the api waits for, so the
       # long-running API never migrates by itself. Set DATABASE__MIGRATEONSTARTUP=true to opt back in to API start-up migration
       # (Development always auto-migrates).
@@ -223,6 +223,7 @@ services:
       # start without a signing key; see docs/self-hosting/upgrading.md for every new switch and its legacy opt-out.
       Api__TenantSigningKey: ${API__TENANTSIGNINGKEY:-}
       Api__RequireSignedTenant: ${API__REQUIRESIGNEDTENANT:-}
+      Api__AcceptLegacyTenantSignature: ${API__ACCEPTLEGACYTENANTSIGNATURE:-}
       Auth__Oidc__Authority: ${AUTH__OIDC__AUTHORITY:-}
       Auth__Oidc__ClientId: ${AUTH__OIDC__CLIENTID:-}
       Auth__Oidc__AllowedEmails__0: ${AUTH__OIDC__ALLOWEDEMAILS__0:-}
@@ -328,7 +329,7 @@ services:
     environment:
       <<: [*app-common-env, *db-env, *redis-env, *backup-env]
       # Same household tenant as the api and web (scheduled sync fans out over every tenant; this is the worker's default scope).
-      Worker__TenantId: ${API__TENANTID:-00000000-0000-0000-0000-000000000001}
+      Worker__TenantId: ${API__TENANTID:-}
     volumes:
       - objects_data:/data/objects
       - backups_data:/data/backups

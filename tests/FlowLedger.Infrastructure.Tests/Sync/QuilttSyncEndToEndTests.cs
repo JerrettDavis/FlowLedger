@@ -37,7 +37,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
 
     private static string Transactions()
     {
-        var d = DateTime.UtcNow.Date;
+        var d = TestClock.Instant.UtcDateTime.Date;
         string Day(int ago) => d.AddDays(-ago).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return """
             {"data":{"transactions":{"nodes":[
@@ -97,6 +97,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddQuilttProvider(config);
+            services.AddSingleton<TimeProvider>(TestClock.Provider); // the provider derives "today" from the same instant the fixture dates are built from
             await using var sp = services.BuildServiceProvider();
 
             var tenant = TestTenantContext.New();

@@ -39,12 +39,12 @@ internal static class QuilttMapper
         !string.Equals(t.Status, "PROJECTED", StringComparison.OrdinalIgnoreCase)
         && DateOnly.TryParse(t.Date, CultureInfo.InvariantCulture, out _);
 
-    public static ProviderTransaction ToTransaction(QTransaction t, string? fallbackCurrency)
+    public static ProviderTransaction ToTransaction(QTransaction t, string? fallbackCurrency, TimeProvider time)
     {
         var accountId = t.Account?.Id ?? throw new FatalProviderException("Quiltt transaction is missing its account.");
         var date = DateOnly.TryParse(t.Date, CultureInfo.InvariantCulture, out var d)
             ? d
-            : DateOnly.FromDateTime(DateTime.UtcNow);
+            : DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
 
         // entryType is authoritative when present; otherwise trust the sign (negative = outflow).
         var raw = t.Amount ?? 0m;

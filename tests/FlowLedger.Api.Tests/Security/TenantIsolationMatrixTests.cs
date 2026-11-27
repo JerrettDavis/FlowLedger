@@ -101,16 +101,14 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{Secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
         var category = await CreateAsync(a, "/api/categories", CreateCategoryRequestBuilder.A().AtPath("zz-a-secret").Named($"{Secret} Category").Build());
         var flow = await CreateAsync(a, "/api/recurring-flows",
-            new CreateRecurringFlowRequest(account, $"{Secret} Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null,
-                new DateOnly(2026, 1, 1), null, null, $"{Secret} Landlord"));
+            CreateRecurringFlowRequestBuilder.A().OnAccount(account).Named($"{Secret} Rent").WithCounterparty($"{Secret} Landlord").Build());
         var asset = await CreateAsync(a, "/api/assets",
-            new CreateAssetRequest($"{Secret} Laptop", "Electronics", 2000m, "USD", null, new DateOnly(2024, 1, 1), 2400m, "Apple", "MBP", null, null,
-                "Manual", null, null, null, null, null));
+            CreateAssetRequestBuilder.A().Named($"{Secret} Laptop").Build());
         var bill = await CreateAsync(a, "/api/sheet/bills",
-            new SaveBillRequest(Secret, $"{Secret} Bill", null, false, false, false, false, false, 4, 100m, null, null, null, null));
+            SaveBillRequestBuilder.A().InSection(Secret).Named($"{Secret} Bill").DueOn(4).Build());
         var report = await CreateAsync(a, "/api/reports",
-            new SaveReportRequest($"{Secret} Report", "d", "View",
-                [new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))]));
+            SaveReportRequestBuilder.A().Named($"{Secret} Report").Described("d")
+                .WithPanels(new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build());
         var goal = await CreateAsync(a, "/api/goals", new { name = $"{Secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
 
         var transaction2 = await CreateAsync(a, "/api/transactions",

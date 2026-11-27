@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using FlowLedger.Api.Endpoints;
+using FlowLedger.Api.Tests.Builders;
 using FlowLedger.Infrastructure.Events;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
@@ -57,8 +57,7 @@ public sealed class OutboxFollowUpTests(FlowLedgerApiFactory factory) : IAsyncLi
         var account = await (await _client.PostAsJsonAsync("/api/accounts",
             CreateAccountRequestBuilder.A().Named("Outbox Import").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>();
 
-        var response = await _client.PostAsJsonAsync("/api/imports", new ImportRequest(
-            account!.Id, "Date,Amount,Description\n2026-01-15,50.00,Coffee Shop\n2026-01-16,100.00,Grocery Store\n"));
+        var response = await _client.PostAsJsonAsync("/api/imports", ImportRequestBuilder.A().IntoAccount(account!.Id).OfCsv("Date,Amount,Description\n2026-01-15,50.00,Coffee Shop\n2026-01-16,100.00,Grocery Store\n").Build());
         response.EnsureSuccessStatusCode();
 
         (await RowsAsync()).Should().ContainSingle(r => r.Type == "TransactionsImported" && !r.Processed,
@@ -75,10 +74,10 @@ public sealed class OutboxFollowUpTests(FlowLedgerApiFactory factory) : IAsyncLi
         var account = await (await _client.PostAsJsonAsync("/api/accounts",
             CreateAccountRequestBuilder.A().Named("Outbox Empty").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>();
         var csv = "Date,Amount,Description\n2026-01-15,50.00,Coffee Shop\n";
-        (await _client.PostAsJsonAsync("/api/imports", new ImportRequest(account!.Id, csv))).EnsureSuccessStatusCode();
+        (await _client.PostAsJsonAsync("/api/imports", ImportRequestBuilder.A().IntoAccount(account!.Id).OfCsv(csv).Build())).EnsureSuccessStatusCode();
         await DrainAsync();
 
-        (await _client.PostAsJsonAsync("/api/imports", new ImportRequest(account.Id, csv))).EnsureSuccessStatusCode();
+        (await _client.PostAsJsonAsync("/api/imports", ImportRequestBuilder.A().IntoAccount(account.Id).OfCsv(csv).Build())).EnsureSuccessStatusCode();
 
         (await RowsAsync()).Count(r => r.Type == "TransactionsImported").Should().Be(1, "the second import was all duplicates");
     }

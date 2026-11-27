@@ -103,7 +103,7 @@ public static partial class TenantMappingValidator
         req.Headers.TryAddWithoutValidation("X-Tenant-Id", tenant.ToString());
         if (!string.IsNullOrEmpty(authOptions.TenantSigningKey))
         {
-            req.Headers.TryAddWithoutValidation("X-Tenant-Sig", FlowLedger.Web.ApiClient.TenantAssertionSigner.Sign(authOptions.TenantSigningKey, tenant, DateTimeOffset.UtcNow));
+            req.Headers.TryAddWithoutValidation("X-Tenant-Sig", FlowLedger.Web.ApiClient.TenantAssertionSigner.SignV2(authOptions.TenantSigningKey, tenant, DateTimeOffset.UtcNow, "GET", "/api/users/identities"));
         }
         using var resp = await http.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode)

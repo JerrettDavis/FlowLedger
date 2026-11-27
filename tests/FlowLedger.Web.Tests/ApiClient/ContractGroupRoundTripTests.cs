@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using FlowLedger.TestSupport.Builders;
 
 namespace FlowLedger.Web.Tests.ApiClient;
 
@@ -61,7 +62,7 @@ public sealed class ContractGroupRoundTripTests
 
         AssertRoundTrips(viz);
         AssertRoundTrips(new SavedReportDto("r1", "Monthly", "desc", "Report", false, [panel], At, null));
-        AssertRoundTrips(new SaveReportRequest("Monthly", null, "View", [panel]));
+        AssertRoundTrips(SaveReportRequestBuilder.A().Named("Monthly").WithPanels(panel).Build());
         AssertRoundTrips(new RunReportResultDto("r1", "Monthly", null, "Report",
             [new PanelResultDto("Trend", "q", viz, result, null), new PanelResultDto("Bad", "q", viz, null, "boom")]));
         AssertRoundTrips(new QuerySchemaDto(
@@ -73,9 +74,9 @@ public sealed class ContractGroupRoundTripTests
     {
         AssertRoundTrips(new RecurringFlowDto(Id1, Id2, "Rent", 1500m, "USD", "Outflow", "Fixed", "Monthly", 1, null, null, null,
             D, null, null, "Landlord", true, At, 1500m));
-        AssertRoundTrips(new CreateRecurringFlowRequest(Id2, "Pay", 2000m, "USD", "Inflow", "Fixed", "TwiceMonthly", 1, 15, null, null,
-            D, D.AddYears(1), Id1, null));
-        AssertRoundTrips(new UpdateRecurringFlowRequest(9.99m, "Variable"));
+        AssertRoundTrips(CreateRecurringFlowRequestBuilder.A().OnAccount(Id2).Named("Pay").WithAmount(2000m).WithDirection("Inflow")
+            .Every("TwiceMonthly", dayOfMonth: 1, secondDayOfMonth: 15).From(D, D.AddYears(1)).InCategory(Id1).WithCounterparty(null).Build());
+        AssertRoundTrips(UpdateRecurringFlowRequestBuilder.A().WithAmount(9.99m).WithModel("Variable").Build());
         AssertRoundTrips(new RecurringSuggestionDto("k", Id1, "Checking", "Netflix", "Outflow", 15.49m, "USD", "Fixed", "Monthly", 3, null,
             null, null, D, D.AddMonths(1), 6, 0.92, true));
     }
@@ -95,10 +96,10 @@ public sealed class ContractGroupRoundTripTests
         AssertRoundTrips(new AssetCategoryTemplateDto("Vehicle", "Vehicle", "Depreciation", 0.15m, 10, ["vin"]));
         AssertRoundTrips(new AssetSummaryDto(1, 1m, 1m, 0m, 0m, 1m, [new AssetCategoryBreakdownDto("Vehicle", 1, 1m)], [asset], worth));
         AssertRoundTrips(new AssetRefreshResultDto(true, "ok", asset));
-        AssertRoundTrips(new CreateAssetRequest("Car", "Vehicle", 1m, "USD", D, D, 1m, null, null, null, null, null, null, null, null, null,
-            new Dictionary<string, string> { ["a"] = "b" }));
-        AssertRoundTrips(new UpdateAssetRequest("Car", "Vehicle", D, 1m, null, null, null, null, "Manual", 0.1m, null, null, null, null));
-        AssertRoundTrips(new RecordValuationRequest(5m, D, "Manual", "n"));
+        AssertRoundTrips(CreateAssetRequestBuilder.A().Named("Car").InCategory("Vehicle").Worth(1m).ValuedOn(D).PurchasedOn(D, 1m).MadeBy(null, null)
+            .Valued(null).WithAttributes(new Dictionary<string, string> { ["a"] = "b" }).Build());
+        AssertRoundTrips(UpdateAssetRequestBuilder.A().Named("Car").InCategory("Vehicle").PurchasedOn(D, 1m).MadeBy(null, null).Valued("Manual", 0.1m).Build());
+        AssertRoundTrips(RecordValuationRequestBuilder.A().Worth(5m).AsOf(D).From("Manual").WithNote("n").Build());
     }
 
     [Fact]
@@ -112,10 +113,10 @@ public sealed class ContractGroupRoundTripTests
             new SheetMonthSummaryDto("2026-03", 1, 2, 88m, 90m));
 
         AssertRoundTrips(view);
-        AssertRoundTrips(new SaveBillRequest("Home", "Power", null, false, true, false, false, true, 5, 90m, null, null, null, "power",
-            BillFrequency.EveryNWeeks, 2, D, null));
-        AssertRoundTrips(new SetPaymentRequest(true, 88m, 1));
-        AssertRoundTrips(new ImportSheetRequest("a,b", true));
+        AssertRoundTrips(SaveBillRequestBuilder.A().InSection("Home").Named("Power").Perpetual().AutoPaying().DueOn(5).Estimating(90m).MatchingText("power")
+            .Recurring(BillFrequency.EveryNWeeks, 2, D).Build());
+        AssertRoundTrips(SetPaymentRequestBuilder.A().Paid().ForAmount(88m).InSlot(1).Build());
+        AssertRoundTrips(ImportSheetRequestBuilder.A().OfCsv("a,b").Replacing().Build());
         AssertRoundTrips(new SheetImportResult(1, 2, 3));
         AssertRoundTrips(new SheetRefreshResult(1, 2, 3));
     }

@@ -35,7 +35,16 @@ public sealed record BackupSettings(
 /// restore, and live at drill time, plus the raw provider-payload archive check.
 /// </summary>
 public sealed record RestoreDrillSummary(
-    IReadOnlyList<DrillTableResult> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, IReadOnlyList<string> Problems);
+    IReadOnlyList<DrillTableResult> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, IReadOnlyList<string> Problems)
+{
+    /// <summary>The Application-layer view the Data page and the status endpoint use.</summary>
+    public static FlowLedger.Application.Features.DataSafety.RestoreDrillView? ToView(RestoreDrillSummary? drill) =>
+        drill is null
+            ? null
+            : new FlowLedger.Application.Features.DataSafety.RestoreDrillView(
+                drill.Tables.Select(t => new FlowLedger.Application.Features.DataSafety.DrillTableView(t.Table, t.ExpectedRows, t.RestoredRows, t.LiveRows, t.Ok)).ToList(),
+                drill.RawArchiveChecked, drill.RawObjectsVerified, drill.RawObjectsSealed, drill.Problems);
+}
 
 public sealed record BackupRunResult(
     bool Ok,
