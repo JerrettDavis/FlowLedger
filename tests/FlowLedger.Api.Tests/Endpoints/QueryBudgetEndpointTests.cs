@@ -22,7 +22,7 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
         _client = factory.CreateAuthenticatedClient(_tenant);
         var account = (await (await _client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = new DateOnly(2026, 11, 1);   // the queries under test do not depend on the date
         for (var i = 0; i < 3; i++)
         {
             await _client.PostAsJsonAsync("/api/transactions",

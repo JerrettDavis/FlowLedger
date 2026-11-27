@@ -31,8 +31,8 @@ public sealed class WebhookReplayGuardTests
     [Fact]
     public void In_process_map_stays_bounded_after_ten_times_the_cap_of_distinct_live_bodies()
     {
-        // Timestamps sit in the recent past so any entries other tests hold (newer) are never the oldest to be evicted.
-        var now = DateTimeOffset.UtcNow.AddMinutes(-5);
+        // Timestamps sit far in the past so any entries other tests hold (newer) are never the oldest to be evicted.
+        var now = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
         for (var i = 0; i < WebhookReplayGuard.MaxEntries * 10; i++)
         {
             WebhookReplayGuard.SeenRecently(Encoding.UTF8.GetBytes("bound-" + Guid.NewGuid()), now.AddMilliseconds(i));
