@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
-using FlowLedger.SharedKernel;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
