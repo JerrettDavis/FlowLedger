@@ -1,5 +1,7 @@
 # FlowLedger
 
+[![CI](https://github.com/JerrettDavis/FlowLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/JerrettDavis/FlowLedger/actions/workflows/ci.yml) [![Nightly](https://github.com/JerrettDavis/FlowLedger/actions/workflows/nightly.yml/badge.svg)](https://github.com/JerrettDavis/FlowLedger/actions/workflows/nightly.yml) [![CodeQL](https://github.com/JerrettDavis/FlowLedger/actions/workflows/security.yml/badge.svg)](https://github.com/JerrettDavis/FlowLedger/actions/workflows/security.yml)
+
 > Know where your money went, where it is going, and when your plans become possible.
 
 FlowLedger is a FOSS-first, self-hostable, cloud-native personal finance platform for forecasting, budgeting, asset tracking, transaction intelligence, and extensible money workflows.
