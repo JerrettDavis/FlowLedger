@@ -61,7 +61,7 @@ internal static class SnapshotRestoreDrill
         var results = new List<DrillTableResult>();
         try
         {
-            await MigrateAsync(scratch.ConnectionString, manifest.AppliedMigrations.LastOrDefault(), ct);
+            await MigrateAsync(scratch.ConnectionString, manifest.AppliedMigrations is { Count: > 0 } applied ? applied[^1] : null, ct);
             await EnsureAdHocTablesAsync(scratch.ConnectionString, ct);
 
             results.AddRange(await LoadTablesAsync(scratch.ConnectionString, snapshotDir, manifest, problems, ct));

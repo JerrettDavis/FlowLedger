@@ -18,7 +18,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// <item>A row deleted in the meantime is forgotten.</item>
 /// </list>
 /// </summary>
-internal sealed class SyncConflictResolver(FlowLedgerDbContext db, ILogger logger)
+internal sealed partial class SyncConflictResolver(FlowLedgerDbContext db, ILogger logger)
 {
     /// <summary>Installs this resolver on the context until the returned scope is disposed.</summary>
     public IDisposable Install()
@@ -46,7 +46,7 @@ internal sealed class SyncConflictResolver(FlowLedgerDbContext db, ILogger logge
             var current = await entry.GetDatabaseValuesAsync(ct);
             if (current is null)
             {
-                logger.LogInformation("{Entity} was deleted while the sync was updating it; skipping it.", entry.Metadata.ClrType.Name);
+                LogWasDeletedWhileTheSync(logger, entry.Metadata.ClrType.Name);
                 entry.State = EntityState.Detached;
                 continue;
             }
@@ -54,7 +54,7 @@ internal sealed class SyncConflictResolver(FlowLedgerDbContext db, ILogger logge
             // Write our changed columns over the newer row. Unchanged columns are not part of the UPDATE, so edits made to them survive.
             token.OriginalValue = current[token.Metadata];
             KeepUserLockedType(entry, current);
-            logger.LogInformation("{Entity} changed while the sync was updating it; merged the sync's columns into the newer row.", entry.Metadata.ClrType.Name);
+            LogChangedWhileTheSyncWas(logger, entry.Metadata.ClrType.Name);
         }
 
         return true;
@@ -85,4 +85,10 @@ internal sealed class SyncConflictResolver(FlowLedgerDbContext db, ILogger logge
     {
         public void Dispose() => db.ConcurrencyConflictResolver = previous;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Entity} was deleted while the sync was updating it; skipping it.")]
+    private static partial void LogWasDeletedWhileTheSync(ILogger logger, string? entity);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Entity} changed while the sync was updating it; merged the sync's columns into the newer row.")]
+    private static partial void LogChangedWhileTheSyncWas(ILogger logger, string? entity);
 }

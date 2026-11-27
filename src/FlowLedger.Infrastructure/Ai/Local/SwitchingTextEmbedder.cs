@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// Native-load or model errors degrade to the fallback and surface in <see cref="GetStatus"/>; they never throw into callers
 /// (except in mode "Onnx", which is explicit about never falling back).
 /// </summary>
-internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, IDisposable
+internal sealed partial class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, IDisposable
 {
     private readonly LocalAiOptions _options;
     private readonly LocalModelManager _models;
@@ -33,7 +33,7 @@ internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, ID
         _logger = logger;
     }
 
-    private ITextEmbedder Active => ResolveOnnx() ?? _hashing;
+    private CachingTextEmbedder Active => ResolveOnnx() ?? _hashing;
 
     public string ModelId => Active.ModelId;
     public int Dimensions => Active.Dimensions;
@@ -91,14 +91,14 @@ internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, ID
                 _loadedId = model.Id;
                 _failedId = null;
                 _note = null;
-                _logger.LogInformation("Local AI embedder active: {Model}", raw.ModelId);
+                LogLocalAIEmbedderActive(_logger, raw.ModelId);
                 return _onnx;
             }
             catch (Exception ex)
             {
                 _failedId = model.Id;
                 _note = "Embedding model could not be loaded (" + ex.GetType().Name + ": " + ex.Message + "); using the lexical fallback.";
-                _logger.LogWarning(ex, "Local AI embedding model {Model} failed to load", model.Id);
+                LogLocalAIEmbeddingModelFailed(_logger, ex, model.Id);
                 return Strict(_note);
             }
         }
@@ -111,7 +111,7 @@ internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, ID
 
     public LocalAiRuntimeStatus GetStatus()
     {
-        ITextEmbedder active;
+        CachingTextEmbedder active;
         try
         {
             active = Active;
@@ -149,4 +149,10 @@ internal sealed class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRuntime, ID
     }
 
     public void Dispose() => _onnxRaw?.Dispose();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Local AI embedder active: {Model}")]
+    private static partial void LogLocalAIEmbedderActive(ILogger logger, string? model);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local AI embedding model {Model} failed to load")]
+    private static partial void LogLocalAIEmbeddingModelFailed(ILogger logger, Exception exception, string? model);
 }
