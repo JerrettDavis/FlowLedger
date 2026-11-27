@@ -108,7 +108,7 @@ public sealed class RecurringFlowEndpointTests(FlowLedgerApiFactory factory) : I
 
         var response = await _client.PutAsJsonAsync(
             $"/api/recurring-flows/{flow.Id}",
-            new UpdateRecurringFlowRequest(1500m, "Fixed"));
+            UpdateRecurringFlowRequestBuilder.A().WithAmount(1500m).WithModel("Fixed").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await response.Content.ReadFromJsonAsync<RecurringFlowDto>();
@@ -120,7 +120,7 @@ public sealed class RecurringFlowEndpointTests(FlowLedgerApiFactory factory) : I
     {
         var response = await _client.PutAsJsonAsync(
             $"/api/recurring-flows/{Guid.NewGuid()}",
-            new UpdateRecurringFlowRequest(100m, "Fixed"));
+            UpdateRecurringFlowRequestBuilder.A().WithAmount(100m).WithModel("Fixed").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

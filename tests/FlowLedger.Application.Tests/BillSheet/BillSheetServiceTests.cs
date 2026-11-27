@@ -181,13 +181,13 @@ public sealed class BillSheetServiceTests
         var cur = BillSheetService.Key(ThisMonth);
         await AddTxn(txns, "POWER CO", 400m, new DateOnly(Today.Year, Today.Month, Math.Min(4, DateTime.DaysInMonth(Today.Year, Today.Month))));
 
-        await svc.SetPaymentAsync(power.Id, cur, new SetPaymentRequest(false, null));
+        await svc.SetPaymentAsync(power.Id, cur, SetPaymentRequestBuilder.A().Paid(false).Build());
         await svc.RefreshAsync();
 
         var view = await svc.GetViewAsync(cur, 1);
         view.Sections.SelectMany(s => s.Rows).Single(r => r.Name == "Power Co").Cells[cur].Paid.Should().BeFalse();
 
-        await svc.SetPaymentAsync(power.Id, cur, new SetPaymentRequest(true, 123m));
+        await svc.SetPaymentAsync(power.Id, cur, SetPaymentRequestBuilder.A().Paid().ForAmount(123m).Build());
         await svc.RefreshAsync();
         var after = await svc.GetViewAsync(cur, 1);
         after.Sections.SelectMany(s => s.Rows).Single(r => r.Name == "Power Co").Cells[cur]
@@ -198,14 +198,14 @@ public sealed class BillSheetServiceTests
     public async Task Create_and_update_validate_input_and_keep_masked_account_ref()
     {
         var (svc, store, _) = Make();
-        var bad = () => svc.CreateBillAsync(new SaveBillRequest("Bills", " ", null, false, false, false, false, false, null, 1, null, null, null, null));
+        var bad = () => svc.CreateBillAsync(SaveBillRequestBuilder.A().Named(" ").Estimating(1).Build());
         await bad.Should().ThrowAsync<SheetOperationException>();
 
-        var id = await svc.CreateBillAsync(new SaveBillRequest("Bills", "Water", "JD", false, true, false, false, true, 14, 120, null, null, "108260316", null));
+        var id = await svc.CreateBillAsync(SaveBillRequestBuilder.A().Named("Water").PaidBy("JD").Perpetual().AutoPaying().DueOn(14).Estimating(120).WithAccountRef("108260316").Build());
         var current = (await store.ListBillsAsync()).Single();
         BillSheetService.MaskReference(current.AccountRef).Should().Be("••••0316");
 
-        await svc.UpdateBillAsync(id, new SaveBillRequest("Bills", "Water", "JD", false, true, false, false, true, 14, 125, null, null, "••••0316", "city of tulsa"));
+        await svc.UpdateBillAsync(id, SaveBillRequestBuilder.A().Named("Water").PaidBy("JD").Perpetual().AutoPaying().DueOn(14).Estimating(125).WithAccountRef("••••0316").MatchingText("city of tulsa").Build());
 
         var updated = (await store.ListBillsAsync()).Single();
         updated.AccountRef.Should().Be("108260316");
@@ -275,7 +275,7 @@ public sealed class BillSheetServiceTests
     public async Task Detection_does_not_duplicate_a_row_the_sheet_already_has()
     {
         var (svc, store, txns) = Make();
-        await svc.CreateBillAsync(new SaveBillRequest("Bills", "Peak Fitness", "JD", false, true, false, false, true, 9, 40, null, null, null, null));
+        await svc.CreateBillAsync(SaveBillRequestBuilder.A().Named("Peak Fitness").PaidBy("JD").Perpetual().AutoPaying().DueOn(9).Estimating(40).Build());
         for (var back = 0; back < 3; back++)
         {
             var month = ThisMonth.AddMonths(-back);
@@ -297,7 +297,7 @@ public sealed class BillSheetServiceTests
         var power = (await store.ListBillsAsync()).Single(b => b.Name == "Power Co");
         var cur = BillSheetService.Key(ThisMonth);
 
-        await svc.SetPaymentAsync(power.Id, cur, new SetPaymentRequest(true, 5m));
+        await svc.SetPaymentAsync(power.Id, cur, SetPaymentRequestBuilder.A().Paid().ForAmount(5m).Build());
         await svc.ClearPaymentAsync(power.Id, cur);
 
         var view = await svc.GetViewAsync(cur, 1);

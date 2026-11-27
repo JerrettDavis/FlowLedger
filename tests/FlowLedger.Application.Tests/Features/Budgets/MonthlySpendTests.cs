@@ -1,3 +1,4 @@
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Goals;
 using FluentAssertions;
@@ -50,7 +51,7 @@ public sealed class MonthlySpendTests
     [InlineData("Food", 100_000_001, false)]
     public void Budget_validator_matches_legacy_rules(string category, decimal limit, bool valid)
     {
-        var r = new SetBudgetRequestValidator().Validate(new SetBudgetRequest(category, limit));
+        var r = new SetBudgetRequestValidator().Validate(SetBudgetRequestBuilder.A().ForCategory(category).Limit(limit).Build());
 
         r.IsValid.Should().Be(valid);
         if (!valid)

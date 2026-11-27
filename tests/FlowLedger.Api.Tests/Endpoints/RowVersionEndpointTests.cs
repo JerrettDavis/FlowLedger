@@ -60,8 +60,7 @@ public sealed class RowVersionEndpointTests(FlowLedgerApiFactory factory) : IAsy
     private async Task<RecurringFlowDto> CreateFlow()
     {
         var account = await CreateAccount();
-        var response = await _client.PostAsJsonAsync("/api/recurring-flows", new CreateRecurringFlowRequest(
-            account.Id, "Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null, new DateOnly(2026, 1, 1), null, null, null));
+        var response = await _client.PostAsJsonAsync("/api/recurring-flows", CreateRecurringFlowRequestBuilder.A().OnAccount(account.Id).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<RecurringFlowDto>())!;
     }
@@ -170,12 +169,12 @@ public sealed class RowVersionEndpointTests(FlowLedgerApiFactory factory) : IAsy
     {
         var created = await CreateCategory("travel");
         var url = $"/api/categories/{created.Id}";
-        var renamed = await SendAsync(HttpMethod.Put, url, new UpdateCategoryRequest("travel-2", "Travel 2"), $"\"{created.Version}\"");
+        var renamed = await SendAsync(HttpMethod.Put, url, UpdateCategoryRequestBuilder.A().AtPath("travel-2").Named("Travel 2").Build(), $"\"{created.Version}\"");
         renamed.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await renamed.Content.ReadFromJsonAsync<CategoryDto>();
         renamed.Headers.ETag!.Tag.Should().Be($"\"{dto!.Version}\"");
 
-        (await SendAsync(HttpMethod.Put, url, new UpdateCategoryRequest("travel-3", "Travel 3"), $"\"{created.Version}\"")).StatusCode
+        (await SendAsync(HttpMethod.Put, url, UpdateCategoryRequestBuilder.A().AtPath("travel-3").Named("Travel 3").Build(), $"\"{created.Version}\"")).StatusCode
             .Should().Be(HttpStatusCode.Conflict);
         (await SendAsync(HttpMethod.Delete, url, null, $"\"{created.Version}\"")).StatusCode.Should().Be(HttpStatusCode.Conflict);
 
@@ -189,12 +188,12 @@ public sealed class RowVersionEndpointTests(FlowLedgerApiFactory factory) : IAsy
     {
         var created = await CreateFlow();
         var url = $"/api/recurring-flows/{created.Id}";
-        var updated = await SendAsync(HttpMethod.Put, url, new UpdateRecurringFlowRequest(1300m, "Fixed"), $"\"{created.Version}\"");
+        var updated = await SendAsync(HttpMethod.Put, url, UpdateRecurringFlowRequestBuilder.A().WithAmount(1300m).WithModel("Fixed").Build(), $"\"{created.Version}\"");
         updated.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await updated.Content.ReadFromJsonAsync<RecurringFlowDto>();
         dto!.Version.Should().NotBe(created.Version);
 
-        (await SendAsync(HttpMethod.Put, url, new UpdateRecurringFlowRequest(1400m, "Fixed"), $"\"{created.Version}\"")).StatusCode
+        (await SendAsync(HttpMethod.Put, url, UpdateRecurringFlowRequestBuilder.A().WithAmount(1400m).WithModel("Fixed").Build(), $"\"{created.Version}\"")).StatusCode
             .Should().Be(HttpStatusCode.Conflict);
         (await SendAsync(HttpMethod.Delete, url, null, $"\"{created.Version}\"")).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await _client.GetFromJsonAsync<RecurringFlowDto>(url))!.Amount.Should().Be(1300m);

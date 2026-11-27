@@ -1,3 +1,5 @@
+using FlowLedger.TestSupport.Builders;
+using FlowLedger.Web.Tests.Builders;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -36,7 +38,7 @@ public sealed class FlowLedgerApiClientTests
     {
         var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
 
-        var act = () => client.UpdateAccountAsync(Guid.NewGuid(), new UpdateAccountRequest("New"), expectedVersion: 7);
+        var act = () => client.UpdateAccountAsync(Guid.NewGuid(), UpdateAccountRequestBuilder.A().Named("New").Build(), expectedVersion: 7);
 
         var thrown = (await act.Should().ThrowAsync<ApiClientException>()).Which;
         thrown.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -52,7 +54,7 @@ public sealed class FlowLedgerApiClientTests
             new HttpClient(handler) { BaseAddress = new Uri("http://localhost") },
             Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
 
-        await client.UpdateAccountAsync(Guid.NewGuid(), new UpdateAccountRequest("New"), expectedVersion: 42);
+        await client.UpdateAccountAsync(Guid.NewGuid(), UpdateAccountRequestBuilder.A().Named("New").Build(), expectedVersion: 42);
 
         sent.Should().Be("\"42\"");
     }
@@ -94,7 +96,7 @@ public sealed class FlowLedgerApiClientTests
     {
         var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
 
-        var act = () => client.UpdateRecurringFlowAsync(Guid.NewGuid(), new UpdateRecurringFlowRequest(10m, "Fixed"), expectedVersion: 3);
+        var act = () => client.UpdateRecurringFlowAsync(Guid.NewGuid(), UpdateRecurringFlowRequestBuilder.A().WithAmount(10m).WithModel("Fixed").Build(), expectedVersion: 3);
 
         (await act.Should().ThrowAsync<ApiClientException>()).Which.Message.Should().Contain("recurring flow was changed elsewhere");
     }
@@ -179,7 +181,7 @@ public sealed class FlowLedgerApiClientTests
         };
         var client = BuildClient(problem);
 
-        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), new SetAccountConnectorRequest("MX", "acct-1"));
+        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), SetAccountConnectorRequestBuilder.A().Build());
 
         var ex = (await act.Should().ThrowAsync<ApiClientException>()).Which;
         ex.Message.Should().Contain("409").And.Contain("Already linked").And.NotContain("SECRET-INTERNAL-DETAIL");
@@ -193,7 +195,7 @@ public sealed class FlowLedgerApiClientTests
             Content = new StringContent("<html>stack trace at Foo.Bar()</html>", Encoding.UTF8, "text/html"),
         });
 
-        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), new SetAccountConnectorRequest("manual", null));
+        var act = () => client.SetAccountConnectorAsync(Guid.NewGuid(), SetAccountConnectorRequestBuilder.A().OnConnector("manual").WithProviderAccount(null).Build());
 
         var ex = (await act.Should().ThrowAsync<ApiClientException>()).Which;
         ex.Message.Should().Contain("502").And.NotContain("stack trace");

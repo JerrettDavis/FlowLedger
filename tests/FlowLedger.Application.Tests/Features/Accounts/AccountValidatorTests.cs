@@ -52,7 +52,7 @@ public sealed class AccountValidatorTests
     [Fact]
     public async Task UpdateAccount_EmptyName_FailsValidation()
     {
-        var req = new UpdateAccountRequest("");
+        var req = UpdateAccountRequestBuilder.A().Named("").Build();
         var result = await _updateValidator.ValidateAsync(req);
         result.IsValid.Should().BeFalse();
     }
@@ -60,7 +60,7 @@ public sealed class AccountValidatorTests
     [Fact]
     public async Task UpdateAccount_ValidName_PassesValidation()
     {
-        var req = new UpdateAccountRequest("New Name");
+        var req = UpdateAccountRequestBuilder.A().Named("New Name").Build();
         var result = await _updateValidator.ValidateAsync(req);
         result.IsValid.Should().BeTrue();
     }

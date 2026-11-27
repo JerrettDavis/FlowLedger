@@ -86,7 +86,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
 
         var response = await _client.PutAsJsonAsync(
             $"/api/accounts/{created.Id}",
-            new UpdateAccountRequest("Renamed Account"));
+            UpdateAccountRequestBuilder.A().Named("Renamed Account").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await response.Content.ReadFromJsonAsync<AccountDto>();
@@ -98,7 +98,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
     {
         var response = await _client.PutAsJsonAsync(
             $"/api/accounts/{Guid.NewGuid()}",
-            new UpdateAccountRequest("Whatever"));
+            UpdateAccountRequestBuilder.A().Named("Whatever").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -107,7 +107,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
 
     private Task<HttpResponseMessage> PutRename(Guid id, string name, string? ifMatch)
     {
-        var message = new HttpRequestMessage(HttpMethod.Put, $"/api/accounts/{id}") { Content = JsonContent.Create(new UpdateAccountRequest(name)) };
+        var message = new HttpRequestMessage(HttpMethod.Put, $"/api/accounts/{id}") { Content = JsonContent.Create(UpdateAccountRequestBuilder.A().Named(name).Build()) };
         if (ifMatch is not null)
         {
             message.Headers.TryAddWithoutValidation("If-Match", ifMatch);

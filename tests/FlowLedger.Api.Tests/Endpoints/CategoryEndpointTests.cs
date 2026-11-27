@@ -89,7 +89,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
 
         var response = await _client.PutAsJsonAsync(
             $"/api/categories/{created.Id}",
-            new UpdateCategoryRequest("food-v2", "Food (Updated)"));
+            UpdateCategoryRequestBuilder.A().AtPath("food-v2").Named("Food (Updated)").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await response.Content.ReadFromJsonAsync<CategoryDto>();
@@ -102,7 +102,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
     {
         var response = await _client.PutAsJsonAsync(
             $"/api/categories/{Guid.NewGuid()}",
-            new UpdateCategoryRequest("x", "X"));
+            UpdateCategoryRequestBuilder.A().AtPath("x").Named("X").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

@@ -88,8 +88,8 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Save_update_run_and_delete_a_view()
     {
-        var request = new SaveReportRequest("Coffee", "d", "View",
-            [new ReportPanel("Coffee spend", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))]);
+        var request = SaveReportRequestBuilder.A().Named("Coffee").Described("d")
+            .WithPanels(new ReportPanel("Coffee spend", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build();
         var created = await _client.PostAsJsonAsync("/api/reports", request);
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var saved = (await created.Content.ReadFromJsonAsync<SavedReportDto>())!;
@@ -107,11 +107,11 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Save_rejects_unparsable_queries_and_multi_panel_views()
     {
-        var bad = new SaveReportRequest("Bad", null, "View", [new ReportPanel("p", "transactions | wherr x", new VizSpec("table"))]);
+        var bad = SaveReportRequestBuilder.A().Named("Bad").WithPanels(new ReportPanel("p", "transactions | wherr x", new VizSpec("table"))).Build();
         (await _client.PostAsJsonAsync("/api/reports", bad)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         var panel = new ReportPanel("p", "transactions | take 1", new VizSpec("table"));
-        var twoPanelView = new SaveReportRequest("Two", null, "View", [panel, panel]);
+        var twoPanelView = SaveReportRequestBuilder.A().Named("Two").WithPanels(panel, panel).Build();
         (await _client.PostAsJsonAsync("/api/reports", twoPanelView)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -119,7 +119,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     public async Task Saved_reports_are_tenant_isolated_and_presets_are_not_deletable()
     {
         var panel = new ReportPanel("p", "transactions | take 1", new VizSpec("table"));
-        var saved = (await (await _client.PostAsJsonAsync("/api/reports", new SaveReportRequest("Mine", null, "View", [panel])))
+        var saved = (await (await _client.PostAsJsonAsync("/api/reports", SaveReportRequestBuilder.A().Named("Mine").WithPanels(panel).Build()))
             .Content.ReadFromJsonAsync<SavedReportDto>())!;
 
         var other = factory.CreateAuthenticatedClient(Guid.NewGuid());

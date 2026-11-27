@@ -151,11 +151,9 @@ public sealed class MultiUserTests(FlowLedgerApiFactory factory) : IAsyncLifetim
             "transactions" => await Post("/api/transactions",
                 CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described("Coffee Shop").On(new DateOnly(2026, 1, 15)).Build()),
             "assets" => await Post("/api/assets",
-                new CreateAssetRequest("MacBook", "Electronics", 2000m, "USD", null, new DateOnly(2024, 1, 1), 2400m, "Apple", "MBP", null, null,
-                    "Manual", null, null, null, null, null)),
+                CreateAssetRequestBuilder.A().Build()),
             "recurring-flows" => await Post("/api/recurring-flows",
-                new CreateRecurringFlowRequest(account, "Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null,
-                    new DateOnly(2026, 1, 1), null, null, "Landlord")),
+                CreateRecurringFlowRequestBuilder.A().OnAccount(account).WithCounterparty("Landlord").Build()),
             "categories" => await Post("/api/categories", CreateCategoryRequestBuilder.A().AtPath("food").Named("Food").Build()),
             _ => throw new ArgumentOutOfRangeException(nameof(resource)),
         };
