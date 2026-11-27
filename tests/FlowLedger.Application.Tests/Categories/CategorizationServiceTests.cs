@@ -330,6 +330,60 @@ public sealed class CategorizationServiceTests
     }
 
     [Fact]
+    public async Task Same_merchant_count_matches_exactly_the_rows_apply_to_merchant_would_change()
+    {
+        var svc = await SetUpAsync();
+        var clicked = Add(_checking, 5, TransactionDirection.Debit, "Zzyzx Cafe", 1);
+        var uncategorized = Add(_checking, 6, TransactionDirection.Debit, "Zzyzx Cafe", 2);
+        var auto = Add(_checking, 7, TransactionDirection.Debit, "Zzyzx Cafe", 3);
+        var manual = Add(_checking, 8, TransactionDirection.Debit, "Zzyzx Cafe", 4);
+        var other = Add(_checking, 9, TransactionDirection.Debit, "Plugh Diner", 5);
+        var mine = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Eating"), "Eating");
+        await _categories.AddAsync(mine);
+        auto.Categorize(mine.CategoryId, null, CategorySource.Auto);
+        manual.Categorize(mine.CategoryId);
+
+        var count = await svc.CountSameMerchantAsync(clicked.Id);
+        var result = await svc.SetCategoryWithUndoAsync(clicked.Id, mine.Id, applyToMerchant: true);
+
+        count.Should().Be(2, "the uncategorized and the auto row; the manual row and another merchant are left alone");
+        result.Changed.Should().Be(count + 1);
+        uncategorized.CategoryId.Should().Be(mine.CategoryId);
+        other.CategoryId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Undo_puts_every_row_back_and_leaves_rows_changed_since_alone()
+    {
+        var svc = await SetUpAsync();
+        var clicked = Add(_checking, 5, TransactionDirection.Debit, "Zzyzx Cafe", 1);
+        var uncategorized = Add(_checking, 6, TransactionDirection.Debit, "Zzyzx Cafe", 2);
+        var auto = Add(_checking, 7, TransactionDirection.Debit, "Zzyzx Cafe", 3);
+        var recategorizedSince = Add(_checking, 8, TransactionDirection.Debit, "Zzyzx Cafe", 4);
+        var mine = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Eating"), "Eating");
+        var old = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Old"), "Old");
+        var later = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Later"), "Later");
+        await _categories.AddAsync(mine);
+        await _categories.AddAsync(old);
+        await _categories.AddAsync(later);
+        auto.Categorize(old.CategoryId, null, CategorySource.Auto, 0.8);
+
+        var applied = await svc.SetCategoryWithUndoAsync(clicked.Id, mine.Id, applyToMerchant: true);
+        recategorizedSince.Categorize(later.CategoryId); // the user changed this row after the bulk apply
+
+        var restored = await svc.RestoreCategoriesAsync(mine.Id, applied.Restore);
+
+        restored.Should().Be(3);
+        clicked.CategoryId.Should().BeNull();
+        uncategorized.CategoryId.Should().BeNull();
+        auto.CategoryId.Should().Be(old.CategoryId);
+        auto.CategorySource.Should().Be(CategorySource.Auto);
+        auto.CategoryConfidence.Should().Be(0.8);
+        recategorizedSince.CategoryId.Should().Be(later.CategoryId);
+        (await svc.RestoreCategoriesAsync(mine.Id, applied.Restore)).Should().Be(0, "nothing carries the applied category any more");
+    }
+
+    [Fact]
     public async Task Bulk_edit_rejects_an_unknown_category_and_an_oversized_selection()
     {
         var svc = await SetUpAsync();

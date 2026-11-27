@@ -120,6 +120,8 @@ internal static class TenantIsolationManifest
         ["GET /api/transactions"] = List(),
         ["GET /api/transactions/export.csv"] = List(),
         ["GET /api/transactions/{id:guid}"] = ById("Transaction"),
+
+        ["GET /api/transactions/{id:guid}/same-merchant-count"] = ById("Transaction"),
         ["GET /api/users/identities"] = List(),
         ["GET /openapi/{documentName}.json"] = Global("API description"),
         ["POST /api/accounts"] = Written(),
@@ -177,6 +179,8 @@ internal static class TenantIsolationManifest
         ["POST /api/transactions"] = Written(),
         ["POST /api/transactions/bulk-category"] = Written(),
         ["POST /api/transactions/enrich"] = Written(),
+
+        ["POST /api/transactions/restore-categories"] = Written(),
         ["POST /api/transactions/{id:guid}/match"] = ById("Transaction"),
         ["POST /api/transactions/{id:guid}/unmatch"] = ById("Transaction"),
         ["POST /api/users/link"] = Written(),

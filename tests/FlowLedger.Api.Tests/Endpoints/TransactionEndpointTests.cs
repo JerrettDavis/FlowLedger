@@ -273,6 +273,34 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
         myCategory.Id.Should().NotBe(Guid.Empty);
     }
 
+    [Fact]
+    public async Task Apply_to_merchant_reports_the_exact_count_and_can_be_undone()
+    {
+        var account = await CreateAccount();
+        var clicked = await CreateTransaction(account.Id);
+        var sameMerchant = await CreateTransaction(account.Id);
+        var category = await CreateCategory(_client, "merchant-target");
+
+        var count = await _client.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/transactions/{clicked.Id}/same-merchant-count");
+        count.GetProperty("count").GetInt32().Should().Be(1, "the other row with the same description");
+
+        var set = await _client.PutAsJsonAsync($"/api/transactions/{clicked.Id}/category", new { categoryId = category.Id, applyToMerchant = true });
+        set.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await set.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        body.GetProperty("changed").GetInt32().Should().Be(2);
+        var restore = body.GetProperty("restore");
+        restore.GetArrayLength().Should().Be(2);
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + sameMerchant.Id)).GetProperty("categoryId").GetGuid().Should().Be(category.Id);
+
+        var undo = await _client.PostAsJsonAsync("/api/transactions/restore-categories", new { appliedCategoryId = category.Id, items = restore });
+        undo.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await undo.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("restored").GetInt32().Should().Be(2);
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + sameMerchant.Id)).GetProperty("categoryId").ValueKind
+            .Should().Be(System.Text.Json.JsonValueKind.Null);
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + clicked.Id)).GetProperty("categoryId").ValueKind
+            .Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
     private static CreateTransactionRequest ValidRequest(Guid accountId) =>
         new(accountId, 50m, "USD", "Debit", "Coffee Shop",
             new DateOnly(2026, 1, 15), null, null, null, null);

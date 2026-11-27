@@ -413,6 +413,13 @@ public sealed partial class CategorizationService(
     /// (they become Auto, so a later correction can still replace them); categories the user chose by hand are left alone.
     /// </summary>
     public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
+        => (await SetCategoryWithUndoAsync(transactionId, categoryId, applyToMerchant, ct, expectedVersion)).Changed;
+
+    /// <summary>
+    /// <see cref="SetCategoryAsync"/> that also reports each changed row's previous category, so the caller can offer Undo
+    /// (<see cref="RestoreCategoriesAsync"/>).
+    /// </summary>
+    public async Task<CategoryChangeResult> SetCategoryWithUndoAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var target = await store.FindTrackedAsync(transactionId, ct)
             ?? throw new NotFoundException("Transaction not found.");
@@ -421,25 +428,101 @@ public sealed partial class CategorizationService(
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
             ?? throw new NotFoundException("Category not found.");
         var id = category.CategoryId;
+        var restore = new List<CategoryRestore> { Snapshot(target) };
         target.Categorize(id);
-        var changed = 1;
 
         if (applyToMerchant)
         {
-            var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
-            var candidates = await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct);
-            foreach (var t in candidates.Where(t => t.Id != target.Id
-                         && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
-                         && t.Status.IsReal()
-                         && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key))
+            foreach (var t in await MerchantCandidatesAsync(target, ct))
             {
+                restore.Add(Snapshot(t));
                 t.Categorize(id, null, CategorySource.Auto);
-                changed++;
             }
         }
 
         await store.SaveAsync(ct);
-        return changed;
+        return new CategoryChangeResult(restore.Count, restore);
+    }
+
+    /// <summary>
+    /// How many OTHER transactions "apply to same merchant" would re-label right now (uncategorized or auto-categorized, real, same
+    /// merchant): the exact figure the confirmation shows, counted over the whole history rather than the rows on screen.
+    /// </summary>
+    public async Task<int> CountSameMerchantAsync(Guid transactionId, CancellationToken ct = default)
+    {
+        var target = await store.FindTrackedAsync(transactionId, ct)
+            ?? throw new NotFoundException("Transaction not found.");
+        return (await MerchantCandidatesAsync(target, ct)).Count;
+    }
+
+    /// <summary>
+    /// Undoes a category change: puts each row back as <paramref name="restore"/> says, but only while the row still carries
+    /// <paramref name="appliedCategoryId"/> (a row the user has re-categorized since is left alone). Returns how many rows were restored.
+    /// </summary>
+    public async Task<int> RestoreCategoriesAsync(Guid appliedCategoryId, IReadOnlyCollection<CategoryRestore> restore, CancellationToken ct = default)
+    {
+        if (restore.Count == 0)
+        {
+            return 0;
+        }
+
+        if (restore.Count > MaxRestoreRows)
+        {
+            throw new RequestValidationException("items", $"Restore at most {MaxRestoreRows} transactions at a time.");
+        }
+
+        var applied = CategoryId.From(appliedCategoryId);
+        var byId = (await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct)).ToDictionary(t => t.Id);
+        var restored = 0;
+        foreach (var item in restore.DistinctBy(r => r.TransactionId))
+        {
+            if (!byId.TryGetValue(item.TransactionId, out var tx))
+            {
+                tx = await store.FindTrackedAsync(item.TransactionId, ct);
+            }
+
+            if (tx is null || tx.CategoryId != applied)
+            {
+                continue;
+            }
+
+            if (item.CategoryId is { } previous)
+            {
+                // Only a category of this tenant may be written back.
+                if ((await categories.ListAsync(ct)).All(c => c.Id != previous))
+                {
+                    continue;
+                }
+
+                tx.RestoreCategory(CategoryId.From(previous), item.Manual ? CategorySource.Manual : CategorySource.Auto, item.Confidence);
+            }
+            else
+            {
+                tx.RestoreCategory(null, CategorySource.Manual, null);
+            }
+
+            restored++;
+        }
+
+        await store.SaveAsync(ct);
+        return restored;
+    }
+
+    /// <summary>Most rows one undo may restore.</summary>
+    public const int MaxRestoreRows = 5000;
+
+    private static CategoryRestore Snapshot(Transaction t)
+        => new(t.Id, t.CategoryId?.Value, t.CategorySource == CategorySource.Manual, t.CategoryConfidence);
+
+    private async Task<List<Transaction>> MerchantCandidatesAsync(Transaction target, CancellationToken ct)
+    {
+        var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
+        return (await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct))
+            .Where(t => t.Id != target.Id
+                && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
+                && t.Status.IsReal()
+                && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key)
+            .ToList();
     }
 
     /// <summary>

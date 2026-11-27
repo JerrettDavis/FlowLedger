@@ -10,6 +10,8 @@ internal static class CategorizationEndpoints
 
     internal sealed record BulkCategoryRequest(List<Guid> TransactionIds, Guid CategoryId);
 
+    internal sealed record RestoreCategoriesRequest(Guid AppliedCategoryId, List<CategoryRestore>? Items);
+
     internal sealed record RecategorizeRequest(Guid CategoryId, bool ApplyToAll = false, string? Note = null);
 
     internal static IEndpointRouteBuilder MapCategorizationEndpoints(this IEndpointRouteBuilder app)
@@ -55,6 +57,18 @@ internal static class CategorizationEndpoints
             .WithSummary("Set one category (manual) on up to 500 selected transactions")
             .RequireRateLimiting("write");
 
+        app.MapGet("/api/transactions/{id:guid}/same-merchant-count", async (Guid id, CategorizationService service, CancellationToken ct) =>
+                Results.Ok(new { count = await service.CountSameMerchantAsync(id, ct) }))
+            .WithTags("Transactions").WithName("CountSameMerchantTransactions")
+            .WithSummary("How many other transactions 'apply to same merchant' would re-label (uncategorized or auto-categorized, same merchant)")
+            .RequireRateLimiting("api");
+
+        app.MapPost("/api/transactions/restore-categories", async ([FromBody] RestoreCategoriesRequest request, CategorizationService service, CancellationToken ct) =>
+                Results.Ok(new { restored = await service.RestoreCategoriesAsync(request.AppliedCategoryId, request.Items ?? [], ct) }))
+            .WithTags("Transactions").WithName("RestoreTransactionCategories")
+            .WithSummary("Undo a category change: put rows back to their previous category while they still carry the applied one")
+            .RequireRateLimiting("write");
+
         app.MapPut("/api/transactions/{id:guid}/category", async (
                 Guid id, [FromBody] SetCategoryRequest request, CategorizationService service, HttpRequest httpRequest, HttpResponse response, GetTransactionHandler reader, CancellationToken ct) =>
             {
@@ -64,9 +78,9 @@ internal static class CategorizationEndpoints
                     return RowVersioning.Malformed("transaction");
                 }
 
-                var changed = await service.SetCategoryAsync(id, request.CategoryId, request.ApplyToMerchant, ct, expected);
+                var result = await service.SetCategoryWithUndoAsync(id, request.CategoryId, request.ApplyToMerchant, ct, expected);
                 await RowVersioning.StampTransactionAsync(response, reader, id, ct);
-                return Results.Ok(new { changed });
+                return Results.Ok(new { changed = result.Changed, restore = result.Restore });
             })
             .WithTags("Transactions").WithName("SetTransactionCategory")
             .WithSummary("Set a transaction's category (manual); optionally apply to all uncategorized transactions of the same merchant")

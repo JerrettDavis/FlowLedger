@@ -541,14 +541,15 @@
         try
         {
             var applyToMerchant = _applyToMerchant;
-            var others = applyToMerchant ? MerchantMatch.CountOthers(_transactions, tx) : 0;
+            // The server counts with the exact rule the change uses (uncategorized or auto-categorized rows of the same merchant, whole history).
+            var others = applyToMerchant ? await ApiClient.GetSameMerchantCountAsync(tx.Id) : 0;
             if (others > 0)
             {
                 // Bulk recategorisation must be explicit: say how many rows it touches and let the user narrow it.
                 var choice = await Dialogs.ShowMessageBoxAsync(
                     "Apply to the same merchant?",
-                    $"Set {others} other loaded transaction{(others == 1 ? "" : "s")} from {MerchantMatch.Key(tx)} to {category.Path} as well? " +
-                    "Rows outside the current list may also match.",
+                    $"Set {others} other transaction{(others == 1 ? "" : "s")} from {MerchantMatch.Key(tx)} to {category.Path} as well? " +
+                    "Rows you categorized by hand are left alone, and you can undo this.",
                     yesText: $"Apply to {others + 1}", noText: "Only this one", cancelText: "Cancel");
                 if (choice is null)
                 {
@@ -562,9 +563,24 @@
 
             // Send the version the user last saw (If-Match); a 409 means the row changed elsewhere (another tab or a sync).
             uint? savedVersion = null;
+            IReadOnlyList<FlowLedger.Web.ApiClient.CategoryRestoreDto> restore = [];
             var changed = await ApiClient.SetTransactionCategoryAsync(
-                tx.Id, category.Id, applyToMerchant, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v);
-            if (changed == 1 && previous is { } before)
+                tx.Id, category.Id, applyToMerchant, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v,
+                restore: rows => restore = rows);
+            if (changed > 1 && restore.Count > 0)
+            {
+                // A merchant-wide change is reversible too: Undo puts every touched row back (rows changed since are left alone).
+                Snackbar.AddWithUndo($"Set {changed} transactions to {category.Path}", async () =>
+                {
+                    await ApiClient.RestoreCategoriesAsync(category.Id, restore);
+                    await InvokeAsync(async () =>
+                    {
+                        await LoadPageAsync();
+                        StateHasChanged();
+                    });
+                });
+            }
+            else if (changed == 1 && previous is { } before)
             {
                 // A single-row change can be reverted exactly; bulk changes were already confirmed with their count.
                 var versionAfterSet = savedVersion;

@@ -262,6 +262,17 @@ public sealed partial class Transaction : AggregateRoot
         }
     }
 
+    /// <summary>
+    /// Puts the category back to an earlier state (undo): a category with the source and confidence it had, or none. Never raises a
+    /// categorization; the suggestion is left as it is.
+    /// </summary>
+    public void RestoreCategory(CategoryId? categoryId, CategorySource source, double? confidence)
+    {
+        CategoryId = categoryId;
+        CategorySource = categoryId is null ? CategorySource.Manual : source;
+        CategoryConfidence = categoryId is not null && source == CategorySource.Auto ? confidence : null;
+    }
+
     /// <summary>Sets the display name (alias) for this transaction's merchant without touching its category.</summary>
     public bool SetMerchantName(string? merchantName)
     {

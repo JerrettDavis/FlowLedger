@@ -116,6 +116,9 @@ public sealed record AskQueryAnswer(string Question, string? Query, string? Erro
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
+/// <summary>One row's category before a change, as the server reports it so an Undo can put it back.</summary>
+public sealed record CategoryRestoreDto(Guid TransactionId, Guid? CategoryId, bool Manual, double? Confidence);
+
 public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);

@@ -90,6 +90,49 @@ public sealed class FlowLedgerApiClientTests
     }
 
     [Fact]
+    public async Task SetTransactionCategoryAsync_ReportsTheRowsItChangedSoTheCallerCanUndo()
+    {
+        var id = Guid.NewGuid();
+        var category = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var json = $$"""{"changed":2,"restore":[{"transactionId":"{{id}}","categoryId":null,"manual":true,"confidence":null},{"transactionId":"{{other}}","categoryId":"{{category}}","manual":false,"confidence":0.8}]}""";
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+        IReadOnlyList<CategoryRestoreDto>? restore = null;
+
+        var changed = await client.SetTransactionCategoryAsync(id, category, applyToMerchant: true, restore: r => restore = r);
+
+        changed.Should().Be(2);
+        restore.Should().BeEquivalentTo([new CategoryRestoreDto(id, null, true, null), new CategoryRestoreDto(other, category, false, 0.8)]);
+    }
+
+    [Fact]
+    public async Task SameMerchantCount_AndRestore_ReadTheServersFigures()
+    {
+        var count = BuildClient(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"count":7}""", Encoding.UTF8, "application/json") });
+        (await count.GetSameMerchantCountAsync(Guid.NewGuid())).Should().Be(7);
+
+        string? sentBody = null;
+        var capturing = new CapturingBodyHandler(b => sentBody = b, """{"restored":3}""");
+        var client = new FlowLedgerApiClient(
+            new HttpClient(capturing) { BaseAddress = new Uri("http://localhost") },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
+        var applied = Guid.NewGuid();
+
+        (await client.RestoreCategoriesAsync(applied, [new CategoryRestoreDto(Guid.NewGuid(), null, true, null)])).Should().Be(3);
+
+        sentBody.Should().Contain(applied.ToString()).And.Contain("\"items\"");
+    }
+
+    private sealed class CapturingBodyHandler(Action<string> capture, string responseJson) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            capture(request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken));
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(responseJson, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
     public async Task UpdateRecurringFlowAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
     {
         var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
