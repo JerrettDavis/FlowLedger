@@ -3,23 +3,6 @@ using System.Globalization;
 
 namespace FlowLedger.Application.Features.Query;
 
-/// <summary>
-/// Execution budget for one query (#168): an intermediate-row ceiling, a deterministic evaluation-step ceiling and a wall-clock
-/// timeout. Exceeding the first two is a "too expensive" 422, the timeout a 408; neither leaves partial results.
-/// </summary>
-public sealed record QueryBudget(int MaxIntermediateRows, long MaxEvalSteps, TimeSpan Timeout)
-{
-    public static QueryBudget Default { get; } = new(MaxIntermediateRows: 250_000, MaxEvalSteps: 50_000_000, Timeout: TimeSpan.FromSeconds(10));
-}
-
-public enum QueryBudgetKind { Rows, Steps, Timeout }
-
-/// <summary>A query that ran past its <see cref="QueryBudget"/>. The API maps <see cref="QueryBudgetKind.Timeout"/> to 408, the rest to 422.</summary>
-public sealed class QueryBudgetExceededException(string message, QueryBudgetKind kind) : Exception(message)
-{
-    public QueryBudgetKind Kind { get; } = kind;
-}
-
 /// <summary>A named, typed dataset the query language can read from.</summary>
 public sealed class QueryTable(IReadOnlyList<string> columns, List<object?[]> rows)
 {
@@ -59,9 +42,7 @@ internal static class QueryEngine
 {
     public const int MaxResultRows = 5000;
 
-    public static QueryResult Execute(
-        string query, IReadOnlyDictionary<string, QueryTable> datasets, DateOnly today,
-        QueryBudget? budget = null, CancellationToken ct = default)
+    public static QueryResult Execute(string query, IReadOnlyDictionary<string, QueryTable> datasets, DateOnly today, QueryBudget? budget = null, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
         var parsed = QueryParser.Parse(query);
@@ -72,8 +53,7 @@ internal static class QueryEngine
                 $"Unknown dataset '{parsed.Source}'. Available: {string.Join(", ", datasets.Keys.Order())}.", 0);
         }
 
-        budget ??= QueryBudget.Default;
-        var ctx = new EvalContext(today, budget, sw, ct);
+        var ctx = new EvalContext(today, budget ?? QueryBudget.Default, sw, ct);
         var names = source.Columns.ToList();
         var rows = source.Rows;
 
@@ -81,8 +61,7 @@ internal static class QueryEngine
         {
             foreach (var op in parsed.Operators)
             {
-                (names, rows) = Apply(op, names, rows, ctx);
-                ctx.CheckRows(rows.Count);
+                (names, rows) = ctx.Guard(Apply(op, names, rows, ctx));
             }
         }
         catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException or ArgumentException or FormatException or InvalidCastException)
@@ -419,41 +398,8 @@ internal static class Values
     };
 }
 
-internal sealed class EvalContext(DateOnly today, QueryBudget budget, Stopwatch clock, CancellationToken ct)
+internal sealed partial class EvalContext(DateOnly today, QueryBudget budget, Stopwatch clock, CancellationToken ct)
 {
-    private long _steps;
-
-    public bool Truthy(object? v) => v is true;
-
-    public void CheckRows(int count)
-    {
-        if (count > budget.MaxIntermediateRows)
-        {
-            throw new QueryBudgetExceededException(
-                $"The query produced more than {budget.MaxIntermediateRows:N0} intermediate rows; narrow it with a filter.", QueryBudgetKind.Rows);
-        }
-    }
-
-    private void Tick()
-    {
-        var steps = ++_steps;
-        if (steps > budget.MaxEvalSteps)
-        {
-            throw new QueryBudgetExceededException("The query needs too much computation; narrow it with a filter.", QueryBudgetKind.Steps);
-        }
-
-        // The clock is read every 256 evaluations (and on the first), so the check itself is cheap.
-        if ((steps & 0xFF) == 1)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (clock.Elapsed >= budget.Timeout)
-            {
-                throw new QueryBudgetExceededException(
-                    $"The query ran longer than {budget.Timeout.TotalSeconds:0.#} seconds.", QueryBudgetKind.Timeout);
-            }
-        }
-    }
-
     public object? Eval(Expr e, Scope scope, object?[] row)
     {
         Tick();

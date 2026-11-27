@@ -39,6 +39,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     private readonly bool _autoCreateAccounts;
     private readonly IProviderConnectionStore? _health;
     private readonly TimeProvider? _clock;
+    private readonly SyncChangeSet _changed = new();   // rows this sync inserted or settled (#163)
 
     /// <summary>Per-tenant stored-transaction ceiling the provider path enforces; tests lower it.</summary>
     internal int MaxTransactionsPerTenant { get; init; } = TransactionQuota.MaxPerTenant;
@@ -221,18 +222,9 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
     }
 
-    /// <summary>Ids of transactions this sync inserted or settled in place; carried out in <see cref="SyncResult.ChangedTransactionIds"/> so post-sync steps touch only these (#163).</summary>
-    private readonly List<Guid> _changedTransactionIds = [];
-
-    private bool Track(Transaction t)
-    {
-        _changedTransactionIds.Add(t.Id);
-        return true;
-    }
-
     private async Task<SyncResult> SyncCoreAsync(CancellationToken ct)
     {
-        _changedTransactionIds.Clear();
+        _changed.Clear();
         EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
@@ -326,7 +318,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // failed sync (cursors advanced, then an error) does not start a fresh minimum-interval window.
         await _cursorStore.MarkSuccessfulAsync(_provider.ProviderName, providerIdToAccount.Keys.ToList(), ct);
 
-        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded, _changedTransactionIds.Distinct().ToList());
+        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded, _changed.Snapshot());
         _logger.LogInformation(
             "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added",
             result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped, result.RecurringFlowsAdded);
@@ -579,7 +571,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     if (existingByFp.TryGetValue(x.Fingerprint.Value, out var row))
                     {
                         // Same provider id seen before: pending -> posted transition in place.
-                        if (!x.ProviderTx.IsPending && row.Settle(x.ProviderTx.PostedDate) && Track(row))
+                        if (!x.ProviderTx.IsPending && row.Settle(x.ProviderTx.PostedDate) && _changed.Track(row))
                         {
                             settled++;
                         }
@@ -617,7 +609,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                             }
                         }
 
-                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount) && Track(pending))
+                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount) && _changed.Track(pending))
                         {
                             PendingSettlement.RemoveSettleCandidate(settleCandidates, pending);
                             settled++;
@@ -635,7 +627,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     EnsureQuotaRoom(stored, toInsert.Count);
                     stored += toInsert.Count;
                     await _db.Transactions.AddRangeAsync(toInsert, ct);
-                    _changedTransactionIds.AddRange(toInsert.Select(t => t.Id));
+                    _changed.AddRange(toInsert);
                     added += toInsert.Count;
                     foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
                                  && t.Status == TransactionStatus.Pending && t.Source == TransactionSource.MxAggregation))
@@ -686,22 +678,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         return (added, skipped);
     }
 
-    private void EnsureQuotaRoom(int stored, int adding)
-    {
-        try
-        {
-            TransactionQuota.EnsureRoom(stored, adding, MaxTransactionsPerTenant);
-        }
-        catch (TransactionQuotaExceededException ex)
-        {
-            _logger.LogWarning("Sync stopped: {Message}", ex.Message);
-            throw new NeedsUserActionProviderException(
-                ex.Message, "Remove old transactions (or ask the administrator to raise the limit), then sync again.", "transaction_quota_exceeded")
-            {
-                Kind = ProviderIssueKind.Internal,
-            };
-        }
-    }
+    private void EnsureQuotaRoom(int stored, int adding) => SyncQuotaGuard.Ensure(_logger, stored, adding, MaxTransactionsPerTenant);
 
     /// <summary>Stops tracking saved transactions that cannot change again during this sync (anything not Pending).</summary>
     private void DetachCommittedTransactions(Dictionary<string, Transaction> insertedByFingerprint)

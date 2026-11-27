@@ -10,6 +10,9 @@ namespace FlowLedger.Api.Tests.Endpoints;
 [Collection("ApiIntegration")]
 public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifetime
 {
+    // The API reads the real clock for "this month", so the seeded dates must too: one read, shared by every test.
+    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+
     private HttpClient _client = null!;
 
     public async Task InitializeAsync()
@@ -26,7 +29,7 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
         var acct = await (await _client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null)))
             .Content.ReadFromJsonAsync<AccountDto>();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = Today;
 
         async Task Post(decimal amount, string desc, DateOnly? posted) =>
             (await _client.PostAsJsonAsync("/api/transactions",
@@ -50,13 +53,15 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
     [Fact]
     public async Task Insights_are_cached_per_tenant_but_a_write_invalidates_them_at_once()
     {
-        var acct = (await (await _client.PostAsJsonAsync("/api/accounts",
+        // A tenant of its own: nothing else cached for it, and other tests' data cannot leak into the zero-spend assertion.
+        var mine = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var acct = (await (await mine.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        Task<HttpResponseMessage> Spend(decimal amount, string desc) => _client.PostAsJsonAsync("/api/transactions",
+        var today = Today;
+        Task<HttpResponseMessage> Spend(decimal amount, string desc) => mine.PostAsJsonAsync("/api/transactions",
             new CreateTransactionRequest(acct.Id, amount, "USD", "Debit", desc, today, today, null, desc, null));
         async Task<DashboardInsightsDto> Insights() =>
-            (await (await _client.GetAsync("/api/dashboard/insights")).Content.ReadFromJsonAsync<DashboardInsightsDto>())!;
+            (await (await mine.GetAsync("/api/dashboard/insights")).Content.ReadFromJsonAsync<DashboardInsightsDto>())!;
 
         decimal Spent(DashboardInsightsDto d) => d.SpendingByCategory.Sum(c => c.Amount);
 

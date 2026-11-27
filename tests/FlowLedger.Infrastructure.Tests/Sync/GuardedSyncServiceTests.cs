@@ -95,14 +95,14 @@ public sealed class GuardedSyncServiceTests
     [Fact]
     public async Task In_flight_tenant_state_is_released_after_each_sync_so_it_cannot_grow_with_tenants_seen()
     {
-        var before = GuardedSyncService.InFlight.Count;
         var inner = new FakeSync();
-        for (var i = 0; i < 2000; i++)
+        var tenants = Enumerable.Range(0, 2000).Select(_ => Guid.NewGuid()).ToList();
+        foreach (var tenant in tenants)
         {
-            await new GuardedSyncService(inner, Guid.NewGuid(), TimeSpan.Zero, _ => Task.FromResult<DateTimeOffset?>(null), new Clock(Now)).SyncAsync();
+            await new GuardedSyncService(inner, tenant, TimeSpan.Zero, _ => Task.FromResult<DateTimeOffset?>(null), new Clock(Now)).SyncAsync();
         }
 
-        GuardedSyncService.InFlight.Count.Should().Be(before, "entries exist only while a sync is running (#179)");
+        tenants.Should().NotContain(t => GuardedSyncService.InFlight.Contains(t), "entries exist only while a sync is running (#179)");
     }
 
     [Fact]

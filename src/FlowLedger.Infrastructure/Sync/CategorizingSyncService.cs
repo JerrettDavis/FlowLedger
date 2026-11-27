@@ -41,7 +41,7 @@ internal sealed class CategorizingSyncService(
         {
             result = await inner.SyncAsync(ct);
         }
-        catch (Exception) when (tenantId != Guid.Empty && PendingFullSweep.Count < MaxPendingSweeps)
+        catch (Exception ex) when (ex is not (SyncThrottledException or SyncAlreadyRunningException) && tenantId != Guid.Empty && PendingFullSweep.Count < MaxPendingSweeps)
         {
             PendingFullSweep[tenantId] = 0;
             throw;
