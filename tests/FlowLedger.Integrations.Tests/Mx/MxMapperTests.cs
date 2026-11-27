@@ -111,6 +111,12 @@ public sealed class MxMapperTests
     }
 
     [Fact]
+    public void ToProviderTransaction_carries_the_MX_category_as_the_provider_hint()
+    {
+        MxMapper.ToProviderTransaction(MakeTx("DEBIT", 5m)).ProviderCategory.Should().Be("Shopping");
+    }
+
+    [Fact]
     public void ToProviderTransaction_pending_flag_from_status()
     {
         var pending = MxMapper.ToProviderTransaction(MakeTx("DEBIT", 5m, status: "PENDING"));
