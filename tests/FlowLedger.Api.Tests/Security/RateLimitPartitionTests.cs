@@ -10,6 +10,9 @@ namespace FlowLedger.Api.Tests.Security;
 /// <summary>Pure unit tests (no host / database): how requests are assigned to rate-limit partitions.</summary>
 public sealed class RateLimitPartitionTests
 {
+    // KeyFor verifies signatures against the real clock, so signed assertions must be fresh: one read, shared by the tests that sign.
+    private static readonly DateTimeOffset SignedAt = DateTimeOffset.UtcNow;
+
     private static DefaultHttpContext Ctx(string? authType, string? tenant = null, string ip = "203.0.113.7")
     {
         var http = new DefaultHttpContext();
@@ -74,7 +77,7 @@ public sealed class RateLimitPartitionTests
         var tenant = Guid.NewGuid();
 
         var good = Ctx(ApiKeyAuthenticationHandler.SchemeName, tenant.ToString(), "10.0.0.1");
-        good.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, DateTimeOffset.UtcNow);
+        good.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, SignedAt);
         var forged = Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString(), "10.0.0.1");
         forged.Request.Headers["X-Tenant-Sig"] = "1.deadbeef";
 
@@ -92,7 +95,7 @@ public sealed class RateLimitPartitionTests
         {
             var tenant = Guid.NewGuid();
             var http = Ctx(ApiKeyAuthenticationHandler.SchemeName, tenant.ToString(), "10.0.0.1");
-            http.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, DateTimeOffset.UtcNow);
+            http.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, SignedAt);
             keys.Add(RateLimitPartitions.KeyFor(http, key, maxTenantPartitions: 50, registry));
         }
 
@@ -105,7 +108,7 @@ public sealed class RateLimitPartitionTests
     public void Idle_partitions_are_released_so_new_tenants_are_admitted_again()
     {
         var registry = new TenantPartitionRegistry();
-        var t0 = DateTimeOffset.UtcNow;
+        var t0 = new DateTimeOffset(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
         registry.TryAdmit("a", 1, t0).Should().BeTrue();
         registry.TryAdmit("b", 1, t0).Should().BeFalse();
         registry.TryAdmit("b", 1, t0 + TenantPartitionRegistry.IdleAfter + TimeSpan.FromSeconds(1)).Should().BeTrue();
