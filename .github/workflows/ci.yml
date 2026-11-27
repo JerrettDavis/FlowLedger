@@ -72,6 +72,22 @@ jobs:
       - name: Fail on unexpected skipped tests
         run: python3 eng/ci/check-trx.py "artifacts/tests/**/*.trx" --allow-skip "LiveSandbox" --min-executed 500
 
+      # The TinyBDD Given/When/Then output of every scenario, as one readable report (job summary + downloadable artifact).
+      - name: BDD scenario report
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/bdd
+          python3 eng/ci/bdd-report.py "artifacts/tests/**/*.trx" artifacts/bdd/scenarios.md "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload BDD scenario report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: bdd-scenarios
+          path: artifacts/bdd/scenarios.md
+          if-no-files-found: ignore
+
       # Renders a line/branch coverage table in the job summary (informational, never fails the build).
       - name: Coverage summary
         if: always()
