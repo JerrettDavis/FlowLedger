@@ -17,7 +17,7 @@ namespace FlowLedger.Worker.Jobs;
 /// <c>:FeedName</c> (default: the AssetFeeds:Http:Name feed, "appraiser").
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledAssetValuationJob(
+public sealed partial class ScheduledAssetValuationJob(
     IServiceProvider services,
     IConfiguration configuration,
     ILogger<ScheduledAssetValuationJob> logger) : IJob
@@ -40,26 +40,38 @@ public sealed class ScheduledAssetValuationJob(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "ScheduledAssetValuationJob: could not list assets.");
+                LogCouldNotListAssets(ex);
                 return;
             }
 
             var homes = all.Where(a => a.IsActive && a.Category == AssetCategory.RealEstate).ToList();
-            logger.LogInformation("ScheduledAssetValuationJob: refreshing {Count} real-estate asset(s) from '{Feed}'.", homes.Count, feedName);
+            LogRefreshing(homes.Count, feedName);
 
             foreach (var home in homes)
             {
                 try
                 {
                     var result = await refresh.HandleAsync(home.Id, feedName, cancellationToken);
-                    logger.LogInformation("ScheduledAssetValuationJob: {Message}", result?.Message ?? "asset not found");
+                    LogResult(result?.Message ?? "asset not found");
                 }
                 catch (Exception ex)
                 {
                     // e.g. feed disabled / not configured, network error, rate limit.
-                    logger.LogWarning(ex, "ScheduledAssetValuationJob: refresh failed for one asset; keeping last value.");
+                    LogRefreshFailed(ex);
                 }
             }
         }, cancellationToken);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "ScheduledAssetValuationJob: could not list assets.")]
+    private partial void LogCouldNotListAssets(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "ScheduledAssetValuationJob: refreshing {Count} real-estate asset(s) from '{Feed}'.")]
+    private partial void LogRefreshing(int count, string feed);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "ScheduledAssetValuationJob: {Message}")]
+    private partial void LogResult(string message);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "ScheduledAssetValuationJob: refresh failed for one asset; keeping last value.")]
+    private partial void LogRefreshFailed(Exception exception);
 }
