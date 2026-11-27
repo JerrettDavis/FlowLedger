@@ -14,7 +14,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// If the native backend or the model cannot load, <see cref="State"/> says so and <see cref="ChooseAsync"/> returns null: the
 /// caller then simply keeps the embedder's answer. Never started by the sync pipeline, only by an explicit categorization run.
 /// </summary>
-internal sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
+internal sealed partial class LlamaSharpLocalLlm : ILocalLlm, IDisposable
 {
     private readonly LocalAiOptions _options;
     private readonly LocalModelManager _models;
@@ -91,7 +91,7 @@ internal sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
         {
             _failedAtUtc = DateTime.UtcNow;
             _failure = "Inference failed (" + ex.GetType().Name + "): " + ex.Message;
-            _logger.LogWarning(ex, "Local LLM inference failed");
+            LogLocalLLMInferenceFailed(_logger, ex);
             return null;
         }
         finally
@@ -126,14 +126,14 @@ internal sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
             _weights = LLamaWeights.LoadFromFile(_params);
             _loadedId = model.Id;
             _failure = null;
-            _logger.LogInformation("Local LLM loaded: {Model}", model.Id);
+            LogLocalLLMLoaded(_logger, model.Id);
             return true;
         }
         catch (Exception ex)
         {
             _failedAtUtc = DateTime.UtcNow;
             _failure = "Could not load the model (" + ex.GetType().Name + "): " + ex.Message;
-            _logger.LogWarning(ex, "Local LLM {Model} failed to load", model.Id);
+            LogLocalLLMFailedToLoad(_logger, ex, model.Id);
             return false;
         }
     }
@@ -149,4 +149,13 @@ internal sealed class LlamaSharpLocalLlm : ILocalLlm, IDisposable
         _weights?.Dispose();
         _gate.Dispose();
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local LLM inference failed")]
+    private static partial void LogLocalLLMInferenceFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Local LLM loaded: {Model}")]
+    private static partial void LogLocalLLMLoaded(ILogger logger, string? model);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local LLM {Model} failed to load")]
+    private static partial void LogLocalLLMFailedToLoad(ILogger logger, Exception exception, string? model);
 }

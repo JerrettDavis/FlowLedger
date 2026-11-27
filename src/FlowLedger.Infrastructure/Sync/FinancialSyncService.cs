@@ -26,7 +26,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// via <see cref="ISyncCursorStore"/>. The cursor is persisted after each successful page so
 /// that a mid-sync crash resumes from the last committed page rather than re-fetching everything.
 /// </summary>
-internal sealed class FinancialSyncService : IFinancialSyncService
+internal sealed partial class FinancialSyncService : IFinancialSyncService
 {
     private readonly IFinancialDataProvider _provider;
     private readonly FlowLedgerDbContext _db;
@@ -124,8 +124,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 "(POST /api/integrations/mx/connect-token); syncs never provision implicitly for real providers.");
         }
 
-        _logger.LogInformation("Provisioning provider connection for tenant {TenantId} via {Provider}",
-            tenantId, _provider.ProviderName);
+        LogProvisioningProviderConnectionForTenant(_logger, tenantId, _provider.ProviderName);
         var memberRef = await _provider.BeginConnectionAsync(tenantId, ct);
 
         // Persist immediately: if the process dies after this point the member is never re-created.
@@ -198,7 +197,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Could not read connection health for {Provider}; treating the clean sync as healthy.", _provider.ProviderName);
+            LogCouldNotReadConnectionHealth(_logger, ex, _provider.ProviderName);
             return null;
         }
     }
@@ -217,7 +216,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Could not record connection health for {Provider}.", _provider.ProviderName);
+            LogCouldNotRecordConnectionHealth(_logger, ex, _provider.ProviderName);
         }
     }
 
@@ -225,7 +224,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
     {
         EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
-        _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
+        LogStartingSyncForTenantVia(_logger, tenantId, _provider.ProviderName);
 
         if (_provider.Traits.HasFlag(ConnectorTraits.UserInitiatedLinking)
             && !await _db.ProviderConnections.AnyAsync(c => c.ProviderName == _provider.ProviderName, ct))
@@ -249,7 +248,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         // Step 2: fetch provider accounts
         var providerAccounts = await _provider.GetAccountsAsync(memberRef.MemberProviderId, ct);
-        _logger.LogDebug("Provider returned {Count} accounts", providerAccounts.Count);
+        LogProviderReturnedAccounts(_logger, providerAccounts.Count);
 
         if (_catalog is not null)
         {
@@ -263,7 +262,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Could not update the provider-account catalog; continuing the sync.");
+                LogCouldNotUpdateTheProvider(_logger, ex);
             }
         }
 
@@ -317,9 +316,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         await _cursorStore.MarkSuccessfulAsync(_provider.ProviderName, providerIdToAccount.Keys.ToList(), ct);
 
         var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded);
-        _logger.LogInformation(
-            "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added",
-            result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped, result.RecurringFlowsAdded);
+        LogSyncCompleteAccountsTransactionsAdded(_logger, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped, result.RecurringFlowsAdded);
 
         return result;
     }
@@ -391,9 +388,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 catch (Domain.Exceptions.CurrencyMismatchException ex)
                 {
                     // A provider changing an account's currency must not abort the whole sync.
-                    _logger.LogWarning(ex,
-                        "Skipping balance update for account {AccountId}: provider currency differs from the stored account currency.",
-                        existing.Id);
+                    LogSkippingBalanceUpdateForAccount(_logger, ex, existing.Id);
                 }
             }
 
@@ -406,7 +401,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 var previousType = existing.AccountType;
                 if (existing.ChangeType(mappedType))
                 {
-                    _logger.LogInformation("Account {AccountId} reclassified from provider data.", existing.Id);
+                    LogAccountReclassifiedFromProviderData(_logger, existing.Id);
                 }
             }
 
@@ -492,7 +487,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 var zeroAmount = page.Items.Count(pt => pt.Amount.Amount == 0m);
                 if (zeroAmount > 0)
                 {
-                    _logger.LogInformation("Skipping {Count} zero-amount transaction(s) on one account.", zeroAmount);
+                    LogSkippingZeroAmountTransactionS(_logger, zeroAmount);
                     skipped += zeroAmount;
                 }
 
@@ -503,9 +498,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     && !string.Equals(pt.Amount.Currency.Code, accountCurrency, StringComparison.OrdinalIgnoreCase));
                 if (foreignCurrency > 0)
                 {
-                    _logger.LogWarning(
-                        "Skipping {Count} transaction(s) whose currency differs from the account currency {Currency}.",
-                        foreignCurrency, accountCurrency);
+                    LogSkippingTransactionSWhoseCurrency(_logger, foreignCurrency, accountCurrency);
                     skipped += foreignCurrency;
                 }
 
@@ -634,7 +627,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 }
                 if (settled > 0)
                 {
-                    _logger.LogInformation("Settled {Count} pending transactions during sync", settled);
+                    LogSettledPendingTransactionsDuringSync(_logger, settled);
                 }
                 skipped += repeatedInPage + fingerprintMap.Count - toInsert.Count - settled;
             }
@@ -642,7 +635,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             if (page.SkippedCount > 0)
             {
                 skipped += page.SkippedCount;
-                _logger.LogInformation("The provider dropped {Count} row(s) without a usable date on one account.", page.SkippedCount);
+                LogTheProviderDroppedRowS(_logger, page.SkippedCount);
             }
 
             cursor = page.NextCursor;
@@ -667,7 +660,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             {
                 if (stale.AbandonPending())
                 {
-                    _logger.LogInformation("Retired a stale pending transaction (pending since {Date}).", stale.EffectiveDate);
+                    LogRetiredAStalePendingTransaction(_logger, stale.EffectiveDate);
                 }
             }
         }
@@ -683,7 +676,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
         catch (TransactionQuotaExceededException ex)
         {
-            _logger.LogWarning("Sync stopped: {Message}", ex.Message);
+            LogSyncStopped(_logger, ex.Message);
             throw new NeedsUserActionProviderException(
                 ex.Message, "Remove old transactions (or ask the administrator to raise the limit), then sync again.", "transaction_quota_exceeded")
             {
@@ -778,7 +771,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         if (checkingEntry.Value is null)
         {
-            _logger.LogWarning("Simulated recurring flow seeding skipped: no Checking account found.");
+            LogSimulatedRecurringFlowSeedingSkipped(_logger);
             return 0;
         }
 
@@ -809,9 +802,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                 // Do not log the raw provider account ID — it is an account-scoped
                 // identifier that should not appear in log output (financial app PII policy).
                 // The seed name provides enough context for diagnostics.
-                _logger.LogWarning(
-                    "Skipping recurring flow seed '{Name}': associated provider account not found in synced set.",
-                    seed.Name);
+                LogSkippingRecurringFlowSeedAssociated(_logger, seed.Name);
                 continue;
             }
 
@@ -841,7 +832,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
             added++;
         }
 
-        _logger.LogInformation("Recurring flow seeding: {Added} new flows created.", added);
+        LogRecurringFlowSeedingNewFlows(_logger, added);
         return added;
     }
 
@@ -913,11 +904,66 @@ internal sealed class FinancialSyncService : IFinancialSyncService
 
         if (mapped == AccountType.Checking && normalizedType != "CHECKING")
         {
-            _logger.LogWarning(
-                "Unknown provider account type '{ProviderType}'; defaulting to Checking.",
-                providerType);
+            LogUnknownProviderAccountTypeDefaulting(_logger, providerType);
         }
 
         return mapped;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Provisioning provider connection for tenant {TenantId} via {Provider}")]
+    private static partial void LogProvisioningProviderConnectionForTenant(ILogger logger, TenantId tenantId, string? provider);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not read connection health for {Provider}; treating the clean sync as healthy.")]
+    private static partial void LogCouldNotReadConnectionHealth(ILogger logger, Exception exception, string? provider);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not record connection health for {Provider}.")]
+    private static partial void LogCouldNotRecordConnectionHealth(ILogger logger, Exception exception, string? provider);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Starting sync for tenant {TenantId} via {Provider}")]
+    private static partial void LogStartingSyncForTenantVia(ILogger logger, TenantId tenantId, string? provider);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Provider returned {Count} accounts")]
+    private static partial void LogProviderReturnedAccounts(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not update the provider-account catalog; continuing the sync.")]
+    private static partial void LogCouldNotUpdateTheProvider(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added")]
+    private static partial void LogSyncCompleteAccountsTransactionsAdded(ILogger logger, int accountsUpserted, int txAdded, int txSkipped, int rfAdded);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping balance update for account {AccountId}: provider currency differs from the stored account currency.")]
+    private static partial void LogSkippingBalanceUpdateForAccount(ILogger logger, Exception exception, Guid accountId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Account {AccountId} reclassified from provider data.")]
+    private static partial void LogAccountReclassifiedFromProviderData(ILogger logger, Guid accountId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Skipping {Count} zero-amount transaction(s) on one account.")]
+    private static partial void LogSkippingZeroAmountTransactionS(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping {Count} transaction(s) whose currency differs from the account currency {Currency}.")]
+    private static partial void LogSkippingTransactionSWhoseCurrency(ILogger logger, int count, string currency);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Settled {Count} pending transactions during sync")]
+    private static partial void LogSettledPendingTransactionsDuringSync(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The provider dropped {Count} row(s) without a usable date on one account.")]
+    private static partial void LogTheProviderDroppedRowS(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Retired a stale pending transaction (pending since {Date}).")]
+    private static partial void LogRetiredAStalePendingTransaction(ILogger logger, DateOnly date);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Sync stopped: {Message}")]
+    private static partial void LogSyncStopped(ILogger logger, string? message);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Simulated recurring flow seeding skipped: no Checking account found.")]
+    private static partial void LogSimulatedRecurringFlowSeedingSkipped(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping recurring flow seed '{Name}': associated provider account not found in synced set.")]
+    private static partial void LogSkippingRecurringFlowSeedAssociated(ILogger logger, string? name);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Recurring flow seeding: {Added} new flows created.")]
+    private static partial void LogRecurringFlowSeedingNewFlows(ILogger logger, int added);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unknown provider account type '{ProviderType}'; defaulting to Checking.")]
+    private static partial void LogUnknownProviderAccountTypeDefaulting(ILogger logger, string? providerType);
 }

@@ -121,7 +121,7 @@ public sealed class BackupRunStore
 /// pruning only happens after a confirmed off-site copy and never touches <c>premigrate-*</c> snapshots.
 /// Every run, success or failure, is recorded in <c>backup_runs</c> so the UI can show it.
 /// </summary>
-public sealed class BackupRunner
+public sealed partial class BackupRunner
 {
     private readonly string _connectionString;
     private readonly BackupSettings _settings;
@@ -204,7 +204,7 @@ public sealed class BackupRunner
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             error = ex.Message;
-            _logger.LogError(ex, "Backup run failed");
+            LogBackupRunFailed(_logger, ex);
         }
 
         var result = new BackupRunResult(error is null, started, DateTimeOffset.UtcNow, dir, rows, offsiteOk, offsiteDetail, drillOk, error);
@@ -214,7 +214,7 @@ public sealed class BackupRunner
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Could not record backup run");
+            LogCouldNotRecordBackupRun(_logger, ex);
         }
 
         return result;
@@ -337,7 +337,7 @@ public sealed class BackupRunner
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Could not prune old snapshot {Dir}", d);
+                LogCouldNotPruneOldSnapshot(_logger, ex, d);
             }
         }
     }
@@ -356,4 +356,13 @@ public sealed class BackupRunner
     private static string LastLine(string s) => s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
 
     private static string Truncate(string s) => s.Length <= 600 ? s.Trim() : s[^600..].Trim();
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Backup run failed")]
+    private static partial void LogBackupRunFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Could not record backup run")]
+    private static partial void LogCouldNotRecordBackupRun(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not prune old snapshot {Dir}")]
+    private static partial void LogCouldNotPruneOldSnapshot(ILogger logger, Exception exception, string? dir);
 }

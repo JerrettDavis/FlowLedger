@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// rule (so a category the user just set by hand is respected, never overwritten) and converges. Never use it around work that
 /// cannot be repeated cheaply and safely (provider calls); those reconcile conflicts column by column instead.
 /// </summary>
-public static class ConcurrencyRetry
+public static partial class ConcurrencyRetry
 {
     /// <summary>Runs per unit before the conflict is allowed to surface.</summary>
     public const int DefaultAttempts = 3;
@@ -27,9 +27,7 @@ public static class ConcurrencyRetry
             }
             catch (Exception ex) when (IsConflict(ex) && attempt < maxAttempts && !ct.IsCancellationRequested)
             {
-                logger.LogWarning(ex,
-                    "{Operation}: a row changed underneath it (attempt {Attempt} of {Max}); reloading and running it again.",
-                    operation, attempt, maxAttempts);
+                LogARowChangedUnderneathIt(logger, ex, operation, attempt, maxAttempts);
 
                 // Everything tracked is stale (and the failed batch is in an unknown state): start from a clean slate so the retry reads fresh rows.
                 db.ChangeTracker.Clear();
@@ -46,4 +44,7 @@ public static class ConcurrencyRetry
         }, logger, operation, ct, maxAttempts);
 
     private static bool IsConflict(Exception ex) => ex is DbUpdateConcurrencyException or ConcurrencyConflictException;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Operation}: a row changed underneath it (attempt {Attempt} of {Max}); reloading and running it again.")]
+    private static partial void LogARowChangedUnderneathIt(ILogger logger, Exception exception, string? operation, int attempt, int max);
 }

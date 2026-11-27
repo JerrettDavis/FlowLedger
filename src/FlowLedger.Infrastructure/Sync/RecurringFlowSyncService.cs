@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// lists stay current without the user doing anything. Everything less certain waits as a suggestion. A failure here never
 /// fails the sync.
 /// </summary>
-internal sealed class RecurringFlowSyncService(
+internal sealed partial class RecurringFlowSyncService(
     IFinancialSyncService inner,
     FlowLedgerDbContext db,
     RecurringSuggestionService suggestions,
@@ -32,14 +32,20 @@ internal sealed class RecurringFlowSyncService(
             var added = await ConcurrencyRetry.RunAsync(db, () => suggestions.AutoAddAsync(ct), logger, "Recurring-flow detection", ct);
             if (added.Added > 0)
             {
-                logger.LogInformation("Auto-added {Count} recurring flow(s): {Names}", added.Added, string.Join(", ", added.Names));
+                LogAutoAddedRecurringFlowS(logger, added.Added, added.Names);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Recurring-flow detection after sync failed; it will retry on the next sync.");
+            LogRecurringFlowDetectionAfterSync(logger, ex);
         }
 
         return result;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Auto-added {Count} recurring flow(s): {Names}")]
+    private static partial void LogAutoAddedRecurringFlowS(ILogger logger, int count, IEnumerable<string> names);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Recurring-flow detection after sync failed; it will retry on the next sync.")]
+    private static partial void LogRecurringFlowDetectionAfterSync(ILogger logger, Exception exception);
 }
