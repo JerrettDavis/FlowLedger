@@ -1,0 +1,105 @@
+@page "/subscriptions"
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+
+<PageTitle>Subscriptions — FlowLedger</PageTitle>
+
+<PageHeader Title="Subscriptions" />
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+    Charges that repeat every month or year for a steady amount, found in your transactions. A price change shows up here
+    for about four months after the first charge at the new price. Variable bills such as utilities are not listed.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_failed)
+{
+    <MudAlert Severity="Severity.Error">Could not load subscriptions.</MudAlert>
+}
+else if (_data is null || _data.Subscriptions.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.Subscriptions"
+                Title="No subscriptions found"
+                Description="Once a charge has repeated on a monthly rhythm for a few months it will be listed here." />
+}
+else
+{
+    @if (_data.Subscriptions.Count(s => s.PriceChange == "Increase") is > 0 and var raised)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true" data-testid="subscription-price-alert">
+            @raised subscription@(raised == 1 ? "" : "s") went up in price recently.
+        </MudAlert>
+    }
+
+    <div class="d-flex gap-4 flex-wrap mb-3">
+        <MudText Typo="Typo.subtitle1" data-testid="subscription-monthly-total">@Format.Money(_data.MonthlyTotal) a month</MudText>
+        <MudText Typo="Typo.subtitle1" Class="fl-muted">@Format.Money(_data.YearlyTotal) a year</MudText>
+    </div>
+
+    <MudSimpleTable Dense="true" Hover="true" aria-label="Detected subscriptions" data-testid="subscriptions-table">
+        <thead>
+            <tr>
+                <th scope="col">Subscription</th>
+                <th scope="col">Charge</th>
+                <th scope="col" class="fl-hide-md">Per month</th>
+                <th scope="col" class="fl-hide-md">Last charged</th>
+                <th scope="col" class="fl-hide-md">Next expected</th>
+                <th scope="col">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in _data.Subscriptions)
+            {
+                <tr data-testid="subscription-row">
+                    <td>
+                        <div>@s.Name</div>
+                        <MudText Typo="Typo.caption" Class="fl-muted">
+                            @s.Cadence@(s.Status == "Lapsed" ? " · possibly cancelled" : "") · @s.Charges charges
+                        </MudText>
+                    </td>
+                    <td class="fl-num">@Format.Money(s.Amount)@(s.Cadence == "Yearly" ? " / yr" : "")</td>
+                    <td class="fl-num fl-hide-md">@Format.Money(s.MonthlyCost)</td>
+                    <td class="fl-hide-md">@Format.FullDate(s.LastCharged)</td>
+                    <td class="fl-hide-md">@(s.Status == "Lapsed" ? "–" : Format.FullDate(s.NextExpected))</td>
+                    <td>
+                        @if (s.PriceChange is { } change)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="@(change == "Increase" ? Color.Warning : Color.Success)" Variant="Variant.Outlined"
+                                     data-testid="subscription-price-change"
+                                     title="@(s.PriceChangedOn is { } on ? $"Since {Format.FullDate(on)}" : null)">
+                                @(change == "Increase" ? "Up" : "Down") from @Format.Money(s.PreviousAmount ?? 0m)
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <span class="fl-muted">Steady</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    private FlowLedger.Web.ApiClient.SubscriptionOverviewDto? _data;
+    private bool _loading = true;
+    private bool _failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _data = await ApiClient.GetSubscriptionsAsync();
+        }
+        catch (Exception)
+        {
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

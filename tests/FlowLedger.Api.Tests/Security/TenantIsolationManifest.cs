@@ -65,6 +65,7 @@ internal static class TenantIsolationManifest
         ["GET /api/accounts/connectors"] = List(),
         ["GET /api/accounts/{id:guid}"] = ById("Account"),
         ["GET /api/alerts"] = List(),
+        ["GET /api/subscriptions"] = List(),
         ["GET /api/assets"] = List(),
         ["GET /api/assets/categories"] = Global("static category list"),
         ["GET /api/assets/summary"] = List(),
