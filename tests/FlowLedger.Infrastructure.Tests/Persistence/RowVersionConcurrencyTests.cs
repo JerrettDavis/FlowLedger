@@ -29,7 +29,7 @@ public sealed class RowVersionConcurrencyTests : IAsyncLifetime
         var accountId = await _fixture.SeedAccountAsync(tenant, "Checking");
         await using var db = _fixture.CreateDbContext(tenant);
         var tx = Transaction.RecordActual(TenantId.From(tenant.TenantId), accountId, new Money(12m, Currency.Usd),
-            TransactionDirection.Debit, "Shop", Day, Day, TransactionSource.Manual);
+            TransactionDirection.Debit, "Shop", Day, Day, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         var category = Category.Create(TenantId.From(tenant.TenantId), new CategoryPath("Food"), "Food");
         db.Transactions.Add(tx);
         db.Categories.Add(category);
@@ -67,7 +67,7 @@ public sealed class RowVersionConcurrencyTests : IAsyncLifetime
         await using (var seed = _fixture.CreateDbContext(tenant))
         {
             var flow = RecurringFlow.Create(TenantId.From(tenant.TenantId), accountId, "Rent", new Money(900m, Currency.Usd),
-                TransactionDirection.Debit, RecurrencePattern.Monthly(1), Day);
+                TransactionDirection.Debit, RecurrencePattern.Monthly(1), Day, FlowLedger.TestSupport.TestClock.Provider);
             seed.RecurringFlows.Add(flow);
             await seed.SaveChangesAsync();
             flowId = flow.Id;

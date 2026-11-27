@@ -40,6 +40,24 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task Each_point_carries_the_currency_of_its_snapshot()
+    {
+        var tenant = TestTenantContext.New();
+        var a = await _fixture.SeedAccountAsync(tenant, "Euro");
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            seed.BalanceSnapshots.Add(AccountBalanceSnapshotRecord.Create(
+                tenant.TenantId, a.Value, "Simulated", "p", 10m, "EUR", new DateTimeOffset(TestClock.Today.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero)));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = _fixture.CreateDbContext(tenant);
+        var points = await new BalanceHistoryReader(db, TestClock.Provider).DailyAccountBalancesAsync(TestClock.Today.AddDays(-5), null);
+
+        points.Should().ContainSingle().Which.Currency.Should().Be("EUR");
+    }
+
+    [DockerFact]
     public async Task Windowed_read_returns_only_the_window_plus_one_anchor_per_account_in_two_queries()
     {
         var tenant = TestTenantContext.New();

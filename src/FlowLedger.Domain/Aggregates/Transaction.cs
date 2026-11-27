@@ -122,8 +122,8 @@ public sealed class Transaction : AggregateRoot
         DateOnly effectiveDate,
         DateOnly? postedDate,
         TransactionSource source,
-        TransactionFingerprint? fingerprint = null,
-        TimeProvider? time = null)
+        TimeProvider time,
+        TransactionFingerprint? fingerprint = null)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -150,7 +150,7 @@ public sealed class Transaction : AggregateRoot
         TransactionDirection direction,
         string description,
         DateOnly plannedDate,
-        TimeProvider? time = null)
+        TimeProvider time)
     {
         if (string.IsNullOrWhiteSpace(description))
         {

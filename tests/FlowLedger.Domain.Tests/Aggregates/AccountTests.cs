@@ -15,7 +15,7 @@ public sealed class AccountTests
     [Fact]
     public void Create_valid_account_records_tenant_and_type()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
 
         account.TenantId.Should().Be(TenantId);
         account.AccountType.Should().Be(AccountType.Checking);
@@ -24,23 +24,23 @@ public sealed class AccountTests
     [Fact]
     public void Create_empty_name_throws_EmptyStringException()
     {
-        var act = () => Account.Create(TenantId, "  ", AccountType.Checking, ZeroUsd);
+        var act = () => Account.Create(TenantId, "  ", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<EmptyStringException>();
     }
 
     [Fact]
     public void Create_trims_name_whitespace()
     {
-        var account = Account.Create(TenantId, "  My Checking  ", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "  My Checking  ", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         account.Name.Should().Be("My Checking");
     }
 
     [Fact]
     public void UpdateBalance_sets_the_balance()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
 
-        account.UpdateBalance(ThousandUsd);
+        account.UpdateBalance(ThousandUsd, FlowLedger.TestSupport.TestClock.Provider);
 
         account.CurrentBalance.Should().Be(ThousandUsd);
     }
@@ -48,29 +48,29 @@ public sealed class AccountTests
     [Fact]
     public void UpdateBalance_currency_mismatch_throws()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         var eur = new Money(100m, "EUR");
 
-        var act = () => account.UpdateBalance(eur);
+        var act = () => account.UpdateBalance(eur, FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<CurrencyMismatchException>();
     }
 
     [Fact]
     public void Asset_account_cannot_have_negative_balance_without_credit_limit()
     {
-        var account = Account.Create(TenantId, "Savings", AccountType.Savings, ZeroUsd);
+        var account = Account.Create(TenantId, "Savings", AccountType.Savings, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         var negative = new Money(-100m, "USD");
 
-        var act = () => account.UpdateBalance(negative);
+        var act = () => account.UpdateBalance(negative, FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<InvalidBalanceException>();
     }
 
     [Fact]
     public void Provider_balance_may_be_negative_on_an_asset_account()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd);
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd, FlowLedger.TestSupport.TestClock.Provider);
 
-        account.ApplyProviderBalance(new Money(-35m, "USD"));
+        account.ApplyProviderBalance(new Money(-35m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
 
         account.CurrentBalance.Amount.Should().Be(-35m);
     }
@@ -78,8 +78,8 @@ public sealed class AccountTests
     [Fact]
     public void Provider_balance_in_another_currency_still_throws()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd);
-        var act = () => account.ApplyProviderBalance(new Money(1m, "EUR"));
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ThousandUsd, FlowLedger.TestSupport.TestClock.Provider);
+        var act = () => account.ApplyProviderBalance(new Money(1m, "EUR"), FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<CurrencyMismatchException>();
     }
 
@@ -87,9 +87,9 @@ public sealed class AccountTests
     public void Asset_account_with_credit_limit_allows_negative_balance()
     {
         var creditLimit = new Money(5000m, "USD");
-        var account = Account.Create(TenantId, "Credit Card", AccountType.CreditCard, ZeroUsd, creditLimit);
+        var account = Account.Create(TenantId, "Credit Card", AccountType.CreditCard, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider, creditLimit);
 
-        account.UpdateBalance(new Money(-200m, "USD")); // should not throw
+        account.UpdateBalance(new Money(-200m, "USD"), FlowLedger.TestSupport.TestClock.Provider); // should not throw
 
         account.CurrentBalance.Amount.Should().Be(-200m);
     }
@@ -97,7 +97,7 @@ public sealed class AccountTests
     [Fact]
     public void Rename_trims_and_updates_name()
     {
-        var account = Account.Create(TenantId, "Old Name", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Old Name", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         account.Rename("  New Name  ");
         account.Name.Should().Be("New Name");
     }
@@ -105,7 +105,7 @@ public sealed class AccountTests
     [Fact]
     public void Rename_empty_throws()
     {
-        var account = Account.Create(TenantId, "Name", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Name", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         var act = () => account.Rename("");
         act.Should().Throw<EmptyStringException>();
     }
@@ -113,7 +113,7 @@ public sealed class AccountTests
     [Fact]
     public void Deactivate_sets_IsActive_to_false()
     {
-        var account = Account.Create(TenantId, "Old", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Old", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         account.Deactivate();
         account.IsActive.Should().BeFalse();
     }
@@ -121,7 +121,7 @@ public sealed class AccountTests
     [Fact]
     public void Account_TenantId_is_preserved()
     {
-        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd);
+        var account = Account.Create(TenantId, "Checking", AccountType.Checking, ZeroUsd, FlowLedger.TestSupport.TestClock.Provider);
         account.TenantId.Should().Be(TenantId);
     }
 
@@ -130,7 +130,7 @@ public sealed class AccountTests
     {
         var act = () => Account.Create(
             TenantId, "Card", AccountType.CreditCard,
-            Money.Zero("USD"), creditLimit: new Money(1000m, "EUR"));
+            Money.Zero("USD"), FlowLedger.TestSupport.TestClock.Provider, creditLimit: new Money(1000m, "EUR"));
 
         act.Should().Throw<CurrencyMismatchException>();
     }

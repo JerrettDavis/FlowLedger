@@ -56,7 +56,7 @@ public partial class ImportScenarios : TinyBddXunitBase
         async Task<ImportSummaryDto> CreateAccountAndImport(TestTenantContext _)
         {
             var accounts = scope.Resolve<IAccountRepository>();
-            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(0m, "USD"));
+            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(0m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
             await accounts.AddAsync(account);
             await accounts.SaveChangesAsync();
             accountId = account.AccountId.Value;

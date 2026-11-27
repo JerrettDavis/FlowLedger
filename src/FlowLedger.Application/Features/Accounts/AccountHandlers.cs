@@ -43,9 +43,9 @@ public sealed class CreateAccountHandler
 {
     private readonly IAccountRepository _repo;
     private readonly ITenantContext _tenant;
-    private readonly TimeProvider? _clock;
+    private readonly TimeProvider _clock;
 
-    public CreateAccountHandler(IAccountRepository repo, ITenantContext tenant, TimeProvider? clock = null)
+    public CreateAccountHandler(IAccountRepository repo, ITenantContext tenant, TimeProvider clock)
     {
         _repo = repo;
         _tenant = tenant;
@@ -67,9 +67,9 @@ public sealed class CreateAccountHandler
             request.Name,
             accountType,
             balance,
+            _clock,
             creditLimit,
-            request.Institution,
-            _clock);
+            request.Institution);
 
         await _repo.AddAsync(account, ct);
         await _repo.SaveChangesAsync(ct);

@@ -34,8 +34,8 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
         // Seed one account per tenant through an unscoped (admin) context.
         await using (var admin = _fixture.CreateProductionStyleContext(null))
         {
-            admin.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd)));
-            admin.Accounts.Add(Account.Create(TenantId.From(b.TenantId), "B-acct", AccountType.Checking, new Money(2m, Currency.Usd)));
+            admin.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd), TestClock.Provider));
+            admin.Accounts.Add(Account.Create(TenantId.From(b.TenantId), "B-acct", AccountType.Checking, new Money(2m, Currency.Usd), TestClock.Provider));
             await admin.SaveChangesAsync();
             // The unscoped context sees both.
             Assert.Equal(2, await admin.Accounts.CountAsync());
@@ -54,7 +54,7 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
 
         await using (var asA = _fixture.CreateProductionStyleContext(a))
         {
-            asA.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd)));
+            asA.Accounts.Add(Account.Create(TenantId.From(a.TenantId), "A-acct", AccountType.Checking, new Money(1m, Currency.Usd), TestClock.Provider));
             await asA.SaveChangesAsync();
             Assert.Single(await asA.Accounts.ToListAsync());
         }
@@ -123,9 +123,9 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
         // #92: an event must never be lost because the save that should carry it failed.
         var t = TestTenantContext.New();
         await using var db = _fixture.CreateProductionStyleContext(t);
-        db.Accounts.Add(Account.Create(TenantId.From(t.TenantId), "Evt", AccountType.Checking, new Money(1m, Currency.Usd)));
+        db.Accounts.Add(Account.Create(TenantId.From(t.TenantId), "Evt", AccountType.Checking, new Money(1m, Currency.Usd), TestClock.Provider));
         new FlowLedger.Infrastructure.Events.EfOutbox(db, t).Enqueue(
-            new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0));
+            new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0) { OccurredAt = FlowLedger.TestSupport.TestClock.Instant });
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();

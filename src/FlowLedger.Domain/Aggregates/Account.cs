@@ -81,9 +81,9 @@ public sealed class Account : AggregateRoot
         string name,
         AccountType accountType,
         Money startingBalance,
+        TimeProvider time,
         Money? creditLimit = null,
-        string? institution = null,
-        TimeProvider? time = null)
+        string? institution = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -120,7 +120,7 @@ public sealed class Account : AggregateRoot
     /// Updates the current balance, e.g. after an import sync or manual reconciliation.
     /// Raises <see cref="AccountBalanceUpdated"/>.
     /// </summary>
-    public void UpdateBalance(Money newBalance, TimeProvider? time = null)
+    public void UpdateBalance(Money newBalance, TimeProvider time)
     {
         if (newBalance.Currency != CurrentBalance.Currency)
         {
@@ -142,7 +142,7 @@ public sealed class Account : AggregateRoot
     /// "assets cannot go negative" input guard of <see cref="UpdateBalance"/> does not apply: an overdrawn
     /// checking account really is negative, and refusing it would leave a stale positive balance behind.
     /// </summary>
-    public void ApplyProviderBalance(Money newBalance, TimeProvider? time = null)
+    public void ApplyProviderBalance(Money newBalance, TimeProvider time)
     {
         if (newBalance.Currency != CurrentBalance.Currency)
         {
@@ -152,7 +152,7 @@ public sealed class Account : AggregateRoot
         SetBalance(newBalance, time);
     }
 
-    private void SetBalance(Money newBalance, TimeProvider? time)
+    private void SetBalance(Money newBalance, TimeProvider time)
     {
         CurrentBalance = newBalance;
         LastBalanceConfirmedAt = Now(time);

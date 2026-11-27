@@ -2,6 +2,7 @@ using System.Globalization;
 using CsCheck;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Application.Features.Imports;
+using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
@@ -94,6 +95,32 @@ public sealed class ApplicationPropertyTests
             var found = TransferDetector.Detect(batch, AccountTypes);
             var net = found.Sum(id => byId[id].Direction == "Credit" ? byId[id].Amount : -byId[id].Amount);
             net.Should().Be(0m);
+        });
+    }
+
+    [Fact]
+    [Trait("Invariant", "INV-03")]
+    public void Both_legs_of_a_detected_transfer_are_left_out_of_income_and_spending()
+    {
+        var accountNames = Accounts.ToDictionary(a => a, a => a.ToString());
+        Prop.ForAll(TransactionBatch, batch =>
+        {
+            var found = TransferDetector.Detect(batch, AccountTypes);
+            var from = TransactionDtoBuilder.DefaultDate.AddDays(-30);
+            var to = TransactionDtoBuilder.DefaultDate.AddDays(45);
+            var window = batch.Where(t => t.Status != "Planned" && t.Status != "Skipped").ToList();
+
+            foreach (var income in new[] { false, true })
+            {
+                var direction = income ? "Credit" : "Debit";
+                var result = SpendingInsightsAnalyzer.Analyze(
+                    new BreakdownQuery(from, to, null, income), batch, new Dictionary<Guid, string>(), accountNames, AccountTypes);
+
+                var legs = window.Where(t => t.Direction == direction && found.Contains(t.Id)).ToList();
+                var rest = window.Where(t => t.Direction == direction && !found.Contains(t.Id)).Sum(t => t.Amount);
+                result.Total.Should().Be(rest, "transfer legs never count toward {0}", income ? "income" : "spending");
+                result.TransfersExcluded.Should().Be(legs.Count);
+            }
         });
     }
 

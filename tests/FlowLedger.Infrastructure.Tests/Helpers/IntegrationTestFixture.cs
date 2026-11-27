@@ -61,7 +61,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             FlowLedger.Domain.ValueObjects.TenantId.From(tenant.TenantId),
             name,
             FlowLedger.Domain.Aggregates.AccountType.Checking,
-            new FlowLedger.Domain.ValueObjects.Money(0m, FlowLedger.Domain.ValueObjects.Currency.Usd));
+            new FlowLedger.Domain.ValueObjects.Money(0m, FlowLedger.Domain.ValueObjects.Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         ctx.Accounts.Add(account);
         await ctx.SaveChangesAsync();
         return account.AccountId;

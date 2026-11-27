@@ -13,7 +13,7 @@ namespace FlowLedger.Application.Features.Dashboard;
 /// </summary>
 public sealed class GetDashboardInsightsHandler(
     RunQueryHandler query,
-    TimeProvider? clock = null,
+    TimeProvider clock,
     TenantResultCache? cache = null,
     FlowLedger.SharedKernel.ITenantContext? tenant = null,
     TransactionAggregates? aggregates = null,
@@ -30,13 +30,13 @@ public sealed class GetDashboardInsightsHandler(
             return ComputeAsync(from, to, ct);
         }
 
-        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetLocalNow().DateTime);
+        var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
         return cache.GetOrAddAsync(tenant.TenantId, $"dashboard-insights:{from:yyyy-MM-dd}:{to:yyyy-MM-dd}:{today:yyyy-MM-dd}", () => ComputeAsync(from, to, ct));
     }
 
     private async Task<DashboardInsightsDto> ComputeAsync(DateOnly? from, DateOnly? to, CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetLocalNow().DateTime);
+        var today = DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
         // Merchants follow the selected window (this month when none).
         var curFrom = from ?? new DateOnly(today.Year, today.Month, 1);
         var curTo = to ?? today;
@@ -57,7 +57,7 @@ public sealed class GetDashboardInsightsHandler(
         if (UseSql)
         {
             // The query engine reads "today" in UTC (this month, ago(5mo)); keep the SQL window on exactly the same day.
-            var utcToday = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime);
+            var utcToday = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
             var spendRows = from is null
                 ? await aggregates!.SpendByCategoryAsync(new DateOnly(utcToday.Year, utcToday.Month, 1), null, ct)
                 : await aggregates!.SpendByCategoryAsync(from, to, ct);

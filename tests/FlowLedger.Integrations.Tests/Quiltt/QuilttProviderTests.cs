@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Quiltt;
+using FlowLedger.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -31,7 +32,7 @@ public sealed class QuilttProviderTests
         opts ??= new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", WebhookSecret = webhookSecret };
         opts.ApiKeySecret ??= "key";
         var o = Options.Create(opts);
-        var verifier = webhookSecret is null ? null : new QuilttWebhookVerifier(webhookSecret, opts.WebhookTolerance);
+        var verifier = webhookSecret is null ? null : new QuilttWebhookVerifier(webhookSecret, opts.WebhookTolerance, TestClock.Provider);
         return new QuilttFinancialDataProvider(
             new QuilttApiClient(new HttpClient(stub), o), o, verifier, NullLogger<QuilttFinancialDataProvider>.Instance);
     }
@@ -338,7 +339,7 @@ public sealed class QuilttProviderTests
     {
         var p = Make(HappyPath());
         var raw = Encoding.UTF8.GetBytes(Hook);
-        var header = Header("whsec", Hook, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var header = Header("whsec", Hook, TestClock.Instant.ToUnixTimeSeconds());
 
         await p.VerifyWebhookAsync(raw, header);
         var evt = await p.ParseWebhookAsync(raw);
@@ -364,7 +365,7 @@ public sealed class QuilttProviderTests
     {
         var p = Make(HappyPath());
         var raw = Encoding.UTF8.GetBytes(Hook);
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var now = TestClock.Instant.ToUnixTimeSeconds();
 
         await p.Invoking(x => x.VerifyWebhookAsync(raw, Header("other", Hook, now)))
             .Should().ThrowAsync<InvalidWebhookSignatureException>();

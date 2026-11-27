@@ -18,6 +18,7 @@ public sealed class DuplicateMergeTests(IntegrationTestFixture fixture) : IAsync
     private static Transaction Tx(TenantId t, AccountId a, string desc, DateOnly d, string? pid)
         => Transaction.RecordActual(t, a, new Money(18.40m, Currency.Usd), TransactionDirection.Debit, desc, d, d,
             pid is null ? TransactionSource.Manual : TransactionSource.MxAggregation,
+            FlowLedger.TestSupport.TestClock.Provider,
             TransactionFingerprint.FromRawDescription(a, d, 18.40m, desc, pid));
 
     [DockerFact]

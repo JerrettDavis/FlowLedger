@@ -24,7 +24,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
     public Task DisposeAsync() => Task.CompletedTask;
 
     private async Task<CategoryDto> Cat(string path)
-        => (await (await _client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest(path, path.Split('/').Last(), null)))
+        => (await (await _client.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath(path).Named(path.Split('/').Last()).Build()))
             .Content.ReadFromJsonAsync<CategoryDto>())!;
 
     private async Task<TransactionDto> Spend(Guid account, string desc, Guid categoryId)

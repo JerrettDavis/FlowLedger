@@ -22,7 +22,7 @@ public sealed class DataEnvironmentGuardTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         await using var ctx = _fixture.CreateDbContext(tenantCtx);
-        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Demo", AccountType.Checking, new Money(1m, Currency.Usd)));
+        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Demo", AccountType.Checking, new Money(1m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider));
         await ctx.SaveChangesAsync();
     }
 

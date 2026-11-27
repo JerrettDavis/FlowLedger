@@ -146,6 +146,7 @@ public static partial class DependencyInjection
         // SQL GROUP BY aggregation for the dashboard (#160); the handler falls back to the query engine when this is not registered.
         services.AddScoped<FlowLedger.Application.Features.Query.ITransactionAggregateStore, EfTransactionAggregateStore>();
         services.AddScoped<FlowLedger.Application.Features.Query.TransactionAggregates>();
+        services.AddScoped<FlowLedger.Application.Features.Insights.IBreakdownStore, EfBreakdownStore>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -185,7 +186,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
 
         var message = new HttpRequestMessage(HttpMethod.Put, $"/api/accounts/{created.Id}/settings")
         {
-            Content = JsonContent.Create(new AccountSettingsRequest(false, "Standard", false)),
+            Content = JsonContent.Create(AccountSettingsRequestBuilder.A().Active(false).InMode("Standard").Build()),
         };
         message.Headers.TryAddWithoutValidation("If-Match", $"\"{created.Version}\"");
         var response = await _client.SendAsync(message);
@@ -258,7 +259,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
     [Fact]
     public async Task Post_with_invalid_account_type_returns_400()
     {
-        var request = new CreateAccountRequest("Bad", "NotARealType", 0m, "USD", null, null);
+        var request = CreateAccountRequestBuilder.A().Named("Bad").OfType("NotARealType").StartingAt(0m).Build();
 
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
 
@@ -268,7 +269,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
     [Fact]
     public async Task Post_with_invalid_currency_length_returns_400()
     {
-        var request = new CreateAccountRequest("Bad", "Checking", 0m, "US", null, null);
+        var request = CreateAccountRequestBuilder.A().Named("Bad").OfType("Checking").StartingAt(0m).InCurrency("US").Build();
 
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
 

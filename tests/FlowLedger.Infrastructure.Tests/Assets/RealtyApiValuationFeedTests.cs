@@ -33,7 +33,7 @@ public sealed class RealtyApiValuationFeedTests
 
     private static Asset Home(string? address)
     {
-        var a = Asset.Create(TenantId.New(), "Home", AssetCategory.RealEstate, new Money(400000m, "USD"), new DateOnly(2020, 1, 1));
+        var a = Asset.Create(TenantId.New(), "Home", AssetCategory.RealEstate, new Money(400000m, "USD"), new DateOnly(2020, 1, 1), FlowLedger.TestSupport.TestClock.Provider);
         var attrs = address is null ? new Dictionary<string, string>() : new Dictionary<string, string> { ["Address"] = address };
         a.UpdateDetails("Home", AssetCategory.RealEstate, null, null, "SERIAL-DO-NOT-SEND", null, null, null, attrs);
         return a;

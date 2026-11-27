@@ -24,7 +24,7 @@ public sealed class DismissSuspiciousHandlerTests
 
     private static Transaction Tx() => Transaction.RecordActual(
         TenantId.New(), AccountId.New(), new Money(20m, Currency.Usd), TransactionDirection.Debit, "ACME",
-        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual);
+        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
     [Fact]
     public async Task Dismiss_with_a_note_also_records_it_on_the_transaction()

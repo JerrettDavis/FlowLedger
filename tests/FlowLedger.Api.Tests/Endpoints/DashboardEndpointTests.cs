@@ -56,10 +56,10 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
         // A tenant of its own: nothing else cached for it, and other tests' data cannot leak into the zero-spend assertion.
         var mine = factory.CreateAuthenticatedClient(Guid.NewGuid());
         var acct = (await (await mine.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named("Checking").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
         var today = factory.ServerToday;
         Task<HttpResponseMessage> Spend(decimal amount, string desc) => mine.PostAsJsonAsync("/api/transactions",
-            new CreateTransactionRequest(acct.Id, amount, "USD", "Debit", desc, today, today, null, desc, null));
+            CreateTransactionRequestBuilder.A().OnAccount(acct.Id).WithAmount(amount).WithDirection("Debit").Described(desc).On(today).PostedOn(today).AtMerchant(desc).Build());
         async Task<DashboardInsightsDto> Insights() =>
             (await (await mine.GetAsync("/api/dashboard/insights")).Content.ReadFromJsonAsync<DashboardInsightsDto>())!;
 

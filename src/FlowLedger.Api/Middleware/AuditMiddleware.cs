@@ -9,7 +9,7 @@ namespace FlowLedger.Api.Middleware;
 /// <summary>
 /// Writes an <c>audit_events</c> row for every request that reaches one of the sensitive endpoints below (connector link/unlink,
 /// data export/import/backup-now, integration and Home Assistant credential changes, login linking, key rotation, tenant offboarding and
-/// destructive edits such as deactivating an account or merging duplicates). Keyed by endpoint name so a
+/// destructive edits such as deactivating an account, merging duplicates or deleting a saved report, sheet row or rule). Keyed by endpoint name so a
 /// route change cannot silently drop auditing; <c>AuditMiddlewareTests</c> pins that every name still exists.
 /// A failing audit write is logged and never changes the response (the action already happened).
 /// </summary>
@@ -47,6 +47,10 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
         ["ClearAutoCategories"] = "category.clear_auto",
         ["DeleteBudget"] = "budget.delete",
         ["DeleteGoal"] = "goal.delete",
+        ["DeleteReport"] = "report.delete",
+        ["DeleteSheetBill"] = "sheet.row_delete",
+        ["DeleteCategoryRule"] = "category_rule.delete",
+        ["DeleteMerchantAlias"] = "merchant_alias.delete",
     };
 
     public async Task InvokeAsync(HttpContext context, IAuditLog audit, TimeProvider clock)
@@ -100,6 +104,13 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
             var actor = userId == Guid.Empty ? principal : $"{principal}/{userId}";
             // Decoded path: strip control characters so a crafted %0d%0a cannot forge a line in anything that later prints the row.
             var target = context.Request.Path.Value is { } rawPath ? string.Concat(rawPath.Where(c => !char.IsControl(c))) : null;
+
+            // Rules and aliases are identified by their pattern, not an id, so the trail names the one that was deleted (control characters stripped, capped).
+            if (target is not null && context.Request.Query.TryGetValue("pattern", out var pattern) && pattern.ToString() is { Length: > 0 } p)
+            {
+                var clean = string.Concat(p.Where(c => !char.IsControl(c)));
+                target += "?pattern=" + (clean.Length > 120 ? clean[..120] : clean);
+            }
 
             await audit.AppendAsync(new AuditEvent(
                 action,

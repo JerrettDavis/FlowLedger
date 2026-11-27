@@ -5,6 +5,7 @@ using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features;
@@ -25,7 +26,7 @@ public sealed class InjectedClockHandlerTests
         var repo = new FakeAccountRepository();
         var handler = new CreateAccountHandler(repo, new FakeTenantContext(), Clock);
 
-        var dto = await handler.HandleAsync(new CreateAccountRequest("Checking", "Checking", 10m, "USD", null, null));
+        var dto = await handler.HandleAsync(CreateAccountRequestBuilder.A().Named("Checking").OfType("Checking").StartingAt(10m).Build());
 
         (await repo.GetByIdAsync(AccountId.From(dto.Id)))!.CreatedAt.Should().Be(TestClock.Instant);
     }
@@ -36,8 +37,7 @@ public sealed class InjectedClockHandlerTests
         var repo = new FakeTransactionRepository();
         var handler = new CreateTransactionHandler(repo, new FakeTenantContext(), new FakeReferenceValidator(), Clock);
 
-        await handler.HandleAsync(new CreateTransactionRequest(
-            Guid.NewGuid(), 5m, "USD", "Debit", "Coffee", new DateOnly(2026, 1, 30), null, null, null, null));
+        await handler.HandleAsync(CreateTransactionRequestBuilder.A().OnAccount(Guid.NewGuid()).WithAmount(5m).WithDirection("Debit").Described("Coffee").On(new DateOnly(2026, 1, 30)).Build());
 
         repo.All.Single().CreatedAt.Should().Be(TestClock.Instant);
     }
@@ -48,7 +48,7 @@ public sealed class InjectedClockHandlerTests
         var txRepo = new FakeTransactionRepository();
         var accounts = new FakeAccountRepository();
         var occurrences = new FakePlannedOccurrenceRepository();
-        var account = Account.Create(TenantId.From(FakeTenantContext.DefaultTenantId), "Checking", AccountType.Checking, new Money(100m, "USD"));
+        var account = Account.Create(TenantId.From(FakeTenantContext.DefaultTenantId), "Checking", AccountType.Checking, new Money(100m, "USD"), TestClock.Provider);
         await accounts.AddAsync(account);
         var handler = new ImportTransactionsHandler(txRepo, accounts, occurrences, new FakeTenantContext(), new MatchingEngine(occurrences), Clock);
 

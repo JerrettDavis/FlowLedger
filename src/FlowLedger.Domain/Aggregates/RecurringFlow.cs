@@ -90,11 +90,11 @@ public sealed class RecurringFlow : AggregateRoot
         TransactionDirection direction,
         RecurrencePattern pattern,
         DateOnly startDate,
+        TimeProvider time,
         DateOnly? endDate = null,
         AmountModel amountModel = AmountModel.Fixed,
         CategoryId? categoryId = null,
-        string? counterparty = null,
-        TimeProvider? time = null)
+        string? counterparty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {

@@ -47,6 +47,7 @@ internal static class QueryCatalog
                 new("account", "string", "Account name"),
                 new("account_type", "string", "Checking, Savings, CreditCard, ..."),
                 new("balance", "number", "Balance at that time (negative for debts)"),
+                new("currency", "string", "ISO currency code of the balance (the account's currency when the snapshot carries none)"),
             ]),
         new("assets",
             "Physical and other assets with estimated value.",
@@ -91,7 +92,7 @@ public sealed class QueryDatasetProvider(
     ICategoryRepository categories,
     IAssetRepository assets,
     IBalanceHistoryReader balanceHistory,
-    TimeProvider? clock = null)
+    TimeProvider clock)
 {
     private const int MaxTransactions = TransactionQuota.ProcessingCap;
 
@@ -141,7 +142,7 @@ public sealed class QueryDatasetProvider(
         }
 
         var accountMap = accountEntities.ToDictionary(a => a.Id);
-        var today = AssetClock.Today(clock);
+        var today = clock.UtcToday();
         var assetEntities = await assets.ListAsync(ct);
         var valuationRows = assetEntities
             .SelectMany(a => a.Valuations.Select(v => new object?[]
@@ -163,6 +164,7 @@ public sealed class QueryDatasetProvider(
             .Select(p => new object?[]
             {
                 p.Date, accountById[p.AccountId].Name, accountById[p.AccountId].AccountType, p.Balance,
+                string.IsNullOrWhiteSpace(p.Currency) ? accountById[p.AccountId].BalanceCurrency : p.Currency,
             }).ToList();
 
         return new Dictionary<string, QueryTable>(StringComparer.OrdinalIgnoreCase)

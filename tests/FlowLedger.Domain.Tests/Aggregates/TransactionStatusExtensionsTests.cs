@@ -36,10 +36,10 @@ public sealed class TransactionStatusExtensionsTests
         var account = AccountId.New();
         var money = new Money(5m, Currency.Usd);
         var today = new DateOnly(2026, 1, 1);
-        var planned = Transaction.CreatePlanned(tenant, account, money, TransactionDirection.Debit, "Rent", today);
-        var skipped = Transaction.CreatePlanned(tenant, account, money, TransactionDirection.Debit, "Rent", today);
+        var planned = Transaction.CreatePlanned(tenant, account, money, TransactionDirection.Debit, "Rent", today, FlowLedger.TestSupport.TestClock.Provider);
+        var skipped = Transaction.CreatePlanned(tenant, account, money, TransactionDirection.Debit, "Rent", today, FlowLedger.TestSupport.TestClock.Provider);
         skipped.Skip();
-        var posted = Transaction.RecordActual(tenant, account, money, TransactionDirection.Debit, "Coffee", today, today, TransactionSource.Manual);
+        var posted = Transaction.RecordActual(tenant, account, money, TransactionDirection.Debit, "Coffee", today, today, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
         var predicate = TransactionStatusExtensions.RealTransaction.Compile();
 

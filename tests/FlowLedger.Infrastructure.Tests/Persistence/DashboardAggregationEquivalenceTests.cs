@@ -62,7 +62,7 @@ public sealed class DashboardAggregationEquivalenceTests : IAsyncLifetime
 
         Account Make(string name, AccountType type, Action<Account>? tweak = null)
         {
-            var a = Account.Create(tenantId, name, type, Usd(1000m));
+            var a = Account.Create(tenantId, name, type, Usd(1000m), TestClock.Provider);
             tweak?.Invoke(a);
             db.Accounts.Add(a);
             return a;
@@ -94,7 +94,7 @@ public sealed class DashboardAggregationEquivalenceTests : IAsyncLifetime
         {
             var effective = Ago(daysAgo);
             var posted = pending ? (DateOnly?)null : Ago(postedDaysAgo ?? daysAgo);
-            var tx = Transaction.RecordActual(tenantId, account.AccountId, Usd(amount), dir, description, effective, posted, TransactionSource.Manual);
+            var tx = Transaction.RecordActual(tenantId, account.AccountId, Usd(amount), dir, description, effective, posted, TransactionSource.Manual, TestClock.Provider);
             if (category is not null)
             {
                 tx.Categorize(category.CategoryId, merchant, CategorySource.Manual);
@@ -143,8 +143,8 @@ public sealed class DashboardAggregationEquivalenceTests : IAsyncLifetime
         // Rows on accounts that are off the everyday views, and forecast rows that are not transactions at all.
         Add(hidden, 999m, TransactionDirection.Debit, "HIDDEN SPEND", 10, groceries, "Hiddenmart");
         Add(inactive, 888m, TransactionDirection.Debit, "CLOSED SPEND", 10, groceries, "Closedmart");
-        db.Transactions.Add(Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(777m), TransactionDirection.Debit, "PLANNED RENT", Ago(2)));
-        var skipped = Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(666m), TransactionDirection.Debit, "SKIPPED", Ago(3));
+        db.Transactions.Add(Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(777m), TransactionDirection.Debit, "PLANNED RENT", Ago(2), TestClock.Provider));
+        var skipped = Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(666m), TransactionDirection.Debit, "SKIPPED", Ago(3), TestClock.Provider);
         skipped.Skip();
         db.Transactions.Add(skipped);
 

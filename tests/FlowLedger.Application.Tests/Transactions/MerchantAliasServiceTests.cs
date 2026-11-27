@@ -26,7 +26,7 @@ public sealed class MerchantAliasServiceTests
 
     private static Transaction Tx(string description) => Transaction.RecordActual(
         TenantId.New(), AccountId.New(), new Money(20m, Currency.Usd), TransactionDirection.Debit, description,
-        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual);
+        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
     [Fact]
     public async Task Alias_renames_matching_transactions_case_and_spacing_insensitively_and_keeps_description()

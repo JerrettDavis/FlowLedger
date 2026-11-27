@@ -26,20 +26,20 @@ internal sealed class BalanceHistoryReader(FlowLedgerDbContext db, TimeProvider?
         var lastOfDay = inWindow.Join(lastTimes, s => new { s.AccountId, s.CapturedAt }, l => new { l.AccountId, CapturedAt = l.Last }, (s, l) => s);
         var rows = await lastOfDay
             .OrderBy(s => s.CapturedAt)
-            .Select(s => new { s.AccountId, s.Balance, s.CapturedAt })
+            .Select(s => new { s.AccountId, s.Balance, s.Currency, s.CapturedAt })
             .ToListAsync(ct);
 
         // One anchor per account: its latest snapshot before the window (so "balance at the window start" needs no older history).
         var anchors = await db.BalanceSnapshots.AsNoTracking()
             .Where(s => s.CapturedAt < fromUtc
                 && s.CapturedAt == db.BalanceSnapshots.Where(o => o.AccountId == s.AccountId && o.CapturedAt < fromUtc).Max(o => o.CapturedAt))
-            .Select(s => new { s.AccountId, s.Balance, s.CapturedAt })
+            .Select(s => new { s.AccountId, s.Balance, s.Currency, s.CapturedAt })
             .ToListAsync(ct);
 
         // Last snapshot per account per (UTC) day wins.
         return anchors.Concat(rows)
             .GroupBy(r => (r.AccountId, Date: DateOnly.FromDateTime(r.CapturedAt.UtcDateTime)))
-            .Select(g => new BalancePoint(g.Key.Date, g.Key.AccountId, g.OrderBy(x => x.CapturedAt).Last().Balance))
+            .Select(g => new BalancePoint(g.Key.Date, g.Key.AccountId, g.OrderBy(x => x.CapturedAt).Last().Balance, g.OrderBy(x => x.CapturedAt).Last().Currency))
             .OrderBy(p => p.Date)
             .ToList();
     }

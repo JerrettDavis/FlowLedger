@@ -9,6 +9,7 @@ using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Query;
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -103,10 +104,10 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
 
     internal static async Task<Seeded> SeedTenantAAsync(HttpClient a)
     {
-        var account = await CreateAsync(a, "/api/accounts", new CreateAccountRequest($"{Secret} Checking", "Checking", 1234m, "USD", null, null));
+        var account = await CreateAsync(a, "/api/accounts", CreateAccountRequestBuilder.A().Named($"{Secret} Checking").OfType("Checking").StartingAt(1234m).Build());
         var transaction = await CreateAsync(a, "/api/transactions",
-            new CreateTransactionRequest(account, 50m, "USD", "Debit", $"{Secret} Coffee", new DateOnly(2026, 1, 15), null, null, null, null));
-        var category = await CreateAsync(a, "/api/categories", new CreateCategoryRequest("zz-a-secret", $"{Secret} Category", null));
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{Secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
+        var category = await CreateAsync(a, "/api/categories", CreateCategoryRequestBuilder.A().AtPath("zz-a-secret").Named($"{Secret} Category").Build());
         var flow = await CreateAsync(a, "/api/recurring-flows",
             new CreateRecurringFlowRequest(account, $"{Secret} Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null,
                 new DateOnly(2026, 1, 1), null, null, $"{Secret} Landlord"));
@@ -121,7 +122,7 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
         var goal = await CreateAsync(a, "/api/goals", new { name = $"{Secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
 
         var transaction2 = await CreateAsync(a, "/api/transactions",
-            new CreateTransactionRequest(account, 50m, "USD", "Debit", $"{Secret} Coffee", new DateOnly(2026, 1, 15), null, null, null, null));
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{Secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
         var integrationResponse = await a.PostAsJsonAsync("/api/integrations", new
         {
             name = $"{Secret} Hook",

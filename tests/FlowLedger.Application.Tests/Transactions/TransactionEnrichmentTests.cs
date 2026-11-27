@@ -33,7 +33,7 @@ public class TransactionEnrichmentTests
     public void ApplyAutoTags_replaces_only_vocabulary_tags_and_is_idempotent()
     {
         var tx = Transaction.RecordActual(TenantId.From(Guid.NewGuid()), AccountId.From(Guid.NewGuid()), new Money(20m, Currency.Usd), TransactionDirection.Debit,
-            "NETFLIX.COM", new DateOnly(2026, 1, 5), new DateOnly(2026, 1, 5), TransactionSource.Manual);
+            "NETFLIX.COM", new DateOnly(2026, 1, 5), new DateOnly(2026, 1, 5), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
         Assert.True(tx.ApplyAutoTags(["subscription", "online"], AutoTagger.Vocabulary));
         Assert.False(tx.ApplyAutoTags(["online", "subscription"], AutoTagger.Vocabulary));

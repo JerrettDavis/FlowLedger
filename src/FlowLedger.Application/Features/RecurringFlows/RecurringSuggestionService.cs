@@ -29,9 +29,9 @@ public sealed class RecurringSuggestionService(
     ICategoryRepository categories,
     IRecurringDismissalStore dismissals,
     CreateRecurringFlowHandler creator,
-    TimeProvider? time = null)
+    TimeProvider time)
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly TimeProvider _time = time;
 
     public const double AutoAddConfidence = 0.9;
     private const int ScanLimit = TransactionQuota.ProcessingCap;

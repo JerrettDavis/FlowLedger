@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Query;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,12 +22,12 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
         _tenant = Guid.NewGuid();
         _client = factory.CreateAuthenticatedClient(_tenant);
         var account = (await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named("Checking").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
         var today = new DateOnly(2026, 11, 1);   // the queries under test do not depend on the date
         for (var i = 0; i < 3; i++)
         {
             await _client.PostAsJsonAsync("/api/transactions",
-                new CreateTransactionRequest(account.Id, 5m + i, "USD", "Debit", "Coffee " + i, today, today, null, "Coffee " + i, null));
+                CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(5m + i).WithDirection("Debit").Described("Coffee " + i).On(today).PostedOn(today).AtMerchant("Coffee " + i).Build());
         }
     }
 

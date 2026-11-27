@@ -18,17 +18,9 @@ public sealed class TestClockRatchetTests
     /// <summary>Path relative to tests/ (forward slashes) to number of direct clock reads still allowed.</summary>
     private static readonly Dictionary<string, int> Baseline = new()
     {
-        ["FlowLedger.Api.Tests/Security/RateLimitPartitionTests.cs"] = 1,
-        ["FlowLedger.Infrastructure.Tests/Persistence/ReadinessDatabaseTests.cs"] = 2,
-        ["FlowLedger.Infrastructure.Tests/Sync/PendingSettlementTests.cs"] = 4,
         ["FlowLedger.Infrastructure.Tests/Sync/QuilttSyncEndToEndTests.cs"] = 1,
         ["FlowLedger.Integrations.Tests/Quiltt/QuilttIssueMappingTests.cs"] = 2,
-        ["FlowLedger.Worker.Tests/WorkerHeartbeatTests.cs"] = 1,
-        ["FlowLedger.Application.Tests/BillSheet/BillSheetServiceTests.cs"] = 1,
-        ["FlowLedger.Application.Tests/Query/AskQueryTests.cs"] = 1,
-        ["FlowLedger.Infrastructure.Tests/Persistence/HomeAssistantStoreTests.cs"] = 1,
         ["FlowLedger.Integrations.Tests/Mx/MxResilienceTests.cs"] = 1,
-        ["FlowLedger.Integrations.Tests/Quiltt/QuilttProviderTests.cs"] = 2,
         ["FlowLedger.Integrations.Tests/SimpleFin/SimpleFinProviderTests.cs"] = 3,
         ["FlowLedger.Integrations.Tests/Simulated/SimulatedFaultInjectionTests.cs"] = 1,
         ["FlowLedger.Integrations.Tests/Simulated/SimulatedWebhookTests.cs"] = 2,

@@ -46,7 +46,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         {
             money.Property(m => m.Amount)
                 .HasColumnName("balance_amount")
-                .HasColumnType("numeric(18,4)")
+                .HasColumnType("numeric(19,4)")
                 .IsRequired();
 
             money.Property(m => m.Currency)
@@ -61,7 +61,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         {
             money.Property(m => m.Amount)
                 .HasColumnName("credit_limit_amount")
-                .HasColumnType("numeric(18,4)");
+                .HasColumnType("numeric(19,4)");
 
             money.Property(m => m.Currency)
                 .HasColumnName("credit_limit_currency")

@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using FlowLedger.Api.Auth;
 using FlowLedger.Api.Middleware;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 
@@ -10,8 +11,8 @@ namespace FlowLedger.Api.Tests.Security;
 /// <summary>Pure unit tests (no host / database): how requests are assigned to rate-limit partitions.</summary>
 public sealed class RateLimitPartitionTests
 {
-    // KeyFor verifies signatures against the real clock, so signed assertions must be fresh: one read, shared by the tests that sign.
-    private static readonly DateTimeOffset SignedAt = DateTimeOffset.UtcNow;
+    // KeyFor verifies signatures against the injected clock, so the tests sign at the same fixed instant.
+    private static readonly DateTimeOffset SignedAt = TestClock.Instant;
 
     private static DefaultHttpContext Ctx(string? authType, string? tenant = null, string ip = "203.0.113.7")
     {
@@ -81,8 +82,8 @@ public sealed class RateLimitPartitionTests
         var forged = Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString(), "10.0.0.1");
         forged.Request.Headers["X-Tenant-Sig"] = "1.deadbeef";
 
-        RateLimitPartitions.KeyFor(good, key).Should().Be("tenant:" + tenant.ToString("N"));
-        RateLimitPartitions.KeyFor(forged, key).Should().Be("ip:10.0.0.1", "an unverifiable tenant must not mint a partition");
+        RateLimitPartitions.KeyFor(good, key, TestClock.Provider).Should().Be("tenant:" + tenant.ToString("N"));
+        RateLimitPartitions.KeyFor(forged, key, TestClock.Provider).Should().Be("ip:10.0.0.1", "an unverifiable tenant must not mint a partition");
     }
 
     [Fact]
@@ -96,7 +97,7 @@ public sealed class RateLimitPartitionTests
             var tenant = Guid.NewGuid();
             var http = Ctx(ApiKeyAuthenticationHandler.SchemeName, tenant.ToString(), "10.0.0.1");
             http.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, SignedAt);
-            keys.Add(RateLimitPartitions.KeyFor(http, key, maxTenantPartitions: 50, registry));
+            keys.Add(RateLimitPartitions.KeyFor(http, key, maxTenantPartitions: 50, registry, TestClock.Provider));
         }
 
         registry.Count.Should().Be(50);

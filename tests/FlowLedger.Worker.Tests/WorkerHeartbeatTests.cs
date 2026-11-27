@@ -57,6 +57,7 @@ public sealed class WorkerHeartbeatTests
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:HeartbeatFile"] = path });
         builder.Services.AddQuartz();
         builder.Services.AddQuartzHostedService();
+        builder.Services.AddSingleton(FlowLedger.TestSupport.TestClock.Provider);
         builder.Services.AddHostedService<WorkerHeartbeat>();
         using var host = builder.Build();
         try
@@ -64,7 +65,7 @@ public sealed class WorkerHeartbeatTests
             await host.StartAsync();
             await Eventually.WaitAsync(() => File.Exists(path), "the heartbeat file is written", TimeSpan.FromSeconds(15));
 
-            WorkerHeartbeat.IsHealthy(path, WorkerHeartbeat.MaxAge, DateTimeOffset.UtcNow).Should().BeTrue();
+            WorkerHeartbeat.IsHealthy(path, WorkerHeartbeat.MaxAge, FlowLedger.TestSupport.TestClock.Instant).Should().BeTrue();
         }
         finally
         {

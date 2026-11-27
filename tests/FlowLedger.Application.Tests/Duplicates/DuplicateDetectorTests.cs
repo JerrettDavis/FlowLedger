@@ -15,7 +15,7 @@ public class DuplicateDetectorTests
     {
         var acct = account ?? Acct;
         var fp = TransactionFingerprint.FromRawDescription(acct, date, amount, desc, pid);
-        return Transaction.RecordActual(Tenant, acct, new Money(amount, "USD"), dir, desc, date, pending ? null : date, TransactionSource.Manual, fp);
+        return Transaction.RecordActual(Tenant, acct, new Money(amount, "USD"), dir, desc, date, pending ? null : date, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider, fp);
     }
 
     private static readonly DateOnly D = new(2026, 11, 10);
@@ -94,7 +94,7 @@ public class DuplicateDetectorTests
     [Fact]
     public void Planned_and_skipped_rows_are_ignored()
     {
-        var planned = Transaction.CreatePlanned(Tenant, Acct, new Money(9m, "USD"), TransactionDirection.Debit, "RENT", D);
+        var planned = Transaction.CreatePlanned(Tenant, Acct, new Money(9m, "USD"), TransactionDirection.Debit, "RENT", D, FlowLedger.TestSupport.TestClock.Provider);
         DuplicateDetector.Find([planned, Tx("RENT", 9m, D)]).Should().BeEmpty();
     }
 

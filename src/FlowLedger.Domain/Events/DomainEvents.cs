@@ -8,12 +8,8 @@ public abstract record DomainEventBase : IDomainEvent
 {
     public Guid EventId { get; init; } = Guid.NewGuid();
 
-    private DateTimeOffset _occurredAt = TimeProvider.System.GetUtcNow();
-
-    /// <summary>When the event happened. Defaults to the system clock; aggregates stamp the time they were given (<see cref="StampOccurredAt"/>).</summary>
-    public DateTimeOffset OccurredAt { get => _occurredAt; init => _occurredAt = value; }
-
-    internal void StampOccurredAt(DateTimeOffset at) => _occurredAt = at;
+    /// <summary>When the event happened, from the producer's <see cref="TimeProvider"/>. Required, so no event can fall back to the wall clock.</summary>
+    public required DateTimeOffset OccurredAt { get; init; }
 }
 
 // ── Post-import / post-sync events ───────────────────────────────────────────

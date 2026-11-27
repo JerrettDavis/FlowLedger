@@ -20,9 +20,9 @@ public sealed class CurrencySupportTests
         var txRepo = new FakeTransactionRepository();
         var acctRepo = new FakeAccountRepository();
         var occRepo = new FakePlannedOccurrenceRepository();
-        var account = Account.Create(Tenant, "Euro checking", AccountType.Checking, new Money(100m, "EUR"));
+        var account = Account.Create(Tenant, "Euro checking", AccountType.Checking, new Money(100m, "EUR"), FlowLedger.TestSupport.TestClock.Provider);
         await acctRepo.AddAsync(account);
-        var handler = new ImportTransactionsHandler(txRepo, acctRepo, occRepo, new FakeTenantContext(), new MatchingEngine(occRepo));
+        var handler = new ImportTransactionsHandler(txRepo, acctRepo, occRepo, new FakeTenantContext(), new MatchingEngine(occRepo), FlowLedger.TestSupport.TestClock.Provider);
 
         var summary = await handler.HandleAsync(new ImportTransactionsCommand(
             account.Id, "Date,Amount,Description\n2024-01-10,-12.50,Bakery", new CsvColumnMapping(0, 1, 2)));
@@ -34,8 +34,8 @@ public sealed class CurrencySupportTests
     [Fact]
     public void Net_worth_over_USD_and_EUR_accounts_returns_per_currency_totals_not_a_raw_sum()
     {
-        var usd = Account.Create(Tenant, "US", AccountType.Checking, new Money(1000m, "USD"));
-        var eur = Account.Create(Tenant, "EU", AccountType.Checking, new Money(500m, "EUR"));
+        var usd = Account.Create(Tenant, "US", AccountType.Checking, new Money(1000m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
+        var eur = Account.Create(Tenant, "EU", AccountType.Checking, new Money(500m, "EUR"), FlowLedger.TestSupport.TestClock.Provider);
 
         var result = NetWorthCalculator.Compute([usd, eur], [], Today);
 
@@ -50,7 +50,7 @@ public sealed class CurrencySupportTests
     public void Net_worth_with_a_single_currency_is_unchanged()
     {
         var result = NetWorthCalculator.Compute(
-            [Account.Create(Tenant, "A", AccountType.Checking, new Money(1000m, "EUR"))], [], Today);
+            [Account.Create(Tenant, "A", AccountType.Checking, new Money(1000m, "EUR"), FlowLedger.TestSupport.TestClock.Provider)], [], Today);
 
         result.MixedCurrencies.Should().BeFalse();
         result.NetWorth.Should().Be(1000m);

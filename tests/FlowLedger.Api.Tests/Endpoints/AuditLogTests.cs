@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using FlowLedger.Api.Middleware;
 using FlowLedger.Contracts;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,7 +57,7 @@ public sealed class AuditLogTests(FlowLedgerApiFactory factory)
     {
         await factory.ResetAsync();
         using var client = factory.CreateAuthenticatedClient();
-        var created = await client.PostAsJsonAsync("/api/accounts", new CreateAccountRequest("Audit me", "Checking", 0m, "USD", null, null));
+        var created = await client.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Audit me").OfType("Checking").StartingAt(0m).Build());
         created.EnsureSuccessStatusCode();
         var account = (await created.Content.ReadFromJsonAsync<AccountDto>())!;
         var before = await CountAsync("account.deactivate");
@@ -71,6 +72,27 @@ public sealed class AuditLogTests(FlowLedgerApiFactory factory)
         (await r.ReadAsync()).Should().BeTrue();
         r.GetString(0).Should().Be($"/api/accounts/{account.Id}");
         r.GetInt32(1).Should().Be(204);
+    }
+
+    [Theory]
+    [InlineData("/api/reports/00000000-0000-0000-0000-000000000001", "report.delete")]
+    [InlineData("/api/sheet/bills/00000000-0000-0000-0000-000000000001", "sheet.row_delete")]
+    [InlineData("/api/category-rules?pattern=AUDIT-NO-SUCH-RULE", "category_rule.delete")]
+    [InlineData("/api/merchant-aliases?pattern=AUDIT-NO-SUCH-ALIAS", "merchant_alias.delete")]
+    public async Task Deleting_a_single_record_is_audited_with_its_target_whatever_the_outcome(string url, string action)
+    {
+        await factory.ResetAsync();
+        using var client = factory.CreateAuthenticatedClient();
+        var before = await CountAsync(action);
+
+        await client.DeleteAsync(url);
+
+        (await CountAsync(action)).Should().Be(before + 1);
+        await using var conn = new NpgsqlConnection(factory.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand("SELECT target FROM audit_events WHERE action = @a ORDER BY id DESC LIMIT 1", conn);
+        cmd.Parameters.AddWithValue("a", action);
+        (await cmd.ExecuteScalarAsync()).Should().Be(url, "the path (and the pattern that identifies a rule or alias) of the deleted record is recorded");
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Users;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Npgsql;
 
@@ -133,7 +134,7 @@ public sealed class UserLinkingEndpointTests(FlowLedgerApiFactory factory, AutoL
         var alice = await Resolve(issuer, "alice");
         var aliceClient = factory.CreateAuthenticatedClient(alice.TenantId);
         var created = await aliceClient.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Joint Checking", "Checking", 10m, "USD", null, null));
+            CreateAccountRequestBuilder.A().Named("Joint Checking").OfType("Checking").StartingAt(10m).Build());
         var account = (await created.Content.ReadFromJsonAsync<AccountDto>())!;
 
         var other = await Resolve(issuer, "alice-second-login");

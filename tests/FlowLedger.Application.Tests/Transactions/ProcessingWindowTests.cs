@@ -20,7 +20,7 @@ public sealed class ProcessingWindowTests
         return Enumerable.Range(0, count)
             .Select(i => Transaction.RecordActual(
                 Tenant, account.AccountId, new Money(1m + i, Currency.Usd), TransactionDirection.Debit, "Zzyzx " + i,
-                start.AddDays(i % 20_000), start.AddDays(i % 20_000), TransactionSource.Manual))
+                start.AddDays(i % 20_000), start.AddDays(i % 20_000), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider))
             .OrderByDescending(t => t.EffectiveDate)
             .ToList();
     }
@@ -47,7 +47,7 @@ public sealed class ProcessingWindowTests
         public Task<IReadOnlyList<MergeLogEntry>> RecentMergesAsync(int take, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<MergeLogEntry>>([]);
     }
 
-    private static Account Checking() => Account.Create(Tenant, "Checking", AccountType.Checking, new Money(0m, Currency.Usd));
+    private static Account Checking() => Account.Create(Tenant, "Checking", AccountType.Checking, new Money(0m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
 
     [Fact]
     public void IsPartial_flips_exactly_at_the_cap()

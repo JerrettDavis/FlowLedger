@@ -46,7 +46,7 @@ public sealed class ImportTransactionsHandler
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;
     private readonly ITenantContext _tenant;
     private readonly MatchingEngine _matcher;
-    private readonly TimeProvider? _clock;
+    private readonly TimeProvider _clock;
     private readonly IOutbox? _outbox;
 
     public ImportTransactionsHandler(
@@ -55,7 +55,7 @@ public sealed class ImportTransactionsHandler
         IPlannedOccurrenceRepository occurrenceRepo,
         ITenantContext tenant,
         MatchingEngine matcher,
-        TimeProvider? clock = null,
+        TimeProvider clock,
         IOutbox? outbox = null)
     {
         _clock = clock;
@@ -162,7 +162,10 @@ public sealed class ImportTransactionsHandler
                 FlowLedger.Domain.ValueObjects.TenantId.From(_tenant.TenantId),
                 FlowLedger.Domain.ValueObjects.AccountId.From(command.AccountId),
                 batchId,
-                toInsert.Count));
+                toInsert.Count)
+            {
+                OccurredAt = _clock.GetUtcNow(),
+            });
             await _txRepo.SaveChangesAsync(ct);
         }
 
@@ -261,7 +264,7 @@ public sealed class ImportTransactionsHandler
         string[] dateFormats,
         Dictionary<string, int> occurrences,
         HashSet<string> seenProviderIds,
-        TimeProvider? clock)
+        TimeProvider clock)
     {
         // Date
         bool TryParseDateForCoalesce(string raw, out DateOnly d) =>

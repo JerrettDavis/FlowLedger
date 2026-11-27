@@ -34,7 +34,7 @@ public sealed class TransactionSortTests : IAsyncLifetime
         {
             var date = new DateOnly(2026, 3, day);
             db.Transactions.Add(Transaction.RecordActual(
-                tenantId, account, new Money(amount, Currency.Usd), TransactionDirection.Debit, name, date, date, TransactionSource.Manual));
+                tenantId, account, new Money(amount, Currency.Usd), TransactionDirection.Debit, name, date, date, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider));
         }
 
         await db.SaveChangesAsync();

@@ -110,7 +110,7 @@ public sealed class HomeAssistantStoreTests : IAsyncLifetime
         await storeA.ReleaseAsync(a.TenantId, "bill_due_soon:x:2026-11-20");
         (await storeA.TryClaimAsync(a.TenantId, "bill_due_soon:x:2026-11-20")).Should().BeTrue();
 
-        await storeA.PruneAsync(a.TenantId, DateTimeOffset.UtcNow.AddDays(1));
+        await storeA.PruneAsync(a.TenantId, new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
         (await storeA.TryClaimAsync(a.TenantId, "bill_due_soon:x:2026-11-20")).Should().BeTrue();
     }
 

@@ -227,7 +227,7 @@ internal sealed partial class FinancialSyncService
 
         // Authorizations the provider never settled or re-reported (cancelled holds, fuel pre-auths) must not count as
         // spend forever. Anything still pending after the TTL that this sync did not just receive is retired.
-        var staleBefore = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-PendingSettlement.StalePendingDays);
+        var staleBefore = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime).AddDays(-PendingSettlement.StalePendingDays);
         foreach (var list in settleCandidates.Values)
         {
             foreach (var stale in list.Where(t => t.Status == TransactionStatus.Pending && t.EffectiveDate < staleBefore
@@ -278,7 +278,7 @@ internal sealed partial class FinancialSyncService
         AccountId accountId,
         TenantId tenantId,
         TransactionFingerprint fingerprint,
-        TimeProvider? clock)
+        TimeProvider clock)
     {
         // Signed amount from provider: negative = debit, positive = credit
         var direction = pt.Amount.Amount < 0m

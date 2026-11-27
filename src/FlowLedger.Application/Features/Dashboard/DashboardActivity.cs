@@ -141,7 +141,7 @@ internal static class DashboardActivityAnalyzer
 /// <summary>Loads recent history and runs the analyzer.</summary>
 public sealed class GetDashboardActivityHandler(
     ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals, ICategoryRepository categories,
-    TimeProvider? clock = null)
+    TimeProvider clock)
 {
     /// <summary>Anomaly rules (price increases, merchant/category outliers) need months of history; the 30/90-day panels slice from it.</summary>
     private const int LoadDays = 365;
@@ -150,7 +150,7 @@ public sealed class GetDashboardActivityHandler(
 
     public async Task<DashboardActivityDto> HandleAsync(CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime);
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         var from = today.AddDays(-LoadDays);
         // Newest first, so hitting the cap only drops the oldest baseline months, never the recent panels.
         var txs = await repo.ListAsync(null, from, today.AddDays(7), 0, MaxRows, ct);

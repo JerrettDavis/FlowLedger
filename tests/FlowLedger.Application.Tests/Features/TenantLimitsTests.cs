@@ -2,6 +2,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Query;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features;
@@ -62,14 +63,14 @@ public sealed class TenantLimitsTests
     public async Task Creating_an_account_beyond_the_limit_is_refused_even_when_older_ones_are_deactivated()
     {
         var repo = new FakeAccountRepository();
-        var handler = new CreateAccountHandler(repo, new FakeTenantContext());
+        var handler = new CreateAccountHandler(repo, new FakeTenantContext(), FlowLedger.TestSupport.TestClock.Provider);
         for (var i = 0; i < TenantLimits.MaxAccounts; i++)
         {
-            var created = await handler.HandleAsync(new CreateAccountRequest("A" + i, "Checking", 0m, "USD", null, null));
+            var created = await handler.HandleAsync(CreateAccountRequestBuilder.A().Named("A" + i).OfType("Checking").StartingAt(0m).Build());
             (await repo.GetByIdAsync(FlowLedger.Domain.ValueObjects.AccountId.From(created.Id)))!.Deactivate();
         }
 
-        var act = () => handler.HandleAsync(new CreateAccountRequest("overflow", "Checking", 0m, "USD", null, null));
+        var act = () => handler.HandleAsync(CreateAccountRequestBuilder.A().Named("overflow").OfType("Checking").StartingAt(0m).Build());
 
         await act.Should().ThrowAsync<TenantQuotaExceededException>("inactive accounts still occupy storage");
     }

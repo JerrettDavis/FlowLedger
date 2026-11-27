@@ -44,14 +44,14 @@ public sealed class TransactionAnnotationTests
     private async Task<TransactionAnnotationService> SetUpAsync()
     {
         var tenantId = TenantId.From(_tenant.TenantId);
-        var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd));
+        var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         await _accounts.AddAsync(account);
         _groceries = Category.Create(tenantId, new CategoryPath("Food/Groceries"), "Groceries");
         _household = Category.Create(tenantId, new CategoryPath("Home/Household"), "Household");
         await _categories.AddAsync(_groceries);
         await _categories.AddAsync(_household);
         _tx = Transaction.RecordActual(tenantId, account.AccountId, new Money(100m, Currency.Usd), TransactionDirection.Debit,
-            "TARGET #123", new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual);
+            "TARGET #123", new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         await _repo.AddAsync(_tx);
         _store = new TxStore([_tx]);
         return new TransactionAnnotationService(_store, _categories);
@@ -118,7 +118,7 @@ public sealed class TransactionAnnotationTests
     {
         var svc = await SetUpAsync();
         await svc.SetSplitsAsync(_tx.Id, [new(70m, _groceries.Id, null), new(30m, _household.Id, null)]);
-        var provider = new QueryDatasetProvider(_repo, _accounts, _categories, new NoAssets(), new NoHistory());
+        var provider = new QueryDatasetProvider(_repo, _accounts, _categories, new NoAssets(), new NoHistory(), FlowLedger.TestSupport.TestClock.Provider);
 
         var tables = await provider.BuildAsync();
         var result = QueryEngine.Execute(

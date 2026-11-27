@@ -10,4 +10,17 @@ public static class TestClock
     public static readonly DateTimeOffset Instant = new(2026, 1, 31, 23, 59, 59, TimeSpan.Zero);
 
     public static readonly DateOnly Today = new(2026, 1, 31);
+
+    /// <summary>A <see cref="TimeProvider"/> frozen at <see cref="Instant"/> (UTC), for the explicit time every aggregate factory and handler takes.</summary>
+    public static TimeProvider Provider { get; } = new Frozen(Instant);
+
+    /// <summary>A provider frozen at <paramref name="instant"/> (UTC).</summary>
+    public static TimeProvider At(DateTimeOffset instant) => new Frozen(instant);
+
+    private sealed class Frozen(DateTimeOffset instant) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => instant;
+
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Application.Features.Accounts;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -38,7 +39,7 @@ public sealed class RowVersionEndpointTests(FlowLedgerApiFactory factory) : IAsy
 
     private async Task<AccountDto> CreateAccount()
     {
-        var response = await _client.PostAsJsonAsync("/api/accounts", new CreateAccountRequest("Versioned", "Checking", 0m, "USD", null, null));
+        var response = await _client.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Versioned").OfType("Checking").StartingAt(0m).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>())!;
     }
@@ -46,15 +47,14 @@ public sealed class RowVersionEndpointTests(FlowLedgerApiFactory factory) : IAsy
     private async Task<TransactionDto> CreateTransaction()
     {
         var account = await CreateAccount();
-        var response = await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
-            account.Id, 25m, "USD", "Debit", "Corner shop", new DateOnly(2026, 2, 3), null, null, null, null));
+        var response = await _client.PostAsJsonAsync("/api/transactions", CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(25m).WithDirection("Debit").Described("Corner shop").On(new DateOnly(2026, 2, 3)).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<TransactionDto>())!;
     }
 
     private async Task<CategoryDto> CreateCategory(string path)
     {
-        var response = await _client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest(path, path, null));
+        var response = await _client.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath(path).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CategoryDto>())!;
     }
