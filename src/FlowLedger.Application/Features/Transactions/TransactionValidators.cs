@@ -44,5 +44,13 @@ public sealed class ListTransactionsQueryValidator : AbstractValidator<ListTrans
 
         RuleFor(x => x.Search)
             .MaximumLength(100).WithMessage("Search text must be 100 characters or fewer.");
+
+        RuleFor(x => x.Sort)
+            .Must(s => s is null || ListTransactionsQuery.SortKeys.Contains(s, StringComparer.OrdinalIgnoreCase))
+            .WithMessage("Sort must be one of: date, merchant, description, amount.");
+
+        RuleFor(x => x.Dir)
+            .Must(d => d is null || d.Equals("asc", StringComparison.OrdinalIgnoreCase) || d.Equals("desc", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Dir must be asc or desc.");
     }
 }

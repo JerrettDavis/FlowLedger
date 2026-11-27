@@ -122,4 +122,54 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         changed.Should().Be(0);
         db.ChangeTracker.Entries<Transaction>().Should().BeEmpty();
     }
+
+    private async Task<(TestTenantContext Tenant, CommandLog Log, FlowLedgerDbContext Db)> OpenLoggedAsync(TestTenantContext tenant)
+    {
+        var log = new CommandLog();
+        var options = new DbContextOptionsBuilder<FlowLedgerDbContext>()
+            .UseNpgsql(_fixture.ConnectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
+            .AddInterceptors(log)
+            .Options;
+        return (tenant, log, new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), tenant));
+    }
+
+    [DockerFact]
+    public async Task Categorization_with_nothing_uncategorized_reads_no_history()
+    {
+        // A sync that brought no new rows must not re-read the whole history just to find nothing to do (#163).
+        var tenant = TestTenantContext.New();
+        var account = await _fixture.SeedAccountAsync(tenant);
+        var tenantId = TenantId.From(tenant.TenantId);
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            var category = Category.Create(tenantId, new CategoryPath("Food/Coffee"), "Coffee");
+            seed.Categories.Add(category);
+            for (var i = 0; i < 300; i++)
+            {
+                var tx = Transaction.RecordActual(
+                    tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
+                    $"COFFEE SHOP {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual);
+                tx.Categorize(category.CategoryId, null, CategorySource.Manual);
+                seed.Transactions.Add(tx);
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var (_, log, db) = await OpenLoggedAsync(tenant);
+        await using (db)
+        {
+            var service = new FlowLedger.Application.Features.Categories.CategorizationService(
+                new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant);
+            log.Sql.Clear();
+
+            var result = await service.RunAsync();
+
+            result.Categorized.Should().Be(0);
+            var transactionReads = log.Sql.Where(sql => sql.Contains("FROM transactions", StringComparison.OrdinalIgnoreCase)).ToList();
+            transactionReads.Should().ContainSingle("only the existence probe runs");
+            transactionReads[0].Should().Contain("EXISTS", "an uncategorized-row probe, not a newest-first history window");
+            db.ChangeTracker.Entries<Transaction>().Should().BeEmpty();
+        }
+    }
 }

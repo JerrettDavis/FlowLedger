@@ -9,7 +9,7 @@ public static class WebhookReplayGuard
 {
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
     /// <summary>Hard cap on the in-process map.</summary>
-    public const int MaxEntries = 4096;
+    public const int MaxEntries = ApiLimits.WebhookReplayEntries;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> Seen = new();
 
     /// <summary>Entries currently held in the in-process map (for tests and diagnostics).</summary>

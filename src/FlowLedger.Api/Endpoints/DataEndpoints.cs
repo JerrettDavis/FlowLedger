@@ -57,7 +57,7 @@ internal static class DataEndpoints
                     usage.CallsToday,
                     usage.CallsThisMonth,
                     dailyBudget = cfg.GetValue("Mx:Provider:DailyCallBudget", 500),
-                    monthlyBudget = cfg.GetValue("Mx:Provider:MonthlyCallBudget", 5000),
+                    monthlyBudget = cfg.GetValue("Mx:Provider:MonthlyCallBudget", ApiLimits.DefaultMxMonthlyCallBudget),
                     paused = cfg.GetValue("Mx:Provider:CallsPaused", false),
                     usage.ByEndpoint,
                 },
@@ -94,7 +94,7 @@ internal static class DataEndpoints
             var conn = cfg.GetConnectionString("flowledger")!;
             var zip = await SnapshotImport.ExportZipAsync(conn, Path.Combine(settings.BackupRoot, "exports"), ct, only);
             // DeleteOnClose: the unencrypted export zip is removed from the server as soon as it has been sent.
-            var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+            var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, ApiLimits.FileStreamBufferBytes, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
             return Results.File(stream, "application/zip", $"flowledger-export-{(only is null ? "all" : "tenant")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
         })
         .WithName("ExportData")
@@ -216,7 +216,7 @@ internal static class DataEndpoints
     private const string MxProvider = FlowLedger.Integrations.Abstractions.ConnectorIds.Mx;
 
     /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
-    internal const long MaxImportBytes = 256L * 1024 * 1024;
+    internal const long MaxImportBytes = ApiLimits.DataImportBytes;
 
     /// <summary>
     /// Backup state, provider usage, export, import and backup-now are global (they span every tenant), so they are

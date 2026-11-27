@@ -204,6 +204,7 @@ sealed class FlowLedger.Web.Shared.ChartModel
 sealed class FlowLedger.Web.Shared.ChartRow
 sealed class FlowLedger.Web.Shared.ChartSeries
 sealed class FlowLedger.Web.Shared.DisplaySettings
+sealed class FlowLedger.Web.Shared.FormFeedback
 static class FlowLedger.Web.ApiClient.TenantAssertionSigner
 static class FlowLedger.Web.Auth.AuthSetup
 static class FlowLedger.Web.Auth.HouseholdAccess

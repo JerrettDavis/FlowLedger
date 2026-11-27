@@ -293,4 +293,46 @@ public sealed class SourceRuleTests
 
         Assert.True(offenders.Count == 0, $"Use ConstantTime.SecretEquals (or add a reasoned allow-list entry) in: {string.Join(", ", offenders)}");
     }
+
+    // ── Endpoint limits live in ApiLimits (#121) ─────────────────────────────
+
+    private static readonly Regex NumericLiteral = new(@"(?<![\w.])\d[\d_]*(?:\.\d+)?(?:[lLmMuUfFdD]{0,2})(?![\w.])", RegexOptions.Compiled);
+
+    [Fact]
+    public void Endpoint_files_carry_no_numeric_literal_of_1000_or_more_outside_ApiLimits()
+    {
+        var offenders = new List<string>();
+        foreach (var file in SourceFiles("FlowLedger.Api")
+                     .Where(f => Rel(f).StartsWith("src/FlowLedger.Api/Endpoints/", StringComparison.Ordinal)
+                         && !Rel(f).EndsWith("/ApiLimits.cs", StringComparison.Ordinal)))
+        {
+            var lineNo = 0;
+            foreach (var raw in File.ReadLines(file))
+            {
+                lineNo++;
+                // Drop strings, chars and comments so only code literals are judged.
+                var code = Regex.Replace(raw, "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)'", "\"\"");
+                var comment = code.IndexOf("//", StringComparison.Ordinal);
+                if (comment >= 0)
+                {
+                    code = code[..comment];
+                }
+
+                foreach (Match m in NumericLiteral.Matches(code))
+                {
+                    var digits = new string(m.Value.Where(char.IsDigit).ToArray());
+                    var whole = m.Value.Split('.')[0];
+                    var wholeDigits = new string(whole.Where(char.IsDigit).ToArray());
+                    if (wholeDigits.Length > 0 && decimal.TryParse(wholeDigits, System.Globalization.CultureInfo.InvariantCulture, out var value) && value >= 1000
+                        && digits.Length > 0)
+                    {
+                        offenders.Add($"{Rel(file)}:{lineNo}: {m.Value}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(offenders.Count == 0,
+            $"Name the limit in src/FlowLedger.Api/Endpoints/ApiLimits.cs instead of a literal: {string.Join("; ", offenders)}");
+    }
 }

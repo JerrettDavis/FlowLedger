@@ -111,6 +111,28 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Clicking_a_column_header_sorts_on_the_server_and_restarts_from_the_first_page()
+    {
+        var handler = new Handler { ServerTotal = 120 };
+        var cut = RenderPage(handler);
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("1–50 of 120"));
+        await cut.Find("button[aria-label='Next page']").ClickAsync();
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("51–100 of 120"));
+
+        await cut.Find("[data-testid=sort-amount]").ClickAsync();
+
+        cut.WaitForAssertion(() => cut.Find("[data-testid=tx-range]").TextContent.Should().Be("1–50 of 120"));
+        handler.Queries.Last().Should().Contain("sort=amount").And.Contain("dir=desc").And.NotContain("skip=");
+
+        await cut.Find("[data-testid=sort-amount]").ClickAsync();
+        cut.WaitForAssertion(() => handler.Queries.Last().Should().Contain("sort=amount").And.Contain("dir=asc"));
+        cut.Find("[data-testid=sort-amount]").GetAttribute("aria-label").Should().Contain("ascending");
+
+        await cut.Find("[data-testid=sort-description]").ClickAsync();
+        cut.WaitForAssertion(() => handler.Queries.Last().Should().Contain("sort=description").And.Contain("dir=asc"));
+    }
+
+    [Fact]
     public void A_big_result_never_renders_more_rows_than_the_page_size()
     {
         var handler = new Handler { ServerTotal = 10_000 };
