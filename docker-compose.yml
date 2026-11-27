@@ -219,6 +219,23 @@ services:
       # (Development always auto-migrates).
       Database__MigrateOnStartup: ${DATABASE__MIGRATEONSTARTUP:-false}
       Tenancy__LegacyOwnerEmail: ${TENANCY__LEGACYOWNEREMAIL:-}
+      # Multi-user hardening (#135 #145 #159), all optional: unset = the secure default. With OIDC on (Authority/ClientId below) the api refuses to
+      # start without a signing key; see docs/self-hosting/upgrading.md for every new switch and its legacy opt-out.
+      Api__TenantSigningKey: ${API__TENANTSIGNINGKEY:-}
+      Api__RequireSignedTenant: ${API__REQUIRESIGNEDTENANT:-}
+      Auth__Oidc__Authority: ${AUTH__OIDC__AUTHORITY:-}
+      Auth__Oidc__ClientId: ${AUTH__OIDC__CLIENTID:-}
+      Auth__Oidc__AllowedEmails__0: ${AUTH__OIDC__ALLOWEDEMAILS__0:-}
+      Auth__Oidc__AllowedEmails__1: ${AUTH__OIDC__ALLOWEDEMAILS__1:-}
+      Auth__Oidc__AllowedEmailDomains__0: ${AUTH__OIDC__ALLOWEDEMAILDOMAINS__0:-}
+      Auth__Oidc__AllowedEmailDomains__1: ${AUTH__OIDC__ALLOWEDEMAILDOMAINS__1:-}
+      Auth__SignUp__Mode: ${AUTH__SIGNUP__MODE:-}
+      Auth__SignUp__LegacyOpen: ${AUTH__SIGNUP__LEGACYOPEN:-}
+      Auth__SignUp__LegacyEmailTrust: ${AUTH__SIGNUP__LEGACYEMAILTRUST:-}
+      Tenancy__AllowWellKnownLegacyTenantId: ${TENANCY__ALLOWWELLKNOWNLEGACYTENANTID:-}
+      Tenancy__LegacyOwnerIssuer: ${TENANCY__LEGACYOWNERISSUER:-}
+      Tenancy__AutoLinkVerifiedEmail: ${TENANCY__AUTOLINKVERIFIEDEMAIL:-}
+      Tenancy__TrustUnverifiedEmail: ${TENANCY__TRUSTUNVERIFIEDEMAIL:-}
     # Raw provider payload archive — MUST be a persistent volume (see ADR 0007).
     volumes:
       - objects_data:/data/objects
@@ -266,6 +283,19 @@ services:
       Auth__Oidc__Authority: ${AUTH__OIDC__AUTHORITY:-}
       Auth__Oidc__ClientId: ${AUTH__OIDC__CLIENTID:-}
       Auth__Oidc__ClientSecret: ${AUTH__OIDC__CLIENTSECRET:-}
+      # Multi-user hardening (#135 #145 #159), all optional: unset = the secure default (see docs/self-hosting/upgrading.md).
+      # Api__TenantSigningKey MUST equal the api service's value; with OIDC on, the web refuses to start without it.
+      Api__TenantSigningKey: ${API__TENANTSIGNINGKEY:-}
+      Api__RequireSignedTenant: ${API__REQUIRESIGNEDTENANT:-}
+      Auth__Oidc__AllowedEmails__0: ${AUTH__OIDC__ALLOWEDEMAILS__0:-}
+      Auth__Oidc__AllowedEmails__1: ${AUTH__OIDC__ALLOWEDEMAILS__1:-}
+      Auth__Oidc__AllowedEmailDomains__0: ${AUTH__OIDC__ALLOWEDEMAILDOMAINS__0:-}
+      Auth__Oidc__AllowedEmailDomains__1: ${AUTH__OIDC__ALLOWEDEMAILDOMAINS__1:-}
+      Auth__SignUp__Mode: ${AUTH__SIGNUP__MODE:-}
+      Auth__SignUp__LegacyOpen: ${AUTH__SIGNUP__LEGACYOPEN:-}
+      Auth__Session__AbsoluteMaxDays: ${AUTH__SESSION__ABSOLUTEMAXDAYS:-}
+      Auth__Session__LegacyCookieName: ${AUTH__SESSION__LEGACYCOOKIENAME:-}
+      Tenancy__AllowWellKnownLegacyTenantId: ${TENANCY__ALLOWWELLKNOWNLEGACYTENANTID:-}
       # Without OIDC the Web UI has NO sign-in; outside Development it refuses to start unless this is true.
       Auth__AllowAnonymous: ${AUTH__ALLOWANONYMOUS:-false}
       # Persisted Data Protection key ring: sessions/antiforgery survive `up --force-recreate web` (back this volume up).

@@ -38,6 +38,14 @@ public static partial class MultiUserSettings
 
     public const int MinSigningKeyLength = 32;
 
+    /// <summary>A boolean setting; unset or blank (compose passes unset variables through as empty strings) means <paramref name="fallback"/>, never an exception.</summary>
+    public static bool Flag(IConfiguration cfg, string key, bool fallback = false) =>
+        bool.TryParse(cfg[key], out var value) ? value : fallback;
+
+    /// <summary>An integer setting; unset, blank or not a number means <paramref name="fallback"/>.</summary>
+    public static int Int(IConfiguration cfg, string key, int fallback) =>
+        int.TryParse(cfg[key], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : fallback;
+
     /// <summary>True when OIDC sign-in is configured (mirrors <c>OidcOptions.Enabled</c>).</summary>
     public static bool OidcEnabled(IConfiguration cfg) =>
         !string.IsNullOrWhiteSpace(cfg["Auth:Oidc:Authority"]) && !string.IsNullOrWhiteSpace(cfg["Auth:Oidc:ClientId"]);
@@ -79,7 +87,7 @@ public static partial class MultiUserSettings
             throw new InvalidOperationException($"{SignUpModeKey}='{raw}' is not valid. Use Open, InviteOnly or Closed.");
         }
 
-        return cfg.GetValue(SignUpLegacyOpenKey, false) ? SignUpMode.Open : SignUpMode.InviteOnly;
+        return Flag(cfg, SignUpLegacyOpenKey) ? SignUpMode.Open : SignUpMode.InviteOnly;
     }
 
     /// <summary>
@@ -144,14 +152,14 @@ public static partial class MultiUserSettings
                 break;
         }
 
-        var trustUnverified = cfg.GetValue("Tenancy:TrustUnverifiedEmail", false);
+        var trustUnverified = Flag(cfg, "Tenancy:TrustUnverifiedEmail");
         if (trustUnverified)
         {
             LogTrustUnverifiedEmail(logger);
         }
 
-        if (!env.IsDevelopment() && trustUnverified && cfg.GetValue("Tenancy:AutoLinkVerifiedEmail", false)
-            && string.IsNullOrWhiteSpace(cfg["Tenancy:LegacyOwnerIssuer"]) && !cfg.GetValue(LegacyEmailTrustKey, false))
+        if (!env.IsDevelopment() && trustUnverified && Flag(cfg, "Tenancy:AutoLinkVerifiedEmail")
+            && string.IsNullOrWhiteSpace(cfg["Tenancy:LegacyOwnerIssuer"]) && !Flag(cfg, LegacyEmailTrustKey))
         {
             throw new InvalidOperationException(
                 "Tenancy:TrustUnverifiedEmail=true together with Tenancy:AutoLinkVerifiedEmail=true lets anyone who can set an arbitrary email at the " +
@@ -188,7 +196,7 @@ public static partial class MultiUserSettings
             return;
         }
 
-        if (!cfg.GetValue(AllowWellKnownTenantKey, false))
+        if (!Flag(cfg, AllowWellKnownTenantKey))
         {
             throw new InvalidOperationException(
                 $"OIDC sign-in is enabled and the household tenant id is the well-known constant {WellKnownTenantId}, which anyone holding the API key can name. " +

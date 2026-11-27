@@ -92,6 +92,21 @@ public sealed class MultiUserSettingsTests
     }
 
     [Fact]
+    public void Blank_values_from_compose_passthrough_behave_as_unset()
+    {
+        var cfg = Cfg(OidcOn1, OidcOn2, RandomTenant, Signing, (MultiUserSettings.SignUpModeKey, ""), (MultiUserSettings.SignUpLegacyOpenKey, ""),
+            (MultiUserSettings.RequireSignedTenantKey, ""), (MultiUserSettings.AllowWellKnownTenantKey, ""), (MultiUserSettings.LegacyEmailTrustKey, ""),
+            ("Tenancy:TrustUnverifiedEmail", ""), ("Tenancy:AutoLinkVerifiedEmail", ""), ("Auth:Oidc:AllowedEmails:0", ""), ("Auth:Oidc:AllowedEmails:1", ""));
+
+        MultiUserSettings.ResolveSignUpMode(cfg).Should().Be(SignUpMode.InviteOnly);
+        MultiUserSettings.HasAllowlist(cfg).Should().BeFalse();
+        MultiUserSettings.RequireSignedTenant(cfg, new Env("Production")).Should().BeTrue();
+        new ConfigurationBuilder().AddConfiguration(cfg).Build().GetSection("Auth:Oidc").Get<OidcOptions>()!.HasAllowlist.Should().BeFalse();
+        var act = () => MultiUserSettings.Validate(cfg, new Env("Production"), new CaptureLogger());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
     public void Allowlist_is_detected_from_indexed_and_scalar_config()
     {
         MultiUserSettings.HasAllowlist(Cfg()).Should().BeFalse();

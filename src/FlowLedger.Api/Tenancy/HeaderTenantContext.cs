@@ -46,7 +46,7 @@ public sealed class HeaderTenantContext : ITenantContext
         // When a signing key is configured the Web app must vouch for this tenant (see TenantAssertion).
         // #135: when a signature is required, a missing signing key must reject (never skip) the check; startup also refuses that combination.
         var signingKey = apiOptions.Value.TenantSigningKey;
-        if (apiOptions.Value.RequireSignedTenant || !string.IsNullOrEmpty(signingKey))
+        if (apiOptions.Value.EffectiveRequireSignedTenant || !string.IsNullOrEmpty(signingKey))
         {
             if (string.IsNullOrEmpty(signingKey)
                 || !TenantAssertion.Verify(signingKey, tenantId, http.Request.Headers["X-Tenant-Sig"].ToString(), DateTimeOffset.UtcNow))
