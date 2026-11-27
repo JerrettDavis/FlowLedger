@@ -30,9 +30,7 @@ public sealed class CategoryTests
     [Fact]
     public void Rename_system_category_throws()
     {
-        var cat = new Category(
-            CategoryId.New(), TenantId, new CategoryPath("System"),
-            "System Cat", isSystem: true);
+        var cat = Category.CreateSystem(TenantId, new CategoryPath("System"), "System Cat");
 
         var act = () => cat.Rename(new CategoryPath("Other"), "Other");
         act.Should().Throw<InvalidOperationException>();
