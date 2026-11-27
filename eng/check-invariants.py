@@ -7,7 +7,7 @@ import pathlib
 import re
 import sys
 
-KNOWN_GAPS = {"INV-08"}  # migration upgrade/model-drift tests: tracked by #140
+KNOWN_GAPS: set[str] = set()  # invariants with no test yet; never grow this without an issue
 
 root = pathlib.Path(__file__).resolve().parent.parent
 doc = (root / "docs" / "architecture" / "invariants.md").read_text(encoding="utf-8")
