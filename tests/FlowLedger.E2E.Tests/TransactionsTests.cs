@@ -92,4 +92,35 @@ public class TransactionsTests : E2ETestBase
         (await link.CountAsync()).Should().BeGreaterThan(0);
         AssertNoPageErrors();
     }
+
+    [E2EFact(DisplayName = "Transactions: Description, Account and Status columns are visible on a 1366x768 laptop (#209)")]
+    public async Task Transactions_AllColumnsAreReachableAtLaptopWidth()
+    {
+        await Page!.SetViewportSizeAsync(1366, 768);
+        await NavigateAsync("/transactions");
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
+
+        foreach (var column in new[] { "Description", "Account", "Status" })
+        {
+            var header = Page.Locator("[aria-label='Transactions table'] th, [aria-label='Transactions table'] [role='columnheader']")
+                .Filter(new() { HasTextString = column });
+            (await header.First.IsVisibleAsync()).Should().BeTrue($"the {column} column must not be hidden at 1366 wide");
+        }
+
+        AssertNoPageErrors();
+    }
+
+    [E2EFact(DisplayName = "Transactions: the amount header sorts on the server (#209)")]
+    public async Task Transactions_AmountHeaderSortsOnTheServer()
+    {
+        await NavigateAsync("/transactions");
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
+
+        var request = Page!.WaitForRequestAsync(r => r.Url.Contains("/api/transactions", StringComparison.Ordinal)
+            && r.Url.Contains("sort=amount", StringComparison.Ordinal));
+        await Page.GetByTestId("sort-amount").ClickAsync();
+        await request;
+
+        AssertNoPageErrors();
+    }
 }
