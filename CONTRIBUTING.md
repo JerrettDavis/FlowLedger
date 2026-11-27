@@ -51,6 +51,8 @@ Notes:
 - PRs must pass `dotnet format --verify-no-changes` in CI.
 - The build runs the .NET analyzers at `AnalysisMode=Recommended` with warnings as errors, plus unused usings (IDE0005), file-scoped namespaces (IDE0161) and banned APIs (`BannedSymbols.txt`, rule RS0030; every entry states why). Logging goes through `[LoggerMessage]` source-generated methods (CA1848).
 - Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()`, `new XOptions { }` or `?? new XOptions()` anywhere in `src` (an architecture test enforces it; the two allowlisted bootstrap sites say why).
+- Tests build contracts (Contracts DTOs and requests, Application request/DTO records, the Web client DTOs) through the builders in `tests/FlowLedger.TestSupport/Builders` (`tests/FlowLedger.Web.Tests/Builders` for Web-only types), never positionally, so a new field changes one builder file. `PositionalDtoConstructionTests` enforces it; its allow-list may only shrink.
+- Application `*Handler` classes are `internal` (the Api, Worker, Infrastructure and tests see them through `InternalsVisibleTo`); only Contracts and the ports are public. `PublicApiSurfaceTests` pins the public surface and caps the Application public type count.
 - `TimeProvider` is a required argument in Domain and Application (no `TimeProvider.System` there); connectors take one so tests pass `TestClock.Provider`. Tests never read the wall clock (the ratchet baseline is empty).
 
 ### Meziantou.Analyzer (#113)
