@@ -98,10 +98,10 @@ public sealed class LegacyAdHocTableUpgradeTests : IAsyncLifetime
         (await CountAsync(cs, "provider_api_calls")).Should().Be(1);
         (await CountAsync(cs, "backup_runs")).Should().Be(1);
         var ledger = new ProviderCallLedger(cs);
-        await ledger.RecordAsync(new ProviderCallRecord("MX", "GET", "/new", 200, 3, 10, DateTimeOffset.UtcNow));
-        (await ledger.CountSinceAsync("MX", DateTimeOffset.UtcNow.AddDays(-1))).Should().Be(2);
+        await ledger.RecordAsync(new ProviderCallRecord("MX", "GET", "/new", 200, 3, 10, FlowLedger.TestSupport.TestClock.Instant));
+        (await ledger.CountSinceAsync("MX", FlowLedger.TestSupport.TestClock.Instant.AddDays(-1))).Should().Be(2);
         var store = new BackupRunStore(cs);
-        await store.AddAsync(new BackupRunResult(true, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 9, null, null, null, null));
+        await store.AddAsync(new BackupRunResult(true, FlowLedger.TestSupport.TestClock.Instant, FlowLedger.TestSupport.TestClock.Instant, null, 9, null, null, null, null));
         (await store.RecentAsync(10)).Should().HaveCount(2).And.Contain(r => r.Rows == 7);
     }
 
@@ -131,10 +131,10 @@ public sealed class LegacyAdHocTableUpgradeTests : IAsyncLifetime
         await MigrateToAsync(cs, null);
 
         var host = new FlowLedger.Infrastructure.Persistence.HostDb(cs);
-        await new EfAuditLog(host).AppendAsync(new AuditEvent("new.action", "me", Guid.NewGuid(), "t", "127.0.0.1", "trace", 200, DateTimeOffset.UtcNow));
+        await new EfAuditLog(host).AppendAsync(new AuditEvent("new.action", "me", Guid.NewGuid(), "t", "127.0.0.1", "trace", 200, FlowLedger.TestSupport.TestClock.Instant));
         (await CountAsync(cs, "audit_events")).Should().Be(2);
         var jobs = new EfJobRunStore(host);
-        await jobs.AppendAsync(new JobRunEntry("New", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, true, null, 1));
+        await jobs.AppendAsync(new JobRunEntry("New", FlowLedger.TestSupport.TestClock.Instant, FlowLedger.TestSupport.TestClock.Instant, true, null, 1));
         (await jobs.RecentAsync(10)).Should().HaveCount(2);
         var replays = new EfWebhookReplayStore(host);
         (await replays.TryRecordAsync("MX", "oldhash", TimeSpan.FromMinutes(10))).Should().BeFalse("the legacy row is still inside the window");
