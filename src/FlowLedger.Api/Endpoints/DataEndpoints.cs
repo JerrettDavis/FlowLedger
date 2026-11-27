@@ -11,7 +11,7 @@ internal static class DataEndpoints
         var settings = app.ServiceProvider.GetRequiredService<BackupSettings>();
         // Every /api/data endpoint reports on or acts on the WHOLE database (all tenants): household tenant only.
         var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api")
-            .AddEndpointFilter(HouseholdTenantOnlyAsync);
+            .AddEndpointFilter<HouseholdTenantOnlyFilter>();
 
         group.MapGet("/status", async (
             BackupRunStore store,
@@ -77,7 +77,7 @@ internal static class DataEndpoints
             return result.Ok ? Results.Ok(Public(result)) : Results.Problem(title: "Backup failed", detail: result.Error, statusCode: 500);
         })
         .WithName("BackupNow")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Run a verified backup (snapshot, restore drill, off-site copy) now")
         .RequireRateLimiting("write");
 
@@ -98,7 +98,7 @@ internal static class DataEndpoints
             return Results.File(stream, "application/zip", $"flowledger-export-{(only is null ? "all" : "tenant")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
         })
         .WithName("ExportData")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); all tenants by default, scope=tenant or tenantId=<id> for one")
         .RequireRateLimiting("write");
 
@@ -120,7 +120,7 @@ internal static class DataEndpoints
             new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(MaxImportBytes),
             new Microsoft.AspNetCore.Mvc.RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxImportBytes })
         .WithName("ImportData")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Import an export zip into an EMPTY database (disaster recovery / moving machines)")
         .RequireRateLimiting("write");
 
@@ -136,7 +136,7 @@ internal static class DataEndpoints
             return Results.Ok(rows.Select(r => new { tenantId = r.Id, status = r.Status.ToString().ToLowerInvariant(), r.CreatedUtc, r.OrphanedUtc, r.DeletedUtc }));
         })
         .WithName("ListTenants")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Tenants in the registry by status (default: orphaned), for offboarding review");
 
         group.MapPost("/tenants/{tenantId:guid}/offboard", async (
@@ -173,7 +173,7 @@ internal static class DataEndpoints
             }
         })
         .WithName("OffboardTenant")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Permanently erase every row and stored file of one tenant (never the household tenant); audited")
         .RequireRateLimiting("write");
 
@@ -185,26 +185,19 @@ internal static class DataEndpoints
             return Results.Ok(new { resealed = result.Resealed, alreadyCurrent = result.AlreadyCurrent, unreadable = result.Unreadable });
         })
         .WithName("ReencryptSecrets")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Re-encrypt stored secrets under the current key (key rotation, idempotent)")
         .RequireRateLimiting("write");
 
         group.MapPost("/raw-archive/seal", async (
             FlowLedger.Infrastructure.Storage.RawArchiveMaintenance archive, ILoggerFactory loggers, CancellationToken ct) =>
         {
-            try
-            {
-                var r = await archive.SealPlaintextAsync(ct);
-                ApiLog.RawArchiveSealed(loggers.CreateLogger("RawArchive"), r.Sealed, r.AlreadySealed, r.Skipped, r.Recovered);
-                return Results.Ok(new { sealedCount = r.Sealed, alreadySealed = r.AlreadySealed, skipped = r.Skipped, recovered = r.Recovered });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(title: "Raw archive cannot be sealed", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
-            }
+            var r = await archive.SealPlaintextAsync(ct);
+            ApiLog.RawArchiveSealed(loggers.CreateLogger("RawArchive"), r.Sealed, r.AlreadySealed, r.Skipped, r.Recovered);
+            return Results.Ok(new { sealedCount = r.Sealed, alreadySealed = r.AlreadySealed, skipped = r.Skipped, recovered = r.Recovered });
         })
         .WithName("SealRawArchive")
-        .AddEndpointFilter(LoopbackOnlyAsync)
+        .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Opt-in: encrypt raw provider payloads written before Storage:EncryptionKey was set (in place, verified, idempotent)")
         .RequireRateLimiting("write");
 
@@ -217,40 +210,6 @@ internal static class DataEndpoints
 
     /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
     internal const long MaxImportBytes = ApiLimits.DataImportBytes;
-
-    /// <summary>
-    /// Backup state, provider usage, export, import and backup-now are global (they span every tenant), so they are
-    /// restricted to the household (legacy) tenant, the same tenant that owns the operator's provider credentials
-    /// (<see cref="FlowLedger.Infrastructure.TenancySettings"/>). Any other tenant gets 403 before any work is done.
-    /// With OIDC on and no Tenancy:LegacyOwner* configured nobody is mapped to that tenant, so nobody gets in (fail closed).
-    /// </summary>
-    internal static async ValueTask<object?> HouseholdTenantOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
-    {
-        if (!ctx.HttpContext.RequestServices.GetRequiredService<FlowLedger.Application.Abstractions.IHouseholdTenantAccess>().IsHouseholdTenant)
-        {
-            return Results.Problem(
-                title: "Data administration is limited to the household owner",
-                statusCode: StatusCodes.Status403Forbidden);
-        }
-
-        return await next(ctx);
-    }
-
-    /// <summary>
-    /// Export, import and backup-now act on the WHOLE database (every tenant). See <see cref="DataAdminGate"/>: an explicit
-    /// <c>DataAdmin:Key</c> / <c>X-Admin-Token</c> when configured, otherwise a direct-loopback check that forwarded headers cannot defeat.
-    /// </summary>
-    private static async ValueTask<object?> LoopbackOnlyAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
-    {
-        var http = ctx.HttpContext;
-        var verdict = DataAdminGate.Evaluate(http.RequestServices.GetRequiredService<IConfiguration>(), http);
-        if (!verdict.Allowed)
-        {
-            return Results.Problem(title: verdict.Title, detail: verdict.Detail, statusCode: StatusCodes.Status403Forbidden);
-        }
-
-        return await next(ctx);
-    }
 
     /// <summary>Response projection: the snapshot folder name only (never the absolute server path).</summary>
     private static object Public(BackupRunResult r) => new
