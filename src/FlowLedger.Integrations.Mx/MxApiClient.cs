@@ -14,7 +14,7 @@ namespace FlowLedger.Integrations.Mx;
 /// HTTP Basic auth (ClientId:ApiKey), the MX vendor Accept header, and a standard
 /// resilience handler (Microsoft.Extensions.Http.Resilience).
 /// </summary>
-internal sealed class MxApiClient
+internal sealed partial class MxApiClient
 {
     private readonly HttpClient _http;
     private readonly ILogger<MxApiClient> _logger;
@@ -234,14 +234,12 @@ internal sealed class MxApiClient
             }
             catch (Exception archiveEx)
             {
-                _logger.LogError(archiveEx, "Failed to archive MX error body for '{Operation}'.", operation);
+                LogArchiveErrorBodyFailed(archiveEx, operation);
             }
 
             var ex = MxErrorMapper.FromResponse(response, operation);
             response.Dispose();
-            _logger.LogWarning(
-                "MX '{Operation}' failed: {ExceptionType} ({ProviderCode}).",
-                operation, ex.GetType().Name, ex.ProviderCode);
+            LogOperationFailed(operation, ex.GetType().Name, ex.ProviderCode);
             throw ex;
         }
 
@@ -280,4 +278,10 @@ internal sealed class MxApiClient
             response.Dispose();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to archive MX error body for '{Operation}'.")]
+    private partial void LogArchiveErrorBodyFailed(Exception exception, string operation);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "MX '{Operation}' failed: {ExceptionType} ({ProviderCode}).")]
+    private partial void LogOperationFailed(string operation, string exceptionType, string? providerCode);
 }

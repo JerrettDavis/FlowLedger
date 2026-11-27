@@ -63,7 +63,7 @@ public static class SimulatedDataFactory
 
     // ── Account generation ────────────────────────────────────────────────────
 
-    private static IReadOnlyList<AccountDescriptor> BuildAccountDescriptors(
+    private static List<AccountDescriptor> BuildAccountDescriptors(
         TenantId tenantId,
         int baseSeed)
     {

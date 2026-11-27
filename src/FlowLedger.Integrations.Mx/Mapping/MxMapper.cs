@@ -197,10 +197,7 @@ internal static class MxMapper
         // All date fields failed — log the fact and return MinValue.
         if (logger is not null)
         {
-            logger.LogWarning(
-                "Transaction {TransactionGuid} has no valid date fields (date={Date}, posted_at={PostedAt}, transacted_at={TransactedAt}); " +
-                "defaulting to DateOnly.MinValue.",
-                t.Guid, t.Date, t.PostedAt, t.TransactedAt);
+            MxLog.TransactionHasNoValidDate(logger, t.Guid, t.Date, t.PostedAt, t.TransactedAt);
         }
 
         return DateOnly.MinValue;

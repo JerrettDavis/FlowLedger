@@ -11,7 +11,7 @@ namespace FlowLedger.Integrations.Mx;
 /// After each call: appends a row to the provider call ledger. A ledger WRITE failure never fails a call we
 /// already paid for; a failed budget READ does (fail closed).
 /// </summary>
-public sealed class MxCallGuardHandler : DelegatingHandler
+public sealed partial class MxCallGuardHandler : DelegatingHandler
 {
     public const string ProviderName = "MX";
 
@@ -90,8 +90,11 @@ public sealed class MxCallGuardHandler : DelegatingHandler
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to record MX call in the ledger ({Method} {Path})", request.Method, request.RequestUri?.AbsolutePath);
+                LogLedgerRecordFailed(ex, request.Method.Method, request.RequestUri?.AbsolutePath);
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to record MX call in the ledger ({Method} {Path})")]
+    private partial void LogLedgerRecordFailed(Exception exception, string method, string? path);
 }
