@@ -14,6 +14,10 @@ jobs:
   build-and-test:
     name: Build & Test (.NET 10)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write        # dorny/test-reporter publishes a check run
+      pull-requests: write # sticky coverage comment
     env:
       # Honoured by the Docker availability checks once they are changed to throw instead of skip
       # (tracked in #151). Until then the TRX skipped-test gate below is the effective guard.
@@ -84,7 +88,25 @@ jobs:
       # Gate: fails the build when Domain/Application line coverage drops below the floors in
       # eng/ci/floors-lines.json (ratchet: raise the floors as coverage improves).
       - name: Coverage floor gate
-        run: python3 eng/ci/check-coverage.py eng/ci/floors-lines.json "artifacts/tests/**/coverage.cobertura.xml" "$GITHUB_STEP_SUMMARY"
+        run: >
+          python3 eng/ci/check-coverage.py eng/ci/floors-lines.json "artifacts/tests/**/coverage.cobertura.xml"
+          "$GITHUB_STEP_SUMMARY" --comment-file artifacts/coverage-comment.md
+
+      # Sticky PR comment with the coverage table (delta vs the recorded baseline). Runs even when the gate failed, so the
+      # numbers are visible; skipped for fork PRs (their token is read-only) and never fails the build.
+      - name: Coverage PR comment
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && hashFiles('artifacts/coverage-comment.md') != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate             --jq '.[] | select(.body | startswith("<!-- flowledger-coverage-delta -->")) | .id' | head -n 1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@artifacts/coverage-comment.md
+          else
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file artifacts/coverage-comment.md
+          fi
 
       - name: Upload coverage
         if: always()
