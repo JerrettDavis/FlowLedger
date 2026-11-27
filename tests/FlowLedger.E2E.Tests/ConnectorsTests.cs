@@ -8,15 +8,7 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class ConnectorsTests : E2ETestBase
 {
-    private static string ApiUrl => (Environment.GetEnvironmentVariable("E2E_API_URL") ?? "http://localhost:5001").TrimEnd('/');
-
-    private static HttpClient Api()
-    {
-        var http = new HttpClient { BaseAddress = new Uri(ApiUrl + "/") };
-        http.DefaultRequestHeaders.Add("X-Api-Key", Environment.GetEnvironmentVariable("E2E_API_KEY") ?? "dev-local-key-not-for-production");
-        http.DefaultRequestHeaders.Add("X-Tenant-Id", Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? "00000000-0000-0000-0000-000000000001");
-        return http;
-    }
+    private static HttpClient Api() => E2EApi.CreateClient();
 
     [E2EFact(DisplayName = "Connectors: lists all feeds and marks the enabled one")]
     public async Task Connectors_ListsAllFeedsAndMarksTheActiveOne()

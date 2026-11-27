@@ -1,7 +1,6 @@
 namespace FlowLedger.E2E.Tests;
 
 using System.Collections.Concurrent;
-using System.Net.Http;
 using FluentAssertions;
 using Microsoft.Playwright;
 
@@ -81,10 +80,13 @@ public class E2ETestBase : IAsyncLifetime
         // Always headless — never set Headless = false
         var browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = true
+            Headless = true,
+            Args = E2EAuth.BrowserArgs,
         });
 
-        Context = await browser.NewContextAsync();
+        // OIDC stack: the browser starts signed in (session saved once per run by E2EAuth); anonymous stacks get a plain context.
+        var storageState = await E2EAuth.StorageStatePathAsync(baseUrl, browser);
+        Context = await browser.NewContextAsync(new BrowserNewContextOptions { StorageStatePath = storageState });
         Page = await Context.NewPageAsync();
 
         // ── Attach error-detection listeners ──────────────────────────────────
@@ -274,19 +276,6 @@ public class E2ETestBase : IAsyncLifetime
 
     // ── Seed helpers ──────────────────────────────────────────────────────────
 
-    private static readonly string DefaultApiUrl = "http://localhost:5001";
-    private static readonly string DefaultApiKey = "dev-local-key-not-for-production";
-    private static readonly string DefaultTenantId = "00000000-0000-0000-0000-000000000001";
-
-    private static string ApiUrl =>
-        Environment.GetEnvironmentVariable("E2E_API_URL") ?? DefaultApiUrl;
-
-    private static string ApiKey =>
-        Environment.GetEnvironmentVariable("E2E_API_KEY") ?? DefaultApiKey;
-
-    private static string TenantId =>
-        Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? DefaultTenantId;
-
     /// <summary>
     /// Seeds demo data via /api/connect + /api/sync so all E2E tests have accounts and
     /// transactions regardless of execution order.  Idempotent: a 409 on connect (already
@@ -294,11 +283,9 @@ public class E2ETestBase : IAsyncLifetime
     /// </summary>
     private static async Task EnsureSeededAsync()
     {
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
-        http.DefaultRequestHeaders.Add("X-Tenant-Id", TenantId);
+        using var http = E2EApi.CreateClient();
 
-        var apiBase = ApiUrl.TrimEnd('/');
+        var apiBase = E2EApi.ApiUrl;
 
         // Connect — 200 or 409 (already connected) are both acceptable.
         var connectResponse = await http.PostAsync($"{apiBase}/api/connect", content: null);

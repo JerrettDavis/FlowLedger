@@ -1,6 +1,5 @@
 namespace FlowLedger.E2E.Tests;
 
-using System.Net.Http;
 using FluentAssertions;
 using Microsoft.Playwright;
 
@@ -26,18 +25,7 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class AccountsDataTests : E2ETestBase
 {
-    private static readonly string DefaultApiUrl = "http://localhost:5001";
-    private static readonly string DefaultApiKey = "dev-local-key-not-for-production";
-    private static readonly string DefaultTenantId = "00000000-0000-0000-0000-000000000001";
-
-    private static string ApiUrl =>
-        Environment.GetEnvironmentVariable("E2E_API_URL") ?? DefaultApiUrl;
-
-    private static string ApiKey =>
-        Environment.GetEnvironmentVariable("E2E_API_KEY") ?? DefaultApiKey;
-
-    private static string TenantId =>
-        Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? DefaultTenantId;
+    private static string ApiUrl => E2EApi.ApiUrl;
 
     /// <summary>
     /// Seeds data via the API then asserts that the Accounts page renders at least one
@@ -141,9 +129,7 @@ public class AccountsDataTests : E2ETestBase
     /// </summary>
     private static async Task SeedDataAsync()
     {
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
-        http.DefaultRequestHeaders.Add("X-Tenant-Id", TenantId);
+        using var http = E2EApi.CreateClient();
 
         // POST /api/connect — 200 or 409 (already connected) both are OK
         var connectResponse = await http.PostAsync($"{ApiUrl.TrimEnd('/')}/api/connect", null);
