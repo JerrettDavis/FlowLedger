@@ -421,11 +421,17 @@ else
             <div class="fl-masonry-item">
                 <MudCard Class="fl-card-hover">
                     <MudCardContent>
-                        <MudText Typo="Typo.overline" Color="@(_activity.Suspicious.Count > 0 ? Color.Warning : Color.Success)">Needs a Look</MudText>
-                        <MudText Typo="Typo.h5" Class="fl-num" Color="@(_activity.Suspicious.Count > 0 ? Color.Warning : Color.Success)">
-                            @(_activity.Suspicious.Count > 0 ? $"{_activity.Suspicious.Count} flagged" : "All clear")
+                        <MudText Typo="Typo.overline" Color="@(NeedsALook ? Color.Warning : Color.Success)">Needs a Look</MudText>
+                        <MudText Typo="Typo.h5" Class="fl-num" Color="@(NeedsALook ? Color.Warning : Color.Success)">
+                            @(_activity.Suspicious.Count > 0 ? $"{_activity.Suspicious.Count} flagged" : _uncategorized > 0 ? "Uncategorized" : "All clear")
                         </MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Duplicates, outliers, new merchants</MudText>
+                        @if (_uncategorized > 0)
+                        {
+                            <div>
+                                <MudLink Href="transactions?uncategorized=true" Typo="Typo.caption" data-testid="uncategorized-link">@Format.Count(_uncategorized) uncategorized transaction@(_uncategorized == 1 ? "" : "s")</MudLink>
+                            </div>
+                        }
                     </MudCardContent>
                 </MudCard>
             </div>
@@ -591,6 +597,8 @@ else
 
     private bool _loading = true;
     private string? _error;
+    private int _uncategorized;
+    private bool NeedsALook => (_activity?.Suspicious.Count ?? 0) > 0 || _uncategorized > 0;
 
     // Configurable ranges: history window for the insight charts, and forward horizon for the projection.
     private static readonly string[] HistoryPresets =
@@ -840,6 +848,14 @@ else
                 _activityUnavailable = true;
                 Logger.LogWarning(ex, "Failed to load dashboard activity");
             }
+
+            // Rows still without a category are part of "Needs a Look" (#67); best-effort, a failure only hides that line.
+            try
+            {
+                _uncategorized = (await ApiClient.GetTransactionPageAsync(
+                    take: 1, filter: new FlowLedger.Web.ApiClient.TransactionColumnFilter(UncategorizedOnly: true))).Total ?? 0;
+            }
+            catch (Exception ex) { Logger.LogWarning(ex, "Failed to count uncategorized transactions"); }
 
             // Insight widgets are best-effort: a failure must not blank the rest of the dashboard.
             try

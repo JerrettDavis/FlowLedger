@@ -255,4 +255,90 @@ public sealed class CategorizationServiceTests
         fresh.SuggestedConfidence.Should().BeNull();
         fresh.CategoryConfidence.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Provider_category_is_a_hint_for_rows_no_keyword_or_learned_merchant_covers()
+    {
+        var svc = await SetUpAsync();
+        var hinted = Add(_checking, 33, TransactionDirection.Debit, "Zzyzx Holdings");
+        hinted.SetProviderCategory("Gas & Fuel");
+        var unhinted = Add(_checking, 9, TransactionDirection.Debit, "Qwerty Holdings");
+        var vague = Add(_checking, 12, TransactionDirection.Debit, "Plugh Holdings");
+        vague.SetProviderCategory("Uncategorized");
+
+        var result = await svc.RunAsync();
+
+        result.ByProviderHint.Should().Be(1);
+        hinted.CategoryId.Should().NotBeNull();
+        hinted.CategorySource.Should().Be(CategorySource.Auto);
+        _categories.All.Should().ContainSingle(c => c.Path.Value == "Transport/Fuel");
+        unhinted.CategoryId.Should().BeNull();
+        vague.CategoryId.Should().BeNull("a vague provider label is no hint");
+    }
+
+    [Fact]
+    public async Task A_learned_merchant_or_keyword_wins_over_the_provider_hint()
+    {
+        var svc = await SetUpAsync();
+        var groceries = Add(_checking, 40, TransactionDirection.Debit, "Bluejay Grocery Co.");
+        groceries.SetProviderCategory("Gas & Fuel");
+
+        var result = await svc.RunAsync();
+
+        result.ByKeyword.Should().Be(1);
+        result.ByProviderHint.Should().Be(0);
+        _categories.All.Should().ContainSingle(c => c.Path.Value == "Food/Groceries");
+    }
+
+    [Fact]
+    public async Task Both_legs_of_a_transfer_get_the_same_persisted_link_and_rerunning_changes_nothing()
+    {
+        var svc = await SetUpAsync();
+        var outLeg = Add(_checking, 500, TransactionDirection.Debit, "To savings", day: 3);
+        var inLeg = Add(_savings, 500, TransactionDirection.Credit, "From checking", day: 3);
+        var coffee = Add(_checking, 4.5m, TransactionDirection.Debit, "Zzyzx Coffee", day: 3);
+
+        var first = await svc.RunAsync();
+
+        first.TransfersLinked.Should().Be(2);
+        outLeg.TransferLinkId.Should().NotBeNull().And.Be(inLeg.TransferLinkId);
+        outLeg.TransferLinkId.Should().Be(FlowLedger.Application.Features.Transactions.TransferDetector.LinkIdFor(inLeg.Id, outLeg.Id));
+        coffee.TransferLinkId.Should().BeNull();
+
+        var second = await svc.RunForAsync([outLeg.Id, inLeg.Id]);
+        second.TransfersLinked.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Bulk_edit_sets_one_manual_category_on_every_selected_row_and_skips_unknown_ids()
+    {
+        var svc = await SetUpAsync();
+        var a = Add(_checking, 10, TransactionDirection.Debit, "Zzyzx One");
+        var b = Add(_checking, 20, TransactionDirection.Debit, "Qwerty Two");
+        var untouched = Add(_checking, 30, TransactionDirection.Debit, "Plugh Three");
+        var mine = Category.Create(TenantId.From(_tenant.TenantId), new CategoryPath("Mine/Special"), "Special");
+        await _categories.AddAsync(mine);
+
+        var changed = await svc.SetCategoryBulkAsync([a.Id, b.Id, Guid.NewGuid()], mine.Id);
+
+        changed.Should().Be(2);
+        a.CategoryId.Should().Be(mine.CategoryId);
+        a.CategorySource.Should().Be(CategorySource.Manual);
+        b.CategoryId.Should().Be(mine.CategoryId);
+        untouched.CategoryId.Should().BeNull();
+        (await svc.SetCategoryBulkAsync([a.Id, b.Id], mine.Id)).Should().Be(0, "already set by hand");
+    }
+
+    [Fact]
+    public async Task Bulk_edit_rejects_an_unknown_category_and_an_oversized_selection()
+    {
+        var svc = await SetUpAsync();
+        var a = Add(_checking, 10, TransactionDirection.Debit, "Zzyzx One");
+
+        var unknown = () => svc.SetCategoryBulkAsync([a.Id], Guid.NewGuid());
+        await unknown.Should().ThrowAsync<FlowLedger.Application.Abstractions.NotFoundException>();
+
+        var tooMany = () => svc.SetCategoryBulkAsync(Enumerable.Range(0, CategorizationService.MaxBulkRows + 1).Select(_ => Guid.NewGuid()).ToList(), Guid.NewGuid());
+        await tooMany.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
+    }
 }

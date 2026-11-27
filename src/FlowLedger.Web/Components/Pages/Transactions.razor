@@ -126,11 +126,28 @@
              Dense="true"
              Virtualize="false"
              RowsPerPage="@PageSize"
+             MultiSelection="true"
+             SelectedItems="_selected"
+             SelectedItemsChanged="OnSelectionChanged"
              aria-label="Transactions table">
     <ToolBarContent>
+        @if (_selected.Count > 0)
+        {
+            <MudMenu Dense="true" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Category"
+                     Label="@($"Set category for {_selected.Count} selected")" Disabled="_bulkBusy" aria-label="Set category for selected transactions"
+                     data-testid="bulk-category">
+                @foreach (var c in _sortedCategories)
+                {
+                    var target = c;
+                    <MudMenuItem OnClick="@(() => BulkSetCategory(target))">@target.Path</MudMenuItem>
+                }
+            </MudMenu>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Class="ml-2" OnClick="ClearSelection">Clear selection</MudButton>
+        }
         <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status" data-testid="tx-count">@RangeText</MudText>
     </ToolBarContent>
     <Columns>
+        <SelectColumn T="FlowLedger.Contracts.TransactionDto" ShowInHeader="true" ShowInFooter="false" />
         <TemplateColumn Title="Date" Sortable="false">
             <HeaderTemplate>
                 <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("date")"
@@ -279,6 +296,8 @@
     private string? _filterStatus;
     private decimal? _minAmount;
     private decimal? _maxAmount;
+    private HashSet<FlowLedger.Contracts.TransactionDto> _selected = [];
+    private bool _bulkBusy;
     private bool _applyToMerchant;
     private bool _categorizing;
     private static readonly int[] PageSizes = [25, 50, 100, 250];
@@ -361,6 +380,9 @@
     /// <summary>Deep link from the dashboard account strip: /transactions?account={id}.</summary>
     [SupplyParameterFromQuery(Name = "account")] public Guid? AccountQuery { get; set; }
 
+    /// <summary>Deep link from "Needs a Look": /transactions?uncategorized=true.</summary>
+    [SupplyParameterFromQuery(Name = "uncategorized")] public bool UncategorizedQuery { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -375,6 +397,11 @@
             Snackbar.Add("Couldn't load account and category filters — some dropdowns may be empty.", Severity.Warning);
         }
         _filterAccountId ??= AccountQuery;
+        if (UncategorizedQuery)
+        {
+            _filterCategory = UncategorizedFilter; // deep link from the dashboard's "Needs a Look" card
+        }
+
         await LoadAsync();
     }
 
@@ -432,6 +459,7 @@
 
             _transactions = page.Items;
             _total = page.Total;
+            _selected = [];
             RecomputeVisible();
         }
         catch (Exception ex)
@@ -463,6 +491,38 @@
                 Guid.TryParse(_filterCategory, out var category) ? category : null,
                 _filterCategory == UncategorizedFilter,
                 _filterStatus, _minAmount, _maxAmount);
+
+    private void OnSelectionChanged(HashSet<FlowLedger.Contracts.TransactionDto> items) => _selected = items;
+
+    private void ClearSelection() => _selected = [];
+
+    /// <summary>Sets one category on every selected row (a single server call), then reloads the page. Selection is per page.</summary>
+    private async Task BulkSetCategory(FlowLedger.Contracts.CategoryDto category)
+    {
+        if (_selected.Count == 0)
+        {
+            return;
+        }
+
+        var ids = _selected.Select(t => t.Id).ToList();
+        _bulkBusy = true;
+        try
+        {
+            var changed = await ApiClient.SetCategoryBulkAsync(ids, category.Id);
+            Snackbar.Add($"Set {changed} transaction{(changed == 1 ? "" : "s")} to {category.Path}", Severity.Success);
+            _selected = [];
+            await LoadPageAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Bulk category change failed");
+            Snackbar.AddFailure(ex, "Couldn't set the category on the selected transactions");
+        }
+        finally
+        {
+            _bulkBusy = false;
+        }
+    }
 
     private Task OnCategoryFilterChanged(string? value) { _filterCategory = value; return LoadAsync(); }
 

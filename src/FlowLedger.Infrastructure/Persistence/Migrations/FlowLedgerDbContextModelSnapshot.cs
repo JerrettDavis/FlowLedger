@@ -379,6 +379,11 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("posted_date");
 
+                    b.Property<string>("ProviderCategory")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("provider_category");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -413,6 +418,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TransferLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transfer_link_id");
 
                     b.Property<string>("_tags")
                         .HasMaxLength(500)

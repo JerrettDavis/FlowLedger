@@ -96,6 +96,12 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
 
         builder.Property(t => t.SuggestedConfidence).HasColumnName("suggested_confidence");
 
+        builder.Property(t => t.ProviderCategory)
+            .HasColumnName("provider_category")
+            .HasMaxLength(Transaction.MaxProviderCategoryLength);
+
+        builder.Property(t => t.TransferLinkId).HasColumnName("transfer_link_id");
+
         builder.Property(t => t.MerchantName)
             .HasColumnName("merchant_name")
             .HasMaxLength(300);

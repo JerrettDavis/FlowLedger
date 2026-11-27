@@ -9,6 +9,8 @@ internal static class CategorizationEndpoints
 {
     internal sealed record SetCategoryRequest(Guid CategoryId, bool ApplyToMerchant = false);
 
+    internal sealed record BulkCategoryRequest(List<Guid> TransactionIds, Guid CategoryId);
+
     internal sealed record RecategorizeRequest(Guid CategoryId, bool ApplyToAll = false, string? Note = null);
 
     internal static IEndpointRouteBuilder MapCategorizationEndpoints(this IEndpointRouteBuilder app)
@@ -46,6 +48,12 @@ internal static class CategorizationEndpoints
                 Results.Ok(new { cleared = await service.ClearAutoCategoriesAsync(ct) }))
             .WithTags("Categories").WithName("ClearAutoCategories")
             .WithSummary("Remove categories that were set automatically (manual ones are never touched)")
+            .RequireRateLimiting("write");
+
+        app.MapPost("/api/transactions/bulk-category", async ([FromBody] BulkCategoryRequest request, CategorizationService service, CancellationToken ct) =>
+                Results.Ok(new { changed = await service.SetCategoryBulkAsync(request.TransactionIds ?? [], request.CategoryId, ct) }))
+            .WithTags("Transactions").WithName("BulkSetTransactionCategory")
+            .WithSummary("Set one category (manual) on up to 500 selected transactions")
             .RequireRateLimiting("write");
 
         app.MapPut("/api/transactions/{id:guid}/category", async (

@@ -288,7 +288,7 @@ internal sealed partial class FinancialSyncService
         var amount = new Money(Math.Abs(pt.Amount.Amount), new Currency(pt.Amount.Currency.Code));
         var description = string.IsNullOrWhiteSpace(pt.MerchantName) ? pt.RawDescription : pt.MerchantName;
 
-        return Transaction.RecordActual(
+        var transaction = Transaction.RecordActual(
             tenantId,
             accountId,
             amount,
@@ -299,5 +299,7 @@ internal sealed partial class FinancialSyncService
             source: TransactionSource.MxAggregation,
             fingerprint: fingerprint,
             time: clock);
+        transaction.SetProviderCategory(pt.ProviderCategory); // a hint for the categorizer, never the user's category
+        return transaction;
     }
 }

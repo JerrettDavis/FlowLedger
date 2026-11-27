@@ -84,4 +84,28 @@ public sealed class TransactionFilterTests(IntegrationTestFixture fixture) : IAs
 
         (await new TransactionRepository(db).CountMatchingAsync(filter: new TransactionFilter())).Should().Be(4);
     }
+
+    [DockerFact]
+    public async Task Provider_category_and_transfer_link_round_trip()
+    {
+        var tenant = TestTenantContext.New();
+        var account = await fixture.SeedAccountAsync(tenant);
+        var date = new DateOnly(2026, 3, 1);
+        var link = Guid.NewGuid();
+        Guid id;
+        await using (var db = fixture.CreateDbContext(tenant))
+        {
+            var tx = Transaction.RecordActual(TenantId.From(tenant.TenantId), account, new Money(5m, Currency.Usd), TransactionDirection.Debit, "Hinted", date, date, TransactionSource.Manual);
+            tx.SetProviderCategory("  Food & Dining  ");
+            tx.LinkTransfer(link);
+            db.Transactions.Add(tx);
+            await db.SaveChangesAsync();
+            id = tx.Id;
+        }
+
+        await using var verify = fixture.CreateDbContext(tenant);
+        var loaded = await new TransactionRepository(verify).GetByIdAsync(TransactionId.From(id));
+        loaded!.ProviderCategory.Should().Be("Food & Dining");
+        loaded.TransferLinkId.Should().Be(link);
+    }
 }

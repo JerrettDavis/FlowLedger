@@ -15,7 +15,7 @@ namespace FlowLedger.Domain.Aggregates;
 /// Split support: the aggregate owns a list of <see cref="TransactionSplit"/> value items.
 /// Their amounts must sum to the parent transaction total.
 /// </summary>
-public sealed class Transaction : AggregateRoot
+public sealed partial class Transaction : AggregateRoot
 {
     private Guid _id;
     private readonly List<TransactionSplit> _splits = [];
