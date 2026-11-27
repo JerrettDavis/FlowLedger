@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace FlowLedger.Infrastructure.Configuration;
 
 /// <summary>Typed view of <c>Backup:*</c>. Validated at startup so a typo fails the host instead of silently changing behaviour.</summary>
-public sealed class BackupOptions
+internal sealed class BackupOptions
 {
     public const string SectionName = "Backup";
 
@@ -28,7 +28,7 @@ public sealed class BackupOptions
 }
 
 /// <summary>Typed view of <c>Sync:*</c>.</summary>
-public sealed class SyncOptions
+internal sealed class SyncOptions
 {
     public const string SectionName = "Sync";
 
@@ -37,7 +37,7 @@ public sealed class SyncOptions
 }
 
 /// <summary>Typed view of <c>HomeAssistant:*</c> (alert push settings; the webhook URL itself is stored encrypted in the database).</summary>
-public sealed class HomeAssistantOptions
+internal sealed class HomeAssistantOptions
 {
     public const string SectionName = "HomeAssistant";
 

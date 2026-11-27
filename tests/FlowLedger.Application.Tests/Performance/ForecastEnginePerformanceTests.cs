@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Application.Features.Imports;
 using FlowLedger.Domain.Aggregates;
@@ -80,9 +81,9 @@ public sealed class ForecastEnginePerformanceTests
         for (int i = 0; i < 10000; i++)
         {
             var date = baseDate.AddDays(i % 365);  // Cycle through a year
-            var amount = (100m + i * 0.01m).ToString("F2");
+            var amount = (100m + i * 0.01m).ToString("F2", CultureInfo.InvariantCulture);
             var description = $"Transaction {i}";
-            csvBuilder.AppendLine($"{date:yyyy-MM-dd},{amount},\"{description}\"");
+            csvBuilder.AppendLine(CultureInfo.InvariantCulture, $"{date:yyyy-MM-dd},{amount},\"{description}\"");
         }
 
         var csvText = csvBuilder.ToString();

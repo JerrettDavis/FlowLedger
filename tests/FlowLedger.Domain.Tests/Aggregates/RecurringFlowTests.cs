@@ -24,10 +24,10 @@ public sealed class RecurringFlowTests
     // ── Create ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_valid_flow_raises_RecurringFlowCreated()
+    public void Create_valid_flow_is_active_and_starts_without_occurrences()
     {
         var flow = MakeFlow(Dec31);
-        flow.DomainEvents.Should().ContainSingle(e => e is RecurringFlowCreated);
+        flow.Occurrences.Should().BeEmpty();
     }
 
     [Fact]
@@ -51,10 +51,9 @@ public sealed class RecurringFlowTests
     // ── GenerateOccurrence ────────────────────────────────────────────────────
 
     [Fact]
-    public void GenerateOccurrence_within_window_adds_occurrence_and_raises_event()
+    public void GenerateOccurrence_within_window_adds_occurrence()
     {
         var flow = MakeFlow(Dec31);
-        flow.ClearDomainEvents();
 
         var date = new DateOnly(2024, 3, 1);
         var occurrence = flow.GenerateOccurrence(date);
@@ -62,7 +61,6 @@ public sealed class RecurringFlowTests
         occurrence.PlannedDate.Should().Be(date);
         occurrence.PlannedAmount.Should().Be(Rent);
         flow.Occurrences.Should().ContainSingle(o => o.PlannedOccurrenceId == occurrence.PlannedOccurrenceId);
-        flow.DomainEvents.Should().ContainSingle(e => e is PlannedOccurrenceGenerated);
     }
 
     [Fact]

@@ -6,7 +6,8 @@ public sealed record CategoryDto(
     string Path,
     string DisplayName,
     bool IsSystem,
-    Guid? ParentId);
+    Guid? ParentId,
+    uint Version = 0);
 
 /// <summary>Request DTO for creating a category.</summary>
 public sealed record CreateCategoryRequest(

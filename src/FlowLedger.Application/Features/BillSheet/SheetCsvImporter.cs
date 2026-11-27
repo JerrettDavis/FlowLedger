@@ -9,7 +9,7 @@ namespace FlowLedger.Application.Features.BillSheet;
 /// Columns are mapped by header name. A row containing "Estimated Cost" is a header and starts a
 /// section (named by its first cell); rows starting with "Total" end the section's data.
 /// </summary>
-public static class SheetCsvImporter
+internal static class SheetCsvImporter
 {
     private static readonly string[] MonthNames = CultureInfo.InvariantCulture.DateTimeFormat.MonthNames
         .Where(n => n.Length > 0).ToArray();

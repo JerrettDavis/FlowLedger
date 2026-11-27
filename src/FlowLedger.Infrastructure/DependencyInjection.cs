@@ -109,6 +109,8 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, NoOpDomainEventDispatcher>();
         services.AddSingleton(configuration.GetSection(OutboxOptions.SectionName).Get<OutboxOptions>() ?? new OutboxOptions());
         services.AddScoped<OutboxProcessor>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IOutbox, EfOutbox>();
+        services.AddScoped<FlowLedger.Application.Abstractions.IRowVersionGuard, EfRowVersionGuard>();
 
         // Auto-register all IDomainEventHandler<> implementations in this assembly.
         var infrastructureAssembly = typeof(DependencyInjection).Assembly;
@@ -183,27 +185,29 @@ public static class DependencyInjection
         if (simpleFinEnabled)
         {
             services.AddSimpleFinProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.SimpleFin, "SimpleFIN Bridge", "Aggregator (personal)", !FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider.DeclaredTraits));
         }
 
         if (mxOptions.Enabled)
         {
             services.AddMxProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", SharedCredentials: true));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Mx, "MX", "Aggregator (widget)", !FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Mx.MxFinancialDataProvider.DeclaredTraits));
         }
 
         if (quilttEnabled)
         {
             services.AddQuilttProvider(configuration, registerAsDefault: connectors.Count == 0);
             // Per-user profiles: Quiltt isolates each tenant itself, so unlike SimpleFIN/MX it is not tied to the household tenant.
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Quiltt, "Quiltt", "Aggregator (embedded)", !FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider.DeclaredTraits));
         }
 
         if (simulatedEnabled)
         {
             services.AddSimulatedProvider(configuration, registerAsDefault: connectors.Count == 0);
-            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", SharedCredentials: false));
+            connectors.Add(new(FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated, "Simulated demo data", "Demo", !FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.PerTenantAccess), FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider.DeclaredTraits));
         }
+
+        services.AddScoped<FlowLedger.Application.Abstractions.IHouseholdTenantAccess, HouseholdTenantAccess>();
 
         services.AddScoped<FlowLedger.Application.Abstractions.IAccountConnectorLinkStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore>();
@@ -261,7 +265,7 @@ public static class DependencyInjection
             AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto,
         });
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
-        // Decorators (outer -> inner): bill-sheet refresh -> cost guard (min interval + single-flight) -> sync.
+        // Decorators (outer -> inner): outbox SyncCompleted -> recurring detection -> categorization -> cost guard (min interval + single-flight) -> sync.
         services.AddScoped<FlowLedger.Infrastructure.Sync.MultiConnectorSyncService>();
         services.AddScoped<IFinancialSyncService>(sp =>
         {
@@ -277,7 +281,7 @@ public static class DependencyInjection
             }
 
             // Real connectors default to 30 min between syncs; the free Simulated provider is unthrottled.
-            var defaultMinutes = usable.Any(c => c.Id != FlowLedger.Integrations.Abstractions.ConnectorIds.Simulated) ? 30 : 0;
+            var defaultMinutes = usable.Any(c => !c.Traits.HasFlag(FlowLedger.Integrations.Abstractions.ConnectorTraits.SeedsDemoData)) ? 30 : 0;
             var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : defaultMinutes;
             var db = sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>();
             var connectorIds = usable.Select(c => c.Id).ToArray();
@@ -293,13 +297,11 @@ public static class DependencyInjection
                     configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
             // After every successful sync, fill in missing categories (never overwrites existing ones).
-            var deduped = new FlowLedger.Infrastructure.Sync.DedupingSyncService(
-                guarded,
-                sp.GetRequiredService<FlowLedger.Application.Features.Duplicates.DuplicateService>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.DedupingSyncService>>());
-
+            // Duplicate merge, bill-sheet refresh, webhooks and Home Assistant alerts are not inline steps any more: the outermost
+            // decorator records SyncCompleted in the outbox and idempotent handlers do them with retry (#92, #175, #180).
             var categorizing = new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
-                deduped,
+                guarded,
+                db,
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategorizationService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
@@ -310,14 +312,15 @@ public static class DependencyInjection
             // Config: RecurringFlows:AutoAdd (default true) adds only fixed-amount, very regular patterns.
             var recurring = new FlowLedger.Infrastructure.Sync.RecurringFlowSyncService(
                 categorizing,
+                db,
                 sp.GetRequiredService<FlowLedger.Application.Features.RecurringFlows.RecurringSuggestionService>(),
                 !bool.TryParse(cfg["RecurringFlows:AutoAdd"], out var autoAdd) || autoAdd,
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.RecurringFlowSyncService>>());
 
-            return new FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService(
+            return new FlowLedger.Infrastructure.Sync.OutboxPublishingSyncService(
                 recurring,
-                sp.GetService<FlowLedger.Application.Abstractions.ISheetAutoMarker>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.SheetRefreshingSyncService>>());
+                sp.GetRequiredService<FlowLedger.Application.Abstractions.IOutbox>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>());
         });
 
         services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>

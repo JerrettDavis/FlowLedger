@@ -3,7 +3,7 @@ using FlowLedger.Application.Abstractions;
 namespace FlowLedger.Application.Features.LocalAi;
 
 /// <summary>A set of raw merchant strings that very likely name one merchant.</summary>
-public sealed record MerchantGroup(string Canonical, IReadOnlyList<MerchantOccurrence> Members, double MinSimilarity)
+internal sealed record MerchantGroup(string Canonical, IReadOnlyList<MerchantOccurrence> Members, double MinSimilarity)
 {
     public int TotalCount => Members.Sum(m => m.Count);
 }
@@ -14,7 +14,7 @@ public sealed record MerchantGroup(string Canonical, IReadOnlyList<MerchantOccur
 /// close enough to. Comparing against the LEADER (not any member) stops chains from drifting into unrelated names.
 /// Suggest-only: nothing is renamed; the caller turns an accepted group into merchant aliases.
 /// </summary>
-public static class MerchantGrouper
+internal static class MerchantGrouper
 {
     public static async Task<IReadOnlyList<MerchantGroup>> GroupAsync(
         ITextEmbedder embedder, IReadOnlyList<MerchantOccurrence> merchants, double threshold, CancellationToken ct = default)

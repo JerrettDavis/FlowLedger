@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.BillSheet;
 /// Pure, deterministic matcher that decides which transactions pay which (bill, month) cells.
 /// See docs/superpowers/specs/2026-11-13-spreadsheet-mode-design.md.
 /// </summary>
-public static class SheetMatcher
+internal static class SheetMatcher
 {
     /// <summary>Largest gap (days) between a transaction and a bill's expected date in a month.</summary>
     public const int MaxDueDayDistance = 7;

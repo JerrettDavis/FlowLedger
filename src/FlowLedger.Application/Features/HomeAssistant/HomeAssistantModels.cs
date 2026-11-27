@@ -50,10 +50,10 @@ public sealed record HaEvent(
     decimal? Balance = null);
 
 /// <summary>Inputs to the pure detector (no I/O).</summary>
-public sealed record HaFlow(Guid Id, string Name, string? Counterparty, bool IsIncome, decimal Amount, IReadOnlyList<DateOnly> Dates);
+internal sealed record HaFlow(Guid Id, string Name, string? Counterparty, bool IsIncome, decimal Amount, IReadOnlyList<DateOnly> Dates);
 
-public sealed record HaAccountBalance(Guid Id, string Name, decimal Balance, bool IsLiquid);
+internal sealed record HaAccountBalance(Guid Id, string Name, decimal Balance, bool IsLiquid);
 
-public sealed record HaRecentTransaction(string Description, string? Merchant, bool IsIncome, decimal Amount, DateOnly Date);
+internal sealed record HaRecentTransaction(string Description, string? Merchant, bool IsIncome, decimal Amount, DateOnly Date);
 
-public sealed record HaBudgetBreach(string Category, bool Over);
+internal sealed record HaBudgetBreach(string Category, bool Over);

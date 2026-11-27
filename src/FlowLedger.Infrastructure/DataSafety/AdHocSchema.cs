@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// can always be restored. Each store exposes a public const <c>CreateSqlText</c>; add new stores to <see cref="Scripts"/>
 /// (a test fails if a store with CreateSqlText is missing here).
 /// </summary>
-public static class AdHocSchema
+internal static class AdHocSchema
 {
     public const string SystemSettingsSql =
         "CREATE TABLE IF NOT EXISTS system_settings (key text PRIMARY KEY, value text NOT NULL, updated_utc timestamptz NOT NULL DEFAULT now());";

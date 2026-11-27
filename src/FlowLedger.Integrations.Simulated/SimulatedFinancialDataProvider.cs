@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -17,7 +18,7 @@ namespace FlowLedger.Integrations.Simulated;
 /// - Configurable fault injection via <see cref="SimulatedProviderOptions"/>.
 /// - Webhook verification accepts a fixed HMAC using a test secret ("test-webhook-secret").
 /// </summary>
-public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
+public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRecurringFlowSeedSource
 {
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -47,6 +48,14 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         ProviderCapabilities.WebhookVerification |
         ProviderCapabilities.WebhookParsing |
         ProviderCapabilities.FaultSimulation;
+
+    /// <summary>No credentials, local provisioning, fabricated data.</summary>
+    public const ConnectorTraits DeclaredTraits = ConnectorTraits.PerTenantAccess | ConnectorTraits.ProvisionsLocally | ConnectorTraits.SeedsDemoData;
+
+    public ConnectorTraits Traits => DeclaredTraits;
+
+    public IReadOnlyList<RecurringFlowSeed> GetRecurringFlowSeeds(string checkingProviderAccountId, string creditProviderAccountId)
+        => SimulatedDataFactory.GetRecurringFlowSeeds(checkingProviderAccountId, creditProviderAccountId);
 
     public async Task<ProviderMemberRef> BeginConnectionAsync(
         TenantId tenantId,
@@ -95,7 +104,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider
         var page = allTransactions.Skip(startIndex).Take(pageSize).ToList();
         var nextIndex = startIndex + page.Count;
         var hasMore = nextIndex < allTransactions.Count;
-        var nextCursor = new SyncCursor(nextIndex.ToString());
+        var nextCursor = new SyncCursor(nextIndex.ToString(CultureInfo.InvariantCulture));
 
         return new TransactionPage(page, nextCursor, hasMore);
     }

@@ -73,7 +73,8 @@ public sealed class CategorizationService(
     CategorizationOptions? options = null,
     ITextEmbedder? embedder = null,
     LocalAiOptions? localAi = null,
-    ILocalLlm? llm = null)
+    ILocalLlm? llm = null,
+    IRowVersionGuard? guard = null)
 {
     private readonly CategorizationOptions _options = options ?? new CategorizationOptions();
     private readonly LocalAiOptions _localAi = localAi ?? new LocalAiOptions();
@@ -319,10 +320,11 @@ public sealed class CategorizationService(
     /// every other transaction of the same merchant that is uncategorized OR was categorized automatically gets it too
     /// (they become Auto, so a later correction can still replace them); categories the user chose by hand are left alone.
     /// </summary>
-    public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default)
+    public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var target = await store.FindTrackedAsync(transactionId, ct)
             ?? throw new KeyNotFoundException("Transaction not found.");
+        guard?.Expect(target, expectedVersion);
         // The id comes from the request body: it must be one of THIS tenant's categories (the repository is tenant-scoped).
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
             ?? throw new KeyNotFoundException("Category not found.");

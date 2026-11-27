@@ -11,6 +11,7 @@
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Caption</MudText>
             }
         </CardHeaderContent>
+        <CardHeaderActions>@HeaderActions</CardHeaderActions>
     </MudCardHeader>
     <MudCardContent>
         @switch (State)
@@ -48,5 +49,6 @@
     [Parameter] public string SkeletonHeight { get; set; } = "120px";
     [Parameter] public string? Class { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

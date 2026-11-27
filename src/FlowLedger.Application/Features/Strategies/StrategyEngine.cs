@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Strategies;
 /// Pure rules engine: turns a snapshot of balances, cash flow and market rates into ranked suggestions.
 /// No I/O. Every suggestion carries its evidence and assumptions so the numbers are checkable.
 /// </summary>
-public static class StrategyEngine
+internal static class StrategyEngine
 {
     public const string Disclaimer =
         "General educational information based on your data and public benchmark rates, not personalised financial, tax or legal advice. "

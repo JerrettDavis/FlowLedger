@@ -24,10 +24,10 @@ internal static class CategoryEndpoints
             .WithName("RestoreDefaultCategories")
             .WithSummary("Add any missing default (Mint-equivalent) categories; existing categories are untouched");
 
-        group.MapGet("/{id:guid}", async (Guid id, GetCategoryHandler handler, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, GetCategoryHandler handler, HttpResponse response, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("GetCategory")
         .WithSummary("Get a single category by ID");
@@ -78,6 +78,8 @@ internal static class CategoryEndpoints
             [FromBody] UpdateCategoryRequest request,
             UpdateCategoryHandler handler,
             IValidator<UpdateCategoryRequest> validator,
+            HttpRequest httpRequest,
+            HttpResponse response,
             CancellationToken ct) =>
         {
             var validation = await validator.ValidateAsync(request, ct);
@@ -86,18 +88,30 @@ internal static class CategoryEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var result = await handler.HandleAsync(id, request, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("category");
+            }
+
+            var result = await handler.HandleAsync(id, request, ct, expected);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("UpdateCategory")
         .WithSummary("Rename a category")
         .RequireRateLimiting("write");
 
-        group.MapDelete("/{id:guid}", async (Guid id, DeleteCategoryHandler handler, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, DeleteCategoryHandler handler, HttpRequest httpRequest, CancellationToken ct) =>
         {
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("category");
+            }
+
             try
             {
-                var found = await handler.HandleAsync(id, ct);
+                var found = await handler.HandleAsync(id, ct, expected);
                 return found ? Results.NoContent() : Results.NotFound();
             }
             catch (InvalidOperationException ex)

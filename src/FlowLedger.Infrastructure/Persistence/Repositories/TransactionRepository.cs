@@ -25,6 +25,28 @@ internal sealed class TransactionRepository : ITransactionRepository
         bool everydayOnly = false,
         string? search = null)
     {
+        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
+
+        return await query
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenByDescending(t => t.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> CountMatchingAsync(
+        AccountId? accountId = null,
+        DateOnly? from = null,
+        DateOnly? to = null,
+        CancellationToken ct = default,
+        bool everydayOnly = false,
+        string? search = null)
+        => await (await FilteredAsync(accountId, from, to, everydayOnly, search, ct)).CountAsync(ct);
+
+    private async Task<IQueryable<Transaction>> FilteredAsync(
+        AccountId? accountId, DateOnly? from, DateOnly? to, bool everydayOnly, string? search, CancellationToken ct)
+    {
         var query = _db.Transactions.AsNoTracking();
 
         if (accountId.HasValue)
@@ -50,17 +72,15 @@ internal sealed class TransactionRepository : ITransactionRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLowerInvariant();
+            // ToLower() on the column is deliberate: EF translates it to SQL lower(); string.Contains(string, StringComparison) is not translatable.
+#pragma warning disable CA1304, CA1311, CA1862
             query = query.Where(t => t.Description.ToLower().Contains(term)
                 || (t.MerchantName != null && t.MerchantName.ToLower().Contains(term))
                 || (t.Notes != null && t.Notes.ToLower().Contains(term)));
+#pragma warning restore CA1304, CA1311, CA1862
         }
 
-        return await query
-            .OrderByDescending(t => t.EffectiveDate)
-            .ThenByDescending(t => t.CreatedAt)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync(ct);
+        return query;
     }
 
     /// <summary>

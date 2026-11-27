@@ -9,15 +9,16 @@
 
 <PageTitle>Query — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4 fl-enter">
-    <div>
-        <MudText Typo="Typo.h4" HtmlTag="h1" tabindex="-1">Query</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Pipe-style queries over your own data. Build a result, pick a chart, save it as a view or add it to a report.
-        </MudText>
-    </div>
-    <MudButton Href="reports" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Assessment">Reports</MudButton>
-</div>
+<PageHeader Title="Query">
+    <Description>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Pipe-style queries over your own data. Build a result, pick a chart, save it as a view or add it to a report.
+            </MudText>
+    </Description>
+    <ChildContent>
+        <MudButton Href="reports" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Assessment">Reports</MudButton>
+    </ChildContent>
+</PageHeader>
 
 @if (_error is not null)
 {
@@ -139,7 +140,7 @@
                 @foreach (var group in _reports.Where(r => r.Kind == "View").GroupBy(r => r.IsPreset).OrderBy(g => g.Key))
                 {
                     <MudText Typo="Typo.overline" Color="Color.Secondary">@(group.Key ? "Preset views" : "My views")</MudText>
-                    <MudList T="string" Dense="true" Class="pa-0">
+                    <MudList T="string" Dense="true" Class="pa-0" aria-label="@(group.Key ? "Preset views" : "My views")">
                         @foreach (var r in group)
                         {
                             <MudListItem T="string" OnClick="() => LoadViewAsync(r)" Text="@r.Name" Icon="@Icons.Material.Filled.ShowChart" />
@@ -210,7 +211,7 @@
         """;
 
     private string _query = "transactions\n| where direction == \"Debit\" and date >= ago(90d)\n| summarize total = sum(amount), n = count() by category\n| sort by total desc\n| take 12";
-    private QueryResultDto? _result;
+    private QueryResult? _result;
     private QuerySchemaDto? _schema;
     private List<SavedReportDto> _reports = [];
     private string? _error;
@@ -416,7 +417,7 @@
         await LoadPanelAsync(r.Panels[0], r.Name);
     }
 
-    private async Task LoadPanelAsync(ReportPanelDto panel, string title)
+    private async Task LoadPanelAsync(ReportPanel panel, string title)
     {
         await SetQueryAsync(panel.Query);
         _loadedTitle = title;
@@ -428,7 +429,7 @@
         await RunCoreAsync(keepViz: true);
     }
 
-    private VizSpecDto CurrentViz() => new(_kind, _x, _y.ToList(), _seriesBy, _stacked);
+    private VizSpec CurrentViz() => new(_kind, _x, _y.ToList(), _seriesBy, _stacked);
 
     private static readonly string[] DatasetNames = ["transactions", "accounts", "assets"];
 
@@ -500,15 +501,15 @@
     private static string Snippet(string q, int pos)
         => q.Substring(pos, Math.Min(20, q.Length - pos)).Replace('\n', ' ');
 
-    private IReadOnlyCollection<string> DefaultY(QueryResultDto r)
+    private IReadOnlyCollection<string> DefaultY(QueryResult r)
         => r.Columns.Where(c => c.Type == "number" && c.Name != _x).Take(1).Select(c => c.Name).ToList();
 
     /// <summary>Picks a sensible default display for a fresh result: time on X becomes a line, small categorical a column.</summary>
-    private void AutoViz(QueryResultDto r)
+    private void AutoViz(QueryResult r)
     {
         _seriesBy = null;
         _stacked = false;
-        var xIndex = r.Columns.FindIndex(c => c.Type != "number");
+        var xIndex = r.Columns.ToList().FindIndex(c => c.Type != "number");
         if (xIndex < 0)
         {
             xIndex = 0;
@@ -523,7 +524,7 @@
             : timeLike ? "line" : r.Rows.Count <= 20 ? "column" : "table";
     }
 
-    private ReportPanelDto CurrentPanel(string title) => new(title, _query, CurrentViz());
+    private ReportPanel CurrentPanel(string title) => new(title, _query, CurrentViz());
 
     private async Task SaveViewAsync()
     {

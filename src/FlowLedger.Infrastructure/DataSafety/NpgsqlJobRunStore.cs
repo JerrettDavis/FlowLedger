@@ -18,7 +18,7 @@ public interface IJobRunStore
 /// Postgres-backed <see cref="IJobRunStore"/> (<c>job_runs</c>, created on first use like the other ad hoc tables, so it needs no EF
 /// migration and is part of every snapshot). Rows older than <see cref="RetentionDays"/> are deleted on insert.
 /// </summary>
-public sealed class NpgsqlJobRunStore(string connectionString) : IJobRunStore
+internal sealed class NpgsqlJobRunStore(string connectionString) : IJobRunStore
 {
     public const string CreateSqlText = """
         CREATE TABLE IF NOT EXISTS job_runs (

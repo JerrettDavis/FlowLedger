@@ -90,7 +90,7 @@ public class StrategyEngineTests
     public void Mortgage_surfaces_refinance_prompt_with_market_rate()
     {
         var r = Run([Acct("Home loan", "Mortgage", 250_000m, liability: true)], Flows(6000, 3000));
-        var s = r.Suggestions.Single(x => x.Id.StartsWith("mortgage-refi-check:"));
+        var s = r.Suggestions.Single(x => x.Id.StartsWith("mortgage-refi-check:", StringComparison.Ordinal));
         s.Summary.Should().Contain("6.5%");
         s.Simulator.Should().Be("refinance");
     }
@@ -224,7 +224,7 @@ public class StrategyEngineRealRateTests
     public void High_rate_mortgage_gets_a_concrete_refinance_recommendation()
     {
         var r = Run(Acct("Home", "Mortgage", 300_000m, rate: 7.5m, months: 336, liability: true));
-        var s = r.Suggestions.Single(x => x.Id.StartsWith("mortgage-refi:"));
+        var s = r.Suggestions.Single(x => x.Id.StartsWith("mortgage-refi:", StringComparison.Ordinal));
         s.AnnualImpact.Should().BeGreaterThan(2_000m);
         s.Summary.Should().Contain("breaks even");
     }

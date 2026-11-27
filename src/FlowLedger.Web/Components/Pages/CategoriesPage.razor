@@ -5,23 +5,22 @@
 
 <PageTitle>Categories — FlowLedger</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-1" style="flex-wrap:wrap;gap:8px">
-    <MudText Typo="Typo.h5" HtmlTag="h1" tabindex="-1">Categories</MudText>
-    @if (!_loading && _nodes.Count > 0)
-    {
-        <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
-            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Immediate="true" DebounceInterval="120"
-                          Placeholder="Search categories" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="width:min(260px,100%)" aria-label="Search categories" />
-            <MudTooltip Text="Expand all">
-                <MudIconButton Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" OnClick="ExpandAll" aria-label="Expand all" />
-            </MudTooltip>
-            <MudTooltip Text="Collapse all">
-                <MudIconButton Icon="@Icons.Material.Filled.UnfoldLess" Size="Size.Small" OnClick="CollapseAll" aria-label="Collapse all" />
-            </MudTooltip>
-        </div>
-    }
-</div>
+<PageHeader Title="Categories">
+        @if (!_loading && _nodes.Count > 0)
+        {
+            <div class="d-flex align-center" style="gap:8px;flex-wrap:wrap">
+                <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Immediate="true" DebounceInterval="120"
+                              Placeholder="Search categories" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="width:min(260px,100%)" aria-label="Search categories" />
+                <MudTooltip Text="Expand all">
+                    <MudIconButton Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" OnClick="ExpandAll" aria-label="Expand all" />
+                </MudTooltip>
+                <MudTooltip Text="Collapse all">
+                    <MudIconButton Icon="@Icons.Material.Filled.UnfoldLess" Size="Size.Small" OnClick="CollapseAll" aria-label="Collapse all" />
+                </MudTooltip>
+            </div>
+        }
+</PageHeader>
 <MudText Typo="Typo.body2" Class="mb-4 fl-muted">
     Rename, move or merge a category and everything under it. Transactions, splits, recurring flows, rules and budgets follow.
 </MudText>

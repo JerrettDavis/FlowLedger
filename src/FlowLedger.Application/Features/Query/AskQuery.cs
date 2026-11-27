@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -16,7 +17,7 @@ public sealed record AskQueryRequest(string Question);
 public sealed record AskQueryResult(string Question, string? Query, string? Error, int Attempts, string? Note = null);
 
 /// <summary>Builds the model prompt and cleans the model's reply. Pure, so it is unit-tested without a model.</summary>
-public static class QueryPrompt
+internal static class QueryPrompt
 {
     public const string DataBlockStart = "<<<FLOWLEDGER_DATA";
     public const string DataBlockEnd = "FLOWLEDGER_DATA>>>";
@@ -108,21 +109,21 @@ public static class QueryPrompt
         var sb = new StringBuilder();
         sb.AppendLine("You translate questions about a person's finances into ONE query in a Kusto-style pipeline language.");
         sb.AppendLine("Reply with ONLY the query. No explanation, no markdown fences. Read-only: you cannot change data.");
-        sb.AppendLine($"Today is {today:yyyy-MM-dd}.");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Today is {today:yyyy-MM-dd}.");
         sb.AppendLine();
         sb.AppendLine("Language: `dataset | where cond | extend x = expr | summarize total = sum(amount), n = count() by key | sort by total desc | take 10`.");
         sb.AppendLine("Operators: where, project, extend, summarize ... by, sort by, top N by, take N, distinct, count.");
         sb.AppendLine("Conditions: and, or, not, == != < <= > >=, contains, startswith, endswith, in (...), between(a, b). Strings use double quotes.");
         sb.AppendLine("Durations: 30d, 2w, 6mo, 1y. Dates compare as \"2026-01-01\" strings. Use ago(30d), today(), month(date), startofmonth(date).");
-        sb.AppendLine($"Aggregates: {string.Join(", ", aggregates)}");
-        sb.AppendLine($"Functions: {string.Join(", ", functions)}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Aggregates: {string.Join(", ", aggregates)}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Functions: {string.Join(", ", functions)}");
         sb.AppendLine();
         foreach (var d in datasets)
         {
-            sb.AppendLine($"Dataset `{d.Name}`: {d.Description}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Dataset `{d.Name}`: {d.Description}");
             foreach (var c in d.Columns)
             {
-                sb.AppendLine($"  - {c.Name} ({c.Type}): {c.Description}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"  - {c.Name} ({c.Type}): {c.Description}");
             }
         }
 
@@ -287,7 +288,7 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
 
     private static bool IsEmpty(QueryResult r) =>
         r.Rows.Count == 0
-        || (r.Rows.Count == 1 && r.Rows[0].All(v => v is null || (v is IConvertible c && v is not string && Convert.ToDecimal(c) == 0m)));
+        || (r.Rows.Count == 1 && r.Rows[0].All(v => v is null || (v is IConvertible c && v is not string && Convert.ToDecimal(c, CultureInfo.InvariantCulture) == 0m)));
 
     private static List<string> Distinct(IReadOnlyDictionary<string, QueryTable> tables, string query, DateOnly today)
     {

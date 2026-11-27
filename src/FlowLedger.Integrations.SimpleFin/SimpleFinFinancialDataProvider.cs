@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Domain.ValueObjects;
@@ -39,6 +40,11 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
     public ProviderCapabilities Capabilities =>
         ProviderCapabilities.Accounts | ProviderCapabilities.IncrementalTransactions;
+
+    /// <summary>Operator-held access URL (household tenant only), connection is a local record, balances use the holdings sign.</summary>
+    public const ConnectorTraits DeclaredTraits = ConnectorTraits.ProvisionsLocally | ConnectorTraits.ReportsHoldingsSign;
+
+    public ConnectorTraits Traits => DeclaredTraits;
 
     public Task<ProviderMemberRef> BeginConnectionAsync(TenantId tenantId, CancellationToken cancellationToken = default)
     {
@@ -136,7 +142,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
     private static string FormatCursor(DateOnly? date, int backfilledDays)
     {
-        var text = date?.ToString("yyyy-MM-dd") ?? string.Empty;
+        var text = date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
         return backfilledDays > 0 ? text + BackfillMarker + backfilledDays : text;
     }
 

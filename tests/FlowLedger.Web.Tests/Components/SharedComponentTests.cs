@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -125,8 +126,8 @@ public sealed class SharedComponentTests : IAsyncDisposable
     [Fact]
     public void ResultTable_renders_headers_rows_and_right_aligns_numbers()
     {
-        var result = new QueryResultDto(
-            [new QueryColumnDto("Merchant", "text"), new QueryColumnDto("Total", "number")],
+        var result = new QueryResult(
+            [new QueryColumn("Merchant", "text"), new QueryColumn("Total", "number")],
             [[Json("\"Coffee\""), Json("1234.5")]],
             false,
             1);
@@ -134,15 +135,15 @@ public sealed class SharedComponentTests : IAsyncDisposable
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result));
 
         cut.FindAll("th[scope=col]").Select(e => e.TextContent).Should().Equal("Merchant", "Total");
-        cut.FindAll("td").Select(e => e.TextContent).Should().Equal("Coffee", 1234.5m.ToString("N2"));
+        cut.FindAll("td").Select(e => e.TextContent).Should().Equal("Coffee", 1234.5m.ToString("N2", CultureInfo.InvariantCulture));
         cut.FindAll("td")[1].ClassList.Should().Contain("num");
     }
 
     [Fact]
     public void ResultTable_caps_rows_and_says_so()
     {
-        var rows = Enumerable.Range(0, 5).Select(i => new List<JsonElement> { Json(i.ToString()) }).ToList();
-        var result = new QueryResultDto([new QueryColumnDto("n", "number")], rows, false, 1);
+        var rows = Enumerable.Range(0, 5).Select(i => (IReadOnlyList<object?>)new List<object?> { Json(i.ToString(CultureInfo.InvariantCulture)) }).ToList();
+        var result = new QueryResult([new QueryColumn("n", "number")], rows, false, 1);
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result).Add(c => c.MaxRows, 2));
 
@@ -153,7 +154,7 @@ public sealed class SharedComponentTests : IAsyncDisposable
     [Fact]
     public void ResultTable_shows_No_rows_for_an_empty_result()
     {
-        var result = new QueryResultDto([new QueryColumnDto("n", "number")], [], false, 1);
+        var result = new QueryResult([new QueryColumn("n", "number")], [], false, 1);
 
         var cut = _ctx.Render<ResultTable>(p => p.Add(c => c.Result, result));
 

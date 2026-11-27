@@ -72,6 +72,9 @@ public sealed class Transaction : AggregateRoot
 
     public DateTimeOffset CreatedAt { get; }
 
+    /// <summary>Optimistic-concurrency token (Postgres <c>xmin</c>, no schema column): a stale write fails instead of overwriting (#157).</summary>
+    public uint RowVersion { get; private set; }
+
     private Transaction()
     {
         // EF Core constructor — fields initialised by EF.
@@ -136,7 +139,6 @@ public sealed class Transaction : AggregateRoot
             description.Trim(), status, source, effectiveDate, postedDate,
             fingerprint, Now(time));
 
-        tx.RaiseEvent(new TransactionImported(tx.TransactionId, tx.TenantId, tx.AccountId, amount, direction, source), tx.CreatedAt);
         return tx;
     }
 
@@ -179,8 +181,6 @@ public sealed class Transaction : AggregateRoot
 
         MatchedOccurrenceId = occurrenceId;
         Status = TransactionStatus.Matched;
-
-        RaiseEvent(new TransactionMatchedToPlan(TransactionId, TenantId, occurrenceId, confidence));
     }
 
     /// <summary>
@@ -261,8 +261,6 @@ public sealed class Transaction : AggregateRoot
         {
             MerchantName = merchantName.Trim();
         }
-
-        RaiseEvent(new TransactionCategorized(TransactionId, TenantId, categoryId));
     }
 
     /// <summary>Sets the display name (alias) for this transaction's merchant without touching its category.</summary>

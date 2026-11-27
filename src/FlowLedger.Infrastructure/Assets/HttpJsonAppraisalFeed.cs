@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.Assets;
 /// Configuration for the generic JSON appraisal feed. Disabled by default; no vendor is assumed.
 /// Bind from <c>AssetFeeds:Http</c>.
 /// </summary>
-public sealed class HttpJsonAppraisalFeedOptions
+internal sealed class HttpJsonAppraisalFeedOptions
 {
     public const string SectionName = "AssetFeeds:Http";
 
@@ -39,7 +39,7 @@ public sealed class HttpJsonAppraisalFeedOptions
 /// Pulls a value for an asset from any HTTP JSON endpoint described by configuration. Only descriptive
 /// fields ever leave the system — never the serial number.
 /// </summary>
-public sealed class HttpJsonAppraisalFeed(
+internal sealed class HttpJsonAppraisalFeed(
     IHttpClientFactory httpFactory,
     IOptions<HttpJsonAppraisalFeedOptions> options,
     ILogger<HttpJsonAppraisalFeed> logger) : IAssetValuationFeed

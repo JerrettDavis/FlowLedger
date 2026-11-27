@@ -163,6 +163,13 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
                 .HasMaxLength(2000);
         });
 
+        // Optimistic concurrency (#157): Postgres' own xmin system column, so no schema change is needed.
+        builder.Property(t => t.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         // Indexes per PLAN §23: tenant + account + date composite for fast cashflow queries.
         builder.HasIndex("TenantId", "AccountId", nameof(Transaction.EffectiveDate))
             .HasDatabaseName("ix_transactions_tenant_account_date");

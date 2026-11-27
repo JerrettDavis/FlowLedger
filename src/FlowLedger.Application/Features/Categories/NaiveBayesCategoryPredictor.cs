@@ -3,16 +3,16 @@ using System.Text.RegularExpressions;
 namespace FlowLedger.Application.Features.Categories;
 
 /// <summary>One labelled transaction used to train the model.</summary>
-public sealed record TrainingExample(string? Merchant, string? Description, string Direction, decimal Amount, string Label);
+internal sealed record TrainingExample(string? Merchant, string? Description, string Direction, decimal Amount, string Label);
 
-public sealed record Prediction(string Label, double Probability);
+internal sealed record Prediction(string Label, double Probability);
 
 /// <summary>
 /// Small in-process multinomial naive Bayes text classifier over a transaction's merchant/description
 /// (words + character 3-grams, digits stripped) plus direction and amount bucket. Pure, deterministic, no dependencies.
 /// Trained fresh from the user's own manual categories, so it needs no stored model.
 /// </summary>
-public sealed class NaiveBayesCategoryPredictor
+internal sealed class NaiveBayesCategoryPredictor
 {
     public const int MinExamples = 20;
     public const int MinPerLabel = 2;

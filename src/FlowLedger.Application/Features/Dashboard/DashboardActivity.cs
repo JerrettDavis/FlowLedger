@@ -16,7 +16,7 @@ public interface ISuspiciousDismissalStore
 /// Pure heuristics that turn raw transactions into dashboard insights. No I/O so it is trivially testable.
 /// "Suspicious" means "worth a second look", not proven fraud.
 /// </summary>
-public static class DashboardActivityAnalyzer
+internal static class DashboardActivityAnalyzer
 {
     public const int WindowDays = 30;
     public const int HistoryDays = 90;
@@ -123,7 +123,7 @@ public static class DashboardActivityAnalyzer
             {
                 // The legacy "× the usual amount" rule already covers a merchant outlier; don't double-report it.
                 var hasOutlier = reasons.Any(r => r.Contains("the usual amount"));
-                reasons.AddRange(extra.Where(r => !(hasOutlier && r.StartsWith(AnomalyDetector.MerchantOutlierPrefix))));
+                reasons.AddRange(extra.Where(r => !(hasOutlier && r.StartsWith(AnomalyDetector.MerchantOutlierPrefix, StringComparison.Ordinal))));
             }
 
             if (reasons.Count > 0)

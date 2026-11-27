@@ -20,7 +20,7 @@ public sealed class FinancialProviderOptions
     /// When false (the default), the Simulated provider is used and no API credentials
     /// are required.  Set true only when a real MX account is available.
     /// </summary>
-    public bool Enabled { get; set; } = false;
+    public bool Enabled { get; set; }
 
     /// <summary>MX API key.  Required only when <see cref="Enabled"/> is true.</summary>
     public string? ApiKey { get; set; }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components;
 
 namespace FlowLedger.Web.Shared;
@@ -70,8 +71,8 @@ public static class SvgChart
             decimal gVal = minBal + range * g / 3m;
             double gy = ScaleY(gVal);
             string label = CompactMoney(gVal);
-            gridLines.Append($"<line x1='{padL}' y1='{gy:F1}' x2='{W - padR}' y2='{gy:F1}' stroke='var(--mud-palette-lines-default)' stroke-width='1'/>");
-            gridLines.Append($"<text x='{padL - 5}' y='{gy + 4:F1}' text-anchor='end' font-size='10' fill='var(--mud-palette-text-secondary)'>{label}</text>");
+            gridLines.Append(CultureInfo.InvariantCulture, $"<line x1='{padL}' y1='{gy:F1}' x2='{W - padR}' y2='{gy:F1}' stroke='var(--mud-palette-lines-default)' stroke-width='1'/>");
+            gridLines.Append(CultureInfo.InvariantCulture, $"<text x='{padL - 5}' y='{gy + 4:F1}' text-anchor='end' font-size='10' fill='var(--mud-palette-text-secondary)'>{label}</text>");
         }
 
         // X-axis ticks (3-4 evenly spaced)
@@ -82,7 +83,7 @@ public static class SvgChart
             int idx = (int)Math.Round((double)t / (tickCount - 1) * (points.Count - 1));
             double tx = ScaleX(idx);
             string label = Format.DayMonth(points[idx].date);
-            xTicks.Append($"<text x='{tx:F1}' y='{H - 5}' text-anchor='middle' font-size='10' fill='var(--mud-palette-text-secondary)'>{label}</text>");
+            xTicks.Append(CultureInfo.InvariantCulture, $"<text x='{tx:F1}' y='{H - 5}' text-anchor='middle' font-size='10' fill='var(--mud-palette-text-secondary)'>{label}</text>");
         }
 
         // Zero line
@@ -103,7 +104,7 @@ public static class SvgChart
                 if (breachSet.Contains(points[i].date))
                 {
                     double bx = ScaleX(i), by = ScaleY(points[i].balance);
-                    breachMarkers.Append($"<circle cx='{bx:F1}' cy='{by:F1}' r='4' fill='var(--mud-palette-error)' fill-opacity='0.7'/>");
+                    breachMarkers.Append(CultureInfo.InvariantCulture, $"<circle cx='{bx:F1}' cy='{by:F1}' r='4' fill='var(--mud-palette-error)' fill-opacity='0.7'/>");
                 }
             }
         }

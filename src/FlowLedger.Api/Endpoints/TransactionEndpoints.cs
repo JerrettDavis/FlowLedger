@@ -7,6 +7,9 @@ namespace FlowLedger.Api.Endpoints;
 
 internal static class TransactionEndpoints
 {
+    /// <summary>Response header carrying how many transactions match the list filters, ignoring Skip/Take.</summary>
+    internal const string TotalCountHeader = "X-Total-Count";
+
     internal static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/transactions").WithTags("Transactions")
@@ -16,6 +19,7 @@ internal static class TransactionEndpoints
             [AsParameters] ListTransactionsQuery query,
             ListTransactionsHandler handler,
             IValidator<ListTransactionsQuery> validator,
+            HttpContext http,
             CancellationToken ct) =>
         {
             var validation = await validator.ValidateAsync(query, ct);
@@ -24,6 +28,8 @@ internal static class TransactionEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
+            // The total lets clients page on the server ("51-100 of 1,234") instead of loading everything.
+            http.Response.Headers[TotalCountHeader] = (await handler.CountAsync(query, ct)).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Results.Ok(await handler.HandleAsync(query, ct));
         })
         .WithName("ListTransactions")
@@ -52,10 +58,10 @@ internal static class TransactionEndpoints
         .WithName("ExportTransactionsCsv")
         .WithSummary("Download transactions (filtered like the list) as CSV");
 
-        group.MapGet("/{id:guid}", async (Guid id, GetTransactionHandler handler, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, GetTransactionHandler handler, HttpResponse response, CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(id, ct);
-            return result is null ? Results.NotFound() : Results.Ok(result);
+            return result is null ? Results.NotFound() : RowVersioning.Ok(response, result, result.Version);
         })
         .WithName("GetTransaction")
         .WithSummary("Get a single transaction by ID");

@@ -1,7 +1,6 @@
 using FlowLedger.Application.Features.Imports;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Api.Endpoints;
 
@@ -15,55 +14,13 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class ImportEndpoints
 {
-    private static async Task AfterImportAsync(
-        ImportSummaryDto summary,
-        FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
-        FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
-        FlowLedger.Application.Features.Integrations.IntegrationService integrations,
-        ILogger logger,
-        CancellationToken ct)
-    {
-        if (summary.ImportedCount <= 0)
-        {
-            return;
-        }
-
-        await integrations.DispatchAsync(
-            FlowLedger.Application.Features.Integrations.IntegrationEvents.ImportCompleted,
-            new { imported = summary.ImportedCount },
-            ct);
-
-        // A file often overlaps what the bank already synced: fold the unambiguous overlaps now.
-        try
-        {
-            await duplicates.AutoMergeAsync(ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex, "Duplicate merge after import failed.");
-        }
-
-        try
-        {
-            await sheetMarker.RefreshAsync(ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex, "Bill sheet refresh after import failed.");
-        }
-    }
-
     internal static IEndpointRouteBuilder MapImportEndpoints(this IEndpointRouteBuilder app)
     {
         // ── Import ────────────────────────────────────────────────────────────
 
         app.MapPost("/api/imports", async (
             [FromBody] ImportRequest request,
-            ImportTransactionsHandler handler,
-            FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
-            FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
-            FlowLedger.Application.Features.Integrations.IntegrationService integrations,
-            ILogger<ImportTransactionsHandler> logger,
+            ImportCoordinator coordinator,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.CsvContent))
@@ -95,10 +52,7 @@ internal static class ImportEndpoints
                     HasHeaderRow: request.HasHeaderRow);
 
                 var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
-                var summary = await handler.HandleAsync(command, ct);
-                await AfterImportAsync(summary, sheetMarker, duplicates, integrations, logger, ct);
-
-                return Results.Ok(summary);
+                return Results.Ok(await coordinator.ImportAsync(command, ct));
             }
             catch (InvalidOperationException ex)
             {
@@ -122,11 +76,7 @@ internal static class ImportEndpoints
 
         app.MapPost("/api/imports/auto", async (
             [FromBody] AutoImportRequest request,
-            ImportTransactionsHandler handler,
-            FlowLedger.Application.Abstractions.ISheetAutoMarker sheetMarker,
-            FlowLedger.Application.Features.Duplicates.DuplicateService duplicates,
-            FlowLedger.Application.Features.Integrations.IntegrationService integrations,
-            ILogger<ImportTransactionsHandler> logger,
+            ImportCoordinator coordinator,
             CancellationToken ct) =>
         {
             if (request.AccountId == Guid.Empty || string.IsNullOrWhiteSpace(request.Content))
@@ -136,11 +86,8 @@ internal static class ImportEndpoints
 
             try
             {
-                var normalized = ImportNormalizer.Normalize(request.Content, request.FormatId, new ImportHints(request.DateOrder, request.NumberFormat));
-                var summary = await handler.HandleAsync(
-                    new ImportTransactionsCommand(request.AccountId, normalized.Csv, NormalizedImport.Mapping), ct);
-                await AfterImportAsync(summary, sheetMarker, duplicates, integrations, logger, ct);
-                return Results.Ok(new AutoImportResult(normalized.FormatId, normalized.FormatName, normalized.Warnings, summary));
+                return Results.Ok(await coordinator.ImportAutoAsync(
+                    request.AccountId, request.Content, request.FormatId, new ImportHints(request.DateOrder, request.NumberFormat), ct));
             }
             catch (InvalidOperationException ex)
             {
@@ -251,6 +198,3 @@ public sealed record ManualMatchRequest(Guid PlannedOccurrenceId);
 
 /// <summary>Request body for POST /api/imports/auto. <paramref name="FormatId"/> overrides detection.</summary>
 public sealed record AutoImportRequest(Guid AccountId, string Content, string? FormatId = null, string? DateOrder = null, string? NumberFormat = null);
-
-/// <summary>What was detected plus the import summary.</summary>
-public sealed record AutoImportResult(string FormatId, string FormatName, IReadOnlyList<string> Warnings, ImportSummaryDto Summary);

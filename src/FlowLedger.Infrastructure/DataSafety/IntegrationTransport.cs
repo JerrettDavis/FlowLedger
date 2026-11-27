@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// resolves to an internal address is refused. Responses are read with a hard size cap, and failures are reduced to a short fixed
 /// string (never the URL, headers or credentials).
 /// </summary>
-public sealed class IntegrationTransport(IHttpClientFactory http) : IIntegrationTransport
+internal sealed class IntegrationTransport(IHttpClientFactory http) : IIntegrationTransport
 {
     public const string HttpClientName = "integrations";
 

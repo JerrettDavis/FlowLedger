@@ -32,7 +32,7 @@ public sealed record CashTrajectory(
 /// engine-generated suggestion to do first; it cannot write text or alter numbers. Everything shown is built from engine facts.
 /// Without a model the same pick is made by a transparent score, so results are deterministic and the feature never depends on AI.
 /// </summary>
-public static class StrategyCoach
+internal static class StrategyCoach
 {
     private const int MaxCandidates = 5;
     private static readonly TimeSpan ModelTimeout = TimeSpan.FromSeconds(20);
@@ -137,7 +137,7 @@ public static class StrategyCoach
 }
 
 /// <summary>Least-squares trend on monthly net cash flow, projected forward with a widening uncertainty band.</summary>
-public static class CashTrajectoryProjector
+internal static class CashTrajectoryProjector
 {
     public static CashTrajectory Project(IReadOnlyList<MonthFlow> months, decimal liquid, decimal avgSpend, int horizon = 12)
     {

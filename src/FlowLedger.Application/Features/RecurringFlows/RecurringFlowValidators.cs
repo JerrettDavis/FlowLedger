@@ -4,9 +4,9 @@ namespace FlowLedger.Application.Features.RecurringFlows;
 
 public sealed class CreateRecurringFlowRequestValidator : AbstractValidator<CreateRecurringFlowRequest>
 {
-    private static readonly string[] ValidDirections = Enum.GetNames(typeof(Domain.Aggregates.TransactionDirection));
-    private static readonly string[] ValidAmountModels = Enum.GetNames(typeof(Domain.Aggregates.AmountModel));
-    private static readonly string[] ValidFrequencies = Enum.GetNames(typeof(Domain.ValueObjects.RecurrenceFrequency));
+    private static readonly string[] ValidDirections = Enum.GetNames<Domain.Aggregates.TransactionDirection>();
+    private static readonly string[] ValidAmountModels = Enum.GetNames<Domain.Aggregates.AmountModel>();
+    private static readonly string[] ValidFrequencies = Enum.GetNames<Domain.ValueObjects.RecurrenceFrequency>();
 
     public CreateRecurringFlowRequestValidator()
     {
@@ -36,7 +36,7 @@ public sealed class CreateRecurringFlowRequestValidator : AbstractValidator<Crea
 
 public sealed class UpdateRecurringFlowRequestValidator : AbstractValidator<UpdateRecurringFlowRequest>
 {
-    private static readonly string[] ValidAmountModels = Enum.GetNames(typeof(Domain.Aggregates.AmountModel));
+    private static readonly string[] ValidAmountModels = Enum.GetNames<Domain.Aggregates.AmountModel>();
 
     public UpdateRecurringFlowRequestValidator()
     {

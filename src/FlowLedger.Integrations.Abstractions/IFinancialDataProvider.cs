@@ -25,6 +25,9 @@ public interface IFinancialDataProvider
     /// <summary>Capabilities advertised by this provider. Check before calling optional methods.</summary>
     ProviderCapabilities Capabilities { get; }
 
+    /// <summary>Behavioural traits (credential scope, local provisioning, sign convention, billing). Defaults to none.</summary>
+    ConnectorTraits Traits => ConnectorTraits.None;
+
     // ── Connection lifecycle ───────────────────────────────────────────────────
 
     /// <summary>

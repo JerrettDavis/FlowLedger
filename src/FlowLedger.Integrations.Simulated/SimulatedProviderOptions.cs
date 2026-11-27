@@ -24,20 +24,20 @@ public sealed class SimulatedProviderOptions
     /// Fraction of operations that should fail with a <see cref="Abstractions.TransientProviderException"/>.
     /// Range 0.0–1.0; 0.0 = never fail (default).
     /// </summary>
-    public double FailureRate { get; set; } = 0.0;
+    public double FailureRate { get; set; }
 
     /// <summary>
     /// Artificial delay in milliseconds added to every provider call.
     /// Useful for testing resilience and timeout handling.
     /// </summary>
-    public int LatencyMs { get; set; } = 0;
+    public int LatencyMs { get; set; }
 
     /// <summary>
     /// After this many successful operations in a session, all subsequent calls
     /// throw <see cref="Abstractions.RateLimitedProviderException"/>.
     /// 0 means no rate limiting.
     /// </summary>
-    public int RateLimitAfter { get; set; } = 0;
+    public int RateLimitAfter { get; set; }
 
     /// <summary>
     /// HMAC secret used to verify Simulated webhooks. There is deliberately no default: when it is

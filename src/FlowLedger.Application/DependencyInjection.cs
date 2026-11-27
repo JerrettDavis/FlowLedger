@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
         services.AddScoped<FlowLedger.Application.Features.Insights.GetSpendingBreakdownHandler>();
         services.AddScoped<FlowLedger.Application.Features.Dashboard.DismissSuspiciousHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardInsightsHandler>();
 
         // Assets
         services.AddScoped<ListAssetsHandler>();
@@ -94,6 +95,7 @@ public static class DependencyInjection
         // ── Handlers — Imports and Matching ──────────────────────────────────────
         services.AddScoped<MatchingEngine>();
         services.AddScoped<ImportTransactionsHandler>();
+        services.AddScoped<ImportCoordinator>();
         services.AddScoped<MatchTransactionHandler>();
         services.AddScoped<UnmatchTransactionHandler>();
         services.AddScoped<ListMatchSuggestionsHandler>();

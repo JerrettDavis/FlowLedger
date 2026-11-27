@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Forecasting;
@@ -132,7 +133,7 @@ public sealed class HomeAssistantService(
 
         if (e.Date is { } d)
         {
-            p["date"] = d.ToString("yyyy-MM-dd");
+            p["date"] = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
 
         if (e.DueInDays is { } due)

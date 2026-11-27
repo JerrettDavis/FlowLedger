@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Features.Query;
 
 namespace FlowLedger.Application.Features.Budgets;
@@ -24,7 +25,7 @@ public static class MonthlySpend
 
     /// <summary>Parses <see cref="ByCategoryQuery"/> rows into a case-insensitive category -> total map.</summary>
     public static Dictionary<string, decimal> Parse(QueryResult result) => result.Rows.ToDictionary(
-        r => r[0]?.ToString() ?? "", r => r[1] is decimal d ? d : Convert.ToDecimal(r[1] ?? 0m), StringComparer.OrdinalIgnoreCase);
+        r => r[0]?.ToString() ?? "", r => r[1] is decimal d ? d : Convert.ToDecimal(r[1] ?? 0m, CultureInfo.InvariantCulture), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Spending covered by a budget on <paramref name="category"/>: a parent ("Food") covers its children ("Food/Groceries").</summary>
     public static decimal SpentFor(string category, IReadOnlyDictionary<string, decimal> spendByCategory)

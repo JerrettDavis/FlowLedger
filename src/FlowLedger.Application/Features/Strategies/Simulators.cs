@@ -20,7 +20,7 @@ public sealed record LadderPlan(
     IReadOnlyList<LadderRung> Rungs, decimal BlendedApy, decimal AnnualInterest, decimal SavingsAnnualInterest, decimal Advantage);
 
 /// <summary>Standard amortised-loan payment. Zero-rate loans amortise linearly.</summary>
-public static class LoanMath
+internal static class LoanMath
 {
     public static decimal Payment(decimal balance, decimal annualRatePercent, int months)
     {

@@ -4,7 +4,7 @@ namespace FlowLedger.Application.Features.Accounts;
 
 public sealed class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequest>
 {
-    private static readonly string[] ValidAccountTypes = Enum.GetNames(typeof(Domain.Aggregates.AccountType));
+    private static readonly string[] ValidAccountTypes = Enum.GetNames<Domain.Aggregates.AccountType>();
 
     public CreateAccountRequestValidator()
     {
@@ -28,7 +28,7 @@ public sealed class CreateAccountRequestValidator : AbstractValidator<CreateAcco
 
 public sealed class ChangeAccountTypeRequestValidator : AbstractValidator<ChangeAccountTypeRequest>
 {
-    private static readonly string[] ValidAccountTypes = Enum.GetNames(typeof(Domain.Aggregates.AccountType));
+    private static readonly string[] ValidAccountTypes = Enum.GetNames<Domain.Aggregates.AccountType>();
 
     public ChangeAccountTypeRequestValidator()
     {

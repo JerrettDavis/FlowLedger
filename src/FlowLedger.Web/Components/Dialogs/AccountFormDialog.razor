@@ -6,10 +6,15 @@
     </TitleContent>
     <DialogContent>
         <MudForm @ref="_form" aria-label="Account form">
+            @if (_formError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_formError</MudAlert>
+            }
             @if (Account is null)
             {
                 <!-- Create mode: all fields -->
-                <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                <MudTextField @bind-Value="Name" Label="Name" Required="true" RequiredError="Name is required"
+                              Error="@(ServerError("name") is not null)" ErrorText="@ServerError("name")"
                               aria-required="true" aria-label="Account name" Class="mb-3" />
                 <MudSelect @bind-Value="_accountType" Label="Account Type" Required="true"
                            aria-required="true" aria-label="Account type" Class="mb-3">
@@ -18,9 +23,12 @@
                         <MudSelectItem Value="@t">@t</MudSelectItem>
                     }
                 </MudSelect>
-                <MudNumericField @bind-Value="_startingBalance" Label="Starting Balance" Format="F2"
+                <MudNumericField @bind-Value="StartingBalance" Label="Starting Balance" Format="F2"
+                                 Error="@(ServerError("startingBalance") is not null)" ErrorText="@ServerError("startingBalance")"
                                  aria-label="Starting balance" Class="mb-3" />
-                <MudTextField @bind-Value="_currency" Label="Currency" MaxLength="3"
+                <MudTextField @bind-Value="Currency" Label="Currency" MaxLength="3" HelperText="3-letter code, for example USD"
+                              Validation="@(new Func<string, string?>(ValidateCurrency))"
+                              Error="@(ServerError("currency") is not null)" ErrorText="@ServerError("currency")"
                               aria-label="Currency code" Class="mb-3" />
                 <MudTextField @bind-Value="_institution" Label="Institution (optional)"
                               aria-label="Institution name" Class="mb-3" />
@@ -88,11 +96,29 @@
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public FlowLedger.Contracts.AccountDto? Account { get; set; }
 
+    /// <summary>
+    /// When set, the dialog performs the create itself and stays open on failure, so the API's per-field validation errors
+    /// appear next to the fields they belong to instead of in a toast after the dialog is gone.
+    /// </summary>
+    [Parameter] public Func<FlowLedger.Contracts.CreateAccountRequest, Task>? CreateAsync { get; set; }
+
     private MudForm _form = default!;
+    private string? _formError;
+    private IReadOnlyDictionary<string, string>? _serverErrors;
     private string _name = "";
     private string _accountType = "Checking";
     private decimal _startingBalance = 0m;
     private string _currency = "USD";
+
+    private string Name { get => _name; set { _name = value; _serverErrors = null; } }
+    private decimal StartingBalance { get => _startingBalance; set { _startingBalance = value; _serverErrors = null; } }
+    private string Currency { get => _currency; set { _currency = value; _serverErrors = null; } }
+
+    private string? ServerError(string field) =>
+        _serverErrors is not null && _serverErrors.TryGetValue(field, out var message) ? message : null;
+
+    private static string? ValidateCurrency(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value.Trim().Length != 3 ? "Use a 3-letter currency code, for example USD." : null;
     private string? _institution;
     private bool _enabled = true;
     private string _mode = "Standard";
@@ -131,6 +157,28 @@
     {
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
+
+        if (Account is null && CreateAsync is not null)
+        {
+            _formError = null;
+            try
+            {
+                await CreateAsync(new FlowLedger.Contracts.CreateAccountRequest(
+                    _name, _accountType, _startingBalance, _currency, _institution, null));
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            catch (FlowLedger.Web.ApiClient.ApiClientException ex)
+            {
+                _serverErrors = ex.FieldErrors is { Count: > 0 } ? new Dictionary<string, string>(ex.FieldErrors, StringComparer.OrdinalIgnoreCase) : null;
+                _formError = _serverErrors is null ? SnackbarExtensions.ProblemText(ex) : "Fix the highlighted fields and try again.";
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            {
+                _formError = SnackbarExtensions.GenericFailure;
+            }
+
+            return;
+        }
 
         object result = Account is null
             ? new FlowLedger.Contracts.CreateAccountRequest(

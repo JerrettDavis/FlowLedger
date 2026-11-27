@@ -5,7 +5,7 @@ using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Assets;
 
 /// <summary>Network-free feed that projects the asset's own depreciation/appreciation model forward.</summary>
-public sealed class ModelEstimateFeed : IAssetValuationFeed
+internal sealed class ModelEstimateFeed : IAssetValuationFeed
 {
     public const string FeedName = "model";
 
