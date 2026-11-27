@@ -18,14 +18,9 @@ public class ConnectorsTests : E2ETestBase
         return http;
     }
 
-    [Fact(DisplayName = "Connectors: lists all feeds and marks the enabled one")]
+    [E2EFact(DisplayName = "Connectors: lists all feeds and marks the enabled one")]
     public async Task Connectors_ListsAllFeedsAndMarksTheActiveOne()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/connectors");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -41,14 +36,9 @@ public class ConnectorsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: shows each account's data source and lets the owner open the data-source dialog")]
+    [E2EFact(DisplayName = "Accounts: shows each account's data source and lets the owner open the data-source dialog")]
     public async Task Accounts_ShowDataSourceAndOpenDialog()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         // Make sure at least one connector-fed account exists.
         using (var http = Api())
         {

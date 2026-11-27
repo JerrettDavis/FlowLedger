@@ -21,14 +21,18 @@ class FlowLedger.Infrastructure.Persistence.Migrations.DedupeDetectedBills
 class FlowLedger.Infrastructure.Persistence.Migrations.InitialCreate
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveAccountConnectorLinksToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveAccountRatesToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveAuditJobRunsWebhookReplaysToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveBudgetsAndGoalsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveDuplicatesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveHomeAssistantToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveIntegrationsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveProviderAccountCatalogToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveProviderCallsAndBackupRunsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRecurringDismissalsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRulesAndAliasesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveSuspiciousDismissalsToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveSystemSettingsToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveUserDirectoryAndTenantsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.RowVersionOnTransactionsFlowsCategoriesBudgetsGoals
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
@@ -48,8 +52,8 @@ sealed class FlowLedger.Infrastructure.DataSafety.DataEnvironmentState
 sealed class FlowLedger.Infrastructure.DataSafety.DataRetention
 sealed class FlowLedger.Infrastructure.DataSafety.DrillTableResult
 sealed class FlowLedger.Infrastructure.DataSafety.JobRunEntry
-sealed class FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger
 sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
+sealed class FlowLedger.Infrastructure.DataSafety.ProviderCallLedger
 sealed class FlowLedger.Infrastructure.DataSafety.ProviderEndpointUsage
 sealed class FlowLedger.Infrastructure.DataSafety.ProviderUsageSummary
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
@@ -64,6 +68,7 @@ sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContextFactory
 sealed class FlowLedger.Infrastructure.Persistence.NoOpDomainEventDispatcher
 sealed class FlowLedger.Infrastructure.Persistence.UnscopedTenantContext
 sealed class FlowLedger.Infrastructure.Storage.RawArchiveMaintenance
+sealed class FlowLedger.Infrastructure.Storage.SealResult
 sealed class FlowLedger.Infrastructure.Sync.OutboxPublishingSyncService
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptDecision
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptGate

@@ -55,6 +55,37 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task Alias_apply_scoped_to_ids_reads_only_those_rows_and_leaves_the_rest_untouched()
+    {
+        var (tenant, count) = await SeedAsync(1200);
+        var log = new CommandLog();
+        var options = new DbContextOptionsBuilder<FlowLedgerDbContext>()
+            .UseNpgsql(_fixture.ConnectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
+            .AddInterceptors(log)
+            .Options;
+        await using var db = new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), tenant);
+        var aliases = new EfMerchantAliasStore(db, tenant);
+        await aliases.SetAsync("COFFEE SHOP", "Cafe");
+        var service = new MerchantAliasService(aliases, new CategorizationStore(db));
+        List<Guid> scope;
+        await using (var pick = _fixture.CreateDbContext(tenant))
+        {
+            scope = await pick.Transactions.OrderBy(t => t.Description).Take(10).Select(t => t.Id).ToListAsync();
+        }
+
+        log.Sql.Clear();
+        var changed = await service.ApplyToAsync(scope);
+
+        changed.Should().Be(10);
+        var historySelects = log.Sql.Where(sql => sql.Contains("FROM transactions", StringComparison.OrdinalIgnoreCase)).ToList();
+        historySelects.Should().ContainSingle("one id lookup, no history scan");
+        historySelects[0].Should().NotContain("LIMIT", "the lookup is by id, not a newest-first window");
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.Transactions.CountAsync(t => t.MerchantName == "Cafe")).Should().Be(10, "rows outside the sync's scope are not touched");
+        (await verify.Transactions.CountAsync()).Should().Be(count);
+    }
+
+    [DockerFact]
     public async Task Alias_apply_loads_history_once_untracked_and_writes_only_changed_rows()
     {
         var (tenant, count) = await SeedAsync(1200);

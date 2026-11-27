@@ -116,6 +116,33 @@ public sealed class MxEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifeti
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task A_flood_of_unsigned_webhooks_is_throttled_with_429_but_a_signed_delivery_from_the_same_source_still_gets_through()
+    {
+        // #152: failed verifications spend a small per-source budget; a verified delivery never does.
+        using var host = factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
+            c.AddInMemoryCollection(new Dictionary<string, string?> { ["RateLimiting:WebhookInvalidPerIpPerMinute"] = "5" })));
+        using var client = host.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 20; i++)
+        {
+            using var junk = new HttpRequestMessage(HttpMethod.Post, "/api/integrations/mx/webhooks") { Content = Body(Encoding.UTF8.GetBytes("{\"junk\":" + i + "}"), chunked: false) };
+            junk.Headers.Add("X-MX-Signature", "forged");
+            statuses.Add((await client.SendAsync(junk)).StatusCode);
+        }
+
+        statuses.Count(s => s == HttpStatusCode.Unauthorized).Should().Be(5);
+        statuses.Count(s => s == HttpStatusCode.TooManyRequests).Should().Be(15);
+
+        var good = Encoding.UTF8.GetBytes("{\"event_type\":\"SYNC_COMPLETE\",\"member_id\":\"sim-member-001\"}");
+        using var signed = new HttpRequestMessage(HttpMethod.Post, "/api/integrations/mx/webhooks") { Content = Body(good, chunked: false) };
+        signed.Headers.Add("X-MX-Signature", SimulatedFinancialDataProvider.BuildSignature(good, FlowLedgerApiFactory.WebhookSecret));
+        var response = await client.SendAsync(signed);
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests).And.NotBe(HttpStatusCode.Unauthorized, "the flood did not touch the verified budget");
+    }
+
     // ── Webhook body cap (anonymous endpoint: bound memory before HMAC work) ──
 
     private const int WebhookCap = 1024 * 1024;

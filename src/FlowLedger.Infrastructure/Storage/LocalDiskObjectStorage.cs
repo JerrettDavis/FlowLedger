@@ -17,6 +17,9 @@ namespace FlowLedger.Infrastructure.Storage;
 /// </summary>
 internal sealed partial class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBrowser
 {
+    [LoggerMessage(Level = LogLevel.Warning, Message = "ObjectStorage: could not restrict the storage root to its owner; restrict it manually (chmod 700).")]
+    private static partial void LogRootNotRestricted(ILogger logger, Exception exception);
+
     private readonly string _rootPath;
     private readonly ILogger<LocalDiskObjectStorage> _logger;
 
@@ -38,21 +41,61 @@ internal sealed partial class LocalDiskObjectStorage : IObjectStorage, IObjectSt
         var filePath = ResolveAndValidatePath(key);
 
         var directory = Path.GetDirectoryName(filePath)!;
-        Directory.CreateDirectory(directory);
+        CreateDirectoryOwnerOnly(directory);
 
-        await using var fileStream = new FileStream(
-            filePath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 81920,
-            useAsync: true);
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.Create,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+            BufferSize = 81920,
+            Options = FileOptions.Asynchronous,
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = OwnerOnlyFile;
+        }
+
+        await using var fileStream = new FileStream(filePath, options);
 
         await content.CopyToAsync(fileStream, ct);
 
         LogObjectStorageUploadedKeyContentType(_logger, key, contentType);
 
         return new Uri($"file://{filePath.Replace('\\', '/')}");
+    }
+
+    /// <summary>Directories are 0700 and files 0600 on Unix (#142): the archive holds bank data, so only the service account may read it.</summary>
+    internal const UnixFileMode OwnerOnlyDirectory = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+    internal const UnixFileMode OwnerOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+    private void CreateDirectoryOwnerOnly(string directory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(directory);   // ACLs are inherited from the parent on Windows; there is no mode to set
+            return;
+        }
+
+        Directory.CreateDirectory(directory, OwnerOnlyDirectory);
+        TightenIfWider(_rootPath);   // a root created by an older version or by the volume mount keeps its mode otherwise
+    }
+
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    private void TightenIfWider(string directory)
+    {
+        try
+        {
+            if (File.GetUnixFileMode(directory) != OwnerOnlyDirectory)
+            {
+                File.SetUnixFileMode(directory, OwnerOnlyDirectory);
+            }
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            // Not the owner (for example a root-owned volume): the operator has to chmod it; do not fail the write.
+            LogRootNotRestricted(_logger, ex);
+        }
     }
 
     /// <inheritdoc/>

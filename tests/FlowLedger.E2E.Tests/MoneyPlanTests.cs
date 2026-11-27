@@ -11,14 +11,9 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class MoneyPlanTests : E2ETestBase
 {
-    [Fact(DisplayName = "MoneyPlan: page title contains 'Money Plan'")]
+    [E2EFact(DisplayName = "MoneyPlan: page title contains 'Money Plan'")]
     public async Task MoneyPlan_PageTitleContainsMoneyPlan()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -27,14 +22,9 @@ public class MoneyPlanTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "MoneyPlan: main heading is visible")]
+    [E2EFact(DisplayName = "MoneyPlan: main heading is visible")]
     public async Task MoneyPlan_MainHeadingIsVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -44,14 +34,9 @@ public class MoneyPlanTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "MoneyPlan: spreadsheet grid is rendered")]
+    [E2EFact(DisplayName = "MoneyPlan: spreadsheet grid is rendered")]
     public async Task MoneyPlan_SpreadsheetGridIsRendered()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -62,14 +47,9 @@ public class MoneyPlanTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "MoneyPlan: spreadsheet grid contains data rows")]
+    [E2EFact(DisplayName = "MoneyPlan: spreadsheet grid contains data rows")]
     public async Task MoneyPlan_SpreadsheetGridContainsDataRows()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -87,14 +67,9 @@ public class MoneyPlanTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "MoneyPlan: nav link is present")]
+    [E2EFact(DisplayName = "MoneyPlan: nav link is present")]
     public async Task MoneyPlan_NavLinkIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/money-plan");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();

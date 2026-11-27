@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
@@ -96,6 +97,12 @@ public class FlowLedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
     }
+
+    /// <summary>The clock the host under test reads (its injected <see cref="TimeProvider"/>): use it, not the wall clock, when a test must agree with the server on "now".</summary>
+    public DateTimeOffset ServerNow => Services.GetRequiredService<TimeProvider>().GetUtcNow();
+
+    /// <summary>Today (UTC) as the host sees it.</summary>
+    public DateOnly ServerToday => DateOnly.FromDateTime(ServerNow.UtcDateTime);
 
     /// <summary>Creates an HttpClient pre-configured with the test API key and demo tenant header.</summary>
     public HttpClient CreateAuthenticatedClient(Guid? tenantId = null)

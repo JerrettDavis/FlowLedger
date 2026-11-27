@@ -61,8 +61,7 @@ internal static class SnapshotRestoreDrill
         var results = new List<DrillTableResult>();
         try
         {
-            await MigrateAsync(scratch.ConnectionString, manifest.AppliedMigrations is { Count: > 0 } applied ? applied[^1] : null, ct);
-            await EnsureAdHocTablesAsync(scratch.ConnectionString, ct);
+            await MigrateForRestoreAsync(scratch.ConnectionString, manifest, ct);
 
             results.AddRange(await LoadTablesAsync(scratch.ConnectionString, snapshotDir, manifest, problems, ct));
         }
@@ -175,12 +174,29 @@ internal static class SnapshotRestoreDrill
         await migrator.MigrateAsync(targetMigration, ct);
     }
 
-    /// <summary>Tables created outside EF migrations (system_settings, provider_api_calls) so they can be restored too.</summary>
-    internal static async Task EnsureAdHocTablesAsync(string connectionString, CancellationToken ct)
+    /// <summary>
+    /// Migrates to the snapshot's own schema level. A snapshot taken before a table moved from runtime DDL into a migration (#154) holds
+    /// a table its own migration level does not have yet, so when any snapshot table is missing the schema is brought up to date.
+    /// </summary>
+    internal static async Task MigrateForRestoreAsync(string connectionString, SnapshotManifest manifest, CancellationToken ct)
     {
+        await MigrateAsync(connectionString, manifest.AppliedMigrations is { Count: > 0 } applied ? applied[^1] : null, ct);
+
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand(AdHocSchema.AllSql, conn);
-        await cmd.ExecuteNonQueryAsync(ct);
+        var existing = new HashSet<string>(StringComparer.Ordinal);
+        await using (var list = new NpgsqlCommand("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", conn))
+        await using (var r = await list.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                existing.Add(r.GetString(0));
+            }
+        }
+
+        if (manifest.Tables.Any(t => !existing.Contains(t.Table)))
+        {
+            await MigrateAsync(connectionString, null, ct);
+        }
     }
 }

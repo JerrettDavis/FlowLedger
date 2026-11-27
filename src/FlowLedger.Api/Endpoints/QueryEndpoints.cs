@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Query;
+using FlowLedger.SharedKernel;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,10 +25,33 @@ internal static class QueryEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message, position = ex.Position });
             }
+            catch (QueryBudgetExceededException ex)
+            {
+                return BudgetExceeded(ex);
+            }
         }).WithName("RunQuery").WithSummary("Run a pipeline query against your data");
 
-        query.MapPost("/ask", async ([FromBody] AskQueryRequest request, AskQueryHandler h, CancellationToken ct) =>
-                Results.Ok(await h.HandleAsync(request.Question ?? "", ct)))
+        query.MapPost("/ask", async (
+                [FromBody] AskQueryRequest request, AskQueryHandler h, AskConcurrencyGate gate, ITenantContext tenant, CancellationToken ct) =>
+            {
+                // A blank question is answered without the model, so it never needs a slot.
+                using var lease = gate.TryEnter(tenant.TenantId);
+                if (lease is null)
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status429TooManyRequests, title: "Too many questions in flight",
+                        detail: "Wait for your current questions to finish before asking another.");
+                }
+
+                try
+                {
+                    return Results.Ok(await h.HandleAsync(request.Question ?? "", ct));
+                }
+                catch (QueryBudgetExceededException ex)
+                {
+                    return BudgetExceeded(ex);
+                }
+            })
             .WithName("AskQuery")
             .WithSummary("Turn a plain-English question into a validated query using a local model (nothing leaves the machine)")
             .RequireRateLimiting("write");
@@ -81,4 +105,10 @@ internal static class QueryEndpoints
 
         return app;
     }
+
+    /// <summary>422 when the query is too expensive (rows/steps), 408 when it ran out of time; never partial results.</summary>
+    private static IResult BudgetExceeded(QueryBudgetExceededException ex) => Results.Problem(
+        statusCode: ex.Kind == QueryBudgetKind.Timeout ? StatusCodes.Status408RequestTimeout : StatusCodes.Status422UnprocessableEntity,
+        title: ex.Kind == QueryBudgetKind.Timeout ? "Query timed out" : "Query too expensive",
+        detail: ex.Message);
 }

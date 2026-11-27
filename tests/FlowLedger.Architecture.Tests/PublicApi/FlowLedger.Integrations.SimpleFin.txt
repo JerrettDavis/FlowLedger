@@ -1,0 +1,3 @@
+sealed class FlowLedger.Integrations.SimpleFin.SimpleFinFinancialDataProvider
+sealed class FlowLedger.Integrations.SimpleFin.SimpleFinOptions
+static class FlowLedger.Integrations.SimpleFin.ServiceCollectionExtensions

@@ -10,7 +10,7 @@ namespace FlowLedger.Worker;
 /// own scope. Handler failures are retried with backoff and dead-lettered by <see cref="OutboxProcessor"/>; this loop never exits
 /// on a failure, it logs and polls again.
 /// </summary>
-public sealed partial class OutboxDispatcherService(IServiceProvider services, OutboxOptions options, ILogger<OutboxDispatcherService> logger)
+internal sealed partial class OutboxDispatcherService(IServiceProvider services, OutboxOptions options, ILogger<OutboxDispatcherService> logger)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -2,6 +2,7 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.Events;
 using FlowLedger.Domain.Exceptions;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Domain.Tests.Aggregates;
@@ -15,11 +16,8 @@ public sealed class RecurringFlowTests
     private static readonly Money Rent = new(1500m, "USD");
 
     private static RecurringFlow MakeFlow(DateOnly? end = null) =>
-        RecurringFlow.Create(
-            TenantId, AccountId, "Rent",
-            Rent, TransactionDirection.Debit,
-            RecurrencePattern.Monthly(1),
-            Jan1, end);
+        RecurringFlowBuilder.A().ForTenant(TenantId).OnAccount(AccountId).Named("Rent")
+            .WithAmount(Rent).Recurring(RecurrencePattern.Monthly(1)).From(Jan1).Until(end).Build();
 
     // ── Create ────────────────────────────────────────────────────────────────
 

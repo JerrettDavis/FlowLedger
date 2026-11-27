@@ -1,4 +1,5 @@
 using System.Globalization;
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Query;
 
@@ -8,9 +9,22 @@ namespace FlowLedger.Application.Features.Dashboard;
 /// Dashboard insights: spending by category, 6-month income vs spending, net-worth trend, top merchants and the biggest category
 /// movers. Everything is composed from the query engine, so it only ever sees the current tenant's already-scoped datasets.
 /// </summary>
-public sealed class GetDashboardInsightsHandler(RunQueryHandler query, TimeProvider? clock = null)
+public sealed class GetDashboardInsightsHandler(
+    RunQueryHandler query, TimeProvider? clock = null, TenantResultCache? cache = null, FlowLedger.SharedKernel.ITenantContext? tenant = null)
 {
-    public async Task<DashboardInsightsDto> HandleAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    /// <summary>Cached per tenant, window and day, and invalidated by any save to the tenant's data (#160); computed fresh when no cache is wired.</summary>
+    public Task<DashboardInsightsDto> HandleAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        if (cache is null || tenant is null)
+        {
+            return ComputeAsync(from, to, ct);
+        }
+
+        var today = DateOnly.FromDateTime((clock ?? TimeProvider.System).GetLocalNow().DateTime);
+        return cache.GetOrAddAsync(tenant.TenantId, $"dashboard-insights:{from:yyyy-MM-dd}:{to:yyyy-MM-dd}:{today:yyyy-MM-dd}", () => ComputeAsync(from, to, ct));
+    }
+
+    private async Task<DashboardInsightsDto> ComputeAsync(DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         // Optional window (default: this month for spending, last 6 months for cash flow, all history for net worth).
         var fromS = from?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

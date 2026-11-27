@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FlowLedger.Integrations.Simulated;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Npgsql;
 
@@ -54,11 +55,8 @@ public sealed class WebhookTenantRoutingTests(FlowLedgerApiFactory factory) : IA
         var response = await PostWebhookAsync("member-of-B");
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (await AccountsAsync(tenantB) == 0 && DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(250);
-        }
+        // The sync runs as a background job with no completion signal the host exposes: poll the observable effect.
+        await Eventually.WaitAsync(async () => await AccountsAsync(tenantB) > 0, "the owning tenant's accounts appear after the webhook");
 
         (await AccountsAsync(tenantB)).Should().BeGreaterThan(0, "the owning tenant is the one that gets synced");
         (await AccountsAsync(FlowLedgerApiFactory.DemoTenantId)).Should().Be(0, "the household tenant must not be synced by someone else's webhook");
@@ -70,7 +68,8 @@ public sealed class WebhookTenantRoutingTests(FlowLedgerApiFactory factory) : IA
         var response = await PostWebhookAsync("nobody-knows-this-member");
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        await Task.Delay(3000);
+        // An unknown member never reaches the scheduler: the endpoint says so in its reply, so there is nothing to wait out.
+        (await response.Content.ReadAsStringAsync()).Should().Contain("unknown member");
         (await AccountsAsync(FlowLedgerApiFactory.DemoTenantId)).Should().Be(0);
     }
 }

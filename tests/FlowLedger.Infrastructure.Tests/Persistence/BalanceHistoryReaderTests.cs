@@ -84,6 +84,44 @@ public sealed class BalanceHistoryReaderTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task Many_snapshots_per_day_are_collapsed_to_one_per_account_per_day_in_sql()
+    {
+        var tenant = TestTenantContext.New();
+        var accounts = new[] { (await _fixture.SeedAccountAsync(tenant, "A")).Value, (await _fixture.SeedAccountAsync(tenant, "B")).Value };
+        var today = TestClock.Today;
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            // 2 accounts x 10 days x 1,000 snapshots = 20,000 rows; the balance is the snapshot's index so the last one of a day is known.
+            foreach (var account in accounts)
+            {
+                for (var d = 0; d < 10; d++)
+                {
+                    for (var i = 0; i < 1000; i++)
+                    {
+                        var at = new DateTimeOffset(today.AddDays(-d).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddSeconds(i * 86);
+                        seed.BalanceSnapshots.Add(AccountBalanceSnapshotRecord.Create(tenant.TenantId, account, "Simulated", "p", i, "USD", at));
+                    }
+                }
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var log = new CommandLog();
+        var options = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<FlowLedgerDbContext>()
+            .UseNpgsql(_fixture.ConnectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
+            .AddInterceptors(log).Options;
+        await using var db = new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), tenant);
+
+        var points = await new BalanceHistoryReader(db).DailyAccountBalancesAsync(today.AddDays(-9), null);
+
+        log.Sql.Should().HaveCount(2);
+        log.Sql[0].ToLowerInvariant().Should().Contain("max(", "the per-day collapse is a SQL aggregate, not a client-side grouping over every snapshot");
+        points.Should().HaveCount(2 * 10);
+        points.Should().OnlyContain(p => p.Balance == 999m, "the last snapshot of each day wins");
+    }
+
+    [DockerFact]
     public async Task Default_read_is_bounded_to_the_default_window()
     {
         var tenant = TestTenantContext.New();

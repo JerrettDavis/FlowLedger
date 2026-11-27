@@ -8,9 +8,9 @@ using Microsoft.Playwright;
 /// <summary>
 /// Base class for E2E tests running in CI with headless Chromium.
 ///
-/// CI-Gating: When E2E_BASE_URL is not set, <see cref="ShouldSkip"/> returns <c>true</c>
-/// and each test method exits early via <c>if (ShouldSkip) return;</c>.  No browser is
-/// launched, and the test is recorded as Passed (0 failures) by xUnit.
+/// Gating: tests use <see cref="E2EFactAttribute"/>/<see cref="E2ETheoryAttribute"/>, which report a test as Skipped (with a
+/// reason) when E2E_BASE_URL is not set, so a local run without a stack never shows green for tests that did not run. CI sets
+/// E2E_REQUIRED=true: the attributes then do not skip, and <see cref="InitializeAsync"/> throws when E2E_BASE_URL is missing.
 ///
 /// In CI, E2E_BASE_URL is set to the composed Web URL (e.g. http://localhost:5002) and
 /// tests run for real against a live headless Chromium instance.
@@ -30,12 +30,6 @@ public class E2ETestBase : IAsyncLifetime
     protected IBrowserContext? Context { get; private set; }
     protected IPage? Page { get; private set; }
     protected string BaseUrl { get; private set; } = string.Empty;
-
-    /// <summary>
-    /// Returns <c>true</c> when E2E_BASE_URL is not set.
-    /// Each [Fact] method should guard with: <c>if (ShouldSkip) return;</c>
-    /// </summary>
-    protected bool ShouldSkip { get; private set; }
 
     // ── Error-capture state ───────────────────────────────────────────────────
 
@@ -75,19 +69,10 @@ public class E2ETestBase : IAsyncLifetime
         var baseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            if (string.Equals(Environment.GetEnvironmentVariable("E2E_REQUIRED"), "true", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    "E2E_REQUIRED=true but E2E_BASE_URL is not set; refusing to pass vacuously.");
-            }
-
-            // E2E_BASE_URL not set — record skip flag, do NOT launch browser.
-            // Tests guard with `if (ShouldSkip) return;` to exit cleanly (0 failures).
-            ShouldSkip = true;
-            return;
+            // Unreachable for E2EFact/E2ETheory tests unless E2E_REQUIRED=true (they are skipped otherwise): fail loudly, never pass.
+            throw new InvalidOperationException("E2E_BASE_URL is not set; an E2E test must not run (or pass) without a stack.");
         }
 
-        ShouldSkip = false;
         BaseUrl = baseUrl;
 
         // Ensure data is seeded before every test class so that tests are independent

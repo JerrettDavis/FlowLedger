@@ -16,14 +16,9 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class DashboardTests : E2ETestBase
 {
-    [Fact(DisplayName = "Dashboard: page title contains 'Dashboard'")]
+    [E2EFact(DisplayName = "Dashboard: page title contains 'Dashboard'")]
     public async Task Dashboard_PageTitleContainsDashboard()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -32,14 +27,9 @@ public class DashboardTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: main heading is visible")]
+    [E2EFact(DisplayName = "Dashboard: main heading is visible")]
     public async Task Dashboard_MainHeadingIsVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -49,14 +39,9 @@ public class DashboardTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: navigation menu is present")]
+    [E2EFact(DisplayName = "Dashboard: navigation menu is present")]
     public async Task Dashboard_NavigationMenuIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -67,14 +52,9 @@ public class DashboardTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: summary cards are present")]
+    [E2EFact(DisplayName = "Dashboard: summary cards are present")]
     public async Task Dashboard_SummaryCardsArePresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -86,14 +66,9 @@ public class DashboardTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: Balance Projection section is present")]
+    [E2EFact(DisplayName = "Dashboard: Balance Projection section is present")]
     public async Task Dashboard_BalanceProjectionSectionPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -110,14 +85,9 @@ public class DashboardTests : E2ETestBase
     /// stack seeds data, the chart must be visible.  A "no data" fallback with seeded data
     /// means the forecast pipeline is broken.
     /// </summary>
-    [Fact(DisplayName = "Dashboard: SVG chart renders (no-data fallback is a failure)")]
+    [E2EFact(DisplayName = "Dashboard: SVG chart renders (no-data fallback is a failure)")]
     public async Task Dashboard_SvgChartRendersWithData()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -140,14 +110,9 @@ public class DashboardTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: Upcoming Flows section is present")]
+    [E2EFact(DisplayName = "Dashboard: Upcoming Flows section is present")]
     public async Task Dashboard_UpcomingFlowsSectionPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();

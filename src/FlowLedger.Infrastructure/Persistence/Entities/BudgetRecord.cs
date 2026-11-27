@@ -12,4 +12,13 @@ internal sealed class BudgetRecord
     public uint RowVersion { get; private set; }
 
     private BudgetRecord() { }
+
+    public static BudgetRecord Create(Guid tenantId, string category, decimal monthlyLimit) =>
+        new() { TenantId = tenantId, Category = category, MonthlyLimit = monthlyLimit, UpdatedUtc = DateTimeOffset.UtcNow };
+
+    public void SetLimit(decimal monthlyLimit)
+    {
+        MonthlyLimit = monthlyLimit;
+        UpdatedUtc = DateTimeOffset.UtcNow;
+    }
 }

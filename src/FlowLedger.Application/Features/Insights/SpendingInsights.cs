@@ -23,7 +23,7 @@ public sealed record BreakdownGroup(string Key, string Label, decimal Amount, in
 public sealed record TrendPoint(string Bucket, decimal Amount);
 public sealed record BreakdownTransaction(
     Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, IReadOnlyList<string> Tags,
-    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null);
+    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null, uint Version = 0);
 
 public sealed record BreakdownResult(
     DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,
@@ -32,7 +32,8 @@ public sealed record BreakdownResult(
     IReadOnlyList<TrendPoint> Trend,
     IReadOnlyList<BreakdownTransaction> Transactions,
     int TransfersExcluded,
-    decimal NonSpendingExcluded = 0);
+    decimal NonSpendingExcluded = 0,
+    bool Partial = false);   // true: the period holds more rows than the processing cap, so the oldest were left out
 
 /// <summary>
 /// Pure spending/income breakdown (Mint-style). Transfers between own accounts are excluded, splits contribute one row per
@@ -47,7 +48,7 @@ internal static class SpendingInsightsAnalyzer
 
     private sealed record Row(
         Guid Id, DateOnly Date, string Description, string? Merchant, string Category, Guid AccountId, decimal Amount, IReadOnlyList<string> Tags,
-        double? Confidence = null, string? Suggested = null, double? SuggestedConfidence = null);
+        double? Confidence = null, string? Suggested = null, double? SuggestedConfidence = null, uint Version = 0);
 
     public static BreakdownResult Analyze(
         BreakdownQuery q,
@@ -78,13 +79,14 @@ internal static class SpendingInsightsAnalyzer
             {
                 foreach (var s in splits)
                 {
-                    yield return new Row(t.Id, date, t.Description, t.MerchantName, CatOf(s.CategoryId ?? t.CategoryId), t.AccountId, s.Amount, tags);
+                    yield return new Row(t.Id, date, t.Description, t.MerchantName, CatOf(s.CategoryId ?? t.CategoryId), t.AccountId, s.Amount, tags,
+                        Version: t.Version);
                 }
             }
             else
             {
                 yield return new Row(t.Id, date, t.Description, t.MerchantName, CatOf(t.CategoryId), t.AccountId, t.Amount, tags,
-                    t.CategoryConfidence, t.SuggestedCategoryId is { } sg && categoryPathById.TryGetValue(sg, out var sp) ? sp : null, t.SuggestedConfidence);
+                    t.CategoryConfidence, t.SuggestedCategoryId is { } sg && categoryPathById.TryGetValue(sg, out var sp) ? sp : null, t.SuggestedConfidence, t.Version);
             }
         }
 
@@ -132,7 +134,7 @@ internal static class SpendingInsightsAnalyzer
             .Select(r => new BreakdownTransaction(
                 r.Id, r.Date, r.Description, r.Merchant, r.Category,
                 accountNameById.GetValueOrDefault(r.AccountId, "Account"), r.Amount, r.Tags,
-                r.Confidence, r.Suggested, r.SuggestedConfidence))
+                r.Confidence, r.Suggested, r.SuggestedConfidence, r.Version))
             .ToList();
 
         return new BreakdownResult(
@@ -265,10 +267,11 @@ public sealed class GetSpendingBreakdownHandler(
             ? await repo.ListAllAsync(MaxTransactions, ct)
             : await repo.ListAsync(null, q.From.AddDays(-span - TransferPadDays), q.To.AddDays(TransferPadDays), 0, MaxTransactions, ct);
         var dtos = loaded.Select(TransactionMapper.ToDto).ToList();
-        return SpendingInsightsAnalyzer.Analyze(
+        var result = SpendingInsightsAnalyzer.Analyze(
             q, dtos, cats,
             accountEntities.ToDictionary(a => a.Id, a => a.Name),
             accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()),
             await AccountVisibility.ExcludedIdsAsync(accounts, q.AccountIds, ct));
+        return TransactionQuota.IsPartial(loaded.Count) ? result with { Partial = true } : result;
     }
 }

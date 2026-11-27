@@ -31,10 +31,15 @@ public static class DependencyInjection
         // ── Handlers — Transactions ──────────────────────────────────────────────
         services.AddScoped<ListTransactionsHandler>();
         services.AddScoped<GetTransactionHandler>();
+        services.AddScoped<GetProcessingWindowHandler>();
+        // Process-local, bounded: per-tenant data version + small result cache (#160). Replicas see a write after the cache TTL.
+        services.TryAddSingleton<FlowLedger.Application.Abstractions.ITenantDataVersion, FlowLedger.Application.Abstractions.TenantDataVersion>();
+        services.TryAddSingleton<FlowLedger.Application.Abstractions.TenantResultCache>();
         services.AddScoped<FlowLedger.Application.Abstractions.IReferenceValidator, FlowLedger.Application.Abstractions.ReferenceValidator>();
         services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
         services.AddScoped<FlowLedger.Application.Features.Query.AskQueryHandler>();
+        services.TryAddSingleton<FlowLedger.Application.Features.Query.AskConcurrencyGate>();   // process-local, bounded by in-flight asks
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.TryAddSingleton<FlowLedger.Application.Features.LocalAi.LocalAiOptions>();
         services.AddScoped<FlowLedger.Application.Features.LocalAi.LocalAiService>();
