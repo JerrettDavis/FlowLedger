@@ -69,14 +69,22 @@ internal static class SyncEndpoints
             .WithName("GetSyncStatus")
             .WithSummary("When the last successful sync finished and the enforced minimum interval");
 
-        // "Would make N calls" before a billable sync: one account listing plus one transactions page per active account.
-        group.MapGet("/sync/estimate", async (IAccountRepository accounts, CancellationToken ct) =>
+        // "Would make N calls" before a billable sync: one account listing plus one transactions page per account the active
+        // connector feeds. Accounts pinned manual, or linked to another connector, are never fetched by this connector's sync.
+        group.MapGet("/sync/estimate", async (
+                IAccountRepository accounts,
+                IAccountConnectorLinkStore links,
+                FlowLedger.Integrations.Abstractions.IFinancialDataProvider primary,
+                CancellationToken ct) =>
             {
-                var active = (await accounts.ListAsync(ct)).Count;
-                return Results.Ok(new { activeAccounts = active, estimatedProviderCalls = SyncCallEstimate.ForAccounts(active) });
+                var activeIds = (await accounts.ListAsync(ct)).Where(a => a.IsActive).Select(a => a.AccountId.Value).ToHashSet();
+                var fed = (await links.ListAsync(ct))
+                    .Count(l => activeIds.Contains(l.AccountId)
+                        && string.Equals(l.ConnectorId, primary.ProviderName, StringComparison.OrdinalIgnoreCase));
+                return Results.Ok(new { activeAccounts = fed, estimatedProviderCalls = SyncCallEstimate.ForAccounts(fed) });
             })
             .WithName("GetSyncEstimate")
-            .WithSummary("How many provider calls a sync would make right now (no provider call is made)");
+            .WithSummary("How many provider calls a sync would make right now: accounts fed by the active connector (no provider call is made)");
 
         group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
