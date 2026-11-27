@@ -83,6 +83,13 @@ public static class FlowLedgerTelemetry
         }
     }
 
+    /// <summary>Backup cycles (#61), tagged <c>outcome</c> (success | failure) and, on failure, <c>stage</c> (snapshot | drill | offsite).</summary>
+    public static readonly Counter<long> BackupRuns = Meter.CreateCounter<long>(
+        "flowledger.backup.runs", "{run}", "Backup cycles by outcome; alert on any outcome=failure.");
+
+    public static void RecordBackup(bool ok, string stage)
+        => BackupRuns.Add(1, new KeyValuePair<string, object?>("outcome", ok ? "success" : "failure"), new KeyValuePair<string, object?>("stage", stage));
+
     /// <summary>Automatic retries scheduled after a failed job run, tagged <c>job</c>.</summary>
     public static readonly Counter<long> JobRetries = Meter.CreateCounter<long>("flowledger.job.retries", "{retry}", "Retries scheduled for failed background jobs.");
 

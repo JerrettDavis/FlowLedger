@@ -92,11 +92,17 @@ public static partial class DependencyInjection
     {
         services.AddSingleton(_ => BackupSettings.From(configuration));
         services.AddSingleton(_ => new BackupRunStore(HostConnectionString(configuration)));
+        services.AddSingleton(sp => new BackupFailureNotifier(
+            configuration,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup"),
+            sp.GetService<IAuditLog>(),
+            sp.GetService<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender>()));
         services.AddSingleton(sp => new BackupRunner(
             configuration.GetConnectionString(ConnectionName)!,
             sp.GetRequiredService<BackupSettings>(),
             sp.GetRequiredService<BackupRunStore>(),
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup")));
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup"),
+            sp.GetRequiredService<BackupFailureNotifier>()));
         services.AddSingleton(_ => new DataRetention(HostConnectionString(configuration), RetentionSettings.From(configuration)));
     }
 }

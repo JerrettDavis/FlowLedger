@@ -78,9 +78,11 @@ public sealed partial class BackupRunner
     private readonly BackupSettings _settings;
     private readonly BackupRunStore _store;
     private readonly ILogger _logger;
+    private readonly BackupFailureNotifier? _notifier;
 
-    public BackupRunner(string connectionString, BackupSettings settings, BackupRunStore store, ILogger logger)
+    public BackupRunner(string connectionString, BackupSettings settings, BackupRunStore store, ILogger logger, BackupFailureNotifier? notifier = null)
     {
+        _notifier = notifier;
         _connectionString = connectionString;
         _settings = settings;
         _store = store;
@@ -168,7 +170,27 @@ public sealed partial class BackupRunner
             LogCouldNotRecordBackupRun(_logger, ex);
         }
 
+        await NotifyAsync(result);
         return result;
+    }
+
+    private async Task NotifyAsync(BackupRunResult result)
+    {
+        try
+        {
+            if (_notifier is not null)
+            {
+                await _notifier.NotifyAsync(result, CancellationToken.None);
+            }
+            else
+            {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordBackup(result.Ok, result.Ok ? "none" : BackupFailureNotifier.StageOf(result));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogCouldNotNotifyBackupResult(_logger, ex);
+        }
     }
 
     private async Task<(bool Ok, string Detail)> RunResticAsync(string snapshotDir, CancellationToken ct)
@@ -313,6 +335,9 @@ public sealed partial class BackupRunner
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Could not record backup run")]
     private static partial void LogCouldNotRecordBackupRun(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not send the backup result notification")]
+    private static partial void LogCouldNotNotifyBackupResult(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not prune old snapshot {Dir}")]
     private static partial void LogCouldNotPruneOldSnapshot(ILogger logger, Exception exception, string? dir);

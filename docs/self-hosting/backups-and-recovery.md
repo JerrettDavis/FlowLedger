@@ -62,6 +62,10 @@ Other settings: `Backup__Enabled` (default true), `Backup__CronExpression` (defa
 `Backup__Directory`, `Backup__KeepLocalSnapshots` (default 30; pruning happens only after a confirmed off-site copy and never
 touches `premigrate-*` snapshots or the raw archive), `Backup__DrillAfterBackup` (default true).
 
+### Failure alerts
+
+Every backup cycle increments the `flowledger.backup.runs{outcome,stage}` metric (alert on `outcome="failure"`; `stage` is `snapshot`, `drill` or `offsite`), and a failed cycle writes a `backup.failed` audit event. To also get a push, set `Backup__Alert__WebhookUrl` to a Home Assistant webhook URL (and `Backup__Alert__AllowLocalNetwork=true` if it is a LAN address); the payload names only the stage and time, never paths or credentials.
+
 ## Docker Compose (`--profile full`)
 
 The compose stack gives the api and worker a persistent **`backups_data`** volume mounted at `/data/backups`, and sets
