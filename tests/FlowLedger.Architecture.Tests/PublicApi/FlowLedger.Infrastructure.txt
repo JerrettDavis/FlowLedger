@@ -5,6 +5,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.AddAssets
 class FlowLedger.Infrastructure.Persistence.Migrations.AddBalanceSnapshots
 class FlowLedger.Infrastructure.Persistence.Migrations.AddBillSheet
 class FlowLedger.Infrastructure.Persistence.Migrations.AddCompositeTenantForeignKeys
+class FlowLedger.Infrastructure.Persistence.Migrations.AddJobFireMarks
 class FlowLedger.Infrastructure.Persistence.Migrations.AddOutboxMessages
 class FlowLedger.Infrastructure.Persistence.Migrations.AddProviderConnectionIssue
 class FlowLedger.Infrastructure.Persistence.Migrations.AddProviderConnectionIssueRepairRef
@@ -37,6 +38,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.RowVersionOnTransactionsF
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
 enum FlowLedger.Infrastructure.Sync.SyncTrigger
+interface FlowLedger.Infrastructure.DataSafety.IJobFireMarks
 interface FlowLedger.Infrastructure.HostStores.IAuditLog
 interface FlowLedger.Infrastructure.HostStores.IJobRunStore
 sealed class FlowLedger.Infrastructure.Ai.Local.CatalogModel
@@ -50,6 +52,7 @@ sealed class FlowLedger.Infrastructure.DataSafety.BackupSettings
 sealed class FlowLedger.Infrastructure.DataSafety.DataEnvironmentState
 sealed class FlowLedger.Infrastructure.DataSafety.DataRetention
 sealed class FlowLedger.Infrastructure.DataSafety.DrillTableResult
+sealed class FlowLedger.Infrastructure.DataSafety.JobFireMark
 sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
 sealed class FlowLedger.Infrastructure.DataSafety.RestoreDrillResult
