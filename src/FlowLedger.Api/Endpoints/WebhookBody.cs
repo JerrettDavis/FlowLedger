@@ -7,13 +7,13 @@ namespace FlowLedger.Api.Endpoints;
 internal static class WebhookBody
 {
     /// <summary>Webhook payloads are small JSON events; anything larger is refused before signature work.</summary>
-    public const int MaxBytes = 1024 * 1024;
+    public const int MaxBytes = ApiLimits.WebhookBodyBytes;
 
     /// <summary>Reads at most <paramref name="limit"/> bytes; returns null as soon as the body exceeds it.</summary>
     public static async Task<byte[]?> ReadBoundedAsync(Stream body, int limit, CancellationToken ct)
     {
         using var ms = new MemoryStream();
-        var buffer = new byte[16 * 1024];
+        var buffer = new byte[ApiLimits.BodyReadBufferBytes];
         int read;
         while ((read = await body.ReadAsync(buffer, ct)) > 0)
         {

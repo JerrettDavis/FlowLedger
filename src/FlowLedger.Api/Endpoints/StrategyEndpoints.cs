@@ -56,7 +56,7 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/growth", ([FromBody] GrowthRequest r) =>
             {
-                if (r.Start < 0 || r.Start > 1_000_000_000m || r.BaseMonthly is < -1_000_000m or > 1_000_000m || r.ScenarioMonthly is < -1_000_000m or > 1_000_000m
+                if (r.Start < 0 || r.Start > ApiLimits.SimulationAmountCeiling || r.BaseMonthly is < -ApiLimits.SimulationMonthlyFlowCeiling or > ApiLimits.SimulationMonthlyFlowCeiling || r.ScenarioMonthly is < -ApiLimits.SimulationMonthlyFlowCeiling or > ApiLimits.SimulationMonthlyFlowCeiling
                     || r.BaseApy is < -50 or > 100 || r.ScenarioApy is < -50 or > 100 || r.Years is < 1 or > 50)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["growth"] = ["Use a non-negative start, sane monthly amounts, rates between -50% and 100%, and 1-50 years."] });
@@ -69,7 +69,7 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/fire", ([FromBody] FireRequest r) =>
             {
-                if (r.Invested is < 0 or > 1_000_000_000m || r.MonthlyContribution is < -1_000_000m or > 1_000_000m || r.AnnualSpend is <= 0 or > 100_000_000m
+                if (r.Invested is < 0 or > ApiLimits.SimulationAmountCeiling || r.MonthlyContribution is < -ApiLimits.SimulationMonthlyFlowCeiling or > ApiLimits.SimulationMonthlyFlowCeiling || r.AnnualSpend is <= 0 or > ApiLimits.SimulationAnnualCeiling
                     || r.WithdrawalRate is <= 0 or > 20 || r.RealReturn is < -50 or > 50 || r.Age is < 0 or > 120 || r.Years is < 1 or > FirePlanner.MaxYears)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["fire"] = ["Use positive spending, a 0-20% withdrawal rate, a sane return, and 1-60 years."] });
@@ -82,7 +82,7 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/past", async (StrategyService svc, [FromBody] PastWhatIfRequest r, CancellationToken ct) =>
             {
-                if (r.Months is < 1 or > 60 || r.ExtraMonthly is < 0 or > 1_000_000m || r.CutPercent is < 0 or > 100 || r.IdleCash is < 0 or > 1_000_000_000m
+                if (r.Months is < 1 or > 60 || r.ExtraMonthly is < 0 or > ApiLimits.SimulationMonthlyFlowCeiling || r.CutPercent is < 0 or > 100 || r.IdleCash is < 0 or > ApiLimits.SimulationAmountCeiling
                     || r.FromApy is < -50 or > 100 || r.ToApy is < -50 or > 100 || r.GrowthApy is < -50 or > 100)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["past"] = ["Months 1-60, non-negative amounts, percentages 0-100, rates -50% to 100%."] });
@@ -95,10 +95,10 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/goal", async (StrategyService svc, [FromBody] GoalRequest r, CancellationToken ct) =>
             {
-                if (r.Target is <= 0 or > 1_000_000_000m || r.Saved is < 0 or > 1_000_000_000m || r.Monthly is < 0 or > 10_000_000m
+                if (r.Target is <= 0 or > ApiLimits.SimulationAmountCeiling || r.Saved is < 0 or > ApiLimits.SimulationAmountCeiling || r.Monthly is < 0 or > ApiLimits.SimulationMonthlyCeiling
                     || r.Apy is < -50 or > 100 || r.ScenarioApy is < -50 or > 100 || r.DeadlineMonths is < 0 or > 600
-                    || r.ExtraMonthly is < 0 or > 10_000_000m || r.IncomeRaisePct is < 0 or > 1000 || r.SpendCutPct is < 0 or > 100
-                    || r.LumpSum is < 0 or > 1_000_000_000m)
+                    || r.ExtraMonthly is < 0 or > ApiLimits.SimulationMonthlyCeiling || r.IncomeRaisePct is < 0 or > ApiLimits.SimulationIncomeRaisePercentCeiling || r.SpendCutPct is < 0 or > 100
+                    || r.LumpSum is < 0 or > ApiLimits.SimulationAmountCeiling)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["goal"] = ["Provide a positive target, non-negative amounts, rates -50% to 100%, and a deadline of 0-600 months."] });
                 }
@@ -110,8 +110,8 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/refinance", ([FromBody] RefinanceRequest r) =>
             {
-                if (r.Balance is <= 0 or > 1_000_000_000m || r.CurrentRate is < 0 or > 100 || r.NewRate is < 0 or > 100
-                    || r.RemainingMonths is < 1 or > 600 || r.NewTermMonths is < 1 or > 600 || r.ClosingCosts is < 0 or > 10_000_000m)
+                if (r.Balance is <= 0 or > ApiLimits.SimulationAmountCeiling || r.CurrentRate is < 0 or > 100 || r.NewRate is < 0 or > 100
+                    || r.RemainingMonths is < 1 or > 600 || r.NewTermMonths is < 1 or > 600 || r.ClosingCosts is < 0 or > ApiLimits.SimulationMonthlyCeiling)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["refinance"] = ["Provide a positive balance, rates 0-100%, terms of 1-600 months and non-negative closing costs."] });
                 }
@@ -123,7 +123,7 @@ internal static class StrategyEndpoints
 
         group.MapPost("/simulate/ladder", async (StrategyService svc, [FromBody] LadderRequest r, CancellationToken ct) =>
             {
-                if (r.Amount is < 400 or > 1_000_000_000m)
+                if (r.Amount is < 400 or > ApiLimits.SimulationAmountCeiling)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["amount"] = ["Provide an amount of at least $400."] });
                 }
