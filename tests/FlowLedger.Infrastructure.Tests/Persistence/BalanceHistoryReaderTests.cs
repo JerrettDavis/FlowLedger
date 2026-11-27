@@ -4,7 +4,6 @@ using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.SharedKernel;
 using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

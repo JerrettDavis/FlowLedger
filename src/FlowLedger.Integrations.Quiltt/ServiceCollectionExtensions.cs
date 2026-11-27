@@ -1,7 +1,6 @@
 using FlowLedger.Integrations.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -28,7 +27,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<QuilttSessionCache>();
 
         // The session POST can create a profile, so unsafe methods (all Quiltt calls are POSTs) are never auto-retried.
-        services.AddConnectorHttpClient<QuilttApiClient>();
+        services.AddConnectorHttpClient<QuilttApiClient>()
+            .AddConnectorCallGuard(
+                ConnectorIds.Quiltt,
+                "Quiltt:CallsPaused",
+                sp =>
+                {
+                    var o = sp.GetRequiredService<IOptionsMonitor<QuilttOptions>>().CurrentValue;
+                    return new ConnectorCallPolicy(o.CallsPaused, o.DailyCallBudget, o.MonthlyCallBudget);
+                });
 
         services.AddScoped(sp =>
         {

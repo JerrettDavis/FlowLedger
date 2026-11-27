@@ -79,30 +79,33 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
     }
 
     [DockerFact]
-    public async Task Budget_and_goal_stores_reject_new_rows_over_the_cap_but_allow_updates()
+    public async Task Budget_and_goal_handlers_reject_new_rows_over_the_cap_but_allow_updates()
     {
         var tenant = NewTenant();
-        await using var db = _fixture.CreateProductionStyleContext(new TestTenantContext(tenant));
-        var budgets = new FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore(db, new TestTenantContext(tenant));
-        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore.MaxBudgets; i++)
+        var tenantContext = new TestTenantContext(tenant);
+        await using var db = _fixture.CreateProductionStyleContext(tenantContext);
+        var budgets = new FlowLedger.Application.Features.Budgets.SetBudgetHandler(
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore(db, tenantContext), tenantContext);
+        for (var i = 0; i < FlowLedger.Application.Features.Budgets.BudgetLimits.MaxBudgets; i++)
         {
-            await budgets.SetAsync(tenant, $"Cat{i}", 10m);
+            await budgets.HandleAsync($"Cat{i}", 10m);
         }
 
-        var overBudget = () => budgets.SetAsync(tenant, "One too many", 10m);
+        var overBudget = () => budgets.HandleAsync("One too many", 10m);
         await overBudget.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
-        await budgets.SetAsync(tenant, "Cat1", 99m);
+        await budgets.HandleAsync("Cat1", 99m);
 
-        var goals = new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, new TestTenantContext(tenant));
+        var goals = new FlowLedger.Application.Features.Goals.SaveGoalHandler(
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, tenantContext), tenantContext);
         Guid first = default;
-        for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore.MaxGoals; i++)
+        for (var i = 0; i < FlowLedger.Application.Features.Goals.GoalLimits.MaxGoals; i++)
         {
-            var (id, _) = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
+            var (id, _) = await goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(null, $"G{i}", 100m, 0m, null));
             if (i == 0) { first = id; }
         }
 
-        var overGoal = () => goals.UpsertAsync(tenant, null, "one too many", 100m, 0m, null);
+        var overGoal = () => goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(null, "one too many", 100m, 0m, null));
         await overGoal.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
-        await goals.UpsertAsync(tenant, first, "renamed", 100m, 5m, null);
+        await goals.HandleAsync(new FlowLedger.Application.Features.Goals.SaveGoalRequest(first, "renamed", 100m, 5m, null));
     }
 }

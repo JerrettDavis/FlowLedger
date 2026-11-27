@@ -1,5 +1,3 @@
-using FlowLedger.Contracts;
-
 namespace FlowLedger.TestSupport.Builders;
 
 /// <summary>Builds <see cref="CreateCategoryRequest"/>: a top-level category whose display name is its path.</summary>

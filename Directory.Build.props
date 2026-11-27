@@ -11,7 +11,10 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- Per-rule severities live in .editorconfig (see the #113 ratchet plan there). -->
     <AnalysisMode>Recommended</AnalysisMode>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- IDE0005 (unused usings) only runs in the build when documentation generation is on. The XML-comment quality warnings that
+         switching it on surfaces (missing or malformed docs, unresolved crefs) predate this and are parked here, not fixed: shrink the list as docs are cleaned up. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS0419;CS1570;CS1573;CS1574;CS1587;CS1734</NoWarn>
     <RootNamespace>$(MSBuildProjectName.Replace('-', '_'))</RootNamespace>
     <Authors>FlowLedger contributors</Authors>
     <Copyright>Copyright (c) FlowLedger contributors</Copyright>
@@ -27,8 +30,9 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <!-- Suppress analyzer warnings from templates during M0 -->
-  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
+  <!-- Banned APIs (#113): BannedSymbols.txt at the repo root states the rationale per entry. Production code only; tests may print and block. -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
+  </ItemGroup>
 </Project>

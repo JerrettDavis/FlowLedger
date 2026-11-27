@@ -32,7 +32,7 @@ internal static class GoalEndpoints
         .WithSummary("Savings goals with progress");
 
         group.MapPut("/", async (
-            [FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, IGoalStore store, ITenantContext tenant,
+            [FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, SaveGoalHandler handler,
             HttpRequest httpRequest, HttpResponse response, CancellationToken ct) =>
         {
             var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
@@ -47,7 +47,7 @@ internal static class GoalEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var (id, version) = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, expected, ct);
+            var (id, version) = await handler.HandleAsync(r, expected, ct);
             return RowVersioning.Ok(response, new { id, version }, version);
         })
         .WithName("SaveGoal")

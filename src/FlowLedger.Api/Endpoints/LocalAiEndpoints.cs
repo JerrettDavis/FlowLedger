@@ -1,3 +1,4 @@
+using FlowLedger.Api.Auth;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.LocalAi;
 
@@ -34,14 +35,14 @@ internal static class LocalAiEndpoints
                     : Results.ValidationProblem(new Dictionary<string, string[]> { ["id"] = [error ?? "Cannot start download."] }))
             .WithTags("Local AI").WithName("LocalAiDownloadModel")
             .WithSummary("Download a catalog model (pinned revision, SHA-256 verified). Takes a catalog id, never a URL. Household owner only: the model directory is shared by the whole installation.")
-            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
+            .RequireAuthorization(HouseholdPolicy.Name)
             .RequireRateLimiting("write");
 
         app.MapDelete("/api/local-ai/models/{id}", (string id, ILocalAiModels models) =>
                 models.Remove(id) ? Results.NoContent() : Results.NotFound())
             .WithTags("Local AI").WithName("LocalAiRemoveModel")
             .WithSummary("Delete an installed model's files (household owner only)")
-            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
+            .RequireAuthorization(HouseholdPolicy.Name)
             .RequireRateLimiting("write");
 
         app.MapGet("/api/local-ai/similar/{transactionId:guid}", async (

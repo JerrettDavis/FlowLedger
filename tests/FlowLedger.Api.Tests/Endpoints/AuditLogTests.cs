@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using FlowLedger.Api.Middleware;
-using FlowLedger.Contracts;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Routing;

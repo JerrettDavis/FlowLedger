@@ -1,5 +1,4 @@
 using FlowLedger.Api;
-using FlowLedger.Api.Middleware;
 using FlowLedger.Application;
 using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;

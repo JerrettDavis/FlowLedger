@@ -24,7 +24,9 @@ internal static class MigrateCommand
             using var host = builder.Build();
             await host.StartAsync();
             await host.StopAsync();
+#pragma warning disable RS0030 // CLI command: its stdout is the result the operator reads, not a log
             Console.WriteLine("Migrations are up to date.");
+#pragma warning restore RS0030
             return 0;
         }
         catch (Exception ex)

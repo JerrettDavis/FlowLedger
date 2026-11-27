@@ -28,7 +28,7 @@ public sealed class CategoryRestructureServiceTests
     {
         var tenantId = TenantId.From(_tenant.TenantId);
         var cat = system
-            ? new Category(CategoryId.New(), tenantId, new CategoryPath(path), path.Split('/').Last(), isSystem: true)
+            ? Category.CreateSystem(tenantId, new CategoryPath(path), path.Split('/').Last())
             : Category.Create(tenantId, new CategoryPath(path), path.Split('/').Last());
         await _repo.AddAsync(cat);
         return cat;

@@ -6,10 +6,6 @@ using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Storage;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
-using FlowLedger.Integrations.Mx;
-using FlowLedger.Integrations.Quiltt;
-using FlowLedger.Integrations.SimpleFin;
-using FlowLedger.Integrations.Simulated;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -52,28 +48,24 @@ public static partial class DependencyInjection
     private static void AddCategorizationAndLocalAi(IServiceCollection services, IConfiguration configuration)
     {
         // ML categorizer tuning ("Categorization:MlThreshold" / ":SuggestionFloor"); defaults keep auto-apply off.
-        var categorization = new FlowLedger.Application.Features.Categories.CategorizationOptions();
-        if (double.TryParse(configuration["Categorization:MlThreshold"], System.Globalization.CultureInfo.InvariantCulture, out var mlThreshold))
-        {
-            categorization.MlThreshold = mlThreshold;
-        }
-
-        if (double.TryParse(configuration["Categorization:SuggestionFloor"], System.Globalization.CultureInfo.InvariantCulture, out var mlFloor))
-        {
-            categorization.SuggestionFloor = mlFloor;
-        }
-
+        services.AddOptions<FlowLedger.Application.Features.Categories.CategorizationOptions>()
+            .BindConfiguration(FlowLedger.Application.Features.Categories.CategorizationOptions.SectionName)
+            .Validate(o => double.IsFinite(o.MlThreshold) && double.IsFinite(o.SuggestionFloor), "Categorization thresholds must be finite numbers.")
+            .ValidateOnStart();
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.Categories.CategorizationOptions>(services);
-        services.AddSingleton(categorization);
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FlowLedger.Application.Features.Categories.CategorizationOptions>>().Value);
 
         // ── Local AI (in-process embeddings; no external server) ─────────────────
-        var localAi = new FlowLedger.Application.Features.LocalAi.LocalAiOptions();
-        configuration.GetSection(FlowLedger.Application.Features.LocalAi.LocalAiOptions.SectionName).Bind(localAi);
+        services.AddOptions<FlowLedger.Application.Features.LocalAi.LocalAiOptions>()
+            .BindConfiguration(FlowLedger.Application.Features.LocalAi.LocalAiOptions.SectionName)
+            .Validate(o => o.Neighbours > 0 && o.MaxTextsPerRequest > 0 && o.DownloadInactivityTimeout > TimeSpan.Zero,
+                "LocalAi:Neighbours, MaxTextsPerRequest and DownloadInactivityTimeout must be positive.")
+            .ValidateOnStart();
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.RemoveAll<FlowLedger.Application.Features.LocalAi.LocalAiOptions>(services);
-        services.AddSingleton(localAi);
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FlowLedger.Application.Features.LocalAi.LocalAiOptions>>().Value);
         // No auto-redirect + connect-time IP guard (public addresses only): LocalModelManager validates every redirect hop itself.
         services.AddHttpClient(FlowLedger.Infrastructure.Ai.Local.LocalModelManager.HttpClientName, c => c.Timeout = TimeSpan.FromMinutes(30))
-            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.DataSafety.HomeAssistantWebhookSender.CreateHandler);
+            .ConfigurePrimaryHttpMessageHandler(FlowLedger.Infrastructure.Outbound.HomeAssistantWebhookSender.CreateHandler);
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>();
         services.AddSingleton<FlowLedger.Application.Abstractions.ILocalAiModels>(sp => sp.GetRequiredService<FlowLedger.Infrastructure.Ai.Local.LocalModelManager>());
         services.AddSingleton<FlowLedger.Infrastructure.Ai.Local.LlamaSharpLocalLlm>();

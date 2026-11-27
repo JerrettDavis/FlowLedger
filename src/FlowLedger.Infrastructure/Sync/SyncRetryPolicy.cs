@@ -166,7 +166,7 @@ public sealed class SyncRetryPolicy
 }
 
 /// <summary>Converts between the persisted/Application issue shape and the connector-neutral <see cref="ProviderIssue"/>.</summary>
-public static class ProviderIssueMapping
+internal static class ProviderIssueMapping
 {
     public static ConnectionIssueInfo ToInfo(ProviderIssue issue, DateTimeOffset at, int consecutiveFailures = 0, bool informational = false)
         => new(issue.Kind.ToString(), issue.Message, issue.Retryable, issue.RequiresUserAction, issue.RetryAfter, at, consecutiveFailures,

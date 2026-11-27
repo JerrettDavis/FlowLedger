@@ -36,7 +36,7 @@ public sealed class Category : IEntity
         DisplayName = null!;
     }
 
-    public Category(
+    private Category(
         CategoryId id,
         TenantId tenantId,
         CategoryPath path,
@@ -63,6 +63,14 @@ public sealed class Category : IEntity
         string displayName,
         CategoryId? parentId = null)
         => new(CategoryId.New(), tenantId, path, displayName, false, parentId);
+
+    /// <summary>A built-in category: it cannot be renamed or removed by the user.</summary>
+    public static Category CreateSystem(
+        TenantId tenantId,
+        CategoryPath path,
+        string displayName,
+        CategoryId? parentId = null)
+        => new(CategoryId.New(), tenantId, path, displayName, true, parentId);
 
     public void Rename(CategoryPath newPath, string newDisplayName)
     {

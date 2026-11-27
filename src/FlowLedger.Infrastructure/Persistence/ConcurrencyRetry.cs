@@ -11,7 +11,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// rule (so a category the user just set by hand is respected, never overwritten) and converges. Never use it around work that
 /// cannot be repeated cheaply and safely (provider calls); those reconcile conflicts column by column instead.
 /// </summary>
-public static partial class ConcurrencyRetry
+internal static partial class ConcurrencyRetry
 {
     /// <summary>Runs per unit before the conflict is allowed to surface.</summary>
     public const int DefaultAttempts = 3;

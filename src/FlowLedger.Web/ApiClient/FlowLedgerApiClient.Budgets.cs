@@ -1,9 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.Logging;
-
 namespace FlowLedger.Web.ApiClient;
 
 public sealed partial class FlowLedgerApiClient

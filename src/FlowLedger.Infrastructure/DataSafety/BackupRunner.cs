@@ -4,7 +4,6 @@ using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 
 namespace FlowLedger.Infrastructure.DataSafety;
 

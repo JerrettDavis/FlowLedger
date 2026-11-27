@@ -2,7 +2,6 @@ using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;

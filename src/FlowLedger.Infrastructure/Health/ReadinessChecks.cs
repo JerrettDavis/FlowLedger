@@ -10,7 +10,7 @@ using Npgsql;
 namespace FlowLedger.Infrastructure.Health;
 
 /// <summary>Tag carried by every check that gates readiness (<c>/ready</c>). Liveness (<c>/alive</c>) uses "live" only.</summary>
-public static class HealthTags
+internal static class HealthTags
 {
     public const string Ready = "ready";
     public const string Live = "live";

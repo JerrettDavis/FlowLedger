@@ -1,4 +1,3 @@
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;

@@ -1,3 +1,5 @@
+using FlowLedger.SharedKernel;
+
 namespace FlowLedger.Integrations.Abstractions;
 
 /// <summary>Describes one financial data connector (a provider implementation plus the credentials it runs with).</summary>
@@ -9,7 +11,7 @@ namespace FlowLedger.Integrations.Abstractions;
 /// (legacy) tenant. False means the connector needs no shared secret (Simulated) or holds credentials per user.
 /// </param>
 /// <param name="Traits">The provider's declared <see cref="ConnectorTraits"/>, so host code can branch on behaviour without resolving the provider.</param>
-public sealed record ConnectorDescriptor(string Id, string DisplayName, string Kind, bool SharedCredentials, ConnectorTraits Traits = ConnectorTraits.None);
+public sealed record ConnectorDescriptor(ConnectorId Id, string DisplayName, string Kind, bool SharedCredentials, ConnectorTraits Traits = ConnectorTraits.None);
 
 /// <summary>
 /// The connectors enabled on this instance and a way to get the provider behind each. Enablement is configuration (per instance);
@@ -20,8 +22,8 @@ public interface IConnectorRegistry
     /// <summary>Enabled connectors, primary first (SimpleFIN, MX, then Simulated).</summary>
     IReadOnlyList<ConnectorDescriptor> Enabled { get; }
 
-    bool IsEnabled(string connectorId);
+    bool IsEnabled(ConnectorId connectorId);
 
     /// <summary>The provider for an enabled connector. Throws <see cref="InvalidOperationException"/> for an unknown or disabled id.</summary>
-    IFinancialDataProvider Resolve(string connectorId);
+    IFinancialDataProvider Resolve(ConnectorId connectorId);
 }

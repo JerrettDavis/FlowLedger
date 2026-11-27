@@ -1,3 +1,5 @@
+using FlowLedger.SharedKernel;
+
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>
@@ -15,7 +17,7 @@ public interface ISyncCursorStore
     /// or an empty string when no cursor has been persisted yet (initial load).
     /// </summary>
     Task<string> GetAsync(
-        string providerName,
+        ConnectorId connector,
         string providerAccountId,
         CancellationToken ct = default);
 
@@ -24,7 +26,7 @@ public interface ISyncCursorStore
     /// Idempotent: calling with the same key multiple times always stores the latest value.
     /// </summary>
     Task SetAsync(
-        string providerName,
+        ConnectorId connector,
         string providerAccountId,
         string cursorValue,
         CancellationToken ct = default);
@@ -34,7 +36,7 @@ public interface ISyncCursorStore
     /// window and the "last synced" display read this, never the cursor-write time, which also advances on a failed sync.
     /// </summary>
     Task MarkSuccessfulAsync(
-        string providerName,
+        ConnectorId connector,
         IReadOnlyCollection<string> providerAccountIds,
         CancellationToken ct = default);
 }

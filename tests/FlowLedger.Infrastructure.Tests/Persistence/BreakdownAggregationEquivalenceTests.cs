@@ -1,6 +1,5 @@
 using System.Data.Common;
 using FlowLedger.Application.Features.Insights;
-using FlowLedger.Application.Features.Query;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;

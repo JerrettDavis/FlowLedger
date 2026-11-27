@@ -1,10 +1,10 @@
 namespace FlowLedger.Infrastructure.Ai.Local;
 
 /// <summary>One downloadable file, pinned to an exact Hugging Face revision and verified by SHA-256 after download.</summary>
-public sealed record ModelFile(string Name, string Url, string Sha256, long SizeBytes);
+internal sealed record ModelFile(string Name, string Url, string Sha256, long SizeBytes);
 
 /// <summary>How to run a sentence-embedding ONNX model (pooling, prefixes, calibration). Every field is a swap-in touchpoint.</summary>
-public sealed record EmbeddingSpec(
+internal sealed record EmbeddingSpec(
     int Dimensions,
     int MaxTokens,
     string Pooling,
@@ -15,9 +15,9 @@ public sealed record EmbeddingSpec(
     double SameMerchantThreshold);
 
 /// <summary>How to prompt a GGUF chat model. "chatml" covers Qwen; add templates for Llama/Gemma as needed.</summary>
-public sealed record LlmSpec(string ChatTemplate);
+internal sealed record LlmSpec(string ChatTemplate);
 
-public sealed record CatalogModel(
+internal sealed record CatalogModel(
     string Id,
     string Kind,
     string Title,
@@ -35,7 +35,7 @@ public sealed record CatalogModel(
 /// name a catalog id (never a URL), so the download endpoint cannot be pointed at an arbitrary server.
 /// To plug in another model: add an entry here (or drop the files into the model directory with the same names).
 /// </summary>
-public static class ModelCatalog
+internal static class ModelCatalog
 {
     public const string MiniLm = "minilm-l6-v2-q8";
     public const string BgeSmall = "bge-small-en-v1.5-q8";

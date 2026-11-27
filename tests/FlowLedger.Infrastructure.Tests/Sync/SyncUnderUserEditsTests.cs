@@ -1,10 +1,10 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
-using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.SharedKernel;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -117,10 +117,10 @@ public sealed class SyncUnderUserEditsTests : IAsyncLifetime
     {
         private bool _fired;
 
-        public Task<string> GetAsync(string providerName, string providerAccountId, CancellationToken ct = default)
+        public Task<string> GetAsync(ConnectorId providerName, string providerAccountId, CancellationToken ct = default)
             => inner.GetAsync(providerName, providerAccountId, ct);
 
-        public async Task SetAsync(string providerName, string providerAccountId, string cursorValue, CancellationToken ct = default)
+        public async Task SetAsync(ConnectorId providerName, string providerAccountId, string cursorValue, CancellationToken ct = default)
         {
             if (beforeSet is not null && !_fired)
             {
@@ -131,7 +131,7 @@ public sealed class SyncUnderUserEditsTests : IAsyncLifetime
             await inner.SetAsync(providerName, providerAccountId, cursorValue, ct);
         }
 
-        public Task MarkSuccessfulAsync(string providerName, IReadOnlyCollection<string> providerAccountIds, CancellationToken ct = default)
+        public Task MarkSuccessfulAsync(ConnectorId providerName, IReadOnlyCollection<string> providerAccountIds, CancellationToken ct = default)
             => inner.MarkSuccessfulAsync(providerName, providerAccountIds, ct);
     }
 

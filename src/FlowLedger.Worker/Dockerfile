@@ -33,6 +33,7 @@ FROM restore AS publish
 WORKDIR /src
 
 COPY src/ src/
+COPY BannedSymbols.txt BannedSymbols.txt
 
 RUN dotnet publish src/FlowLedger.Worker/FlowLedger.Worker.csproj \
         --no-restore \

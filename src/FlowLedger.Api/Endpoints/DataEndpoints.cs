@@ -1,3 +1,4 @@
+using FlowLedger.Api.Auth;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 
@@ -12,7 +13,7 @@ internal static class DataEndpoints
         var settings = app.ServiceProvider.GetRequiredService<BackupSettings>();
         // Every /api/data endpoint reports on or acts on the WHOLE database (all tenants): household tenant only.
         var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api")
-            .AddEndpointFilter<HouseholdTenantOnlyFilter>();
+            .RequireAuthorization(HouseholdPolicy.Name);
 
         group.MapGet("/status", async (
             BackupRunStore store,

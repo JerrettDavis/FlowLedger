@@ -27,6 +27,16 @@ Docker-outside-of-Docker and runs `dotnet restore` on creation.
 - C# 14, nullable enabled, implicit usings, treat-warnings-as-errors.
 - Run `dotnet format` before committing.
 - PRs must pass `dotnet format --verify-no-changes` in CI.
+- The build runs the .NET analyzers at `AnalysisMode=Recommended` with warnings as errors, plus unused usings (IDE0005), file-scoped namespaces (IDE0161) and banned APIs (`BannedSymbols.txt`, rule RS0030; every entry states why). Logging goes through `[LoggerMessage]` source-generated methods (CA1848).
+- Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()` in a `DependencyInjection*.cs` file (an architecture test enforces it).
+
+### Suppression policy
+
+- Fix the code first. Suppress only when the rule is wrong for that spot, and say why.
+- Prefer a scoped `#pragma warning disable <ID> // <reason>` / `restore` pair or `[SuppressMessage(..., Justification = "...")]` over a file- or project-wide `.editorconfig` severity. A suppression without a reason is rejected in review.
+- Parked rules live in `.editorconfig` (severity `suggestion`, with the reason in the comment block above them) and in `NoWarn` in `Directory.Build.props` (XML-doc quality warnings). Those lists may only shrink: flipping a rule to `warning` is that rule's cleanup milestone, and adding a new entry needs a linked issue.
+- Count what exists with `git grep -c "pragma warning disable" -- src` and `git grep -c SuppressMessage -- src`; do not let the numbers grow without a reason in the PR.
+- A banned API (`BannedSymbols.txt`) is suppressed only with `#pragma warning disable RS0030` and a reason, as `MigrateCommand` does for CLI output.
 
 ## Pull requests
 

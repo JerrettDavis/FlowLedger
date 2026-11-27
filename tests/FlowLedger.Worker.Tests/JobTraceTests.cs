@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using FlowLedger.Application.Features.Users;
-using FlowLedger.Worker;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

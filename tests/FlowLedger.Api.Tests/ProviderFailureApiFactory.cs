@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,8 +42,8 @@ public sealed class ProviderFailureApiFactory : FlowLedgerApiFactory
     {
         public Task<IReadOnlyList<ProviderConnectionInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult(owner.Connections);
 
-        public Task<string?> GetMemberProviderIdAsync(string providerName, CancellationToken ct = default) => Task.FromResult<string?>(null);
+        public Task<string?> GetMemberProviderIdAsync(ConnectorId providerName, CancellationToken ct = default) => Task.FromResult<string?>(null);
 
-        public Task SaveAsync(string providerName, string memberProviderId, string institution, string status, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SaveAsync(ConnectorId providerName, string memberProviderId, string institution, string status, CancellationToken ct = default) => Task.CompletedTask;
     }
 }

@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using FlowLedger.Application.Features.HomeAssistant;
 using Microsoft.Extensions.Configuration;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.Outbound;
 
 /// <summary>
 /// POSTs an event to a Home Assistant webhook. Redirects are not followed (a redirect could carry the secret URL somewhere

@@ -1,6 +1,5 @@
 using FlowLedger.Application.Features.Transactions;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;

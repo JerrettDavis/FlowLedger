@@ -2,7 +2,6 @@ using FlowLedger.Api.Auth;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Api.Middleware;
 using FlowLedger.ServiceDefaults;
-using FlowLedger.SharedKernel;
 using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Api;

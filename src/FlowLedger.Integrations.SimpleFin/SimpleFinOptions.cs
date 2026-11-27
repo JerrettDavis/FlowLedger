@@ -26,4 +26,13 @@ public sealed class SimpleFinOptions
 
     /// <summary>Days re-read before the cursor to catch late-posting items (fingerprint dedupe makes this safe).</summary>
     public int OverlapDays { get; set; } = 7;
+
+    /// <summary>Hard cap on SimpleFIN requests per UTC day, counted from the provider call ledger (the Bridge itself allows about 24). 0 = unlimited.</summary>
+    public int DailyCallBudget { get; set; } = 24;
+
+    /// <summary>Hard cap on SimpleFIN requests per UTC month. 0 = unlimited.</summary>
+    public int MonthlyCallBudget { get; set; }
+
+    /// <summary>Kill switch: when true NO request is sent to SimpleFIN (config reload takes effect immediately).</summary>
+    public bool CallsPaused { get; set; }
 }

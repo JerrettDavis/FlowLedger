@@ -31,6 +31,7 @@ FROM restore AS publish
 WORKDIR /src
 
 COPY src/ src/
+COPY BannedSymbols.txt BannedSymbols.txt
 
 # Note: --no-restore is intentionally absent here. When a separate `dotnet restore` stage
 # precedes `dotnet publish`, the Blazor static-asset pipeline (microsoft.aspnetcore.app.internal.assets)

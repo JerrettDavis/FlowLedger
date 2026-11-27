@@ -1,5 +1,3 @@
-using FlowLedger.Domain.Aggregates;
-
 namespace FlowLedger.Application.Features.Transactions;
 
 /// <summary>Query parameters for listing transactions.</summary>

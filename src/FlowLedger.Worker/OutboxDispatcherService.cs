@@ -1,7 +1,4 @@
 using FlowLedger.Infrastructure.Events;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Worker;
 

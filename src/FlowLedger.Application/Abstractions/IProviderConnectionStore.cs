@@ -1,3 +1,5 @@
+using FlowLedger.SharedKernel;
+
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>Read model of one stored provider connection (never contains secrets).</summary>
@@ -27,15 +29,15 @@ public interface IProviderConnectionStore
         => Task.FromResult<IReadOnlyList<ProviderConnectionInfo>>([]);
 
     /// <summary>Returns the persisted member provider id for this tenant, or null if none.</summary>
-    Task<string?> GetMemberProviderIdAsync(string providerName, CancellationToken ct = default);
+    Task<string?> GetMemberProviderIdAsync(ConnectorId connector, CancellationToken ct = default);
 
     /// <summary>
     /// Records the outcome of the latest sync/health check for a provider connection: an issue (and bumps its consecutive-failure
     /// count) or null when the connection recovered (clears the issue and the count). No-op when no connection exists.
     /// </summary>
-    Task RecordHealthAsync(string providerName, ConnectionIssueInfo? issue, CancellationToken ct = default)
+    Task RecordHealthAsync(ConnectorId connector, ConnectionIssueInfo? issue, CancellationToken ct = default)
         => Task.CompletedTask;
 
     /// <summary>Persists a newly provisioned member (no-op if one already exists).</summary>
-    Task SaveAsync(string providerName, string memberProviderId, string institution, string status, CancellationToken ct = default);
+    Task SaveAsync(ConnectorId connector, string memberProviderId, string institution, string status, CancellationToken ct = default);
 }

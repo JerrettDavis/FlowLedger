@@ -1,7 +1,6 @@
 using System.Globalization;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.SharedKernel;
-using FlowLedger.Worker;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

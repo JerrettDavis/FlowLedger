@@ -12,8 +12,6 @@ namespace FlowLedger.Infrastructure.Persistence.Repositories;
 /// </summary>
 internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant) : IGoalStore
 {
-    public const int MaxGoals = 200;
-
     private void Guard(Guid tenantId)
     {
         if (tenantId != tenant.TenantId)
@@ -42,11 +40,6 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
             if (expectedVersion is not null)
             {
                 throw new ConcurrencyConflictException("This goal was removed elsewhere. Reload it and try again.");
-            }
-
-            if (await db.Goals.CountAsync(ct) >= MaxGoals)
-            {
-                throw new RequestValidationException("goal", $"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
             }
 
             existing = GoalRecord.Create(tenantId, goalId, name, target, saved, targetDate);

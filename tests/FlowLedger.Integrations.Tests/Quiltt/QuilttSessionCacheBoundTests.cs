@@ -1,5 +1,4 @@
 using FlowLedger.Integrations.Quiltt;
-using FluentAssertions;
 
 namespace FlowLedger.Integrations.Tests.Quiltt;
 

@@ -12,7 +12,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// rather than an inline step that is lost when it fails. The event is committed right after the sync's own commits, so it is
 /// durable but not in the same transaction as the sync's data; a crash in that gap loses the follow-ups until the next sync.
 /// </summary>
-public sealed class OutboxPublishingSyncService(IFinancialSyncService inner, IOutbox outbox, ITenantContext tenant, TimeProvider clock) : IFinancialSyncService
+internal sealed class OutboxPublishingSyncService(IFinancialSyncService inner, IOutbox outbox, ITenantContext tenant, TimeProvider clock) : IFinancialSyncService
 {
     public Task<string> ConnectAsync(CancellationToken ct = default) => inner.ConnectAsync(ct);
 

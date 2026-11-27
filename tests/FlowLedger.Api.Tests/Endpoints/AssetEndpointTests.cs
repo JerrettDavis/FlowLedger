@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Application.Features.Accounts;
-using FlowLedger.Application.Features.Assets;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 

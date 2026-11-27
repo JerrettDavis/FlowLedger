@@ -51,13 +51,13 @@ public sealed partial class OutboxProcessor
         FlowLedgerDbContext db,
         IServiceProvider services,
         ILogger<OutboxProcessor> logger,
-        OutboxOptions? options = null,
+        OutboxOptions options,
         TimeProvider? time = null)
     {
         _db = db;
         _services = services;
         _logger = logger;
-        _options = options ?? new OutboxOptions();
+        _options = options;
         _time = time ?? TimeProvider.System;
     }
 

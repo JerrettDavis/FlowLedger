@@ -271,16 +271,8 @@ public sealed class SourceRuleTests
 
     private const int MaxSourceLines = 500;
 
-    /// <summary>Files over the limit today, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list.</summary>
-    private static readonly Dictionary<string, int> OversizedCeilings = new()
-    {
-        ["src/FlowLedger.Application/Features/Imports/ImportNormalizer.cs"] = 747,
-        ["src/FlowLedger.Integrations.Simulated/SimulatedDataFactory.cs"] = 687,
-        ["src/FlowLedger.Application/Features/Query/QueryParser.cs"] = 611,
-        ["src/FlowLedger.Application/Features/RecurringFlows/RecurringFlowDetector.cs"] = 538,
-        ["src/FlowLedger.Application/Features/Forecasting/ForecastEngine.cs"] = 522,
-        ["src/FlowLedger.Domain/Aggregates/Transaction.cs"] = 503,
-    };
+    /// <summary>Files over the limit, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list. Empty today (#103): keep it empty.</summary>
+    private static readonly Dictionary<string, int> OversizedCeilings = new();
 
     [Fact]
     public void Source_files_stay_under_the_size_limit_or_hold_a_shrinking_ceiling()
@@ -320,6 +312,51 @@ public sealed class SourceRuleTests
             .ToList();
 
         Assert.True(offenders.Count == 0, $"Use ConstantTime.SecretEquals (or add a reasoned allow-list entry) in: {string.Join(", ", offenders)}");
+    }
+
+    // ── No service locator on the request in the API (#94) ───────────────────
+
+    [Fact]
+    public void Api_does_not_pull_required_services_off_the_request()
+    {
+        var offenders = SourceFiles("FlowLedger.Api")
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"RequestServices\s*\.\s*GetRequiredService"))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Inject the dependency (endpoint parameter, constructor or an authorization policy) instead of HttpContext.RequestServices.GetRequiredService in: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void Endpoints_do_not_hand_roll_the_whole_endpoint_household_guard()
+    {
+        var offenders = SourceFiles("FlowLedger.Api")
+            .Where(f => Rel(f).StartsWith("src/FlowLedger.Api/Endpoints/", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains("HouseholdTenantOnlyFilter", StringComparison.Ordinal))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Whole-endpoint household access is the registered 'Household' authorization policy: use .RequireAuthorization(HouseholdPolicy.Name) in: {string.Join(", ", offenders)}");
+    }
+
+    // ── Options go through IOptions + ValidateOnStart, never new XOptions() in DI (#108) ─
+
+    [Fact]
+    public void Dependency_injection_files_do_not_construct_options_by_hand()
+    {
+        var ctor = new Regex(@"new\s+[\w.]*Options\s*(\(|\{)");
+        var offenders = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+            .SelectMany(d => SourceFiles(Path.GetFileName(d)))
+            .Where(f => Path.GetFileName(f).StartsWith("DependencyInjection", StringComparison.Ordinal)
+                        || Path.GetFileName(f).StartsWith("ServiceRegistration", StringComparison.Ordinal))
+            .Where(f => ctor.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Register options with AddOptions<T>().BindConfiguration(...).ValidateOnStart() instead of new XOptions() in: {string.Join(", ", offenders)}");
     }
 
     // ── Endpoint limits live in ApiLimits (#121) ─────────────────────────────

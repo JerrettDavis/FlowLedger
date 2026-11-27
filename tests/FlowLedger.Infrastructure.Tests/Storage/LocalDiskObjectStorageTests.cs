@@ -1,4 +1,3 @@
-using System.Text;
 using FlowLedger.Infrastructure.Storage;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
