@@ -44,12 +44,17 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    /// <summary>Downloads the full-data export zip (CSV per table + manifest).</summary>
-    public async Task<byte[]?> ExportAllAsync(CancellationToken ct = default)
+    /// <summary>Downloads the signed-in tenant's export zip (CSV per table + manifest). Single-tenant bundles cannot be restored with import.</summary>
+    public Task<byte[]?> ExportMyDataAsync(CancellationToken ct = default) => ExportAsync("/api/data/export", ct);
+
+    /// <summary>Downloads the WHOLE-database dump (every tenant; disaster recovery only; importable into an empty database).</summary>
+    public Task<byte[]?> ExportWholeDatabaseAsync(CancellationToken ct = default) => ExportAsync("/api/data/export?scope=all", ct);
+
+    private async Task<byte[]?> ExportAsync(string path, CancellationToken ct)
     {
         return await ExecuteAsync("export data", async () =>
         {
-            var response = await _http.GetAsync("/api/data/export", ct);
+            var response = await _http.GetAsync(path, ct);
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Export failed (server returned {(int)response.StatusCode}).", response.StatusCode);

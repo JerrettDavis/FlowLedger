@@ -76,6 +76,18 @@ public sealed class DataAdminTenantTests(FlowLedgerApiFactory factory) : IAsyncL
         scoped.Content.Headers.ContentType!.MediaType.Should().Be("application/zip");
         scoped.Content.Headers.ContentDisposition!.FileName.Should().Contain("tenant");
 
+        // BEHAVIOUR CHANGE (#139): the default is the caller's tenant; only an explicit scope=all is the whole-database dump.
+        var defaulted = await household.GetAsync("/api/data/export");
+        defaulted.StatusCode.Should().Be(HttpStatusCode.OK);
+        defaulted.Content.Headers.ContentDisposition!.FileName.Should().Contain("-tenant-").And.NotContain("-all-");
+        var all = await household.GetAsync("/api/data/export?scope=all");
+        all.StatusCode.Should().Be(HttpStatusCode.OK);
+        all.Content.Headers.ContentDisposition!.FileName.Should().Contain("-all-");
+
+        // scope=all is never reachable by another tenant.
+        var intruder = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        (await intruder.GetAsync("/api/data/export?scope=all")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
         // A non-household tenant cannot reach the export, scoped or not.
         var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
         (await other.GetAsync($"/api/data/export?tenantId={Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);

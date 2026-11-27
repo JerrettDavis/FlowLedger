@@ -14,6 +14,10 @@
 4. Start it: `docker compose --profile full up -d`. The one-shot `migrate` service runs first and the api/worker wait for it (`docker compose logs migrate` shows the result; if it fails nothing else starts and the database is untouched beyond the verified snapshot). The api does not migrate by itself unless `DATABASE__MIGRATEONSTARTUP=true`. Migration is serialized by a Postgres advisory lock so two starters never migrate concurrently, and the app takes a verified pre-migration snapshot first when data exists.
 5. Check `/alive`, the Data page (backup status) and one manual sync.
 
+## Breaking changes
+
+- **`GET /api/data/export` default scope (#139).** It used to dump every tenant; it now exports only the caller's tenant. The whole-database dump is the explicit `GET /api/data/export?scope=all` (disaster recovery only; still needs the household tenant and the admin token). Update any script or cron that downloads the export for disaster recovery, and note that single-tenant bundles cannot be restored with `POST /api/data/import`. The Data page has separate "Export my data" and "Full database dump (disaster recovery)" buttons.
+
 ## Rolling back
 
 1. `docker compose --profile full down`

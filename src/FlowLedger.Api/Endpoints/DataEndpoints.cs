@@ -71,7 +71,7 @@ internal static class DataEndpoints
 
         group.MapGet("/export", async (ExportDataHandler handler, string? scope, Guid? tenantId, CancellationToken ct) =>
         {
-            // Default stays the whole database (disaster recovery). scope=tenant exports only the caller's tenant; tenantId=<id> exports that tenant (#139).
+            // BEHAVIOUR CHANGE (#139): the default (and scope=tenant) exports only the caller's tenant; tenantId=<id> exports that tenant. The whole-database dump is the explicit scope=all (disaster recovery); this route already requires the household tenant and the admin gate.
             var outcome = await handler.HandleAsync(scope, tenantId, ct);
             if (outcome.Refused)
             {
@@ -84,7 +84,7 @@ internal static class DataEndpoints
         })
         .WithName("ExportData")
         .AddEndpointFilter<DataAdminLoopbackFilter>()
-        .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); all tenants by default, scope=tenant or tenantId=<id> for one")
+        .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); the caller's tenant by default; scope=all is the explicit whole-database disaster-recovery dump; tenantId=<id> exports one tenant")
         .RequireRateLimiting("write");
 
         group.MapPost("/import", async (HttpRequest request, ImportDataHandler handler, CancellationToken ct) =>

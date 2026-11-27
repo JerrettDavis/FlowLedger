@@ -42,8 +42,8 @@ provider on (`Mx__Enabled`, `SimpleFin__Enabled`, `Quiltt__Enabled`) in a non-de
    Quiltt (`Quiltt__Enabled`, `Quiltt__Environment=production`,
    [ADR 0017](../adr/0017-quiltt-embedded-connector.md)). Set the API cost budgets
    (`Mx__Provider__DailyCallBudget`, `Mx__Provider__MonthlyCallBudget`) if you use MX.
-8. **Data admin endpoints.** `GET /api/data/export`, `POST /api/data/import` and
-   `POST /api/data/backup-now` accept loopback callers only. Leave `DataAdmin__AllowRemote` unset
+8. **Data admin endpoints.** `GET /api/data/export` (your tenant; `?scope=all` is the whole-database disaster-recovery dump), `POST /api/data/import` and
+   `POST /api/data/backup-now` require the admin key (see [backups](backups-and-recovery.md#data-administration-endpoints)). Leave `DataAdmin__AllowRemote` unset
    unless you understand the exposure; never publish these through the proxy.
 9. **Observability.** Wire `OTEL_EXPORTER_OTLP_ENDPOINT` if you want traces, metrics and logs
    exported. Application logs are not redacted (see [SECURITY.md](../../SECURITY.md)); treat the

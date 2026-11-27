@@ -11,7 +11,7 @@ operating contract for keeping it safe. Everything below is implemented and cove
 | Pre-migration snapshot | Before any pending EF migration is applied to a database that has data, a verified snapshot is taken. If it fails, startup aborts and nothing is migrated. | `~/.flowledger/backups/premigrate-*` |
 | Scheduled backup | Daily 03:15 (Worker): verified snapshot, **restore drill**, then an encrypted off-site copy via restic. Every run is recorded and shown on **Data & Backups**. | `~/.flowledger/backups/backup-*` |
 | Restore drill | Each backup is restored into a scratch database (migrations applied up to the snapshot's version) and every table's row count is compared with the manifest. | automatic |
-| Portable export | One CSV per table + `manifest.json` (SHA-256 and row counts), as a zip. Importable into an **empty** database only. | UI button / `GET /api/data/export` |
+| Portable export | One CSV per table + `manifest.json` (SHA-256 and row counts), as a zip. Importable into an **empty** database only, and only the whole-database dump (`?scope=all`). | UI buttons / `GET /api/data/export` (your tenant) and `?scope=all` (disaster recovery) |
 | `backup.sh` | Linux/macOS twin of `backup.ps1`; CI runs backup -> restore -> row-count compare with it on every push and PR | `eng/scripts/` |
 | `restore.sh` | Linux/macOS twin of `restore.ps1` (restores into a scratch database, prints row counts) | `eng/scripts/` |
 | `backup.ps1` | Independent `pg_dump` + archive copy (uses Docker); still available for manual full dumps. | `eng/scripts/` |
@@ -121,7 +121,7 @@ database), and compares counts taken just before the backup, so run it against a
 
 ## Data administration endpoints
 
-`GET /api/data/export`, `POST /api/data/import` and `POST /api/data/backup-now` act on the whole database (every tenant), so on top of the household-tenant check they are gated as follows:
+`POST /api/data/import`, `POST /api/data/backup-now` and `GET /api/data/export?scope=all` act on the whole database (every tenant), so on top of the household-tenant check they are gated as follows:
 
 * **Recommended: set `DataAdmin__Key`** (>= 32 random characters, `openssl rand -hex 32`) on the API and the Web app. Callers must then send it as the `X-Admin-Token` header (the Web app does this automatically for `/api/data/*`), from any address. Add `DataAdmin__RequireLoopback=true` to also require a direct loopback caller.
 * **Without a key** (Development only; #139) only a *direct* loopback caller is accepted. Outside the Development environment a key is REQUIRED: an address is not a credential, so `/api/data/export`, `/import`, `/backup-now`, `/tenants`, `/tenants/{id}/offboard` and `/reencrypt-secrets` answer 403 until `DataAdmin__Key` is set. Requests that arrive through a reverse proxy are refused even when the proxy runs on the same host (they carry `X-Forwarded-*` headers), and `X-Forwarded-For` can never make a caller look local. `DataAdmin__AllowRemote=true` still disables the check entirely (not recommended; use the key instead).
@@ -170,5 +170,5 @@ data can never be adopted as production (unless you set `DataEnvironment__AdoptE
   catches late-posting and back-dated transactions, and trading it for fewer reads risks silent data loss. Revisit once MX's
   contractual billing unit is confirmed using the ledger numbers.
 
-`GET /api/data/export` exports every tenant by default (disaster recovery). `?scope=tenant` exports only the calling tenant and `?tenantId=<guid>` exports that tenant: every
+**Behaviour change (#139):** `GET /api/data/export` now exports only the CALLING tenant by default (same as `?scope=tenant`); `?tenantId=<guid>` exports that tenant. The whole-database dump moved to the explicit `GET /api/data/export?scope=all`, which is **disaster recovery only**: it needs the household tenant and the admin token like every `/api/data/*` route, and is the only bundle `POST /api/data/import` accepts. Automation that relied on the old default must add `?scope=all`. Export zips contain, for one tenant: every
 tenant-scoped table filtered to it, plus owned child tables, with the tenant recorded in the manifest. A single-tenant bundle is for portability and review; `POST /api/data/import` refuses it.
