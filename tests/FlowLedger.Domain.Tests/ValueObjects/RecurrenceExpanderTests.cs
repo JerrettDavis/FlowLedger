@@ -102,7 +102,7 @@ public sealed class RecurrenceExpanderTests
         var dates = RecurrenceExpander.Expand(pattern, flow, null, horizon);
 
         dates.Should().OnlyContain(d => d.DayOfWeek == DayOfWeek.Friday);
-        dates.First().Should().Be(new DateOnly(2025, 1, 10));
+        dates[0].Should().Be(new DateOnly(2025, 1, 10));
     }
 
     // ── EveryNWeeks ───────────────────────────────────────────────────────────
@@ -360,6 +360,6 @@ public sealed class RecurrenceExpanderTests
         var dates = RecurrenceExpander.Expand(pattern, flow, null, horizon);
 
         // Jan 5 is before horizon start, so first date should be Feb 5
-        dates.First().Should().Be(new DateOnly(2025, 2, 5));
+        dates[0].Should().Be(new DateOnly(2025, 2, 5));
     }
 }

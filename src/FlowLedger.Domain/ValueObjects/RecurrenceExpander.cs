@@ -86,7 +86,7 @@ public static class RecurrenceExpander
 
     // ── Private expansion helpers ────────────────────────────────────────────
 
-    private static IReadOnlyList<DateOnly> ExpandDaily(DateOnly start, DateOnly end)
+    private static List<DateOnly> ExpandDaily(DateOnly start, DateOnly end)
     {
         var dates = new List<DateOnly>();
         var current = start;
@@ -98,7 +98,7 @@ public static class RecurrenceExpander
         return dates;
     }
 
-    private static IReadOnlyList<DateOnly> ExpandWeekly(
+    private static List<DateOnly> ExpandWeekly(
         RecurrencePattern pattern, DateOnly flowStart, DateOnly windowStart, DateOnly end)
     {
         var anchorDay = pattern.AnchorDayOfWeek
@@ -121,7 +121,7 @@ public static class RecurrenceExpander
         return dates;
     }
 
-    private static IReadOnlyList<DateOnly> ExpandEveryNWeeks(
+    private static List<DateOnly> ExpandEveryNWeeks(
         RecurrencePattern pattern, DateOnly flowStart, DateOnly windowStart, DateOnly end)
     {
         var anchorDay = pattern.AnchorDayOfWeek
@@ -146,7 +146,7 @@ public static class RecurrenceExpander
         return dates;
     }
 
-    private static IReadOnlyList<DateOnly> ExpandTwiceMonthly(
+    private static List<DateOnly> ExpandTwiceMonthly(
         RecurrencePattern pattern, DateOnly windowStart, DateOnly end)
     {
         var day1 = pattern.DayOfMonth
@@ -181,7 +181,7 @@ public static class RecurrenceExpander
         return dates;
     }
 
-    private static IReadOnlyList<DateOnly> ExpandMonthly(
+    private static List<DateOnly> ExpandMonthly(
         RecurrencePattern pattern, DateOnly windowStart, DateOnly end)
     {
         var day = pattern.DayOfMonth
@@ -205,7 +205,7 @@ public static class RecurrenceExpander
         return dates;
     }
 
-    private static IReadOnlyList<DateOnly> ExpandLastBusinessDay(DateOnly windowStart, DateOnly end)
+    private static List<DateOnly> ExpandLastBusinessDay(DateOnly windowStart, DateOnly end)
     {
         var dates = new List<DateOnly>();
         var month = new DateOnly(windowStart.Year, windowStart.Month, 1);

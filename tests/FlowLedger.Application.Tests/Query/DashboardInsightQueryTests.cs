@@ -14,7 +14,7 @@ public sealed class DashboardInsightQueryTests
     private static object?[] Tx(string date, decimal amount, string dir, string category, bool transfer = false)
         => [DateOnly.Parse(date), amount, dir == "Debit" ? -amount : amount, dir, "d", "m", category, "Checking", "Checking", "Posted", "Manual", "USD", null, transfer];
 
-    private static IReadOnlyDictionary<string, QueryTable> Tables() => new Dictionary<string, QueryTable>(StringComparer.OrdinalIgnoreCase)
+    private static Dictionary<string, QueryTable> Tables() => new Dictionary<string, QueryTable>(StringComparer.OrdinalIgnoreCase)
     {
         ["transactions"] = Table("transactions",
         [

@@ -179,7 +179,7 @@ public sealed class CategorizationService(
                 var bayes = model?.Predict(t.MerchantName, t.Description, t.Direction.ToString(), t.Amount.Amount);
                 var text = SemanticTraining.TextOf(t);
                 var candidates = ranked.GetValueOrDefault(text);
-                var top = candidates?.FirstOrDefault();
+                var top = candidates is { Count: > 0 } ? candidates[0] : null;
                 var sem = top is not null && top.Probability >= _localAi.SemanticFloor ? top : null;
                 var p = PredictionEnsemble.Combine(bayes, sem, embedder?.IsSemantic == true);
                 if (p is not null && p.Probability >= _options.MlThreshold)

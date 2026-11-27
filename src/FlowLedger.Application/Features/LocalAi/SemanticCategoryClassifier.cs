@@ -101,7 +101,7 @@ internal sealed class SemanticCategoryClassifier
             .ToList();
     }
 
-    public Prediction? Predict(float[] query) => Rank(query, 1).FirstOrDefault();
+    public Prediction? Predict(float[] query) => Rank(query, 1) is { Count: > 0 } ranked ? ranked[0] : null;
 }
 
 /// <summary>Combines the lexical naive-Bayes prediction with the semantic one into a single confidence.</summary>

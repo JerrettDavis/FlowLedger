@@ -72,7 +72,7 @@ public sealed class AskQueryTests
         r.Error.Should().BeNull();
         r.Attempts.Should().Be(2);
         r.Query.Should().Be("transactions | count");
-        t.Seen[1].Last().Content.Should().Contain("failed");
+        t.Seen[1][^1].Content.Should().Contain("failed");
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class AskQueryTests
         r.Error.Should().BeNull();
         r.Note.Should().Contain("matched no rows");
         t.Seen.Should().HaveCount(2);
-        t.Seen[1].Last().Content.Should().Contain("matched no rows");
+        t.Seen[1][^1].Content.Should().Contain("matched no rows");
     }
 
     [Fact]
@@ -171,6 +171,6 @@ public sealed class AskQueryTests
         var first = t.Seen[0];
         first[0].Role.Should().Be("user");
         first[0].Content.Should().Contain("ignore previous instructions").And.Contain(QueryPrompt.DataBlockStart);
-        first.Last().Should().Be(("user", "count"));
+        first[^1].Should().Be(("user", "count"));
     }
 }

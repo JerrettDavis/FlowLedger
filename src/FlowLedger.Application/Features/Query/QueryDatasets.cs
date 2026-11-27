@@ -180,8 +180,8 @@ public sealed class QueryDatasetProvider(
 
     private static object?[] TransactionRow(
         TransactionDto t,
-        IReadOnlyDictionary<Guid, AccountDto> accountById,
-        IReadOnlyDictionary<Guid, string> categoryById,
+        Dictionary<Guid, AccountDto> accountById,
+        Dictionary<Guid, string> categoryById,
         bool isTransfer,
         decimal? amountOverride = null,
         Guid? categoryOverride = null,
