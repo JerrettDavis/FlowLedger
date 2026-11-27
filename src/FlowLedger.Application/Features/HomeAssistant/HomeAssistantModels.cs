@@ -10,9 +10,14 @@ public static class HaEventKinds
     public const string Overdraft = "overdraft";
     public const string LowBalanceForecast = "low_balance_forecast";
     public const string BudgetAlert = "budget_alert";
+    public const string LargeCharge = "large_charge";
+    public const string PriceIncrease = "price_increase";
+    public const string NewSubscription = "new_subscription";
+    public const string LowBalance = "low_balance";
 
     public static IReadOnlyList<string> All { get; } =
-        [BillDueSoon, BillPaid, PaycheckExpected, PaycheckReceived, Overdraft, LowBalanceForecast, BudgetAlert];
+        [BillDueSoon, BillPaid, PaycheckExpected, PaycheckReceived, Overdraft, LowBalanceForecast, BudgetAlert,
+         LargeCharge, PriceIncrease, NewSubscription, LowBalance];
 }
 
 /// <summary>
