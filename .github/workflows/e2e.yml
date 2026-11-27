@@ -64,8 +64,7 @@ jobs:
           --logger "trx;LogFileName=e2e-results.trx"
           --results-directory ./artifacts/tests
         env:
-          # Once the E2E base class honours this (tracked in #138), a missing E2E_BASE_URL throws
-          # instead of silently skipping.
+          # A missing E2E_BASE_URL throws instead of skipping (E2ETestBase / E2EFact).
           E2E_REQUIRED: "true"
           E2E_BASE_URL: http://localhost:5002
           E2E_API_URL: http://localhost:5001
@@ -73,10 +72,10 @@ jobs:
           E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
 
       # Guard against a green run with no E2E tests discovered or executed (e.g. a renamed trait/filter).
-      # Note: tests that return early via ShouldSkip are still reported as Passed; fixing that needs a
-      # change in tests/FlowLedger.E2E.Tests/E2ETestBase.cs (#138).
+      # E2E tests are E2EFact/E2ETheory: skipped when unconfigured, and E2E_REQUIRED=true turns a missing
+      # E2E_BASE_URL into a failure, so a pass here means the tests really ran.
       - name: Require executed E2E tests
-        run: python3 eng/ci/check-trx.py "artifacts/tests/**/e2e-results.trx" --min-executed 1
+        run: python3 eng/ci/check-trx.py "artifacts/tests/**/e2e-results.trx" --allow-skip "using the local model" --min-executed 20
 
       - name: Publish E2E test results
         if: always()
@@ -156,8 +155,7 @@ jobs:
           --logger "trx;LogFileName=a11y-results.trx"
           --results-directory ./artifacts/tests
         env:
-          # Once the E2E base class honours this (tracked in #138), a missing E2E_BASE_URL throws
-          # instead of silently skipping.
+          # A missing E2E_BASE_URL throws instead of skipping (E2ETestBase / E2EFact).
           E2E_REQUIRED: "true"
           E2E_BASE_URL: http://localhost:5002
           E2E_API_URL: http://localhost:5001
@@ -165,8 +163,8 @@ jobs:
           E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
 
       # Guard against a green run with no E2E tests discovered or executed (e.g. a renamed trait/filter).
-      # Note: tests that return early via ShouldSkip are still reported as Passed; fixing that needs a
-      # change in tests/FlowLedger.E2E.Tests/E2ETestBase.cs (#138).
+      # E2E tests are E2EFact/E2ETheory: skipped when unconfigured, and E2E_REQUIRED=true turns a missing
+      # E2E_BASE_URL into a failure, so a pass here means the tests really ran.
       - name: Require executed accessibility tests
         run: python3 eng/ci/check-trx.py "artifacts/tests/**/a11y-results.trx" --min-executed 20
 

@@ -64,11 +64,9 @@ public class MlFeaturesTests : E2ETestBase
 
     private static string Unique(string s) => $"{s} {Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
 
-    [Fact(DisplayName = "Spending: the learned categorizer offers a one-click suggestion that can be accepted")]
+    [E2EFact(DisplayName = "Spending: the learned categorizer offers a one-click suggestion that can be accepted")]
     public async Task Spending_ShowsCategorySuggestion_AndAcceptingCategorizes()
     {
-        if (ShouldSkip) { return; }
-
         using var http = Api();
         var acct = await CreateAccountAsync(http, Unique("E2E Cat"));
         // Letters only and unique per run: the model ignores digits, and earlier runs must not leave conflicting labels behind.
@@ -117,11 +115,9 @@ public class MlFeaturesTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: an account's type can be corrected by hand and is pinned against sync")]
+    [E2EFact(DisplayName = "Accounts: an account's type can be corrected by hand and is pinned against sync")]
     public async Task Accounts_TypeCanBeCorrectedByHand_AndIsPinned()
     {
-        if (ShouldSkip) { return; }
-
         using var http = Api();
         var name = Unique("E2E Chase Card");
         var id = await CreateAccountAsync(http, name);   // created as Checking, like the misclassified card
@@ -152,11 +148,9 @@ public class MlFeaturesTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Dashboard: a subscription price increase is flagged under Needs a Look")]
+    [E2EFact(DisplayName = "Dashboard: a subscription price increase is flagged under Needs a Look")]
     public async Task Dashboard_FlagsSubscriptionPriceIncrease()
     {
-        if (ShouldSkip) { return; }
-
         using var http = Api();
         var acct = await CreateAccountAsync(http, Unique("E2E Subs"));
         var merchant = Unique("Streamly Plus").Replace("0", "A").Replace("1", "B").Replace("2", "C").Replace("3", "D").Replace("4", "E")
@@ -177,11 +171,9 @@ public class MlFeaturesTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Forecasts: shows the 'With everyday spending' range once there is spending history")]
+    [E2EFact(DisplayName = "Forecasts: shows the 'With everyday spending' range once there is spending history")]
     public async Task Forecasts_ShowsEverydaySpendingBand()
     {
-        if (ShouldSkip) { return; }
-
         using var http = Api();
         var acct = await CreateAccountAsync(http, Unique("E2E Fc"));
         for (var week = 1; week <= 12; week++)
@@ -198,17 +190,9 @@ public class MlFeaturesTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Query: 'Ask in plain English' writes and runs a query using the local model")]
+    [E2ELocalModelFact(DisplayName = "Query: 'Ask in plain English' writes and runs a query using the local model")]
     public async Task Query_AskInPlainEnglish_WritesAndRunsAQuery()
     {
-        if (ShouldSkip) { return; }
-
-        using (var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(3) })
-        {
-            try { (await probe.GetAsync("http://localhost:11434/api/tags")).IsSuccessStatusCode.Should().BeTrue(); }
-            catch (Exception) { return; } // no local model available: nothing to validate
-        }
-
         using var http = Api();
         var acct = await CreateAccountAsync(http, Unique("E2E Ask"));
         await SpendAsync(http, acct, 12m, Unique("Ask Cafe"), 1);
