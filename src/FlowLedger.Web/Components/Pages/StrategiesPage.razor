@@ -41,7 +41,7 @@ else
     <div class="d-flex flex-wrap gap-3 mb-4">
         <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Liquid cash</MudText><MudText Class="fl-num">@Format.Money(_report.LiquidCash)</MudText></MudPaper>
         <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Avg monthly spend</MudText><MudText Class="fl-num">@Format.Money(_report.AvgMonthlySpend)</MudText></MudPaper>
-        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Savings rate</MudText><MudText Class="fl-num">@(_report.SavingsRate is { } sr ? sr.ToString("P0") : "—")</MudText></MudPaper>
+        <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Savings rate</MudText><MudText Class="fl-num">@(_report.SavingsRate is { } sr ? Format.Ratio(sr) : "—")</MudText></MudPaper>
         <MudPaper Class="pa-3" Outlined="true" Style="min-width:min(180px,100%);flex:1"><MudText Typo="Typo.caption" Class="fl-muted">Emergency cover</MudText><MudText Class="fl-num">@(_report.EmergencyMonths is { } em ? $"{em:0.0} months" : "—")</MudText></MudPaper>
     </div>
 
@@ -96,7 +96,7 @@ else
                     <ol>@foreach (var e in s.Steps) { <li>@e</li> }</ol>
                     <MudText Typo="Typo.subtitle2">Assumptions</MudText>
                     <ul>@foreach (var e in s.Assumptions) { <li class="fl-muted">@e</li> }</ul>
-                    <MudText Typo="Typo.caption" Class="fl-muted">Confidence @(s.Confidence.ToString("P0"))</MudText>
+                    <MudText Typo="Typo.caption" Class="fl-muted">Confidence @Format.Ratio(s.Confidence)</MudText>
                     @if (s.Simulator is { } sim)
                     {
                         <div class="mt-2"><MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => _tab = TabFor(sim))">Open simulator</MudButton></div>

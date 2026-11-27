@@ -187,7 +187,7 @@ else
                         {
                             <div class="d-flex align-center gap-2 mt-2 flex-wrap">
                                 <MudChip T="string" Size="Size.Small" Color="@(rate >= 0.2 ? Color.Success : rate >= 0 ? Color.Warning : Color.Error)">
-                                    Savings rate @rate.ToString("P0")
+                                    Savings rate @Format.Ratio(rate)
                                 </MudChip>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
                                     Kept @Format.Money(_netSaved) of @Format.Money(_totalIncome) earned over @RangeLabel
