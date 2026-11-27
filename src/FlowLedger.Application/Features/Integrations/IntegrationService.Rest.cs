@@ -7,38 +7,38 @@ public sealed partial class IntegrationService
 {
     // ── REST ─────────────────────────────────────────────────────────────────────
 
-    public async Task<(IntegrationCallResult? Result, string? Error)> CallRestAsync(Guid id, RestCallRequest r, CancellationToken ct = default)
+    public async Task<(IntegrationCallResult? Result, CallRejection? Error)> CallRestAsync(Guid id, RestCallRequest r, CancellationToken ct = default)
     {
         var integration = await store.GetAsync(TenantId, id, ct);
         if (integration is null || integration.Kind != IntegrationKind.Rest)
         {
-            return (null, "That REST integration doesn't exist.");
+            return (null, new CallRejection("That REST integration doesn't exist."));
         }
 
         if (!integration.Enabled)
         {
-            return (null, "That integration is turned off.");
+            return (null, new CallRejection("That integration is turned off."));
         }
 
         var method = (r.Method ?? "GET").Trim().ToUpperInvariant();
         if (!RestMethods.Contains(method))
         {
-            return (null, "Use GET, POST, PUT, PATCH, DELETE or HEAD.");
+            return (null, new CallRejection("Use GET, POST, PUT, PATCH, DELETE or HEAD.", "method"));
         }
 
-        if (!TryBuildRestUrl(integration.Config.Url, r.Path, r.Query, out var url, out var urlError))
+        if (!TryBuildRestUrl(integration.Config.Url, r.Path, r.Query, out var url, out var urlError, out var urlField))
         {
-            return (null, urlError);
+            return (null, new CallRejection(urlError!, urlField));
         }
 
         if (!OutboundHeaders.TryClean(r.Headers, out var extra, out var headerError))
         {
-            return (null, headerError);
+            return (null, new CallRejection(headerError!, "headers"));
         }
 
         if (r.Body is { } body && Encoding.UTF8.GetByteCount(body) > MaxRequestBytes)
         {
-            return (null, "The request body is too large (256 KB maximum).");
+            return (null, new CallRejection("The request body is too large (256 KB maximum).", "body"));
         }
 
         var secrets = await store.GetSecretsAsync(TenantId, id, ct);
@@ -50,10 +50,11 @@ public sealed partial class IntegrationService
     }
 
 
-    private bool TryBuildRestUrl(string baseUrl, string? path, string? query, out string? url, out string? error)
+    private bool TryBuildRestUrl(string baseUrl, string? path, string? query, out string? url, out string? error, out string? field)
     {
         url = null;
         error = null;
+        field = "path";
         var p = (path ?? "").Trim();
         var q = (query ?? "").Trim().TrimStart('?');
         if (p.Contains("://") || p.StartsWith("//", StringComparison.Ordinal) || p.Contains('\\') || p.Contains('#') || p.Contains(".."))
@@ -65,6 +66,7 @@ public sealed partial class IntegrationService
         if (q.Contains('#') || q.Length > 1024)
         {
             error = "The query string is invalid.";
+            field = "query";
             return false;
         }
 

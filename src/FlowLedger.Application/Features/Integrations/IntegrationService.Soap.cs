@@ -16,24 +16,24 @@ public sealed partial class IntegrationService
             : new SoapOperationsResult(wsdl.Operations, wsdl.Operations.Count == 0 ? "The WSDL has no SOAP operations." : null);
     }
 
-    public async Task<(IntegrationCallResult? Result, string? Error)> SoapInvokeAsync(Guid id, SoapInvokeRequest r, CancellationToken ct = default)
+    public async Task<(IntegrationCallResult? Result, CallRejection? Error)> SoapInvokeAsync(Guid id, SoapInvokeRequest r, CancellationToken ct = default)
     {
         var (integration, wsdl, error) = await LoadWsdlAsync(id, ct);
         if (integration is null || wsdl is null)
         {
-            return (null, error);
+            return (null, new CallRejection(error ?? "The request was not sent."));
         }
 
         var candidates = wsdl.Operations.Where(o => o.Name.Equals(r.Operation, StringComparison.Ordinal)).ToList();
         var op = candidates.FirstOrDefault(o => r.Version is null || o.SoapVersion == r.Version) ?? candidates.FirstOrDefault();
         if (op is null)
         {
-            return (null, $"The WSDL has no operation named '{r.Operation}'.");
+            return (null, new CallRejection($"The WSDL has no operation named '{r.Operation}'.", "operation"));
         }
 
         if (r.BodyXml is null || Encoding.UTF8.GetByteCount(r.BodyXml) > MaxRequestBytes)
         {
-            return (null, "Provide the request body XML (256 KB maximum).");
+            return (null, new CallRejection("Provide the request body XML (256 KB maximum).", "bodyXml"));
         }
 
         string envelope;
@@ -44,13 +44,13 @@ public sealed partial class IntegrationService
         }
         catch (FormatException ex)
         {
-            return (null, ex.Message);
+            return (null, new CallRejection(ex.Message, "bodyXml"));
         }
 
         var endpoint = integration.Config.SoapEndpoint ?? op.Endpoint;
         if (!IntegrationUrl.TryValidate(endpoint, AllowLocal, out var checkedEndpoint, out var endpointError))
         {
-            return (null, "The service endpoint in the WSDL isn't allowed: " + endpointError);
+            return (null, new CallRejection("The service endpoint in the WSDL isn't allowed: " + endpointError));
         }
 
         var secrets = await store.GetSecretsAsync(TenantId, id, ct);

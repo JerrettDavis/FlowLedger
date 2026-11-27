@@ -88,6 +88,20 @@ public sealed class IntegrationEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     [Fact]
+    public async Task A_rest_call_with_a_full_url_path_is_a_validation_problem_keyed_to_the_path_field()
+    {
+        var create = await _client.PostAsJsonAsync("/api/integrations", Body("Rest", "https://api.example.com/v1"));
+        using var created = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var id = created.RootElement.GetProperty("integration").GetProperty("id").GetGuid();
+
+        var call = await _client.PostAsJsonAsync($"/api/integrations/{id}/rest/call", new { method = "GET", path = "https://evil.example/x" });
+
+        call.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        using var problem = JsonDocument.Parse(await call.Content.ReadAsStringAsync());
+        problem.RootElement.GetProperty("errors").GetProperty("path")[0].GetString().Should().Contain("not a full URL");
+    }
+
+    [Fact]
     public async Task Integrations_are_isolated_per_tenant_and_can_be_deleted()
     {
         var create = await _client.PostAsJsonAsync("/api/integrations", Body("Rest", "https://api.example.com/v1"));

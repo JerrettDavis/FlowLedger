@@ -227,7 +227,7 @@ public sealed class IntegrationServiceTests
         var saved = await service.SaveAsync(null, Rest() with { Enabled = false });
         var (result, error) = await service.CallRestAsync(saved.Integration!.Id, RestCallRequestBuilder.A().Build());
         result.Should().BeNull();
-        error.Should().Contain("off");
+        error!.Message.Should().Contain("off");
         transport.Sent.Should().BeEmpty();
     }
 
@@ -332,7 +332,7 @@ public sealed class IntegrationServiceTests
 
         var (none, error) = await service.SoapInvokeAsync(saved.Integration.Id, SoapInvokeRequestBuilder.A().Calling("Nope", "<Nope/>").Build());
         none.Should().BeNull();
-        error.Should().Contain("Nope");
+        error!.Message.Should().Contain("Nope");
     }
 
     [Fact]
@@ -345,7 +345,7 @@ public sealed class IntegrationServiceTests
 
         var (result, error) = await service.SoapInvokeAsync(saved.Integration!.Id, SoapInvokeRequestBuilder.A().Build());
         result.Should().BeNull();
-        error.Should().Contain("isn't allowed");
+        error!.Message.Should().Contain("isn't allowed");
         transport.Sent.Should().OnlyContain(r => r.Method == "GET");
     }
 }

@@ -98,6 +98,9 @@ public sealed record RestCallRequest(string Method, string? Path, string? Query,
 
 public sealed record SoapInvokeRequest(string Operation, string BodyXml, string? Version = null);
 
+/// <summary>Why a console call was not sent; <see cref="Field"/> names the request field (camelCase) the user can fix, when there is one (#211).</summary>
+public sealed record CallRejection(string Message, string? Field = null);
+
 /// <summary>The outcome of one outbound call, shown to the integration's owner.</summary>
 public sealed record IntegrationCallResult(
     int? StatusCode,

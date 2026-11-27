@@ -162,6 +162,8 @@ else
     private string _soapBody = "";
     private string? _soapError;
 
+    private readonly FormFeedback _feedback = new();
+
     private IntegrationCallResultDto? _result;
     private string? _callError;
 
@@ -188,6 +190,7 @@ else
         _operation = null;
         _soapBody = "";
         _soapError = null;
+        _feedback.Clear();
         _deliveries = null;
         _tab = 0;
         await Task.CompletedTask;
@@ -259,10 +262,16 @@ else
         _busy = true;
         _callError = null;
         _result = null;
+        _feedback.Clear();
         try
         {
             _result = await call();
             await LoadAsync();
+        }
+        catch (Exception ex) when (_feedback.TryCaptureFields(ex))
+        {
+            // The console marks the rejected inputs; the alert below only says to fix them.
+            _callError = _feedback.Summary;
         }
         catch (Exception ex)
         {
@@ -319,6 +328,7 @@ else
     private void PickOperation(string? name)
     {
         _operation = name;
+        _feedback.Clear();
         _soapBody = _operations?.FirstOrDefault(o => o.Name == name)?.BodySkeleton ?? "";
     }
 
@@ -405,20 +415,24 @@ else
 
     private RenderFragment RestPanel(IntegrationDto s) => @<div>
         <div class="d-flex gap-2 flex-wrap align-start">
-            <MudSelect T="string" @bind-Value="_method" Label="Method" Margin="Margin.Dense" Style="max-width:130px">
+            <MudSelect T="string" @bind-Value="_method" Label="Method" Margin="Margin.Dense" Style="max-width:130px"
+                       Error="@_feedback.Has("method")" ErrorText="@_feedback.For("method")" @bind-Value:after="_feedback.Clear">
                 @foreach (var m in new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD" })
                 {
                     <MudSelectItem Value="@m">@m</MudSelectItem>
                 }
             </MudSelect>
             <MudTextField T="string" @bind-Value="_path" Label="Path" Placeholder="/items" Margin="Margin.Dense" Immediate="true" Style="flex:1;min-width:200px"
-                          HelperText="@("Added to " + s.Config.Url)" />
-            <MudTextField T="string" @bind-Value="_query" Label="Query" Placeholder="page=2" Margin="Margin.Dense" Immediate="true" Style="max-width:220px" />
+                          HelperText="@("Added to " + s.Config.Url)" Error="@_feedback.Has("path")" ErrorText="@_feedback.For("path")" @bind-Value:after="_feedback.Clear" />
+            <MudTextField T="string" @bind-Value="_query" Label="Query" Placeholder="page=2" Margin="Margin.Dense" Immediate="true" Style="max-width:220px"
+                          Error="@_feedback.Has("query")" ErrorText="@_feedback.For("query")" @bind-Value:after="_feedback.Clear" />
         </div>
-        <MudTextField T="string" @bind-Value="_headers" Label="Extra headers (Name: value per line)" Lines="2" Margin="Margin.Dense" Immediate="true" Class="mb-2" />
+        <MudTextField T="string" @bind-Value="_headers" Label="Extra headers (Name: value per line)" Lines="2" Margin="Margin.Dense" Immediate="true" Class="mb-2"
+                      Error="@_feedback.Has("headers")" ErrorText="@_feedback.For("headers")" @bind-Value:after="_feedback.Clear" />
         @if (_method is not ("GET" or "HEAD"))
         {
-            <MudTextField T="string" @bind-Value="_body" Label="Body" Lines="6" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono" />
+            <MudTextField T="string" @bind-Value="_body" Label="Body" Lines="6" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono"
+                          Error="@_feedback.Has("body")" ErrorText="@_feedback.For("body")" @bind-Value:after="_feedback.Clear" />
         }
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || !s.Enabled)" OnClick="@(() => SendRestAsync(s))"
                    StartIcon="@Icons.Material.Filled.Send">Send</MudButton>
@@ -435,13 +449,15 @@ else
         }
         @if (_operations is { Count: > 0 })
         {
-            <MudSelect T="string" Value="_operation" ValueChanged="PickOperation" Label="Operation" Margin="Margin.Dense" Class="mt-3">
+            <MudSelect T="string" Value="_operation" ValueChanged="PickOperation" Label="Operation" Margin="Margin.Dense" Class="mt-3"
+                       Error="@_feedback.Has("operation")" ErrorText="@_feedback.For("operation")">
                 @foreach (var o in _operations)
                 {
                     <MudSelectItem Value="@o.Name">@o.Name <span class="fl-muted">· SOAP @o.SoapVersion</span></MudSelectItem>
                 }
             </MudSelect>
-            <MudTextField T="string" @bind-Value="_soapBody" Label="Request body (XML, goes inside soap:Body)" Lines="8" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono" />
+            <MudTextField T="string" @bind-Value="_soapBody" Label="Request body (XML, goes inside soap:Body)" Lines="8" Margin="Margin.Dense" Immediate="true" Class="mb-2 fl-mono"
+                          Error="@_feedback.Has("bodyXml")" ErrorText="@_feedback.For("bodyXml")" @bind-Value:after="_feedback.Clear" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || _operation is null)" OnClick="@(() => InvokeSoapAsync(s))"
                        StartIcon="@Icons.Material.Filled.Send">Call operation</MudButton>
         }
