@@ -78,7 +78,7 @@ public sealed class ForecastEndpointTests(FlowLedgerApiFactory factory) : IAsync
         await _client.PostAsync("/api/connect", null);
         await _client.PostAsync("/api/sync", null);
 
-        var from = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = factory.ServerToday;
         var to = from.AddMonths(2);
         var url = $"/api/forecast?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
 

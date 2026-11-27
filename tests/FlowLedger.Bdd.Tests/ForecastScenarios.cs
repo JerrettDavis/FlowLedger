@@ -1,3 +1,4 @@
+using FlowLedger.TestSupport;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Bdd.Tests.Support;
@@ -33,7 +34,7 @@ public partial class ForecastScenarios : TinyBddXunitBase
         var tenant = TestTenantContext.New();
         using var scope = _fixture.CreateScope(tenant);
         var tenantId = TenantId.From(tenant.TenantId);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var today = TestClock.Today;
 
         async Task<TestTenantContext> CleanDb()
         {
@@ -133,7 +134,7 @@ public partial class ForecastScenarios : TinyBddXunitBase
         var tenant = TestTenantContext.New();
         using var scope = _fixture.CreateScope(tenant);
         var tenantId = TenantId.From(tenant.TenantId);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var today = TestClock.Today;
 
         async Task<TestTenantContext> CleanDb()
         {

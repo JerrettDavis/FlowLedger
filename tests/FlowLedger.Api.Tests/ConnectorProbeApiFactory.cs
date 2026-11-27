@@ -55,7 +55,7 @@ public sealed class ConnectorProbeApiFactory : FlowLedgerApiFactory
                 profile = existing ?? $"prof_{Interlocked.Increment(ref owner._profiles)}";
             }
 
-            var json = JsonSerializer.Serialize(new { token = $"token-{profile}", userId = profile, expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+            var json = JsonSerializer.Serialize(new { token = $"token-{profile}", userId = profile, expiresAt = new DateTimeOffset(2099, 1, 1, 0, 0, 0, TimeSpan.Zero) });
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         }
     }

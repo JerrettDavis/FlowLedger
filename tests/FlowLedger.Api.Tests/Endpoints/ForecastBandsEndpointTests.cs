@@ -26,7 +26,7 @@ public sealed class ForecastBandsEndpointTests(FlowLedgerApiFactory factory) : I
         var account = (await (await _client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 5000m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         for (var week = 1; week <= 12; week++)
         {
             var date = today.AddDays(-7 * week + 1);
