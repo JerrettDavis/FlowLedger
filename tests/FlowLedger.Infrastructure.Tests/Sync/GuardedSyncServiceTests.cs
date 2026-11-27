@@ -91,4 +91,30 @@ public sealed class GuardedSyncServiceTests
         await first;
         inner.Calls.Should().Be(1);
     }
+
+    [Fact]
+    public async Task In_flight_tenant_state_is_released_after_each_sync_so_it_cannot_grow_with_tenants_seen()
+    {
+        var before = GuardedSyncService.InFlight.Count;
+        var inner = new FakeSync();
+        for (var i = 0; i < 2000; i++)
+        {
+            await new GuardedSyncService(inner, Guid.NewGuid(), TimeSpan.Zero, _ => Task.FromResult<DateTimeOffset?>(null), new Clock(Now)).SyncAsync();
+        }
+
+        GuardedSyncService.InFlight.Count.Should().Be(before, "entries exist only while a sync is running (#179)");
+    }
+
+    [Fact]
+    public async Task A_failed_or_throttled_sync_still_releases_its_slot()
+    {
+        var tenant = Guid.NewGuid();
+        var throttled = new GuardedSyncService(new FakeSync(), tenant, TimeSpan.FromMinutes(30),
+            _ => Task.FromResult<DateTimeOffset?>(Now.AddMinutes(-1)), new Clock(Now));
+        await FluentActions.Awaiting(() => throttled.SyncAsync()).Should().ThrowAsync<SyncThrottledException>();
+
+        var inner = new FakeSync();
+        await new GuardedSyncService(inner, tenant, TimeSpan.Zero, _ => Task.FromResult<DateTimeOffset?>(null), new Clock(Now)).SyncAsync();
+        inner.Calls.Should().Be(1);
+    }
 }

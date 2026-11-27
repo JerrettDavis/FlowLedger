@@ -27,4 +27,17 @@ public sealed class WebhookReplayGuardTests
         WebhookReplayGuard.SeenRecently(body, t0).Should().BeFalse();
         WebhookReplayGuard.SeenRecently(body, t0.AddMinutes(11)).Should().BeFalse();
     }
+
+    [Fact]
+    public void In_process_map_stays_bounded_after_ten_times_the_cap_of_distinct_live_bodies()
+    {
+        // Timestamps sit in the recent past so any entries other tests hold (newer) are never the oldest to be evicted.
+        var now = DateTimeOffset.UtcNow.AddMinutes(-5);
+        for (var i = 0; i < WebhookReplayGuard.MaxEntries * 10; i++)
+        {
+            WebhookReplayGuard.SeenRecently(Encoding.UTF8.GetBytes("bound-" + Guid.NewGuid()), now.AddMilliseconds(i));
+        }
+
+        WebhookReplayGuard.TrackedCount.Should().BeLessThanOrEqualTo(WebhookReplayGuard.MaxEntries);
+    }
 }

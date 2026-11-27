@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Observability;
 
@@ -11,7 +10,11 @@ namespace FlowLedger.Infrastructure.Sync;
 /// </summary>
 internal sealed class GuardedSyncService : IFinancialSyncService
 {
-    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> Locks = new();
+    /// <summary>
+    /// Tenants with a sync in flight in THIS process. Entries are removed when the sync ends, so the set is bounded by concurrent syncs,
+    /// not by tenants ever seen (#179). Process-local by design: the cross-process guarantee is the database advisory lock below.
+    /// </summary>
+    internal static readonly InFlightSet<Guid> InFlight = new();
 
     private readonly IFinancialSyncService _inner;
     private readonly Guid _tenant;
@@ -40,8 +43,7 @@ internal sealed class GuardedSyncService : IFinancialSyncService
 
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
-        var gate = Locks.GetOrAdd(_tenant, _ => new SemaphoreSlim(1, 1));
-        if (!await gate.WaitAsync(0, ct))
+        if (!InFlight.TryAdd(_tenant))
         {
             FlowLedgerTelemetry.RecordSync("already_running");
             throw new SyncAlreadyRunningException();
@@ -96,7 +98,35 @@ internal sealed class GuardedSyncService : IFinancialSyncService
                 await lease.DisposeAsync();
             }
 
-            gate.Release();
+            InFlight.Remove(_tenant);
+        }
+    }
+}
+
+/// <summary>A thread-safe set of keys currently in flight; a key is present only between <see cref="TryAdd"/> and <see cref="Remove"/>.</summary>
+internal sealed class InFlightSet<T> where T : notnull
+{
+    private readonly object _gate = new();
+    private readonly HashSet<T> _items = [];
+
+    public int Count
+    {
+        get { lock (_gate) { return _items.Count; } }
+    }
+
+    public bool TryAdd(T key)
+    {
+        lock (_gate)
+        {
+            return _items.Add(key);
+        }
+    }
+
+    public void Remove(T key)
+    {
+        lock (_gate)
+        {
+            _items.Remove(key);
         }
     }
 }
