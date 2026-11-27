@@ -211,7 +211,7 @@ public sealed record BreakdownGroupDto(string Key, string Label, decimal Amount,
 public sealed record TrendPointDto(string Bucket, decimal Amount);
 public sealed record BreakdownTransactionDto(
     Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, List<string> Tags,
-    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null);
+    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null, uint Version = 0);
 
 public sealed record BreakdownResultDto(
     DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,

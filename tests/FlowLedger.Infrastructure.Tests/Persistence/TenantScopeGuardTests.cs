@@ -137,7 +137,6 @@ public sealed class TenantScopeGuardTests
     /// <summary>File name to reason. Statements in these files are host-wide or filter by another tenant-derived key.</summary>
     private static readonly Dictionary<string, string> RawSqlAllowlist = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["BackupRunner.cs"] = "host backup history (backup_runs is host-wide)",
         ["DatabaseSnapshotService.cs"] = "whole-database snapshot/restore, never per tenant",
         ["SnapshotImport.cs"] = "whole-database restore, never per tenant",
         ["SnapshotRestoreDrill.cs"] = "whole-database restore drill, never per tenant",
@@ -203,5 +202,31 @@ public sealed class TenantScopeGuardTests
 
         offenders.Should().BeEmpty(
             "raw SQL bypasses EF query filters; every statement must filter or key by tenant_id, or its file must be in RawSqlAllowlist with a reason");
+    }
+
+    [Fact]
+    public void Raw_SQL_allowlist_has_no_stale_entries()
+    {
+        // An allowlisted file must still hold at least one statement that needs the exemption; otherwise the entry only hides future mistakes.
+        var root = InfrastructureRoot();
+        var filesNeedingExemption = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            if (relative.Contains("/Migrations/") || relative.Contains("/obj/") || relative.Contains("/bin/"))
+            {
+                continue;
+            }
+
+            var text = Regex.Replace(File.ReadAllText(file), @"""\s*\+\s*\$?""", string.Empty);
+            if (SqlLiteral.Matches(text).Select(l => l.Groups["raw"].Success ? l.Groups["raw"].Value : l.Groups["str"].Value)
+                .Any(body => SqlStatement.IsMatch(body) && !body.Contains("tenant_id", StringComparison.OrdinalIgnoreCase)))
+            {
+                filesNeedingExemption.Add(Path.GetFileName(file));
+            }
+        }
+
+        RawSqlAllowlist.Keys.Where(f => !filesNeedingExemption.Contains(f)).Should().BeEmpty(
+            "these files no longer contain tenant-less raw SQL; remove them from RawSqlAllowlist");
     }
 }

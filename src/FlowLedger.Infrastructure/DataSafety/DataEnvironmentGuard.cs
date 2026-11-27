@@ -66,7 +66,23 @@ public static class DataEnvironmentGuard
     public static async Task<DataEnvironment> EnsureAsync(
         string connectionString, DataEnvironment expected, bool adoptExistingAsProduction, CancellationToken ct = default)
     {
-        // The schema (including system_settings) comes from the EF migrations: the guard runs after the migration service.
+        try
+        {
+            return await EnsureCoreAsync(connectionString, expected, adoptExistingAsProduction, ct);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UndefinedTable)
+        {
+            // The schema comes from the EF migrations, which a separate migration job (or the API) may not have applied yet when a
+            // host such as the worker starts first. An unmigrated database holds no data and no marker, so there is nothing to
+            // contradict; the first host that starts after the migration stamps the marker.
+            return expected;
+        }
+    }
+
+    private static async Task<DataEnvironment> EnsureCoreAsync(
+        string connectionString, DataEnvironment expected, bool adoptExistingAsProduction, CancellationToken ct)
+    {
+        // The schema (including system_settings) comes from the EF migrations.
         await using var db = new HostDb(connectionString).Create();
 
         var marker = await db.SystemSettings.AsNoTracking().Where(s => s.Key == SettingKey).Select(s => s.Value).SingleOrDefaultAsync(ct);

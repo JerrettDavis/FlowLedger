@@ -140,4 +140,15 @@ public sealed class LegacyAdHocTableUpgradeTests : IAsyncLifetime
         (await replays.TryRecordAsync("MX", "oldhash", TimeSpan.FromMinutes(10))).Should().BeFalse("the legacy row is still inside the window");
         (await replays.TryRecordAsync("MX", "newhash", TimeSpan.FromMinutes(10))).Should().BeTrue();
     }
+
+    [DockerFact]
+    public async Task The_environment_guard_tolerates_a_database_the_migrations_have_not_reached_yet()
+    {
+        // A worker can start before the migration job: no schema means no data and no marker, so there is nothing to contradict.
+        var cs = await NewDatabaseAsync();
+
+        var env = await DataEnvironmentGuard.EnsureAsync(cs, DataEnvironment.Production, adoptExistingAsProduction: false);
+
+        env.Should().Be(DataEnvironment.Production);
+    }
 }

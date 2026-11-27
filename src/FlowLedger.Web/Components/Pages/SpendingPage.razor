@@ -422,13 +422,17 @@ else if (_result is not null)
                 return;
             }
 
-            await ApiClient.RecategorizeAsync(tx.Id, target.Id, false);
+            await ApiClient.RecategorizeAsync(tx.Id, target.Id, false, expectedVersion: tx.Version == 0 ? null : tx.Version);
             Snackbar.Add($"Categorized as {target.Path}.", Severity.Success);
             await LoadAsync();
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 
@@ -473,7 +477,9 @@ else if (_result is not null)
                 path = created.Path;
             }
 
-            var changed = await ApiClient.RecategorizeAsync(tx.Id, categoryId, all, note: note);
+            uint? savedVersion = null;
+            var changed = await ApiClient.RecategorizeAsync(
+                tx.Id, categoryId, all, note: note, expectedVersion: tx.Version == 0 ? null : tx.Version, newVersion: v => savedVersion = v);
             // Show the new category immediately, then reload totals/charts/groups from the server.
             if (_result is not null)
             {
@@ -498,7 +504,7 @@ else if (_result is not null)
                     {
                         try
                         {
-                            await ApiClient.RecategorizeAsync(tx.Id, undoTo, false);
+                            await ApiClient.RecategorizeAsync(tx.Id, undoTo, false, expectedVersion: savedVersion);
                             await LoadAsync();
                             FlashRows([tx.Id]);
                             await InvokeAsync(StateHasChanged);
@@ -506,6 +512,10 @@ else if (_result is not null)
                         catch (Exception ex)
                         {
                             Snackbar.AddFailure(ex);
+                            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+                            {
+                                await LoadAsync(); // pick up the current versions
+                            }
                         }
                     };
                 });
@@ -518,6 +528,10 @@ else if (_result is not null)
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 

@@ -2,8 +2,8 @@ namespace FlowLedger.Infrastructure.Persistence.Entities;
 
 /// <summary>
 /// One security-relevant action (#193, #154). Append-only and host-wide: <see cref="ActingTenantId"/> is informational (the tenant
-/// the action concerned, null for host-level actions), so this is NOT tenant-owned data, carries no query filter, and survives
-/// tenant erasure as the audit record. Reached only through <see cref="HostDb"/>.
+/// the action concerned, null for host-level actions), so this is NOT tenant-owned data and carries no query filter (tenant erasure still
+/// removes a tenant's rows through the table's tenant_id column). Reached only through <see cref="HostDb"/>.
 /// </summary>
 internal sealed class AuditEventRecord
 {
