@@ -2,10 +2,10 @@ using FlowLedger.Application.Features.Users;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.Persistence;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using FluentAssertions;
 using Testcontainers.PostgreSql;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
