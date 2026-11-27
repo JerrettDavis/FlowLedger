@@ -1,6 +1,7 @@
 using FlowLedger.Application.Features.Assets;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Assets;
@@ -10,7 +11,7 @@ public sealed class NetWorthCalculatorTests
     private static readonly TenantId Tenant = TenantId.New();
     private static readonly DateOnly Today = new(2026, 11, 13);
 
-    private static Account Acct(AccountType t, decimal bal) => Account.Create(Tenant, t.ToString(), t, new Money(bal, "USD"));
+    private static Account Acct(AccountType t, decimal bal) => AccountBuilder.A().ForTenant(Tenant).Named(t.ToString()).OfType(t).Holding(bal).Build();
 
     private static Asset House(decimal value, Account? link = null)
     {

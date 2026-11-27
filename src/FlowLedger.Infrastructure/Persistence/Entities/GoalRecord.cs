@@ -15,4 +15,25 @@ internal sealed class GoalRecord
     public uint RowVersion { get; private set; }
 
     private GoalRecord() { }
+
+    public static GoalRecord Create(Guid tenantId, Guid id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate) =>
+        new()
+        {
+            TenantId = tenantId,
+            Id = id,
+            Name = name,
+            TargetAmount = targetAmount,
+            SavedAmount = savedAmount,
+            TargetDate = targetDate,
+            UpdatedUtc = DateTimeOffset.UtcNow,
+        };
+
+    public void Update(string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate)
+    {
+        Name = name;
+        TargetAmount = targetAmount;
+        SavedAmount = savedAmount;
+        TargetDate = targetDate;
+        UpdatedUtc = DateTimeOffset.UtcNow;
+    }
 }

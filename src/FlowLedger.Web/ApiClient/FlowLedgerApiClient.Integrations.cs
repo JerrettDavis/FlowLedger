@@ -112,11 +112,12 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task SaveGoalAsync(Guid? id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, CancellationToken ct = default)
+    public async Task SaveGoalAsync(Guid? id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, uint? expectedVersion = null, CancellationToken ct = default)
     {
         await ExecuteAsync("save goal", async () =>
         {
-            var response = await _http.PutAsJsonAsync("/api/goals", new { id, name, targetAmount, savedAmount, targetDate }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, "/api/goals", new { id, name, targetAmount, savedAmount, targetDate }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "goal");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't save goal (server returned {(int)response.StatusCode}).", response.StatusCode);
@@ -126,11 +127,12 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task DeleteGoalAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteGoalAsync(Guid id, uint? expectedVersion = null, CancellationToken ct = default)
     {
         await ExecuteAsync("remove goal", async () =>
         {
-            var response = await _http.DeleteAsync($"/api/goals/{id}", ct);
+            var response = await SendVersionedAsync(HttpMethod.Delete, $"/api/goals/{id}", null, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "goal");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't remove goal (server returned {(int)response.StatusCode}).", response.StatusCode);

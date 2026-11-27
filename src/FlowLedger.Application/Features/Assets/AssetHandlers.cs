@@ -136,6 +136,7 @@ public sealed class CreateAssetHandler(IAssetRepository assets, IAccountReposito
 {
     public async Task<AssetDto> HandleAsync(CreateAssetRequest r, CancellationToken ct = default)
     {
+        FlowLedger.Application.Abstractions.TenantLimits.EnsureRoom((await assets.ListAsync(ct)).Count, 1, FlowLedger.Application.Abstractions.TenantLimits.MaxAssets, "assets");
         var currency = new Currency(r.Currency);
         var linked = await AssetMapper.ResolveLinkAsync(accounts, r.LinkedAccountId, ct);
         var category = Enum.Parse<AssetCategory>(r.Category, ignoreCase: true);

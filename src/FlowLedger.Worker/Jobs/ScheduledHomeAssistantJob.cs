@@ -10,7 +10,7 @@ namespace FlowLedger.Worker.Jobs;
 /// Households that have not turned sharing on are a cheap no-op. A failing tenant never blocks the others.
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed partial class ScheduledHomeAssistantJob(IServiceProvider services, ILogger<ScheduledHomeAssistantJob> logger) : IJob
+internal sealed partial class ScheduledHomeAssistantJob(IServiceProvider services, ILogger<ScheduledHomeAssistantJob> logger) : IJob
 {
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {

@@ -14,7 +14,7 @@ internal enum RouteKind
     /// <summary>No tenant data (probes, static catalogues, pure calculations, host-level files, signature-authenticated webhooks).</summary>
     Global,
 
-    /// <summary>Known hole in the sweep: tenant-scoped but not probed yet. Listed so it is visible, not so it is considered safe.</summary>
+    /// <summary>Known hole in the sweep: tenant-scoped but not probed yet. None remain (<c>No_route_is_left_as_a_Gap</c> keeps it that way); add a helper here before using it again.</summary>
     Gap,
 
     /// <summary>Tenant-scoped write or integration route probed with a real payload by <c>TenantIsolationWriteTests</c> (B calls it, A must be unaffected).</summary>
@@ -38,8 +38,6 @@ internal static class TenantIsolationManifest
     private static RouteEntry Global(string why) => new(RouteKind.Global, why);
 
     private static RouteEntry Written() => new(RouteKind.Written);
-
-    private static RouteEntry Gap(string why) => new(RouteKind.Gap, why);
 
     public static readonly IReadOnlyDictionary<string, RouteEntry> Routes = new Dictionary<string, RouteEntry>(StringComparer.Ordinal)
     {
@@ -77,12 +75,14 @@ internal static class TenantIsolationManifest
         ["GET /api/category-rules"] = List(),
         ["GET /api/dashboard/activity"] = List(),
         ["GET /api/dashboard/insights"] = List(),
-        ["GET /api/data/tenants"] = Gap("household-only tenant registry listing"),
-        ["POST /api/data/tenants/{tenantId:guid}/offboard"] = Gap("household-only erasure of another tenant, covered by DataAdminTenantTests"),
-        ["POST /api/data/reencrypt-secrets"] = Gap("household-only key rotation"),
+        ["GET /api/data/tenants"] = Written(),
+        ["POST /api/data/tenants/{tenantId:guid}/offboard"] = Written(),
+        ["POST /api/data/reencrypt-secrets"] = Written(),
+        ["POST /api/data/raw-archive/seal"] = Written(),
         ["GET /api/data/export"] = Written(),
         ["GET /api/data/status"] = Written(),
         ["GET /api/duplicates"] = List(),
+        ["GET /api/transactions/processing-window"] = List(),
         ["GET /api/duplicates/log"] = List(),
         ["GET /api/environment"] = Global("host environment flags"),
         ["GET /api/forecast"] = List(),
@@ -94,7 +94,7 @@ internal static class TenantIsolationManifest
         ["GET /api/insights/breakdown"] = List(),
         ["GET /api/integrations"] = List(),
         ["GET /api/integrations/connectors"] = Global("connector catalogue"),
-        ["GET /api/integrations/connectors/{connectorId}/available-accounts"] = Gap("needs a seeded provider account catalogue for tenant A (no seeding path without a live connector)"),
+        ["GET /api/integrations/connectors/{connectorId}/available-accounts"] = Written(),
         ["GET /api/integrations/provider"] = Global("provider kind, no rows"),
         ["GET /api/integrations/quiltt/config"] = Global("public connector config"),
         ["GET /api/integrations/{id:guid}/deliveries"] = Written(),
@@ -145,7 +145,7 @@ internal static class TenantIsolationManifest
         ["POST /api/integrations"] = Written(),
         ["POST /api/integrations/mx/connect-token"] = Written(),
         ["POST /api/integrations/mx/webhooks"] = Global("authenticated by provider signature, tenant derived from payload (see MxEndpointTests)"),
-        ["POST /api/integrations/quiltt/session"] = Gap("needs Quiltt enabled with a stubbed Quiltt API; the profile id is read from the tenant-filtered connection store"),
+        ["POST /api/integrations/quiltt/session"] = Written(),
         ["POST /api/integrations/quiltt/webhooks"] = Global("authenticated by provider signature (see Quiltt tests)"),
         ["POST /api/integrations/{id:guid}/rest/call"] = Written(),
         ["POST /api/integrations/{id:guid}/rotate-secret"] = Written(),
@@ -155,7 +155,7 @@ internal static class TenantIsolationManifest
         ["POST /api/local-ai/evaluate"] = Global("runs on supplied text only"),
         ["POST /api/local-ai/models/{id}/download"] = Global("host-level model files"),
         ["POST /api/merchant-aliases/seed-sheet-defaults"] = Written(),
-        ["POST /api/query/ask"] = Gap("needs a local model or stub translator; the generated query runs through the same tenant-filtered dataset as POST /api/query/run, which is probed"),
+        ["POST /api/query/ask"] = Written(),
         ["POST /api/query/run"] = Written(),
         ["POST /api/recurring-flows"] = Written(),
         ["POST /api/recurring-flows/detect"] = Written(),

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Query;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -22,13 +23,13 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
 
     private static async Task<AccountDto> Account(HttpClient client, string name)
         => (await (await client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest(name, "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named(name).StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
 
-    private static Task<HttpResponseMessage> Spend(HttpClient client, Guid account, decimal amount, string desc)
+    private Task<HttpResponseMessage> Spend(HttpClient client, Guid account, decimal amount, string desc)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         return client.PostAsJsonAsync("/api/transactions",
-            new CreateTransactionRequest(account, amount, "USD", "Debit", desc, today, today, null, desc, null));
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(amount).Described(desc).On(today).PostedOn(today).AtMerchant(desc).Build());
     }
 
     [Fact]

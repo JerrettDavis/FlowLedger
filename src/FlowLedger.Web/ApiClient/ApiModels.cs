@@ -116,11 +116,11 @@ public sealed record AskQueryAnswer(string Question, string? Query, string? Erro
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
-public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
+public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
 
-public sealed record GoalDto(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete, DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete);
+public sealed record GoalDto(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete, DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0);
 
 public sealed record DebtRowDto(string Name, decimal Balance, decimal AnnualRatePercent, decimal MinimumPayment);
 
@@ -211,7 +211,7 @@ public sealed record BreakdownGroupDto(string Key, string Label, decimal Amount,
 public sealed record TrendPointDto(string Bucket, decimal Amount);
 public sealed record BreakdownTransactionDto(
     Guid Id, DateOnly Date, string Description, string? Merchant, string Category, string Account, decimal Amount, List<string> Tags,
-    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null);
+    double? Confidence = null, string? SuggestedCategory = null, double? SuggestedConfidence = null, uint Version = 0);
 
 public sealed record BreakdownResultDto(
     DateOnly From, DateOnly To, bool Income, string GroupBy, string? Parent,

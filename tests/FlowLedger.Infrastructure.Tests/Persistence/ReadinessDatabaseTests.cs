@@ -13,8 +13,7 @@ public sealed class ReadinessDatabaseTests(IntegrationTestFixture fixture) : IAs
 {
     public Task InitializeAsync() => fixture.ResetAsync();
 
-    // backup_runs is created ad hoc (outside Respawn's table list), so leave it empty for the other tests sharing the DB.
-    public Task DisposeAsync() => ExecAsync("DROP TABLE IF EXISTS backup_runs");
+    public Task DisposeAsync() => Task.CompletedTask;
 
     private IConfiguration Config() => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:flowledger"] = fixture.ConnectionString })

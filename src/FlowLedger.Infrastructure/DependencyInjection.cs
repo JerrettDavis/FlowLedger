@@ -306,7 +306,8 @@ public static class DependencyInjection
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId);
 
             // Then detect recurring income/bills (after categories exist, so transfers/trades are excluded).
             // Config: RecurringFlows:AutoAdd (default true) adds only fixed-amount, very regular patterns.
@@ -324,29 +325,29 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlUserDirectory(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
+            new FlowLedger.Infrastructure.DataSafety.EfUserDirectory(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")),
                 TenancySettings.Legacy(configuration)));
         services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlWebhookReplayStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+            new FlowLedger.Infrastructure.DataSafety.EfWebhookReplayStore(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
         services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlTenantRegistry(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+            new FlowLedger.Infrastructure.DataSafety.EfTenantRegistry(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
         services.AddScoped<FlowLedger.Application.Features.Users.ITenantErasure>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfTenantErasure(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
                 TenancySettings.Legacy(configuration).LegacyTenantId,
                 sp.GetServices<FlowLedger.Application.Features.Users.ITenantFileEraser>()));
 
-        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore>(sp =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlCategoryMaintenanceStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
-                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>()));
+        services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore,
+            FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryMaintenanceStore>();
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategoryRuleStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfCategoryRuleStore>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.IMerchantAliasStore,
@@ -359,20 +360,22 @@ public static class DependencyInjection
             FlowLedger.Infrastructure.Persistence.Repositories.EfRecurringDismissalStore>();
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
-        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.ProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Audit log of sensitive actions (append-only, ad hoc table) --
+        // -- Audit log of sensitive actions (append-only, host-wide EF table) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IAuditLog>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAuditLog(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Durable background job run history (ad hoc table; worker writes, API reads) --
+            new FlowLedger.Infrastructure.DataSafety.EfAuditLog(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
+        // -- Durable background job run history (host-wide EF table; worker writes, API reads) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlJobRunStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+            new FlowLedger.Infrastructure.DataSafety.EfJobRunStore(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
@@ -427,7 +430,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
             FlowLedger.Infrastructure.DataSafety.RetentionSettings.From(configuration)));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
+            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>());
     }
 
     /// <summary>

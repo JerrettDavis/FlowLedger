@@ -5,7 +5,7 @@ using FlowLedger.SharedKernel;
 
 namespace FlowLedger.Infrastructure.Sync;
 
-internal sealed class ConnectorStatusReader(NpgsqlProviderCallLedger ledger, FlowLedgerDbContext db, ITenantContext tenant) : IConnectorStatusReader
+internal sealed class ConnectorStatusReader(ProviderCallLedger ledger, FlowLedgerDbContext db, ITenantContext tenant) : IConnectorStatusReader
 {
     public async Task<ConnectorUsage> GetUsageAsync(string providerName, CancellationToken ct = default)
     {

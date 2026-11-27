@@ -1,6 +1,11 @@
 using FlowLedger.Application.Features.Users;
 using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Events;
+using FlowLedger.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Testcontainers.PostgreSql;
 
 namespace FlowLedger.Infrastructure.Tests.Persistence;
@@ -13,11 +18,25 @@ public sealed class UserDirectoryLinkingTests : IAsyncLifetime
 
     private readonly PostgreSqlContainer _pg = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
-    public Task InitializeAsync() => _pg.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _pg.StartAsync();
+        await MigrateAsync(_pg.GetConnectionString(), null);
+    }
+
     public Task DisposeAsync() => _pg.DisposeAsync().AsTask();
 
-    private NpgsqlUserDirectory Dir(LegacyTenantClaim? c = null) =>
-        new(_pg.GetConnectionString(), c ?? new LegacyTenantClaim(Legacy, null));
+    private static async Task MigrateAsync(string connectionString, string? target)
+    {
+        var options = new DbContextOptionsBuilder<FlowLedgerDbContext>()
+            .UseNpgsql(connectionString, n => n.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name))
+            .Options;
+        await using var ctx = new FlowLedgerDbContext(options, new NoOpDomainEventDispatcher(), UnscopedTenantContext.Instance);
+        await ctx.GetService<IMigrator>().MigrateAsync(target);
+    }
+
+    private EfUserDirectory Dir(LegacyTenantClaim? c = null, string? connectionString = null) =>
+        new(new HostDb(connectionString ?? _pg.GetConnectionString()), c ?? new LegacyTenantClaim(Legacy, null));
 
     private static ExternalIdentity Id(string sub, string? email = null, bool verified = true) =>
         new(Iss, sub, email, sub, verified);
@@ -113,8 +132,18 @@ public sealed class UserDirectoryLinkingTests : IAsyncLifetime
     [Fact]
     public async Task ExistingRowsFromBeforeThisMigration_KeepTheirTenant()
     {
-        // Simulate the pre-migration table shape (no email_verified column) with an existing user.
-        await using (var conn = new Npgsql.NpgsqlConnection(_pg.GetConnectionString()))
+        // A database as the old runtime-created store left it: the pre-email_verified table shape with an existing user, and no
+        // registry row for its tenant. Adopting it must keep the user in its tenant and backfill the registry.
+        var legacyDb = new Npgsql.NpgsqlConnectionStringBuilder(_pg.GetConnectionString()) { Database = "legacy_dir", Pooling = false }.ConnectionString;
+        await using (var admin = new Npgsql.NpgsqlConnection(_pg.GetConnectionString()))
+        {
+            await admin.OpenAsync();
+            await using var create = new Npgsql.NpgsqlCommand("CREATE DATABASE legacy_dir", admin);
+            await create.ExecuteNonQueryAsync();
+        }
+
+        await MigrateAsync(legacyDb, "20261127000000_AddSyncCursorLastSuccessfulSyncAt");
+        await using (var conn = new Npgsql.NpgsqlConnection(legacyDb))
         {
             await conn.OpenAsync();
             await using var cmd = new Npgsql.NpgsqlCommand(
@@ -124,7 +153,10 @@ public sealed class UserDirectoryLinkingTests : IAsyncLifetime
             await cmd.ExecuteNonQueryAsync();
         }
 
-        var dir = Dir();
+        await MigrateAsync(legacyDb, null);
+
+        var dir = Dir(connectionString: legacyDb);
         (await dir.ResolveAsync(Id("old"))).TenantId.Should().Be(Legacy);
+        (await new EfTenantRegistry(new HostDb(legacyDb)).GetAsync(Legacy)).Should().NotBeNull("the migration backfills every tenant that already has a login");
     }
 }

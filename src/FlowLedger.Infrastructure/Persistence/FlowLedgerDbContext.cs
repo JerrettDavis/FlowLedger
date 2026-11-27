@@ -66,6 +66,17 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<AccountConnectorLinkRecord> AccountConnectorLinks => Set<AccountConnectorLinkRecord>();
     internal DbSet<OutboxMessageRecord> OutboxMessages => Set<OutboxMessageRecord>();
 
+    // Host-wide tables (#154): no tenant column and no query filter; reached only through HostDb.
+    internal DbSet<ProviderApiCallRecord> ProviderApiCalls => Set<ProviderApiCallRecord>();
+    internal DbSet<BackupRunRecord> BackupRuns => Set<BackupRunRecord>();
+    internal DbSet<AuditEventRecord> AuditEvents => Set<AuditEventRecord>();
+    internal DbSet<JobRunRecord> JobRuns => Set<JobRunRecord>();
+    internal DbSet<WebhookReplayRecord> WebhookReplays => Set<WebhookReplayRecord>();
+    internal DbSet<TenantRegistryRecord> Tenants => Set<TenantRegistryRecord>();
+    internal DbSet<AppUserRecord> AppUsers => Set<AppUserRecord>();
+    internal DbSet<AppUserLinkCodeRecord> AppUserLinkCodes => Set<AppUserLinkCodeRecord>();
+    internal DbSet<SystemSettingRecord> SystemSettings => Set<SystemSettingRecord>();
+
     // ── Constructors ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -74,11 +85,20 @@ public sealed class FlowLedgerDbContext : DbContext
     public FlowLedgerDbContext(
         DbContextOptions<FlowLedgerDbContext> options,
         IDomainEventDispatcher eventDispatcher, // retained for constructor compatibility; delivery now goes through the outbox
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        FlowLedger.Application.Abstractions.ITenantDataVersion? dataVersion = null)
         : base(options)
     {
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
+        _dataVersion = dataVersion;
     }
+
+    private readonly FlowLedger.Application.Abstractions.ITenantDataVersion? _dataVersion;
+
+    /// <summary>True when the pending changes touch data the cached dashboard/insight results are derived from.</summary>
+    private bool TouchesCachedReads() => ChangeTracker.Entries().Any(e =>
+        e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+        && e.Entity is Transaction or Account or Category or AccountBalanceSnapshotRecord);
 
     // ── Model building ───────────────────────────────────────────────────────
 
@@ -114,6 +134,15 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new MergedTransactionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new DuplicateDismissalRecordConfiguration());
         modelBuilder.ApplyConfiguration(new OutboxMessageRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ProviderApiCallRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new BackupRunRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEventRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new JobRunRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookReplayRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantRegistryRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AppUserRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AppUserLinkCodeRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SystemSettingRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
@@ -212,6 +241,7 @@ public sealed class FlowLedgerDbContext : DbContext
         var (outbox, aggregates) = CollectDomainEvents();
         OutboxMessages.AddRange(outbox);
 
+        var touchesCachedReads = _dataVersion is not null && TouchesCachedReads();
         int result;
         try
         {
@@ -227,6 +257,11 @@ public sealed class FlowLedgerDbContext : DbContext
             }
 
             throw;
+        }
+
+        if (touchesCachedReads)
+        {
+            _dataVersion!.Bump(_tenantContext.TenantId);   // explicit invalidation of the tenant's cached reads (#160)
         }
 
         // Only a committed save consumes the events.

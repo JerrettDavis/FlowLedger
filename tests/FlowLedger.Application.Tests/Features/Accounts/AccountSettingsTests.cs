@@ -2,6 +2,7 @@ using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Accounts;
@@ -13,7 +14,7 @@ public sealed class AccountSettingsTests
 
     private async Task<Account> AddAsync(string name, AccountType type)
     {
-        var a = Account.Create(TenantId.From(_tenant.TenantId), name, type, new Money(10m, Currency.Usd));
+        var a = AccountBuilder.A().ForTenant(_tenant.TenantId).Named(name).OfType(type).Holding(10m).Build();
         await _repo.AddAsync(a);
         return a;
     }

@@ -10,7 +10,7 @@ internal static class GoalEndpoints
 {
     internal sealed record GoalStatus(
         Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete,
-        DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete);
+        DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0);
 
     internal static IEndpointRouteBuilder MapGoalEndpoints(this IEndpointRouteBuilder app)
     {
@@ -24,15 +24,23 @@ internal static class GoalEndpoints
                 var remaining = Math.Max(0, g.TargetAmount - g.SavedAmount);
                 return new GoalStatus(g.Id, g.Name, g.TargetAmount, g.SavedAmount, remaining,
                     (double)Math.Min(100m, g.SavedAmount / g.TargetAmount * 100m), g.TargetDate,
-                    GoalMath.MonthlyNeeded(remaining, g.TargetDate, today), remaining == 0);
+                    GoalMath.MonthlyNeeded(remaining, g.TargetDate, today), remaining == 0, g.Version);
             }).ToList();
             return Results.Ok(goals);
         })
         .WithName("ListGoals")
         .WithSummary("Savings goals with progress");
 
-        group.MapPut("/", async ([FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapPut("/", async (
+            [FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, IGoalStore store, ITenantContext tenant,
+            HttpRequest httpRequest, HttpResponse response, CancellationToken ct) =>
         {
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("goal");
+            }
+
             var validation = await validator.ValidateAsync(r, ct);
             if (!validation.IsValid)
             {
@@ -41,8 +49,8 @@ internal static class GoalEndpoints
 
             try
             {
-                var id = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, ct);
-                return Results.Ok(new { id });
+                var (id, version) = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, expected, ct);
+                return RowVersioning.Ok(response, new { id, version }, version);
             }
             catch (InvalidOperationException ex)
             {
@@ -53,9 +61,15 @@ internal static class GoalEndpoints
         .WithSummary("Create or update a savings goal")
         .RequireRateLimiting("write");
 
-        group.MapDelete("/{id:guid}", async (Guid id, IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, IGoalStore store, ITenantContext tenant, HttpRequest httpRequest, CancellationToken ct) =>
         {
-            await store.RemoveAsync(tenant.TenantId, id, ct);
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("goal");
+            }
+
+            await store.RemoveAsync(tenant.TenantId, id, expected, ct);
             return Results.NoContent();
         })
         .WithName("DeleteGoal")

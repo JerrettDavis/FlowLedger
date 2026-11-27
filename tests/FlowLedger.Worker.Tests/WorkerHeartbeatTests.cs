@@ -62,10 +62,7 @@ public sealed class WorkerHeartbeatTests
         try
         {
             await host.StartAsync();
-            for (var i = 0; i < 50 && !File.Exists(path); i++)
-            {
-                await Task.Delay(100);
-            }
+            await Eventually.WaitAsync(() => File.Exists(path), "the heartbeat file is written", TimeSpan.FromSeconds(15));
 
             WorkerHeartbeat.IsHealthy(path, WorkerHeartbeat.MaxAge, DateTimeOffset.UtcNow).Should().BeTrue();
         }

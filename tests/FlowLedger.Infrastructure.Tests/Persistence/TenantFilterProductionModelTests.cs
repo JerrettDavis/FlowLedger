@@ -73,7 +73,8 @@ public sealed class TenantFilterProductionModelTests : IAsyncLifetime
         {
             await using var ctx = _fixture.CreateProductionStyleContext(tenant);
             var unfiltered = ctx.Model.GetEntityTypes()
-                .Where(e => !e.IsOwned() && e.BaseType is null && e.GetDeclaredQueryFilters().Count == 0)
+                .Where(e => !e.IsOwned() && e.BaseType is null && e.GetDeclaredQueryFilters().Count == 0
+                    && !FlowLedger.Infrastructure.Persistence.HostWideEntities.Tables.ContainsKey(e.GetTableName() ?? string.Empty))
                 .Select(e => e.ClrType.Name)
                 .ToList();
             Assert.True(unfiltered.Count == 0, $"Entity types without a tenant query filter: {string.Join(", ", unfiltered)}");

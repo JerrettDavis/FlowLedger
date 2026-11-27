@@ -4,7 +4,7 @@ namespace FlowLedger.Worker.Jobs;
 /// Configures the Quartz-scheduled sync job.
 /// Bind from the "ScheduledSync" configuration section.
 /// </summary>
-public sealed class JobScheduleOptions
+internal sealed class JobScheduleOptions
 {
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "ScheduledSync";

@@ -15,7 +15,7 @@ public sealed class HostLayerDependencyTests
     /// </summary>
     private static readonly HashSet<string> EndpointInfrastructureAllowlist = new(StringComparer.Ordinal)
     {
-        // Backup health/run, export/import zip: BackupRunner, BackupRunStore, BackupSettings, SnapshotImport, NpgsqlProviderCallLedger.
+        // Backup health/run, export/import zip: BackupRunner, BackupRunStore, BackupSettings, SnapshotImport, ProviderCallLedger.
         "FlowLedger.Api.Endpoints.DataEndpoints",
         // Verified data environment: DataEnvironmentState / DataEnvironment.
         "FlowLedger.Api.Endpoints.EnvironmentEndpoints",

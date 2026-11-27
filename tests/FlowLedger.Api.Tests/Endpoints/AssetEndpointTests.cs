@@ -64,11 +64,11 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         var a = await Create(NewAsset());
 
         var resp = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(1500m, DateOnly.FromDateTime(DateTime.UtcNow), "Appraiser", "Insurance appraisal"));
+            new RecordValuationRequest(1500m, factory.ServerToday, "Appraiser", "Insurance appraisal"));
         resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
 
         var third = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(1400m, DateOnly.FromDateTime(DateTime.UtcNow), null, null));
+            new RecordValuationRequest(1400m, factory.ServerToday, null, null));
         third.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var reread = await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}");
@@ -164,7 +164,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Valuations_from_different_sources_within_window_are_blended_and_outside_window_latest_wins()
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         var a = await Create(NewAsset(value: 1000m, valuedOn: today));
 
         // Different source, same window: average of 1000 (Manual) and 2000 (Appraiser).
@@ -293,7 +293,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     {
         // Created in 2024 with a 20% declining model → the model feed must lower the value.
         var a = await Create(NewAsset(value: 1000m, method: "DecliningBalance", rate: 0.2m,
-            valuedOn: DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-1)));
+            valuedOn: factory.ServerToday.AddYears(-1)));
 
         var resp = await _client.PostAsync($"/api/assets/{a.Id}/refresh", null);
         resp.StatusCode.Should().Be(HttpStatusCode.OK);

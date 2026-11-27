@@ -14,14 +14,9 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class ForecastTests : E2ETestBase
 {
-    [Fact(DisplayName = "Forecasts: page title contains 'Forecasts'")]
+    [E2EFact(DisplayName = "Forecasts: page title contains 'Forecasts'")]
     public async Task Forecasts_PageTitleContainsForecasts()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -30,14 +25,9 @@ public class ForecastTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Forecasts: main heading is visible")]
+    [E2EFact(DisplayName = "Forecasts: main heading is visible")]
     public async Task Forecasts_MainHeadingIsVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -47,14 +37,9 @@ public class ForecastTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Forecasts: 'Run Forecast' button is present")]
+    [E2EFact(DisplayName = "Forecasts: 'Run Forecast' button is present")]
     public async Task Forecasts_RunForecastButtonIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -72,14 +57,9 @@ public class ForecastTests : E2ETestBase
     /// silently fails (returns a non-JSON response, 500, or empty series).  After seeding,
     /// the chart must render.
     /// </summary>
-    [Fact(DisplayName = "Forecasts: aggregate SVG chart renders (no-data fallback is a failure)")]
+    [E2EFact(DisplayName = "Forecasts: aggregate SVG chart renders (no-data fallback is a failure)")]
     public async Task Forecasts_AggregateSvgChartRendersWithData()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -102,14 +82,9 @@ public class ForecastTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Forecasts: nav link is present")]
+    [E2EFact(DisplayName = "Forecasts: nav link is present")]
     public async Task Forecasts_NavLinkIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/forecasts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
