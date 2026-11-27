@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read        # dorny/test-reporter (its documented permission set)
       checks: write        # dorny/test-reporter publishes a check run
       pull-requests: write # sticky coverage comment
     env:

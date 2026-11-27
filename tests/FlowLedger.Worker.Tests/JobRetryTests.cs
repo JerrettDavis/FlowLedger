@@ -1,3 +1,4 @@
+using FlowLedger.TestSupport;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,7 +98,10 @@ public sealed class JobRetryTests
             // The scheduler logs "will not be retried" exactly when it declines to schedule another attempt, so that is the completion
             // signal: no polling, and it cannot pass early (a fourth run would have to be scheduled before this line is logged).
             await exhausted.Task.WaitAsync(TimeSpan.FromSeconds(15));
-            (await scheduler.GetTriggersOfJob(new JobKey("ScheduledBackupJob", "FlowLedger"))).Should().BeEmpty("no retry trigger may be left after exhaustion");
+            // The finished third run's own one-shot trigger is removed only after its listeners return, so wait for the job to have no
+            // trigger left; a retry scheduled after exhaustion would keep one and this would time out.
+            var key = new JobKey("ScheduledBackupJob", "FlowLedger");
+            await Eventually.WaitAsync(async () => (await scheduler.GetTriggersOfJob(key)).Count == 0, "no retry trigger may be left after exhaustion", TimeSpan.FromSeconds(15));
             FailingJob.Runs.Should().Be(3);
             FailingJob.Attempts.Should().Equal(1, 2, 3);
             host.Services.GetRequiredService<JobRunHistory>().Recent().Should().HaveCount(3).And.OnlyContain(r => !r.Success);
