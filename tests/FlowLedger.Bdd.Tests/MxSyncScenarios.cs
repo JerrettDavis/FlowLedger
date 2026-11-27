@@ -22,7 +22,7 @@ public partial class MxSyncScenarios : TinyBddXunitBase
     public MxSyncScenarios(BddTestFixture fixture, ITestOutputHelper output) : base(output)
         => _fixture = fixture;
 
-    private static IReadOnlyDictionary<string, string?> MxConfig(string baseUrl, Guid householdTenant) =>
+    private static Dictionary<string, string?> MxConfig(string baseUrl, Guid householdTenant) =>
         new Dictionary<string, string?>
         {
             ["Tenancy:LegacyTenantId"] = householdTenant.ToString(), // configured provider credentials belong to the household tenant only
