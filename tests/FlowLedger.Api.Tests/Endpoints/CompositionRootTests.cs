@@ -23,10 +23,10 @@ public sealed class CompositionRootTests(FlowLedgerApiFactory factory)
     }
 
     [Fact]
-    public void Every_public_Handler_in_Application_is_registered()
+    public void Every_Handler_in_Application_is_registered()
     {
-        var handlers = typeof(FlowLedger.Application.DependencyInjection).Assembly.GetExportedTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false } && t.Name.EndsWith("Handler", StringComparison.Ordinal))
+        var handlers = typeof(FlowLedger.Application.DependencyInjection).Assembly.GetTypes() // handlers are internal (#121): the scan must see them too
+            .Where(t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false, IsNested: false } && t.Name.EndsWith("Handler", StringComparison.Ordinal))
             .ToList();
         handlers.Should().NotBeEmpty();
 
