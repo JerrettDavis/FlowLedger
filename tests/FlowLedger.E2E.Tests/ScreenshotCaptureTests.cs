@@ -65,11 +65,9 @@ public class ScreenshotCaptureTests : E2ETestBase
 
     // ── Screenshot tests ──────────────────────────────────────────────────────
 
-    [Fact(DisplayName = "Screenshots: seed data then capture all key pages (light + dark)")]
+    [E2EFact(DisplayName = "Screenshots: seed data then capture all key pages (light + dark)")]
     public async Task Capture_all_key_pages()
     {
-        if (ShouldSkip) { return; }
-
         var outputDir = ResolveOutputDir();
         Directory.CreateDirectory(outputDir);
 

@@ -52,7 +52,7 @@ jobs:
       - name: Run unit tests
         run: >
           dotnet test --no-build --configuration Release
-          --filter "Category!=E2E&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests"
+          --filter "Category!=E2E&Category!=A11y&Category!=Screenshots&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests"
           --logger "trx"
           --collect:"XPlat Code Coverage"
           --settings coverlet.runsettings
@@ -117,7 +117,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate             --jq '.[] | select(.body | startswith("<!-- flowledger-coverage-delta -->")) | .id' | head -n 1)
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq'.[] | select(.body | startswith("<!-- flowledger-coverage-delta -->")) | .id' | head -n 1)
           if [ -n "$id" ]; then
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@artifacts/coverage-comment.md
           else

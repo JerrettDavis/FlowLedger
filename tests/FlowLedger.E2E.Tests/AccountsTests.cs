@@ -11,14 +11,9 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class AccountsTests : E2ETestBase
 {
-    [Fact(DisplayName = "Accounts: page title contains 'Accounts'")]
+    [E2EFact(DisplayName = "Accounts: page title contains 'Accounts'")]
     public async Task Accounts_PageTitleContainsAccounts()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -27,14 +22,9 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: main heading is visible")]
+    [E2EFact(DisplayName = "Accounts: main heading is visible")]
     public async Task Accounts_MainHeadingIsVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -44,14 +34,9 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: 'Add Account' button is present")]
+    [E2EFact(DisplayName = "Accounts: 'Add Account' button is present")]
     public async Task Accounts_AddAccountButtonIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -62,14 +47,9 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: account list is rendered")]
+    [E2EFact(DisplayName = "Accounts: account list is rendered")]
     public async Task Accounts_DataGridIsRendered()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -78,14 +58,9 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: nav link is present")]
+    [E2EFact(DisplayName = "Accounts: nav link is present")]
     public async Task Accounts_NavLinkIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -94,14 +69,9 @@ public class AccountsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Accounts: clicking Add Account opens Create Account dialog")]
+    [E2EFact(DisplayName = "Accounts: clicking Add Account opens Create Account dialog")]
     public async Task Accounts_ClickingAddAccountOpensDialog()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();

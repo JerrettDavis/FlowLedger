@@ -11,14 +11,9 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public class TransactionsTests : E2ETestBase
 {
-    [Fact(DisplayName = "Transactions: page title contains 'Transactions'")]
+    [E2EFact(DisplayName = "Transactions: page title contains 'Transactions'")]
     public async Task Transactions_PageTitleContainsTransactions()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -27,14 +22,9 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Transactions: main heading is visible")]
+    [E2EFact(DisplayName = "Transactions: main heading is visible")]
     public async Task Transactions_MainHeadingIsVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -44,14 +34,9 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Transactions: data grid is rendered")]
+    [E2EFact(DisplayName = "Transactions: data grid is rendered")]
     public async Task Transactions_DataGridIsRendered()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -62,14 +47,9 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Transactions: seeded transaction rows are visible")]
+    [E2EFact(DisplayName = "Transactions: seeded transaction rows are visible")]
     public async Task Transactions_SeededRowsAreVisible()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -89,14 +69,9 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Transactions: filter bar is present")]
+    [E2EFact(DisplayName = "Transactions: filter bar is present")]
     public async Task Transactions_FilterBarIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
@@ -107,14 +82,9 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [Fact(DisplayName = "Transactions: nav link is present")]
+    [E2EFact(DisplayName = "Transactions: nav link is present")]
     public async Task Transactions_NavLinkIsPresent()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();

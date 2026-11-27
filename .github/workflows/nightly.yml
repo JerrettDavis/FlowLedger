@@ -33,7 +33,7 @@ jobs:
           status=0
           for i in 1 2 3; do
             dotnet test --no-build --configuration Release \
-              --filter "Category!=E2E&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests" \
+              --filter "Category!=E2E&Category!=A11y&Category!=Screenshots&Category!=Perf&FullyQualifiedName!~ForecastPerformanceTests" \
               --logger "trx" \
               --results-directory "./artifacts/nightly/run-$i" || status=1
           done
@@ -66,7 +66,10 @@ jobs:
         run: |
           status=0
           for i in $(seq 1 10); do
-            dotnet test tests/FlowLedger.Infrastructure.Tests --no-build --configuration Release               --filter "Category!=E2E&Category!=Perf"               --logger "trx"               --results-directory "./artifacts/nightly-infra/run-$i" || status=1
+            dotnet test tests/FlowLedger.Infrastructure.Tests --no-build --configuration Release \
+              --filter "Category!=E2E&Category!=A11y&Category!=Screenshots&Category!=Perf" \
+              --logger "trx" \
+              --results-directory "./artifacts/nightly-infra/run-$i" || status=1
           done
           exit $status
       - name: Fail on unexpected skipped tests
