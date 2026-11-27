@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// Provides a DbContext without a live tenant context so that the EF tools can
 /// inspect the model and generate migrations without needing a running application.
 /// </summary>
-public sealed class FlowLedgerDbContextFactory : IDesignTimeDbContextFactory<FlowLedgerDbContext>
+internal sealed class FlowLedgerDbContextFactory : IDesignTimeDbContextFactory<FlowLedgerDbContext>
 {
     public FlowLedgerDbContext CreateDbContext(string[] args)
     {

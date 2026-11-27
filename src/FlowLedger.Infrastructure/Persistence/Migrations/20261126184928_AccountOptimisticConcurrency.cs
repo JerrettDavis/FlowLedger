@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations;
 /// xmin exists on every row already, so there is nothing to alter; the scaffolded AddColumn would fail
 /// ("column name xmin conflicts with a system column"). This migration only records the model snapshot change.
 /// </summary>
-public partial class AccountOptimisticConcurrency : Migration
+internal partial class AccountOptimisticConcurrency : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

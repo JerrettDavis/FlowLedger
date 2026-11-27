@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FlowLedger.Infrastructure.Persistence.Migrations;
 
 /// <inheritdoc />
-public partial class AddTransactionTagsAndSuggestedName : Migration
+internal partial class AddTransactionTagsAndSuggestedName : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

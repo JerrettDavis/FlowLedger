@@ -19,7 +19,7 @@ internal static class BudgetEndpoints
         .WithSummary("Budgets with this month's spending");
 
         group.MapPut("/", async (
-            [FromBody] SetBudgetRequest request, IValidator<SetBudgetRequest> validator, IBudgetStore store, ITenantContext tenant,
+            [FromBody] SetBudgetRequest request, IValidator<SetBudgetRequest> validator, SetBudgetHandler handler,
             HttpRequest httpRequest, HttpResponse response, CancellationToken ct) =>
         {
             var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
@@ -34,7 +34,7 @@ internal static class BudgetEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var version = await store.SetAsync(tenant.TenantId, request.Category.Trim(), request.MonthlyLimit, expected, ct);
+            var version = await handler.HandleAsync(request.Category.Trim(), request.MonthlyLimit, expected, ct);
             response.Headers.ETag = $"\"{version}\"";
             return Results.NoContent();
         })

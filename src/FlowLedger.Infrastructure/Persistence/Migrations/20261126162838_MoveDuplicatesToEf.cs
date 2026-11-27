@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FlowLedger.Infrastructure.Persistence.Migrations;
 
 /// <inheritdoc />
-public partial class MoveDuplicatesToEf : Migration
+internal partial class MoveDuplicatesToEf : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

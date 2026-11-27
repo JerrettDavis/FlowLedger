@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations;
 /// <inheritdoc />
 [DbContext(typeof(FlowLedgerDbContext))]
 [Migration("20261119030000_AddAccountModeAndHiddenTransactions")]
-public partial class AddAccountModeAndHiddenTransactions : Migration
+internal partial class AddAccountModeAndHiddenTransactions : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

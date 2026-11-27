@@ -22,7 +22,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations;
 ///
 /// The constraints are deliberately DB-only (not in the EF model), so the model snapshot is unchanged.
 /// </summary>
-public partial class AddCompositeTenantForeignKeys : Migration
+internal partial class AddCompositeTenantForeignKeys : Migration
 {
     private sealed record Fk(string Name, string Child, string Column, string Parent, string OnDelete = null);
 

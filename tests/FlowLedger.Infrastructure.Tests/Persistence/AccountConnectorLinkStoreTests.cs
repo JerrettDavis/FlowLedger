@@ -34,7 +34,7 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
 
         // Re-link account a to another connector: replaces its previous link.
         (await store.LinkAsync(a, "MX", "ACT-9")).Should().BeTrue();
-        (await store.FindByAccountAsync(a))!.ConnectorId.Should().Be("MX");
+        (await store.FindByAccountAsync(a))!.ConnectorId.Value.Should().Be("MX");
         (await store.FindByProviderAccountAsync("SimpleFIN", "ACT-1")).Should().BeNull();
         (await store.ListAsync()).Should().HaveCount(2);
     }
@@ -48,7 +48,7 @@ public sealed class AccountConnectorLinkStoreTests : IAsyncLifetime
         var a = (await _fixture.SeedAccountAsync(tenant)).Value;
 
         await store.PinManualAsync(a);
-        (await store.FindByAccountAsync(a))!.ConnectorId.Should().Be(AccountConnectorLinks.Manual);
+        (await store.FindByAccountAsync(a))!.ConnectorId.Value.Should().Be(AccountConnectorLinks.Manual);
         (await other.FindByAccountAsync(a)).Should().BeNull("links are per tenant");
         (await other.ListAsync()).Should().BeEmpty();
         (await other.UnlinkAsync(a)).Should().BeFalse("another tenant's unlink must not touch this tenant's link");

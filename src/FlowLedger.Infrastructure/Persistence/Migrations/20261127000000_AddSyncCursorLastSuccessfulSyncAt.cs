@@ -12,7 +12,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations;
 /// </summary>
 [DbContext(typeof(FlowLedgerDbContext))]
 [Migration("20261127000000_AddSyncCursorLastSuccessfulSyncAt")]
-public partial class AddSyncCursorLastSuccessfulSyncAt : Migration
+internal partial class AddSyncCursorLastSuccessfulSyncAt : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

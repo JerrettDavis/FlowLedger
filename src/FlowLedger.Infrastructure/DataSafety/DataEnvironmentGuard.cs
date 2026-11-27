@@ -34,7 +34,7 @@ public sealed class DataEnvironmentState
 ///  - marker and expected both non-prod           -> allowed (demo/sandbox are interchangeable); marker follows expected.
 /// The table is created here (IF NOT EXISTS), so no EF migration is involved.
 /// </summary>
-public static class DataEnvironmentGuard
+internal static class DataEnvironmentGuard
 {
     public const string SettingKey = "data_environment";
 

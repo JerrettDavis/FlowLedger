@@ -137,7 +137,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
 
         // The first connector claims the account; the second finds it linked elsewhere and skips it.
         result.AccountsUpserted.Should().Be(1);
-        (await sut.Links.ListAsync()).Should().ContainSingle().Which.ConnectorId.Should().Be("SimpleFIN");
+        (await sut.Links.ListAsync()).Should().ContainSingle().Which.ConnectorId.Value.Should().Be("SimpleFIN");
         (await _fixture.CreateDbContext(tenant).Accounts.CountAsync()).Should().Be(1);
     }
 
@@ -152,7 +152,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
 
         await sut.Service.SyncAsync();
 
-        (await sut.Links.FindByAccountAsync(legacy.Id))!.ConnectorId.Should().Be("SimpleFIN");
+        (await sut.Links.FindByAccountAsync(legacy.Id))!.ConnectorId.Value.Should().Be("SimpleFIN");
         (await _fixture.CreateDbContext(tenant).Accounts.CountAsync()).Should().Be(1, "the existing account is reused, not duplicated");
     }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using FlowLedger.Application.Abstractions;
 using FlowLedger.SharedKernel;
 using FluentValidation;
 
@@ -40,5 +41,26 @@ public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCate
         }).ToList();
 
         return new BudgetOverview((month ?? DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)).ToString("yyyy-MM", CultureInfo.InvariantCulture), rows, spentByCategory);
+    }
+}
+
+/// <summary>The per-tenant budget quota: a business limit, so it lives here and not in the store (#121).</summary>
+public static class BudgetLimits
+{
+    public const int MaxBudgets = 500;
+}
+
+/// <summary>Creates or updates one budget, refusing a new one past <see cref="BudgetLimits.MaxBudgets"/>; updating an existing one is always allowed.</summary>
+public sealed class SetBudgetHandler(IBudgetStore store, ITenantContext tenant)
+{
+    public async Task<uint> HandleAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default)
+    {
+        var existing = await store.ListAsync(tenant.TenantId, ct);
+        if (existing.Count >= BudgetLimits.MaxBudgets && !existing.Any(b => string.Equals(b.Category, category, StringComparison.Ordinal)))
+        {
+            throw new RequestValidationException("budget", $"You can have at most {BudgetLimits.MaxBudgets} budgets. Remove one before adding another.");
+        }
+
+        return await store.SetAsync(tenant.TenantId, category, monthlyLimit, expectedVersion, ct);
     }
 }

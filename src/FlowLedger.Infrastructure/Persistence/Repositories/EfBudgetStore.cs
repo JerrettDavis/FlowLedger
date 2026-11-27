@@ -12,8 +12,6 @@ namespace FlowLedger.Infrastructure.Persistence.Repositories;
 /// </summary>
 internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenant) : IBudgetStore
 {
-    public const int MaxBudgets = 500;
-
     private void Guard(Guid tenantId)
     {
         if (tenantId != tenant.TenantId)
@@ -38,11 +36,6 @@ internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenan
             if (expectedVersion is not null)
             {
                 throw new ConcurrencyConflictException("This budget was removed elsewhere. Reload it and try again.");
-            }
-
-            if (await db.Budgets.CountAsync(ct) >= MaxBudgets)
-            {
-                throw new RequestValidationException("budget", $"You can have at most {MaxBudgets} budgets. Remove one before adding another.");
             }
 
             existing = BudgetRecord.Create(tenantId, category, monthlyLimit);

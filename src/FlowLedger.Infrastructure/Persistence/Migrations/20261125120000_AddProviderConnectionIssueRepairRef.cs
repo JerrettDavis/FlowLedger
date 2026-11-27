@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations;
 /// <inheritdoc />
 [DbContext(typeof(FlowLedgerDbContext))]
 [Migration("20261125120000_AddProviderConnectionIssueRepairRef")]
-public partial class AddProviderConnectionIssueRepairRef : Migration
+internal partial class AddProviderConnectionIssueRepairRef : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
