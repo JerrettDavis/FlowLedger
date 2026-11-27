@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -117,6 +118,7 @@ internal enum HouseholdTenantOutcome
     NotApplicable,
 }
 
+[StructLayout(LayoutKind.Auto)]
 internal readonly record struct HouseholdTenantResult(HouseholdTenantOutcome Outcome, Guid? TenantId);
 
 /// <summary>Lowest-effort bridge from the stored id to the synchronous <see cref="IConfiguration"/> readers: a provider added last whose only key is <c>Tenancy:LegacyTenantId</c>.</summary>

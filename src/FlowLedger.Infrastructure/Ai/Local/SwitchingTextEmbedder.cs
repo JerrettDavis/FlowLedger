@@ -17,7 +17,7 @@ internal sealed partial class SwitchingTextEmbedder : ITextEmbedder, ILocalAiRun
     private readonly LocalModelManager _models;
     private readonly ILogger<SwitchingTextEmbedder> _logger;
     private readonly CachingTextEmbedder _hashing = new(new HashingTextEmbedder());
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private CachingTextEmbedder? _onnx;
     private OnnxTextEmbedder? _onnxRaw;
     private string? _loadedId;

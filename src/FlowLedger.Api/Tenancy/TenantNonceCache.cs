@@ -16,7 +16,7 @@ public sealed class TenantNonceCache(TimeProvider clock, int maxEntries = Tenant
     public static readonly TimeSpan Ttl = (TenantAssertion.MaxAge * 2) + TimeSpan.FromSeconds(5);
 
     private readonly ConcurrentDictionary<string, long> _seen = new(StringComparer.Ordinal);
-    private readonly object _purgeGate = new();
+    private readonly Lock _purgeGate = new();
 
     public int MaxEntries { get; } = maxEntries;
 

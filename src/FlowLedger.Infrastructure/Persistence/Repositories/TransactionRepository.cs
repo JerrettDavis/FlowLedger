@@ -146,11 +146,11 @@ internal sealed class TransactionRepository : ITransactionRepository
         {
             var term = search.Trim().ToLowerInvariant();
             // ToLower() on the column is deliberate: EF translates it to SQL lower(); string.Contains(string, StringComparison) is not translatable.
-#pragma warning disable CA1304, CA1311, CA1862
+#pragma warning disable CA1304, CA1311, CA1862, MA0011
             query = query.Where(t => t.Description.ToLower().Contains(term)
                 || (t.MerchantName != null && t.MerchantName.ToLower().Contains(term))
                 || (t.Notes != null && t.Notes.ToLower().Contains(term)));
-#pragma warning restore CA1304, CA1311, CA1862
+#pragma warning restore CA1304, CA1311, CA1862, MA0011
         }
 
         return query;

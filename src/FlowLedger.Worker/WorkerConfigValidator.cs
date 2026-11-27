@@ -1,3 +1,4 @@
+using System.Globalization;
 using Quartz;
 
 namespace FlowLedger.Worker;
@@ -61,13 +62,13 @@ internal static class WorkerConfigValidator
 
         foreach (var key in new[] { "Worker:JobRetry:MaxAttempts", "Worker:JobRetry:BaseDelaySeconds", "Worker:JobRetry:MaxDelaySeconds" })
         {
-            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, out var v) || v < 1))
+            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, CultureInfo.InvariantCulture, out var v) || v < 1))
             {
                 errors.Add($"{key} must be a positive integer but is '{raw}'.");
             }
         }
 
-        if (config["Backup:KeepLocalSnapshots"] is { Length: > 0 } keep && (!int.TryParse(keep, out var n) || n < 1))
+        if (config["Backup:KeepLocalSnapshots"] is { Length: > 0 } keep && (!int.TryParse(keep, CultureInfo.InvariantCulture, out var n) || n < 1))
         {
             errors.Add($"Backup:KeepLocalSnapshots must be a positive integer but is '{keep}'.");
         }
@@ -75,7 +76,7 @@ internal static class WorkerConfigValidator
         foreach (var key in new[] { "Backup:Retention:KeepLocalSnapshots", "Backup:Retention:PremigrateMaxAgeDays", "Backup:Retention:ResticKeepDaily", "Backup:Retention:ResticKeepWeekly", "Backup:Retention:ResticKeepMonthly" })
         {
             var minimum = key.EndsWith("KeepLocalSnapshots", StringComparison.Ordinal) ? 1 : 0;
-            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, out var v) || v < minimum))
+            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, CultureInfo.InvariantCulture, out var v) || v < minimum))
             {
                 errors.Add($"{key} must be {(minimum == 1 ? "a positive" : "a non-negative")} integer but is '{raw}'.");
             }

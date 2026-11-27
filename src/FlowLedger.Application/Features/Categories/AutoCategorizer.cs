@@ -15,7 +15,7 @@ internal static class AutoCategorizer
     private sealed record Rule(string Path, Regex Pattern, string? Direction = null);
 
     private static Rule R(string path, string words, string? direction = null) =>
-        new(path, new Regex("(?:" + words + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant), direction);
+        new(path, new Regex("(?:" + words + ")", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)), direction);
 
     // Patterns are regex fragments in verbatim strings. Short or ambiguous words carry explicit word boundaries;
     // long distinctive stems (e.g. "fuel") deliberately match inside compound names such as "QuickFuel".

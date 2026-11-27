@@ -33,7 +33,7 @@ internal sealed partial class LocalModelManager(
     private static bool IsAllowed(Uri uri) =>
         uri.Scheme == Uri.UriSchemeHttps && AllowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase);
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private LocalAiDownload? _download;
     private bool _running;
     private Task _completion = Task.CompletedTask;
@@ -188,9 +188,9 @@ internal sealed partial class LocalModelManager(
             // Range request (#130). Only a file that can never become valid is deleted (checksum mismatch, oversize, rejected range).
             await FetchToPartialAsync(model, file, alreadyDone, uri, tmp, idle, cts);
         }
-        catch (OperationCanceledException) when (!shutdown.IsCancellationRequested && cts.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!shutdown.IsCancellationRequested && cts.IsCancellationRequested)
         {
-            throw new TimeoutException($"Download of {file.Name} stalled: no data for {idle.TotalSeconds:0.#}s.");
+            throw new TimeoutException($"Download of {file.Name} stalled: no data for {idle.TotalSeconds:0.#}s.", ex);
         }
     }
 

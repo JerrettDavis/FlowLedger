@@ -10,7 +10,7 @@ public sealed class AskConcurrencyGate(int maxPerTenant = AskConcurrencyGate.Def
 {
     public const int DefaultMaxPerTenant = 2;
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly Dictionary<Guid, int> _inFlight = [];
 
     /// <summary>Number of tenants with at least one request in flight (for tests and diagnostics).</summary>

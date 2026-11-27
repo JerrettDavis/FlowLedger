@@ -127,6 +127,6 @@ internal sealed partial class FinancialSyncService
             return "UNKNOWN";
         }
         // Collapse whitespace, trim, uppercase for stable fingerprinting
-        return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ").ToUpperInvariant();
+        return System.Text.RegularExpressions.Regex.Replace(raw.Trim(), @"\s+", " ", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)).ToUpperInvariant();
     }
 }

@@ -155,7 +155,7 @@ internal sealed class HomeAssistantService(
         return p;
     }
 
-    public async Task<IReadOnlyList<HaEvent>> DetectAsync(DateOnly today, HomeAssistantSettings settings, CancellationToken ct)
+    public async Task<IReadOnlyList<HaEvent>> DetectAsync(DateOnly today, HomeAssistantSettings settings, CancellationToken ct = default)
     {
         var accountList = await accounts.ListAsync(ct); // active accounts only
         var flowList = (await flows.ListAsync(ct)).Where(f => f.IsActive).ToList();

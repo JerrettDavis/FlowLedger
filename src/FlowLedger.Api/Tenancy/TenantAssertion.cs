@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -37,7 +38,7 @@ public static class TenantAssertion
         }
 
         var dot = header.IndexOf('.');
-        if (dot <= 0 || !long.TryParse(header.AsSpan(0, dot), out var ts) || !WithinWindow(ts, now))
+        if (dot <= 0 || !long.TryParse(header.AsSpan(0, dot), CultureInfo.InvariantCulture, out var ts) || !WithinWindow(ts, now))
         {
             return false;
         }
@@ -65,7 +66,7 @@ public static class TenantAssertion
         }
 
         var parts = header[V2Prefix.Length..].Split('.');
-        if (parts.Length != 3 || !long.TryParse(parts[0], out var ts) || !WithinWindow(ts, now) || parts[1].Length is < 8 or > 64)
+        if (parts.Length != 3 || !long.TryParse(parts[0], CultureInfo.InvariantCulture, out var ts) || !WithinWindow(ts, now) || parts[1].Length is < 8 or > 64)
         {
             return false;
         }

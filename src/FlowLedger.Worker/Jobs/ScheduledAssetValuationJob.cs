@@ -19,7 +19,7 @@ internal sealed partial class ScheduledAssetValuationJob(
     IConfiguration configuration,
     ILogger<ScheduledAssetValuationJob> logger) : IJob
 {
-    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken = default)
         => FlowLedger.Worker.Scheduling.JobTrace.RunAsync(context, logger, ct => ExecuteCoreAsync(context, ct), cancellationToken);
 
     private async ValueTask ExecuteCoreAsync(IJobExecutionContext context, CancellationToken cancellationToken)

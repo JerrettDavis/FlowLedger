@@ -169,8 +169,8 @@ internal static class QueryPrompt
         return sb.ToString().TrimEnd();
     }
 
-    private static readonly Regex Think = new(@"<think>.*?</think>", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex Fence = new(@"```(?:[a-zA-Z]*)\s*\n?(.*?)```", RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex Think = new(@"<think>.*?</think>", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+    private static readonly Regex Fence = new(@"```(?:[a-zA-Z]*)\s*\n?(?<body>.*?)```", RegexOptions.Singleline | RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     /// <summary>Strips reasoning tags, code fences and a leading "Query:" label, leaving just the query text.</summary>
     public static string ExtractQuery(string reply)
@@ -179,10 +179,10 @@ internal static class QueryPrompt
         var fence = Fence.Match(text);
         if (fence.Success)
         {
-            text = fence.Groups[1].Value.Trim();
+            text = fence.Groups["body"].Value.Trim();
         }
 
-        text = Regex.Replace(text, @"^\s*(query|answer)\s*:\s*", string.Empty, RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"^\s*(?:query|answer)\s*:\s*", string.Empty, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         return text.Trim().TrimEnd(';').Trim();
     }
 }

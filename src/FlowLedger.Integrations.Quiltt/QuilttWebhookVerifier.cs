@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using FlowLedger.Integrations.Abstractions;
 
@@ -47,7 +48,7 @@ internal sealed class QuilttWebhookVerifier
             }
         }
 
-        if (t is null || v1.Count == 0 || !long.TryParse(t, out var ts))
+        if (t is null || v1.Count == 0 || !long.TryParse(t, CultureInfo.InvariantCulture, out var ts))
         {
             throw new InvalidWebhookSignatureException("Quiltt webhook signature header is malformed.");
         }

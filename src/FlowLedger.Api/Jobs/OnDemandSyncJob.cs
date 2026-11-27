@@ -67,7 +67,7 @@ public sealed partial class OnDemandSyncJob : IJob
     [LoggerMessage(Level = LogLevel.Error, Message = "OnDemandSyncJob: webhook-triggered sync faulted.")]
     private partial void LogSyncFaulted(Exception ex);
 
-    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken = default)
     {
         var data = context.MergedJobDataMap;
         var memberId = data.ContainsKey(MemberIdKey) ? data.GetString(MemberIdKey) : null;

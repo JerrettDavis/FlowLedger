@@ -29,7 +29,7 @@ public sealed record RestoreDrillResult(
 /// </summary>
 internal static class SnapshotRestoreDrill
 {
-    private static readonly System.Text.RegularExpressions.Regex SafeIdentifier = new("^[A-Za-z_][A-Za-z0-9_]{0,62}$");
+    private static readonly System.Text.RegularExpressions.Regex SafeIdentifier = new("^[A-Za-z_][A-Za-z0-9_]{0,62}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
 
     internal static readonly string[] SkippedTables = ["__EFMigrationsHistory"];
 

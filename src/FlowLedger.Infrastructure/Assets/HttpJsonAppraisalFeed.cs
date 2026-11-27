@@ -111,7 +111,7 @@ internal sealed partial class HttpJsonAppraisalFeed(
         var current = root;
         foreach (var part in path.Split('.', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index)
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, CultureInfo.InvariantCulture, out var index)
                 && index >= 0 && index < current.GetArrayLength())
             {
                 current = current[index];

@@ -63,7 +63,7 @@ internal static class SyncEndpoints
                 }
 
                 var anyReal = connectors.Enabled.Any(c => !c.Traits.HasFlag(ConnectorTraits.SeedsDemoData));
-                var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : (anyReal ? 30 : 0);
+                var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], CultureInfo.InvariantCulture, out var m) ? m : (anyReal ? 30 : 0);
                 return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = primary.ProviderName });
             })
             .WithName("GetSyncStatus")

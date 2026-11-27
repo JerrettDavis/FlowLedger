@@ -256,7 +256,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
             return 0;
         }
 
-        return int.TryParse(cursor.Value, out var idx) ? Math.Max(0, idx) : 0;
+        return int.TryParse(cursor.Value, CultureInfo.InvariantCulture, out var idx) ? Math.Max(0, idx) : 0;
     }
 
     private static TenantId ParseTenantFromMemberId(string memberProviderId)

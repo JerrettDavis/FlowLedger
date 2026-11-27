@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 
 namespace FlowLedger.Infrastructure.DataSafety;
@@ -20,7 +21,7 @@ public sealed record SnapshotFolder(string Path, DateTimeOffset CreatedUtc)
             return new SnapshotFolder(path, new DateTimeOffset(taken, TimeSpan.Zero));
         }
 
-        return new SnapshotFolder(path, Directory.GetCreationTimeUtc(path));
+        return new SnapshotFolder(path, new DateTimeOffset(Directory.GetCreationTimeUtc(path)));
     }
 }
 
@@ -61,9 +62,9 @@ public sealed record BackupRetention(
             NonNegative(c["Backup:Retention:ResticKeepMonthly"]) ?? d.ResticKeepMonthly);
     }
 
-    private static int? Positive(string? raw) => int.TryParse(raw, out var v) && v > 0 ? v : null;
+    private static int? Positive(string? raw) => int.TryParse(raw, CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
 
-    private static int? NonNegative(string? raw) => int.TryParse(raw, out var v) && v >= 0 ? v : null;
+    private static int? NonNegative(string? raw) => int.TryParse(raw, CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : null;
 
     /// <summary>True when off-site expiry is on and at least one keep rule is set (restic refuses a forget with no rule).</summary>
     public bool ResticForgetEnabled => ResticForget && (ResticKeepDaily > 0 || ResticKeepWeekly > 0 || ResticKeepMonthly > 0);

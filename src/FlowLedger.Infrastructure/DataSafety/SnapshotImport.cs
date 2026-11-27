@@ -129,7 +129,7 @@ public static class SnapshotImport
         }
 
         var columns = (await File.ReadLinesAsync(file, ct).FirstAsync(ct)).Split(',').Select(c => c.Trim('"')).ToList();
-        if (!columns.Contains("key") || !columns.Contains("value") || columns.Any(c => !System.Text.RegularExpressions.Regex.IsMatch(c, "^[A-Za-z_][A-Za-z0-9_]{0,62}$")))
+        if (!columns.Contains("key") || !columns.Contains("value") || columns.Any(c => !System.Text.RegularExpressions.Regex.IsMatch(c, "^[A-Za-z_][A-Za-z0-9_]{0,62}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1))))
         {
             return; // an unexpected shape is not worth failing a restore for; the setting stays what the target had
         }

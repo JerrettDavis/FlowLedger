@@ -127,7 +127,7 @@ internal sealed class NaiveBayesCategoryPredictor
         return (total == 0 ? 0 : (double)predicted / total, predicted == 0 ? 0 : (double)correct / predicted);
     }
 
-    private static readonly Regex NonLetters = new(@"[^a-z&+\s]", RegexOptions.Compiled);
+    private static readonly Regex NonLetters = new(@"[^a-z&+\s]", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     private static List<string> Features(string? merchant, string? description, string direction, decimal amount)
     {

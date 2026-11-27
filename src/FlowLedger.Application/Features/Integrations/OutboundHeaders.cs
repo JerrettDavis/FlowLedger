@@ -14,7 +14,7 @@ internal static partial class OutboundHeaders
         IntegrationService.SignatureHeader, IntegrationService.TimestampHeader, IntegrationService.EventHeader, IntegrationService.DeliveryHeader,
     };
 
-    [GeneratedRegex("^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$")]
+    [GeneratedRegex("^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$", RegexOptions.None, 1000)]
     internal static partial Regex HeaderName();
 
     internal static List<KeyValuePair<string, string>> Build(

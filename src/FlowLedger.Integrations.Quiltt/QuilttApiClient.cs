@@ -203,7 +203,7 @@ internal static class QuilttJwt
         Claim(jwt, "profileId") ?? Claim(jwt, "pid") ?? Claim(jwt, "sub");
 
     public static DateTimeOffset? Expiry(string jwt) =>
-        long.TryParse(Claim(jwt, "exp"), out var exp) ? DateTimeOffset.FromUnixTimeSeconds(exp) : null;
+        long.TryParse(Claim(jwt, "exp"), CultureInfo.InvariantCulture, out var exp) ? DateTimeOffset.FromUnixTimeSeconds(exp) : null;
 
     private static string? Claim(string jwt, string name)
     {
