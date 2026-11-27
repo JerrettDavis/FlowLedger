@@ -8,7 +8,8 @@
             American Express, Discover, Apple Card, PayPal, or any bank's CSV, OFX/QFX or QIF file. The format is detected
             automatically. Transactions already in FlowLedger are skipped.
         </MudText>
-        <MudSelect T="Guid" @bind-Value="_accountId" Label="Import into account" Variant="Variant.Outlined" Class="mb-2">
+        <MudSelect T="Guid" @bind-Value="_accountId" Label="Import into account" Variant="Variant.Outlined" Class="mb-2" Placeholder="Choose an account"
+                   ToStringFunc="@(id => id == Guid.Empty ? string.Empty : Accounts.FirstOrDefault(x => x.Id == id)?.Name ?? string.Empty)">
             @foreach (var a in Accounts)
             {
                 <MudSelectItem T="Guid" Value="@a.Id">@a.Name</MudSelectItem>

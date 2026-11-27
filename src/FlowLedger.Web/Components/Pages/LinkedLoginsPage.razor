@@ -23,6 +23,10 @@ else
         <MudSimpleTable Dense="true">
             <thead><tr><th>Login</th><th>Email</th><th class="fl-hide-sm">Last sign-in</th><th></th></tr></thead>
             <tbody>
+            @if (_logins.Count == 0)
+            {
+                <tr><td colspan="4" class="fl-muted">No sign-in is linked yet. This instance is not asking for a login, so there is nothing to list here.</td></tr>
+            }
             @foreach (var l in _logins)
             {
                 <tr>

@@ -58,7 +58,7 @@
         <MudText Typo="Typo.h6" Class="mt-4 mb-2">@title</MudText>
         @if (items.Count == 0 && emptyText is not null)
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary">@emptyText</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@emptyText</MudText>
         }
         <MudGrid>
             @foreach (var r in items)
