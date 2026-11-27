@@ -91,6 +91,6 @@ public sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITrigg
     public async ValueTask TriggerComplete(ITrigger trigger, IJobExecutionContext context, SchedulerInstruction triggerInstructionCode, CancellationToken cancellationToken = default)
         => await exclusion.ExitAsync(context.FireInstanceId);
 
-    public ValueTask TriggerRetriesExhausted(ITrigger trigger, IJobExecutionContext context, JobExecutionException jobException, CancellationToken cancellationToken = default)
+    public ValueTask TriggerRetriesExhausted(ITrigger trigger, IJobExecutionContext context, JobExecutionException exception, CancellationToken cancellationToken = default)
         => ValueTask.CompletedTask;
 }

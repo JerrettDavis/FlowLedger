@@ -33,7 +33,7 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private FinancialSyncService CreateSyncService(
+    private static FinancialSyncService CreateSyncService(
         FlowLedgerDbContext db,
         TestTenantContext tenant)
     {
@@ -334,7 +334,7 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private FinancialSyncService CreateSyncServiceWithLogger(
+    private static FinancialSyncService CreateSyncServiceWithLogger(
         FlowLedgerDbContext db,
         TestTenantContext tenant,
         ILogger<FinancialSyncService> logger)

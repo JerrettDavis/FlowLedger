@@ -659,7 +659,7 @@ public sealed partial class MxFinancialDataProvider : IFinancialDataProvider, IM
     private partial void LogSkippingTransaction(string message);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping MX transaction {ProviderTransactionId}: no usable date.")]
-    private partial void LogSkippingTransactionNoDate(string providerTransactionId);
+    private partial void LogSkippingTransactionNoDate(string? providerTransactionId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message =
         "GetTransactionsAsync: reached MaxPages limit ({MaxPages}); resuming on the next sync.")]
