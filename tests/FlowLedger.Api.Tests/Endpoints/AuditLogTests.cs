@@ -73,6 +73,27 @@ public sealed class AuditLogTests(FlowLedgerApiFactory factory)
         r.GetInt32(1).Should().Be(204);
     }
 
+    [Theory]
+    [InlineData("/api/reports/00000000-0000-0000-0000-000000000001", "report.delete")]
+    [InlineData("/api/sheet/bills/00000000-0000-0000-0000-000000000001", "sheet.row_delete")]
+    [InlineData("/api/category-rules?pattern=AUDIT-NO-SUCH-RULE", "category_rule.delete")]
+    [InlineData("/api/merchant-aliases?pattern=AUDIT-NO-SUCH-ALIAS", "merchant_alias.delete")]
+    public async Task Deleting_a_single_record_is_audited_with_its_target_whatever_the_outcome(string url, string action)
+    {
+        await factory.ResetAsync();
+        using var client = factory.CreateAuthenticatedClient();
+        var before = await CountAsync(action);
+
+        await client.DeleteAsync(url);
+
+        (await CountAsync(action)).Should().Be(before + 1);
+        await using var conn = new NpgsqlConnection(factory.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand("SELECT target FROM audit_events WHERE action = @a ORDER BY id DESC LIMIT 1", conn);
+        cmd.Parameters.AddWithValue("a", action);
+        (await cmd.ExecuteScalarAsync()).Should().Be(url.Split('?')[0], "the path of the deleted record is recorded (the query string is not)");
+    }
+
     [Fact]
     public async Task Key_rotation_is_audited_even_when_it_is_refused()
     {
