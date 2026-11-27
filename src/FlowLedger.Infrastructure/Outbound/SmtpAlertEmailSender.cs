@@ -1,13 +1,15 @@
 using System.Net;
 using System.Net.Mail;
 using FlowLedger.Application.Features.Alerts;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Infrastructure.Outbound;
 
 /// <summary>
-/// Typed view of <c>Alerts:Email:*</c>: the optional SMTP channel for alerts (#70). Off by default. The password belongs in a secret
+/// Typed view of <c>Alerts:Email:*</c>: the optional SMTP channel for alerts (#70). Off by default, and household-only (one host-wide
+/// recipient must not receive other tenants' alerts). The password belongs in a secret
 /// (an environment variable, <c>dotnet user-secrets</c> or a mounted config file), never in a committed appsettings file.
 /// </summary>
 internal sealed class AlertEmailOptions
@@ -88,13 +90,14 @@ internal sealed class AlertEmailOptionsValidator : IValidateOptions<AlertEmailOp
 /// Sends alert emails over SMTP. Failures are reduced to a short safe summary: no credentials, addresses or server replies are returned
 /// or logged.
 /// </summary>
-internal sealed partial class SmtpAlertEmailSender(IOptions<AlertEmailOptions> options, ILogger<SmtpAlertEmailSender> logger) : IAlertEmailSender
+internal sealed partial class SmtpAlertEmailSender(IOptions<AlertEmailOptions> options, IConfiguration configuration, ILogger<SmtpAlertEmailSender> logger) : IAlertEmailSender
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     private readonly AlertEmailOptions _options = options.Value;
 
-    public bool IsEnabled => _options.Enabled;
+    /// <summary>The recipient is one host-wide address, so only the household tenant's alerts may go to it (INV-01).</summary>
+    public bool IsEnabledFor(Guid tenantId) => _options.Enabled && tenantId == TenancySettings.Legacy(configuration).LegacyTenantId;
 
     public async Task<string?> SendAsync(AlertEmail email, CancellationToken ct = default)
     {

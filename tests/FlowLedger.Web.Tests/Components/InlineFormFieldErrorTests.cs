@@ -46,9 +46,10 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task Budget_limit_error_from_the_api_is_marked_on_the_limit_field_and_the_typed_values_stay()
+    public async Task Budget_error_from_the_api_is_marked_at_form_level_and_the_typed_values_stay()
     {
-        Arrange("""{"monthlyLimit":["The limit must be positive."]}""");
+        // The API validates the budget as one rule and reports it under "budget": the form shows the message and flags the category.
+        Arrange("""{"budget":["A category and a non-negative limit are required."]}""");
         var cut = Render<BudgetsPage>();
         cut.WaitForAssertion(() => cut.FindAll("button[aria-label='Edit budget for Food']").Should().HaveCount(1));
         await cut.Find("button[aria-label='Edit budget for Food']").ClickAsync(new());
@@ -57,25 +58,24 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() =>
         {
-            cut.Markup.Should().Contain("The limit must be positive.").And.Contain("Fix the highlighted fields");
-            cut.Find("input[aria-label='Monthly limit']").GetAttribute("aria-invalid").Should().Be("true");
+            cut.Markup.Should().Contain("A category and a non-negative limit are required.").And.Contain("Fix the highlighted fields");
             cut.Find("input[aria-label='Monthly limit']").GetAttribute("value").Should().StartWith("100");
         });
     }
 
     [Fact]
-    public async Task Editing_the_budget_limit_clears_its_server_error()
+    public async Task Editing_the_budget_limit_clears_the_server_error()
     {
-        Arrange("""{"monthlyLimit":["The limit must be positive."]}""");
+        Arrange("""{"budget":["A category and a non-negative limit are required."]}""");
         var cut = Render<BudgetsPage>();
         cut.WaitForAssertion(() => cut.FindAll("button[aria-label='Edit budget for Food']").Should().HaveCount(1));
         await cut.Find("button[aria-label='Edit budget for Food']").ClickAsync(new());
         await cut.FindAll("button").Single(b => b.TextContent.Contains("Save budget", StringComparison.Ordinal)).ClickAsync(new());
-        cut.WaitForAssertion(() => cut.Markup.Should().Contain("The limit must be positive."));
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("A category and a non-negative limit are required."));
 
         cut.Find("input[aria-label='Monthly limit']").Change("120");
 
-        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("The limit must be positive."));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("A category and a non-negative limit are required."));
     }
 
     [Fact]

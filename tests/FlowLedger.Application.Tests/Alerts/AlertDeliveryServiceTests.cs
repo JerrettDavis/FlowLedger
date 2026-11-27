@@ -87,9 +87,9 @@ public sealed class AlertDeliveryServiceTests
     private static readonly HaEvent PriceUp = new(HaEventKinds.PriceIncrease, "warning", "Price increase", "Streamly Video went up.", "price_increase:abc", "Streamly Video", new DateOnly(2026, 11, 19));
     private static readonly HaEvent Large = new(HaEventKinds.LargeCharge, "warning", "Large charge", "A large charge landed.", "large_charge:def");
 
-    private sealed class FakeEmailSender(bool enabled) : IAlertEmailSender
+    private sealed class FakeEmailSender(bool enabled, Guid? onlyTenant = null) : IAlertEmailSender
     {
-        public bool IsEnabled => enabled;
+        public bool IsEnabledFor(Guid tenantId) => enabled && (onlyTenant is null || onlyTenant == tenantId);
         public List<AlertEmail> Sent { get; } = [];
         public string? Error { get; set; }
 
@@ -191,6 +191,18 @@ public sealed class AlertDeliveryServiceTests
         var sent = email.Sent.Should().ContainSingle().Subject;
         sent.Subject.Should().Be("FlowLedger: Price increase");
         sent.Body.Should().Contain("Streamly Video went up.");
+    }
+
+    [Fact]
+    public async Task The_email_channel_never_carries_another_tenants_alerts()
+    {
+        var email = new FakeEmailSender(true, onlyTenant: Guid.NewGuid()); // the household tenant is not the tenant being served
+        var (delivery, _, _) = await CreateAsync(null, email, PriceUp);
+
+        var result = await delivery.RunAsync();
+
+        result.Should().Be(new AlertDeliveryResult(0, 0, 0, 0));
+        email.Sent.Should().BeEmpty();
     }
 
     [Fact]

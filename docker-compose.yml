@@ -87,6 +87,15 @@ x-app-common-env: &app-common-env
   Secrets__EncryptionKeyPrevious: ${Secrets__EncryptionKeyPrevious:-}
   # Admin credential for /api/data/* (export, import, backup-now, tenant offboarding). Required outside Development; same value on api and web.
   DataAdmin__Key: ${DataAdmin__Key:-}
+  # Optional email channel for alerts (household tenant only; off by default; see .env.example). Enabled with a bad value stops the host at start.
+  Alerts__Email__Enabled: ${Alerts__Email__Enabled:-false}
+  Alerts__Email__Host: ${Alerts__Email__Host:-}
+  Alerts__Email__Port: ${Alerts__Email__Port:-587}
+  Alerts__Email__StartTls: ${Alerts__Email__StartTls:-true}
+  Alerts__Email__Username: ${Alerts__Email__Username:-}
+  Alerts__Email__Password: ${Alerts__Email__Password:-}
+  Alerts__Email__From: ${Alerts__Email__From:-}
+  Alerts__Email__To: ${Alerts__Email__To:-}
 
 services:
   # ── Infrastructure ────────────────────────────────────────────────────────

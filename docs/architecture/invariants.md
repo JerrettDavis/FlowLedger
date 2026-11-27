@@ -11,7 +11,7 @@ INV-03 to INV-07; stateful model tests cover INV-01, INV-02, INV-09 and INV-11, 
 
 | ID | Invariant | Current evidence (existing tests) | Target proof technique (planned) |
 |---|---|---|---|
-| INV-01 | No cross-tenant read or write on any route or store | Seeded model test `tests/FlowLedger.Infrastructure.Tests/Persistence/TenantIsolationModelTests.cs` (3 tenants, random rows, each reads exactly its own and cannot fetch another's by id); Per-feature tests: `tests/FlowLedger.Api.Tests/Security/DataAdminTenantTests.cs`, `ProductionTenantTests.cs`, `TenantAssertionTests.cs`; `tests/FlowLedger.Infrastructure.Tests/Sync/SimpleFinTenantIsolationTests.cs`; route sweep over the whole manifest `tests/FlowLedger.Api.Tests/Security/TenantIsolationMatrixTests.cs` (B sees none of A's rows and cannot change them) and, tagged `INV-01`, `TenantIsolationRouteSweepTests.cs` (both tenants seeded; every tenant-scoped GET route in `TenantIsolationManifest` returns only the caller's rows) | Reflection test on filters, SQL lint, optional Postgres RLS |
+| INV-01 | No cross-tenant read or write on any route or store | Seeded model test `tests/FlowLedger.Infrastructure.Tests/Persistence/TenantIsolationModelTests.cs` (3 tenants, random rows, each reads exactly its own and cannot fetch another's by id); Per-feature tests: `tests/FlowLedger.Api.Tests/Security/DataAdminTenantTests.cs`, `ProductionTenantTests.cs`, `TenantAssertionTests.cs`; `tests/FlowLedger.Infrastructure.Tests/Sync/SimpleFinTenantIsolationTests.cs`; route sweep over the whole manifest `tests/FlowLedger.Api.Tests/Security/TenantIsolationMatrixTests.cs` (B sees none of A's rows and cannot change them) and, tagged `INV-01`, `TenantIsolationRouteSweepTests.cs` (both tenants seeded; every parameterless tenant-scoped GET route in `TenantIsolationManifest` (kind `List`) returns only the caller's rows; GETs by id are covered by the matrix test and the write-style GETs by `TenantIsolationWriteTests`) | Reflection test on filters, SQL lint, optional Postgres RLS |
 | INV-02 | Sync is idempotent: replaying any page sequence yields the same transaction set | Example tests: `tests/FlowLedger.Infrastructure.Tests/Sync/FinancialSyncServiceTests.cs`, `EfSyncCursorStoreTests.cs`; stateful model test `SyncIdempotencyModelTests.cs` (seeded random page subsets, reorders and repeats against a set model) | Deterministic model test exists; a model with failures and cursor commits is not written |
 | INV-03 | A transfer pair sums to zero and both legs are excluded from income and expense | Example tests: `tests/FlowLedger.Application.Tests/Transactions/TransferDetectorTests.cs`; property tests in `Properties/ApplicationPropertyTests.cs` (one-to-one pairing, pairs net to zero, both legs left out of income and spending) | Done |
 | INV-04 | No mixed-currency arithmetic; allocations sum to the total | Example tests: `tests/FlowLedger.Domain.Tests/ValueObjects/MoneyTests.cs` | Property tests |
@@ -32,7 +32,7 @@ INV-03 to INV-07; stateful model tests cover INV-01, INV-02, INV-09 and INV-11, 
 
 ## Remaining work
 
-1. Run `SyncLock.tla` through TLC once and consider a scheduled CI job for it (see `docs/architecture/inv-09-sync-lock/README.md`).
+1. Run `SyncLock.tla` through TLC once (it has been written but never model-checked) and consider a scheduled CI job for it (see `docs/architecture/inv-09-sync-lock/README.md`).
 2. INV-01: reflection test on query filters, SQL lint and optional Postgres row-level security are not written.
 3. INV-11 is covered for accounts and transactions only; the remaining tenant tables are not in the random round trip.
 
@@ -58,7 +58,7 @@ State as of this revision (from GitHub). Closed means the issue is closed; it do
 | #165 | closed | Test-with-fix policy and PR template |
 | #167 | closed | Web component and JS tests in CI |
 | #170 | closed | Wall-clock performance tests in the PR gate |
-| #173 | open | Shared test data builders (single-argument requests and round-trip DTO samples now done) |
+| #173 | open | Shared test data builders (single-argument requests and the wide response DTOs in the round-trip tests are done; positional constructions elsewhere remain) |
 | #176 | closed | Scheduled nightly verification |
 
-Open and therefore deferred: #138 (an OIDC-authenticated E2E flow) and #173 (the long tail of positional DTO constructions).
+Open and therefore deferred: #138 (an OIDC-authenticated E2E flow) and #173 (the long tail of positional constructions in the other tests).

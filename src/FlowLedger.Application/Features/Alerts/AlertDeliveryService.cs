@@ -30,7 +30,7 @@ public sealed class AlertDeliveryService(
     {
         var webhooks = (await integrations.ListAsync(ct))
             .Any(i => i.Kind == IntegrationKind.Webhook && i.Enabled && i.Config.Events.Contains(IntegrationEvents.AlertRaised));
-        var emailing = email.IsEnabled;
+        var emailing = email.IsEnabledFor(tenant.TenantId);
         if (!webhooks && !emailing)
         {
             return new AlertDeliveryResult(0, 0, 0, 0);
