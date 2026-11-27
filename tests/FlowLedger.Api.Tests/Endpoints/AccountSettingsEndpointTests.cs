@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -21,15 +22,15 @@ public sealed class AccountSettingsEndpointTests(FlowLedgerApiFactory factory) :
 
     private async Task<AccountDto> CreateAccountAsync(string name, string type)
     {
-        var r = await _client.PostAsJsonAsync("/api/accounts", new CreateAccountRequest(name, type, 100m, "USD", null, null));
+        var r = await _client.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named(name).OfType(type).StartingAt(100m).Build());
         r.EnsureSuccessStatusCode();
         return (await r.Content.ReadFromJsonAsync<AccountDto>())!;
     }
 
     private async Task AddTxAsync(Guid accountId, string description)
     {
-        var r = await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
-            accountId, 12.34m, "USD", "Debit", description, new DateOnly(2026, 11, 10), null, null, null, null));
+        var r = await _client.PostAsJsonAsync("/api/transactions", CreateTransactionRequestBuilder.A()
+            .OnAccount(accountId).WithAmount(12.34m).Described(description).On(new DateOnly(2026, 11, 10)).Build());
         r.EnsureSuccessStatusCode();
     }
 

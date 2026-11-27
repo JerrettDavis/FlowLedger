@@ -3,6 +3,7 @@ using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Accounts;
@@ -29,16 +30,15 @@ public sealed class ChangeAccountTypeHandlerTests
 
     private async Task<Account> AddAccountAsync(string name, AccountType type, decimal balance)
     {
-        var account = Account.Create(TenantId, name, type, new Money(balance, Currency.Usd));
+        var account = AccountBuilder.A().ForTenant(TenantId).Named(name).OfType(type).Holding(balance).Build();
         await _accounts.AddAsync(account);
         return account;
     }
 
     private Transaction AddDebit(Account account, decimal amount, string description, Category? autoCategory = null, int day = 5)
     {
-        var tx = Transaction.RecordActual(
-            TenantId, account.AccountId, new Money(amount, Currency.Usd), TransactionDirection.Debit, description,
-            new DateOnly(2026, 11, day), new DateOnly(2026, 11, day), TransactionSource.Manual);
+        var tx = TransactionBuilder.A().ForTenant(TenantId).OnAccount(account.AccountId).WithAmount(amount)
+            .Described(description).On(new DateOnly(2026, 11, day)).Build();
         if (autoCategory is not null)
         {
             tx.Categorize(autoCategory.CategoryId, null, CategorySource.Auto);

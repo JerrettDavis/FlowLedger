@@ -40,15 +40,10 @@ public class AccessibilityTests : E2ETestBase
         }
     }
 
-    [Theory(DisplayName = "Accessibility: no serious or critical axe violations")]
+    [E2ETheory(DisplayName = "Accessibility: no serious or critical axe violations")]
     [MemberData(nameof(Routes))]
     public async Task Route_has_no_serious_axe_violations(string route, string scheme, string viewport, int width, int height)
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await Page!.SetViewportSizeAsync(width, height);
         await Page.EmulateMediaAsync(new PageEmulateMediaOptions
         {
@@ -96,14 +91,9 @@ public class AccessibilityTests : E2ETestBase
 [Trait("Category", "A11y")]
 public class KeyboardAccessTests : E2ETestBase
 {
-    [Fact(DisplayName = "Keyboard: the skip link is the first tab stop and moves focus to main")]
+    [E2EFact(DisplayName = "Keyboard: the skip link is the first tab stop and moves focus to main")]
     public async Task Skip_link_is_first_and_focuses_main()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/");
         await WaitForLoadAsync();
 
@@ -116,14 +106,9 @@ public class KeyboardAccessTests : E2ETestBase
         focusedId.Should().Be("main-content");
     }
 
-    [Fact(DisplayName = "Keyboard: Tab reaches Rename, Note and Split on a transaction row with a visible focus ring")]
+    [E2EFact(DisplayName = "Keyboard: Tab reaches Rename, Note and Split on a transaction row with a visible focus ring")]
     public async Task Row_actions_are_reachable_by_keyboard_with_a_visible_ring()
     {
-        if (ShouldSkip)
-        {
-            return;
-        }
-
         await NavigateAsync("/transactions");
         (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
 

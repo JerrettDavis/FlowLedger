@@ -63,6 +63,13 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
         declared.Except(actual).Should().BeEmpty("manifest entries for routes that no longer exist must be removed");
     }
 
+    [Fact]
+    public void No_route_is_left_as_a_Gap()
+    {
+        TenantIsolationManifest.Routes.Where(kv => kv.Value.Kind == RouteKind.Gap).Select(kv => kv.Key).Should().BeEmpty(
+            "every tenant-scoped route is now probed (List/ById/Keyed/Written) or explicitly Global; do not reintroduce holes");
+    }
+
     internal sealed record Seeded(Guid Account, Guid Transaction, Guid Category, Guid RecurringFlow, Guid Asset, Guid SheetBill, Guid Report, Guid Goal, Guid Transaction2, Guid Integration)
     {
         public Guid For(string resource) => resource switch
