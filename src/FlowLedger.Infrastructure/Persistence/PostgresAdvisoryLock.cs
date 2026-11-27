@@ -1,6 +1,6 @@
 using Npgsql;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.Persistence;
 
 /// <summary>
 /// Cross-PROCESS mutual exclusion (API, on-demand job and Worker are separate processes): a Postgres session-level

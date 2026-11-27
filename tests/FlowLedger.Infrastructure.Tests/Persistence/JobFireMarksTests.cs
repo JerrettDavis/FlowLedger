@@ -1,4 +1,4 @@
-using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;

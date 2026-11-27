@@ -1,9 +1,9 @@
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
 enum FlowLedger.Infrastructure.Sync.SyncTrigger
-interface FlowLedger.Infrastructure.DataSafety.IJobFireMarks
 interface FlowLedger.Infrastructure.HostStores.IAuditLog
 interface FlowLedger.Infrastructure.HostStores.IJobRunStore
+interface FlowLedger.Infrastructure.Scheduling.IJobFireMarks
 sealed class FlowLedger.Infrastructure.DataSafety.BackupFailureNotifier
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunResult
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunStore
@@ -12,8 +12,6 @@ sealed class FlowLedger.Infrastructure.DataSafety.BackupSettings
 sealed class FlowLedger.Infrastructure.DataSafety.DataEnvironmentState
 sealed class FlowLedger.Infrastructure.DataSafety.DataRetention
 sealed class FlowLedger.Infrastructure.DataSafety.DrillTableResult
-sealed class FlowLedger.Infrastructure.DataSafety.JobFireMark
-sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
 sealed class FlowLedger.Infrastructure.DataSafety.RestoreDrillResult
 sealed class FlowLedger.Infrastructure.DataSafety.RetentionResult
@@ -27,7 +25,9 @@ sealed class FlowLedger.Infrastructure.HostStores.ProviderCallLedger
 sealed class FlowLedger.Infrastructure.HostStores.ProviderEndpointUsage
 sealed class FlowLedger.Infrastructure.HostStores.ProviderUsageSummary
 sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext
+sealed class FlowLedger.Infrastructure.Persistence.PostgresAdvisoryLock
 sealed class FlowLedger.Infrastructure.Persistence.UnscopedTenantContext
+sealed class FlowLedger.Infrastructure.Scheduling.JobFireMark
 sealed class FlowLedger.Infrastructure.Storage.RawArchiveMaintenance
 sealed class FlowLedger.Infrastructure.Storage.SealResult
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptDecision

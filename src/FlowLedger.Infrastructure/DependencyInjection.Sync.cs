@@ -85,7 +85,7 @@ public static partial class DependencyInjection
             async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                 db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
                 c => c.LastSuccessfulSyncAt, ct),
-            crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
+            crossProcessLock: async ct => await FlowLedger.Infrastructure.Persistence.PostgresAdvisoryLock.TryAcquireAsync(
                 configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
         // After every successful sync, fill in missing categories (never overwrites existing ones).

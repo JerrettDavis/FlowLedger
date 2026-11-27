@@ -1,7 +1,7 @@
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.Scheduling;
 
 /// <summary>The persisted state of a job's newest claimed fire time.</summary>
 /// <param name="LastFireUtc">The newest cron slot a replica has claimed.</param>

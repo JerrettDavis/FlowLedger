@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Observability;
 using Quartz;
 

@@ -4,7 +4,7 @@ namespace FlowLedger.Application.Abstractions;
 
 /// <summary>Read model of one stored provider connection (never contains secrets).</summary>
 public sealed record ProviderConnectionInfo(
-    string ProviderName, string Institution, string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    ConnectorId Connector, string Institution, string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     ConnectionIssueInfo? Issue = null);
 
 /// <summary>

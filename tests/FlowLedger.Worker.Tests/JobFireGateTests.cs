@@ -1,5 +1,5 @@
 using System.Diagnostics.Metrics;
-using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;

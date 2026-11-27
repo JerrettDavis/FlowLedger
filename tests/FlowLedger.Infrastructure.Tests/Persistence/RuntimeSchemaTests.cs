@@ -55,7 +55,7 @@ public sealed class NoRuntimeSchemaTests
             ["FlowLedger.Infrastructure/DataSafety/DatabaseSnapshotService.cs"] = "whole-database snapshot",
             ["FlowLedger.Infrastructure/DataSafety/SnapshotImport.cs"] = "whole-database import",
             ["FlowLedger.Infrastructure/DataSafety/SnapshotRestoreDrill.cs"] = "whole-database restore drill",
-            ["FlowLedger.Infrastructure/DataSafety/PostgresAdvisoryLock.cs"] = "advisory locks need a dedicated connection",
+            ["FlowLedger.Infrastructure/Persistence/PostgresAdvisoryLock.cs"] = "advisory locks need a dedicated connection",
             ["FlowLedger.Infrastructure/DataSafety/PostgresVersionGuard.cs"] = "server version probe before the schema exists",
             ["FlowLedger.Infrastructure/DataSafety/DataRetention.cs"] = "host-wide retention sweeps across tenants",
             ["FlowLedger.Infrastructure/DataSafety/SecretReencryptor.cs"] = "bulk secret re-encryption",
