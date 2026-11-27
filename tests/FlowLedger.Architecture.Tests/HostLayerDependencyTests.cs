@@ -119,4 +119,14 @@ public sealed class HostLayerDependencyTests
         Assert.True(fresh.Count == 0, $"Api code must go through IFinancialDataProvider/IConnectorRegistry. New violations: {string.Join(", ", fresh)}");
         Assert.True(stale.Count == 0, $"These types no longer name a connector assembly; remove them from the allowlist: {string.Join(", ", stale)}");
     }
+
+    [Fact]
+    public void Worker_does_not_name_concrete_connector_assemblies()
+    {
+        var worker = Assembly.Load("FlowLedger.Worker");
+        var result = Types.InAssembly(worker).ShouldNot().HaveDependencyOnAny(ConcreteConnectors).GetResult();
+
+        Assert.True(result.IsSuccessful, $"Worker must resolve connectors through Infrastructure composition. Failing types: {string.Join(", ", result.FailingTypeNames ?? [])}");
+        Assert.DoesNotContain(worker.GetReferencedAssemblies(), a => a.Name is not null && ConcreteConnectors.Contains(a.Name));
+    }
 }
