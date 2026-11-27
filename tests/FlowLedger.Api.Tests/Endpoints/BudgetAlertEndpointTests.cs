@@ -39,7 +39,7 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
 
         using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/budgets"));
         var root = doc.RootElement;
-        root.GetProperty("month").GetString().Should().Be(DateTime.UtcNow.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+        root.GetProperty("month").GetString().Should().Be(factory.ServerNow.ToString("yyyy-MM", CultureInfo.InvariantCulture));
         root.GetProperty("spendByCategory").ValueKind.Should().Be(JsonValueKind.Object);
         var budget = root.GetProperty("budgets").EnumerateArray().Single(b => b.GetProperty("category").GetString() == "Food");
         budget.GetProperty("monthlyLimit").GetDecimal().Should().Be(250m);

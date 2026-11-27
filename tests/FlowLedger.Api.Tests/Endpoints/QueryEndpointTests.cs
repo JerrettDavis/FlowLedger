@@ -24,9 +24,9 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         => (await (await client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest(name, "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
 
-    private static Task<HttpResponseMessage> Spend(HttpClient client, Guid account, decimal amount, string desc)
+    private Task<HttpResponseMessage> Spend(HttpClient client, Guid account, decimal amount, string desc)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         return client.PostAsJsonAsync("/api/transactions",
             new CreateTransactionRequest(account, amount, "USD", "Debit", desc, today, today, null, desc, null));
     }

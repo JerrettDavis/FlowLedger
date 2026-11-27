@@ -26,7 +26,7 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
         var acct = await (await _client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null)))
             .Content.ReadFromJsonAsync<AccountDto>();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
 
         async Task Post(decimal amount, string desc, DateOnly? posted) =>
             (await _client.PostAsJsonAsync("/api/transactions",

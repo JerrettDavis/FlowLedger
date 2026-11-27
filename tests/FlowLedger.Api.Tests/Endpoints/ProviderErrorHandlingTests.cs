@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -46,7 +47,7 @@ public sealed class ProviderErrorHandlingTests(ProviderFailureApiFactory factory
     {
         // Any exception type, any native code: only Kind (and RetryAfter) may matter.
         factory.Failure = withRetryAfter
-            ? new RateLimitedProviderException("Please slow down.", DateTimeOffset.UtcNow.AddSeconds(90), "native-xyz") { Kind = kind }
+            ? new RateLimitedProviderException("Please slow down.", factory.ServerNow.AddSeconds(90), "native-xyz") { Kind = kind }
             : new FatalProviderException("Something is wrong.", "native-xyz") { Kind = kind };
 
         var response = await _client.PostAsync("/api/sync", null);
@@ -127,7 +128,7 @@ public sealed class ProviderErrorHandlingTests(ProviderFailureApiFactory factory
         factory.Failure = new SyncAlreadyRunningException();
         (await _client.PostAsync("/api/sync", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        factory.Failure = new SyncThrottledException(TimeSpan.FromSeconds(30), DateTimeOffset.UtcNow);
+        factory.Failure = new SyncThrottledException(TimeSpan.FromSeconds(30), TestClock.Instant);
         var throttled = await _client.PostAsync("/api/sync", null);
         throttled.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         throttled.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().Be(30);

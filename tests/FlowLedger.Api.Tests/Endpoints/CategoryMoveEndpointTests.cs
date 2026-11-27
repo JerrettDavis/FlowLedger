@@ -28,7 +28,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
 
     private async Task<TransactionDto> Spend(Guid account, string desc, Guid categoryId)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = factory.ServerToday;
         var resp = await _client.PostAsJsonAsync("/api/transactions",
             new CreateTransactionRequest(account, 10m, "USD", "Debit", desc, today, today, categoryId, desc, null));
         resp.EnsureSuccessStatusCode();
