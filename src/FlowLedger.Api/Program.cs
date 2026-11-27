@@ -88,6 +88,13 @@ if (builder.Environment.IsDevelopment() || builder.Configuration.GetValue("Datab
 builder.Services.AddDataEnvironmentGuard();
 
 // ── ProblemDetails (TenantResolutionException → 401; any ProviderException → ProviderExceptionHandler, ADR 0018) ──
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    return new FlowLedger.Api.Endpoints.WebhookAbuseLimiter(
+        cfg.GetValue("RateLimiting:WebhookInvalidPerIpPerMinute", FlowLedger.Api.Endpoints.WebhookAbuseLimiter.DefaultInvalidPerIpPerMinute),
+        cfg.GetValue("RateLimiting:WebhookVerifiedPerProviderPerMinute", FlowLedger.Api.Endpoints.WebhookAbuseLimiter.DefaultVerifiedPerProviderPerMinute));
+});
 builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ConcurrencyExceptionHandler>();
 builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.QuotaExceptionHandler>();
 builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ProviderExceptionHandler>();
