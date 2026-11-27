@@ -60,6 +60,7 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
         {
             cut.Markup.Should().Contain("The monthly limit must be between 0 and 100,000,000.").And.Contain("Fix the highlighted fields");
             cut.Find("input[aria-label='Monthly limit']").GetAttribute("value").Should().StartWith("100");
+            cut.Find("input[aria-label='Monthly limit']").GetAttribute("aria-invalid").Should().Be("true");
         });
     }
 
@@ -93,6 +94,8 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
         {
             cut.Find("[role=alert]").TextContent.Should().Contain("Fix the highlighted fields");
             cut.Markup.Should().Contain("The target must be greater than 0 and at most 1,000,000,000.");
+            cut.Find("input[aria-label='Target']").GetAttribute("aria-invalid").Should().Be("true");
+            cut.Find("input[aria-label='Saved so far']").GetAttribute("aria-invalid").Should().NotBe("true");
         });
     }
 
