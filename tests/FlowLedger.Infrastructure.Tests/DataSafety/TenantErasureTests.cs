@@ -50,10 +50,11 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         catalog.Select(c => c.Table).Should().BeEquivalentTo(scoped);
 
         var unscoped = ctx.Model.GetEntityTypes()
-            .Where(e => !e.IsOwned() && e.BaseType is null && e.FindProperty("TenantId") is null)
+            .Where(e => !e.IsOwned() && e.BaseType is null && e.FindProperty("TenantId") is null
+                && !FlowLedger.Infrastructure.Persistence.HostWideEntities.Tables.ContainsKey(e.GetTableName() ?? string.Empty))
             .Select(e => e.ClrType.Name)
             .ToList();
-        unscoped.Should().BeEmpty("a root entity without a tenant column would survive erasure");
+        unscoped.Should().BeEmpty("a root entity without a tenant column would survive erasure unless it is listed in HostWideEntities");
 
         catalog.Select(c => c.Table).Should().Contain("outbox_messages");
         catalog.Should().OnlyContain(c => c.TenantColumn == "tenant_id");

@@ -1,3 +1,6 @@
+using FlowLedger.Infrastructure.Persistence;
+using FlowLedger.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -38,79 +41,27 @@ public sealed record BackupRunResult(
     bool? DrillOk,
     string? Error);
 
-/// <summary>Durable history of backup runs (table created on first use; shown in the UI).</summary>
+/// <summary>Durable history of backup runs (<c>backup_runs</c>, host-wide, through EF; shown in the UI).</summary>
 public sealed class BackupRunStore
 {
-    public const string CreateSqlText = """
-        CREATE TABLE IF NOT EXISTS backup_runs (
-            id bigserial PRIMARY KEY,
-            started_utc timestamptz NOT NULL,
-            finished_utc timestamptz NOT NULL,
-            ok boolean NOT NULL,
-            snapshot_dir text NULL,
-            rows bigint NOT NULL,
-            offsite_ok boolean NULL,
-            offsite_detail text NULL,
-            drill_ok boolean NULL,
-            error text NULL
-        );
-        """;
+    private readonly HostDb _host;
 
-    private readonly string _connectionString;
-
-    public BackupRunStore(string connectionString) => _connectionString = connectionString;
+    public BackupRunStore(string connectionString) => _host = new HostDb(connectionString);
 
     public async Task AddAsync(BackupRunResult r, CancellationToken ct = default)
     {
-        await using var conn = await OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand(
-            "INSERT INTO backup_runs (started_utc, finished_utc, ok, snapshot_dir, rows, offsite_ok, offsite_detail, drill_ok, error) " +
-            "VALUES (@s,@f,@ok,@dir,@rows,@oo,@od,@dk,@err)", conn);
-        cmd.Parameters.AddWithValue("s", r.StartedUtc);
-        cmd.Parameters.AddWithValue("f", r.FinishedUtc);
-        cmd.Parameters.AddWithValue("ok", r.Ok);
-        cmd.Parameters.AddWithValue("dir", (object?)r.SnapshotDir ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("rows", r.Rows);
-        cmd.Parameters.AddWithValue("oo", (object?)r.OffsiteOk ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("od", (object?)r.OffsiteDetail ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("dk", (object?)r.DrillOk ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("err", (object?)r.Error ?? DBNull.Value);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await using var db = _host.Create();
+        db.BackupRuns.Add(BackupRunRecord.Create(
+            r.StartedUtc, r.FinishedUtc, r.Ok, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error));
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<BackupRunResult>> RecentAsync(int limit, CancellationToken ct = default)
     {
-        var list = new List<BackupRunResult>();
-        await using var conn = await OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand(
-            "SELECT started_utc, finished_utc, ok, snapshot_dir, rows, offsite_ok, offsite_detail, drill_ok, error " +
-            "FROM backup_runs ORDER BY id DESC LIMIT @n", conn);
-        cmd.Parameters.AddWithValue("n", limit);
-        await using var r = await cmd.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct))
-        {
-            list.Add(new BackupRunResult(
-                r.GetBoolean(2),
-                r.GetFieldValue<DateTimeOffset>(0),
-                r.GetFieldValue<DateTimeOffset>(1),
-                r.IsDBNull(3) ? null : r.GetString(3),
-                r.GetInt64(4),
-                r.IsDBNull(5) ? null : r.GetBoolean(5),
-                r.IsDBNull(6) ? null : r.GetString(6),
-                r.IsDBNull(7) ? null : r.GetBoolean(7),
-                r.IsDBNull(8) ? null : r.GetString(8)));
-        }
-
-        return list;
-    }
-
-    private async Task<NpgsqlConnection> OpenAsync(CancellationToken ct)
-    {
-        var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync(ct);
-        await using var cmd = new NpgsqlCommand(CreateSqlText, conn);
-        await cmd.ExecuteNonQueryAsync(ct);
-        return conn;
+        await using var db = _host.Create();
+        var rows = await db.BackupRuns.AsNoTracking().OrderByDescending(r => r.Id).Take(limit).ToListAsync(ct);
+        return rows.Select(r => new BackupRunResult(
+            r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error)).ToList();
     }
 }
 

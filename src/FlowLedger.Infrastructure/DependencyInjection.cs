@@ -359,8 +359,8 @@ public static class DependencyInjection
             FlowLedger.Infrastructure.Persistence.Repositories.EfRecurringDismissalStore>();
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
-        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger(
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>(_ =>
+            new FlowLedger.Infrastructure.DataSafety.ProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
         // -- Audit log of sensitive actions (append-only, ad hoc table) --
@@ -427,7 +427,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
             FlowLedger.Infrastructure.DataSafety.RetentionSettings.From(configuration)));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp =>
-            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger>());
+            sp.GetRequiredService<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>());
     }
 
     /// <summary>

@@ -15,7 +15,7 @@ internal static class DataEndpoints
 
         group.MapGet("/status", async (
             BackupRunStore store,
-            NpgsqlProviderCallLedger ledger,
+            ProviderCallLedger ledger,
             IJobRunStore jobRuns,
             DataEnvironmentState env,
             IConfiguration cfg,

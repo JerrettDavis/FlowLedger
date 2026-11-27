@@ -548,6 +548,56 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_rates", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.BackupRunRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool?>("DrillOk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("drill_ok");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("FinishedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_utc");
+
+                    b.Property<string>("OffsiteDetail")
+                        .HasColumnType("text")
+                        .HasColumnName("offsite_detail");
+
+                    b.Property<bool?>("OffsiteOk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("offsite_ok");
+
+                    b.Property<bool>("Ok")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ok");
+
+                    b.Property<long>("Rows")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rows");
+
+                    b.Property<string>("SnapshotDir")
+                        .HasColumnType("text")
+                        .HasColumnName("snapshot_dir");
+
+                    b.Property<DateTimeOffset>("StartedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_utc");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("backup_runs", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.BudgetRecord", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1056,6 +1106,58 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasKey("TenantId", "ConnectorId", "ProviderAccountId");
 
                     b.ToTable("connector_provider_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.ProviderApiCallRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<DateTimeOffset>("OccurredUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_utc");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("path");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<long?>("ResponseBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("response_bytes");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "OccurredUtc")
+                        .HasDatabaseName("ix_provider_api_calls_provider_time");
+
+                    b.ToTable("provider_api_calls", (string)null);
                 });
 
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.ProviderConnectionRecord", b =>

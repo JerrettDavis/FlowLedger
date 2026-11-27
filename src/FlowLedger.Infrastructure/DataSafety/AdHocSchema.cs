@@ -16,8 +16,6 @@ internal static class AdHocSchema
     public static IReadOnlyList<string> Scripts { get; } =
     [
         SystemSettingsSql,
-        NpgsqlProviderCallLedger.CreateSqlText,
-        BackupRunStore.CreateSqlText,
         NpgsqlUserDirectory.CreateSqlText,
         NpgsqlAuditLog.CreateSqlText,
         NpgsqlJobRunStore.CreateSqlText,

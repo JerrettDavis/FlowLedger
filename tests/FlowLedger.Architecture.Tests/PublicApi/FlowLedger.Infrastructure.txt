@@ -26,6 +26,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.MoveDuplicatesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveHomeAssistantToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveIntegrationsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveProviderAccountCatalogToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveProviderCallsAndBackupRunsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRecurringDismissalsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveRulesAndAliasesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveSuspiciousDismissalsToEf
@@ -48,8 +49,8 @@ sealed class FlowLedger.Infrastructure.DataSafety.DataEnvironmentState
 sealed class FlowLedger.Infrastructure.DataSafety.DataRetention
 sealed class FlowLedger.Infrastructure.DataSafety.DrillTableResult
 sealed class FlowLedger.Infrastructure.DataSafety.JobRunEntry
-sealed class FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger
 sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
+sealed class FlowLedger.Infrastructure.DataSafety.ProviderCallLedger
 sealed class FlowLedger.Infrastructure.DataSafety.ProviderEndpointUsage
 sealed class FlowLedger.Infrastructure.DataSafety.ProviderUsageSummary
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
