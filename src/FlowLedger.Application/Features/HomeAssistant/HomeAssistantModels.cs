@@ -62,3 +62,13 @@ internal sealed record HaAccountBalance(Guid Id, string Name, decimal Balance, b
 internal sealed record HaRecentTransaction(string Description, string? Merchant, bool IsIncome, decimal Amount, DateOnly Date);
 
 internal sealed record HaBudgetBreach(string Category, bool Over);
+
+/// <summary>Where alert events come from: the detection Home Assistant already uses, also delivered to subscribed webhooks.</summary>
+public interface IAlertEventSource
+{
+    /// <summary>The date events are keyed by (server-local), so every delivery path shares dedupe keys.</summary>
+    DateOnly Today { get; }
+
+    /// <summary>The events raised now under <paramref name="settings"/> (which kinds, and whether amounts and names are shared).</summary>
+    Task<IReadOnlyList<HaEvent>> DetectAsync(DateOnly today, HomeAssistantSettings settings, CancellationToken ct = default);
+}

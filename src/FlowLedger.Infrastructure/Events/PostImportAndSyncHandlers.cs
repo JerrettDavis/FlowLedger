@@ -1,4 +1,5 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Application.Features.Alerts;
 using FlowLedger.Application.Features.Duplicates;
 using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Application.Features.Integrations;
@@ -61,4 +62,10 @@ internal sealed class PostSyncMaintenanceHandler(
 internal sealed class SyncCompletedHomeAssistantHandler(HomeAssistantService homeAssistant) : IDomainEventHandler<SyncCompleted>
 {
     public async Task HandleAsync(SyncCompleted e, CancellationToken ct = default) => await homeAssistant.RunAsync(ct);
+}
+
+/// <summary>Pushes any alert the new data raised to the webhooks subscribed to <c>alert.raised</c>; each alert goes out once.</summary>
+internal sealed class SyncCompletedAlertWebhookHandler(AlertDeliveryService delivery) : IDomainEventHandler<SyncCompleted>
+{
+    public async Task HandleAsync(SyncCompleted e, CancellationToken ct = default) => await delivery.RunAsync(ct);
 }

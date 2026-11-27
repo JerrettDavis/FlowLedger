@@ -30,8 +30,11 @@ public static class IntegrationEvents
     public const string SyncCompleted = "sync.completed";
     public const string AlertRaised = "alert.raised";
 
-    /// <summary>Events a webhook can subscribe to. <see cref="AlertRaised"/> is reserved until alerts are dispatched.</summary>
-    public static IReadOnlyList<string> All { get; } = [ImportCompleted, SyncCompleted];
+    /// <summary>
+    /// Events a webhook can subscribe to. <see cref="AlertRaised"/> carries one alert (bill due, large charge, price increase, new
+    /// subscription, low balance, budget over limit) in the same payload Home Assistant receives, once per condition.
+    /// </summary>
+    public static IReadOnlyList<string> All { get; } = [ImportCompleted, SyncCompleted, AlertRaised];
 }
 
 /// <summary>The non-secret part of an integration. Secrets (credential, signing secret) never live here.</summary>

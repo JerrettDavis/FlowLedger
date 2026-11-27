@@ -22,7 +22,7 @@ public sealed partial class IntegrationService
     }
 
     /// <summary>
-    /// Pushes an event to every enabled webhook subscribed to it. Never throws: a broken receiver must not break the action that
+    /// Pushes an event to every enabled webhook subscribed to it and returns how many accepted it. Never throws: a broken receiver must not break the action that
     /// raised the event; each outcome is in the delivery log instead.
     /// </summary>
     public async Task<int> DispatchAsync(string eventKind, object? data, CancellationToken ct = default, Guid? deliveryId = null)
@@ -50,8 +50,11 @@ public sealed partial class IntegrationService
             limit.CancelAfter(DispatchTimeout);
             try
             {
-                await DeliverAsync(integration, eventKind, data, limit.Token, deliveryId);
-                sent++;
+                var delivered = await DeliverAsync(integration, eventKind, data, limit.Token, deliveryId);
+                if (delivered.Error is null)
+                {
+                    sent++; // an HTTP error from the receiver is in the log but is not a delivery
+                }
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {

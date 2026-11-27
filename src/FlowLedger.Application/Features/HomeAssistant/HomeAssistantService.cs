@@ -26,7 +26,7 @@ public sealed class HomeAssistantService(
     GetMonthlySpendByCategoryHandler spend,
     GetForecastHandler forecast,
     ITenantContext tenant,
-    TimeProvider clock)
+    TimeProvider clock) : IAlertEventSource
 {
     private readonly TimeProvider _clock = clock;
 
@@ -154,7 +154,7 @@ public sealed class HomeAssistantService(
         return p;
     }
 
-    private async Task<IReadOnlyList<HaEvent>> DetectAsync(DateOnly today, HomeAssistantSettings settings, CancellationToken ct)
+    public async Task<IReadOnlyList<HaEvent>> DetectAsync(DateOnly today, HomeAssistantSettings settings, CancellationToken ct)
     {
         var accountList = await accounts.ListAsync(ct); // active accounts only
         var flowList = (await flows.ListAsync(ct)).Where(f => f.IsActive).ToList();
