@@ -112,6 +112,14 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         // ── Payloads that name A's rows: B must be refused or find nothing. ──
         ["POST /api/transactions"] = Case(c => Json(c.B, HttpMethod.Post, "/api/transactions",
             CreateTransactionRequestBuilder.A().OnAccount(c.Seed.Account).WithAmount(1m).WithDirection("Debit").Described("B INTRUDER").On(new DateOnly(2026, 1, 16)).Build()), HttpStatusCode.NotFound),
+        ["POST /api/transactions/bulk-category"] = CaseWithBody(async c =>
+        {
+            using var category = await c.B.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath("b-bulk").Named("B Bulk").Build());
+            category.EnsureSuccessStatusCode();
+            var categoryId = (await category.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            return await Json(c.B, HttpMethod.Post, "/api/transactions/bulk-category",
+                new { transactionIds = new[] { c.Seed.Transaction, c.Seed.Transaction2 }, categoryId });
+        }, "\"changed\":0", HttpStatusCode.OK),
         ["POST /api/recurring-flows"] = Case(c => Json(c.B, HttpMethod.Post, "/api/recurring-flows",
             new CreateRecurringFlowRequest(c.Seed.Account, "B INTRUDER", 1m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null, new DateOnly(2026, 1, 1), null, null, "B")), HttpStatusCode.NotFound),
         ["POST /api/imports"] = Case(c => Json(c.B, HttpMethod.Post, "/api/imports",

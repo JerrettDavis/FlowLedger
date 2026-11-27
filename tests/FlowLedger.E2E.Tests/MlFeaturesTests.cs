@@ -165,9 +165,11 @@ public class MlFeaturesTests : E2ETestBase
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await Page!.GetByText("Needs a Look").First.WaitForAsync(new() { Timeout = 30000 });
-        var flagged = Page.GetByText("Price increase", new() { Exact = false });
-        await flagged.First.WaitForAsync(new() { Timeout = 20000 });
-        (await flagged.First.InnerTextAsync()).Should().Contain("$17.99").And.Contain("$15.49");
+        var card = Page.Locator(".mud-card").Filter(new() { HasText = "Suspicious Activity" });
+        var row = card.Locator(".d-flex.justify-space-between.align-center.py-1").Filter(new() { HasText = merchant });
+        var reason = row.GetByText("Price increase:", new() { Exact = false });
+        await reason.WaitForAsync(new() { Timeout = 20000 });
+        (await reason.InnerTextAsync()).Should().Contain("$17.99").And.Contain("$15.49");
         AssertNoPageErrors();
     }
 
