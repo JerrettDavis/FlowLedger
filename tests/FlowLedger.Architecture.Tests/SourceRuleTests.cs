@@ -257,11 +257,8 @@ public sealed class SourceRuleTests
     /// <summary>Files over the limit today, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list.</summary>
     private static readonly Dictionary<string, int> OversizedCeilings = new()
     {
-        ["src/FlowLedger.Infrastructure/Sync/FinancialSyncService.cs"] = 923,
         ["src/FlowLedger.Application/Features/Imports/ImportNormalizer.cs"] = 747,
-        ["src/FlowLedger.Application/Features/Query/QueryEngine.cs"] = 710,
         ["src/FlowLedger.Integrations.Simulated/SimulatedDataFactory.cs"] = 687,
-        ["src/FlowLedger.Integrations.Mx/MxFinancialDataProvider.cs"] = 647,
         ["src/FlowLedger.Application/Features/Query/QueryParser.cs"] = 611,
         ["src/FlowLedger.Application/Features/RecurringFlows/RecurringFlowDetector.cs"] = 538,
         ["src/FlowLedger.Application/Features/Forecasting/ForecastEngine.cs"] = 522,
