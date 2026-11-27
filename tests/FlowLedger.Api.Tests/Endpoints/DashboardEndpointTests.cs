@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Dashboard;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -24,13 +25,13 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
     public async Task Activity_separates_pending_from_posted_and_flags_large_new_merchant()
     {
         var acct = await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null)))
+            CreateAccountRequestBuilder.A().Named("Checking").StartingAt(0m).Build()))
             .Content.ReadFromJsonAsync<AccountDto>();
         var today = factory.ServerToday;
 
         async Task Post(decimal amount, string desc, DateOnly? posted) =>
             (await _client.PostAsJsonAsync("/api/transactions",
-                new CreateTransactionRequest(acct!.Id, amount, "USD", "Debit", desc, today, posted, null, null, null)))
+                CreateTransactionRequestBuilder.A().OnAccount(acct!.Id).WithAmount(amount).Described(desc).On(today).PostedOn(posted).Build()))
                 .EnsureSuccessStatusCode();
 
         await Post(12m, "Coffee", today);

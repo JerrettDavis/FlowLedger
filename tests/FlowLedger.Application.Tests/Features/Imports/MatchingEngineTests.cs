@@ -2,6 +2,7 @@ using FlowLedger.Application.Features.Imports;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Imports;
@@ -20,15 +21,8 @@ public sealed class MatchingEngineTests
         DateOnly date,
         AccountId? accountId = null)
     {
-        return Transaction.RecordActual(
-            Tenant,
-            accountId ?? AccountA,
-            amount,
-            direction,
-            "Test Transaction",
-            date,
-            date,
-            TransactionSource.CsvImport);
+        return TransactionBuilder.A().ForTenant(Tenant).OnAccount(accountId ?? AccountA).WithAmount(amount)
+            .Described("Test Transaction").On(date).From(TransactionSource.CsvImport).WithDirection(direction).Build();
     }
 
     private static RecurringFlow MakeFlowWithOccurrence(
@@ -38,14 +32,8 @@ public sealed class MatchingEngineTests
         AccountId? accountId = null)
     {
         var pattern = RecurrencePattern.Monthly(plannedDate.Day);
-        var flow = RecurringFlow.Create(
-            Tenant,
-            accountId ?? AccountA,
-            "Test Flow",
-            plannedAmount,
-            direction,
-            pattern,
-            plannedDate.AddDays(-30));
+        var flow = RecurringFlowBuilder.A().ForTenant(Tenant).OnAccount(accountId ?? AccountA).Named("Test Flow")
+            .WithAmount(plannedAmount).WithDirection(direction).Recurring(pattern).From(plannedDate.AddDays(-30)).Build();
 
         flow.GenerateOccurrence(plannedDate);
         return flow;
