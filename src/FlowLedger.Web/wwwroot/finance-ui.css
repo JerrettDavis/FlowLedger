@@ -251,3 +251,5 @@ html, body { max-width: 100%; }
 .fl-account-chip__name { font-size: 12px; font-weight: 500; margin-top: 6px; text-align: center; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .fl-account-chip__bal { font-size: 11px; color: var(--mud-palette-text-secondary); }
+
+.fl-wrap-anywhere { overflow-wrap: anywhere; }

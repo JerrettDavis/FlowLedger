@@ -37,6 +37,7 @@ else
         <MudText Typo="Typo.subtitle1" Class="fl-muted">@Format.Money(_data.YearlyTotal) a year</MudText>
     </div>
 
+    <div class="fl-scroll-x">
     <MudSimpleTable Dense="true" Hover="true" aria-label="Detected subscriptions" data-testid="subscriptions-table">
         <thead>
             <tr>
@@ -53,7 +54,7 @@ else
             {
                 <tr data-testid="subscription-row">
                     <td>
-                        <div>@s.Name</div>
+                        <div class="fl-wrap-anywhere">@s.Name</div>
                         <MudText Typo="Typo.caption" Class="fl-muted">
                             @s.Cadence@(s.Status == "Lapsed" ? " · possibly cancelled" : "") · @s.Charges charges
                         </MudText>
@@ -80,6 +81,7 @@ else
             }
         </tbody>
     </MudSimpleTable>
+    </div>
 }
 
 @code {
