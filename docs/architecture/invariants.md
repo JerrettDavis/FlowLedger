@@ -12,8 +12,8 @@ INV-03 to INV-07; there are no stateful-model or TLA+ artefacts yet. Filter a si
 | ID | Invariant | Current evidence (existing tests) | Target proof technique (planned) |
 |---|---|---|---|
 | INV-01 | No cross-tenant read or write on any route or store | Per-feature tests: `tests/FlowLedger.Api.Tests/Security/DataAdminTenantTests.cs`, `ProductionTenantTests.cs`, `TenantAssertionTests.cs`; `tests/FlowLedger.Infrastructure.Tests/Sync/SimpleFinTenantIsolationTests.cs`. No route sweep | Route-matrix integration test, reflection test on filters, SQL lint, optional Postgres RLS |
-| INV-02 | Sync is idempotent: replaying any page sequence yields the same transaction set | Example tests: `tests/FlowLedger.Infrastructure.Tests/Sync/FinancialSyncServiceTests.cs`, `EfSyncCursorStoreTests.cs` | FsCheck model test with random replay, duplicate and reorder |
-| INV-03 | A transfer pair sums to zero and both legs are excluded from income and expense | Example tests: `tests/FlowLedger.Application.Tests/Transactions/TransferDetectorTests.cs` | Property tests |
+| INV-02 | Sync is idempotent: replaying any page sequence yields the same transaction set | Example tests: `tests/FlowLedger.Infrastructure.Tests/Sync/FinancialSyncServiceTests.cs`, `EfSyncCursorStoreTests.cs`; stateful model test `SyncIdempotencyModelTests.cs` (seeded random page subsets, reorders and repeats against a set model) | Deterministic model test exists; a model with failures and cursor commits is not written |
+| INV-03 | A transfer pair sums to zero and both legs are excluded from income and expense | Example tests: `tests/FlowLedger.Application.Tests/Transactions/TransferDetectorTests.cs`; property tests in `Properties/ApplicationPropertyTests.cs` (one-to-one pairing, pairs net to zero, both legs left out of income and spending) | Done |
 | INV-04 | No mixed-currency arithmetic; allocations sum to the total | Example tests: `tests/FlowLedger.Domain.Tests/ValueObjects/MoneyTests.cs` | Property tests |
 | INV-05 | Forecast closing = opening + sum of occurrences, deterministic | Example tests: `tests/FlowLedger.Application.Tests/Features/Forecasting/ForecastEngineTests.cs` | Property tests plus differential test against a naive reference |
 | INV-06 | Recurrence expansion is sorted, bounded, terminating and month-end/leap-year safe | Example tests: `tests/FlowLedger.Domain.Tests/ValueObjects/RecurrenceExpanderTests.cs` | Property tests |
@@ -32,6 +32,6 @@ INV-03 to INV-07; there are no stateful-model or TLA+ artefacts yet. Filter a si
 
 ## Remaining work (not done)
 
-1. Stateful model / property tests for INV-01 (route sweep), INV-02 (replay/reorder), INV-09 and INV-11 (round-trip on random data).
+1. Stateful model / property tests for INV-01 (route sweep), INV-09 and INV-11 (round-trip on random data).
 2. A small TLA+ model for INV-09 (lock plus cursor-commit ordering under retry and crash).
 3. The child testing issues referenced by #178 (mutation testing, coverage gates, E2E auth, wall-clock tests and others) remain open.
