@@ -28,7 +28,18 @@ Docker-outside-of-Docker and runs `dotnet restore` on creation.
 - Run `dotnet format` before committing.
 - PRs must pass `dotnet format --verify-no-changes` in CI.
 - The build runs the .NET analyzers at `AnalysisMode=Recommended` with warnings as errors, plus unused usings (IDE0005), file-scoped namespaces (IDE0161) and banned APIs (`BannedSymbols.txt`, rule RS0030; every entry states why). Logging goes through `[LoggerMessage]` source-generated methods (CA1848).
-- Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()` in a `DependencyInjection*.cs` file (an architecture test enforces it).
+- Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()`, `new XOptions { }` or `?? new XOptions()` anywhere in `src` (an architecture test enforces it; the two allowlisted bootstrap sites say why).
+- `TimeProvider` is a required argument in Domain and Application (no `TimeProvider.System` there); connectors take one so tests pass `TestClock.Provider`. Tests never read the wall clock (the ratchet baseline is empty).
+
+### Third-party analyzers (#113): decision
+
+Roslynator and Meziantou.Analyzer were evaluated and **not adopted**. Meziantou.Analyzer 3.0 was measured against the whole solution at its defaults
+(2026-11): about 6,400 warnings, almost all from five rules that duplicate or contradict decisions already made (MA0004 ConfigureAwait, 3,300; MA0048 file
+name equals type name, 1,700; MA0016 collection abstractions, 360; MA0006/MA0002 string comparison, 570 and already covered by CA1309/CA1307/CA1310; MA0051
+method length, 190). A curated set without those, roughly MA0009 (regex without a match timeout, 42 sites), MA0011 (missing `IFormatProvider`, 29),
+MA0158 (use `System.Threading.Lock`, 8) and a handful of one-offs, comes to about 100 warnings, under the 200 bar, but the build treats warnings as errors, so adopting it
+means fixing every one of them in the same change and the rules that matter most (regex timeouts, culture) overlap with CA rules that are already enforced.
+Nothing was added to the build. If a future change wants the regex-timeout rule, enable `MA0009` alone, fix its sites and add the package at that point.
 
 ### Suppression policy
 
