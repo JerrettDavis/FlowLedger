@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Dashboard;
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.TestSupport;
 using FluentAssertions;
 
@@ -14,6 +15,35 @@ public sealed class DashboardActivityAnalyzerTests
         new(Guid.NewGuid(), account ?? Acct, amount, "USD", dir, merchant, status, "MxAggregation",
             Today.AddDays(-daysAgo), status == "Pending" ? null : Today.AddDays(-daysAgo),
             null, merchant, null, null, TestClock.Instant);
+
+    [Fact]
+    public void Money_in_and_out_exclude_both_legs_of_a_detected_transfer_but_count_real_activity()
+    {
+        var checking = Guid.NewGuid();
+        var savings = Guid.NewGuid();
+        var paycheck = Tx(2000, "EMPLOYER", 2, "Credit", account: checking);
+        var rent = Tx(900, "LANDLORD", 3, account: checking);
+        var outLeg = Tx(600, "To savings", 1, "Debit", account: checking);
+        var inLeg = Tx(600, "From checking", 1, "Credit", account: savings);
+        var types = new Dictionary<Guid, string> { [checking] = "Checking", [savings] = "Savings" };
+        var all = new List<TransactionDto> { paycheck, rent, outLeg, inLeg };
+
+        var transferIds = TransferDetector.Detect(all, types);
+        var r = DashboardActivityAnalyzer.Analyze(all, Today, transferIds: transferIds);
+
+        transferIds.Should().BeEquivalentTo([outLeg.Id, inLeg.Id]);
+        r.MoneyInLast30Days.Should().Be(2000m, "the savings leg of the transfer is not income");
+        r.MoneyOutLast30Days.Should().Be(900m, "the checking leg of the transfer is not spending");
+        r.TransfersExcluded.Should().Be(1);
+    }
+
+    [Fact]
+    public void Money_in_and_out_count_a_lone_transfer_looking_leg_with_no_counterpart()
+    {
+        var r = DashboardActivityAnalyzer.Analyze([Tx(600, "To someone else", 1)], Today, transferIds: new HashSet<Guid>());
+
+        r.MoneyOutLast30Days.Should().Be(600m);
+    }
 
     [Fact]
     public void Dismissed_transactions_are_not_flagged()

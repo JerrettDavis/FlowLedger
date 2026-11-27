@@ -47,4 +47,43 @@ public sealed class ListTransactionsQueryValidatorTests
         new ListTransactionsQuery(Sort: "amount", Dir: "asc").SortKey.Should().Be(FlowLedger.Application.Abstractions.TransactionSortKey.Amount);
         new ListTransactionsQuery(Sort: "amount", Dir: "asc").Descending.Should().BeFalse();
     }
+
+    [Fact]
+    public void Column_filters_are_parsed_and_default_to_none()
+    {
+        new ListTransactionsQuery().Filter.Should().BeNull();
+
+        var filter = new ListTransactionsQuery(Status: "pending", MinAmount: 5m, MaxAmount: 50m, Uncategorized: true).Filter;
+
+        filter.Should().NotBeNull();
+        filter!.Status.Should().Be(FlowLedger.Domain.Aggregates.TransactionStatus.Pending);
+        filter.UncategorizedOnly.Should().BeTrue();
+        (filter.MinAmount, filter.MaxAmount).Should().Be((5m, 50m));
+    }
+
+    [Fact]
+    public void Rejects_an_unknown_status_and_an_inverted_amount_range()
+    {
+        _validator.Validate(new ListTransactionsQuery(Status: "bogus")).IsValid.Should().BeFalse();
+        _validator.Validate(new ListTransactionsQuery(MinAmount: 50m, MaxAmount: 5m)).IsValid.Should().BeFalse();
+        _validator.Validate(new ListTransactionsQuery(Status: "Posted", MinAmount: 5m, MaxAmount: 50m)).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task The_handler_passes_the_filter_to_the_repository_for_the_page_and_the_count()
+    {
+        var repo = new FlowLedger.Application.Tests.Fakes.FakeTransactionRepository();
+        var tenant = FlowLedger.Domain.ValueObjects.TenantId.New();
+        var account = FlowLedger.Domain.ValueObjects.AccountId.New();
+        var date = new DateOnly(2026, 3, 1);
+        await repo.AddAsync(FlowLedger.Domain.Aggregates.Transaction.RecordActual(tenant, account, new FlowLedger.Domain.ValueObjects.Money(9m, "USD"),
+            FlowLedger.Domain.Aggregates.TransactionDirection.Debit, "Small", date, date, FlowLedger.Domain.Aggregates.TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider));
+        await repo.AddAsync(FlowLedger.Domain.Aggregates.Transaction.RecordActual(tenant, account, new FlowLedger.Domain.ValueObjects.Money(90m, "USD"),
+            FlowLedger.Domain.Aggregates.TransactionDirection.Debit, "Big", date, date, FlowLedger.Domain.Aggregates.TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider));
+        var handler = new ListTransactionsHandler(repo);
+        var query = new ListTransactionsQuery(MinAmount: 50m, Uncategorized: true);
+
+        (await handler.HandleAsync(query)).Select(t => t.Description).Should().Equal("Big");
+        (await handler.CountAsync(query)).Should().Be(1);
+    }
 }

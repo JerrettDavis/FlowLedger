@@ -25,9 +25,10 @@ internal sealed class TransactionRepository : ITransactionRepository
         bool everydayOnly = false,
         string? search = null,
         TransactionSortKey sort = TransactionSortKey.Date,
-        bool descending = true)
+        bool descending = true,
+        TransactionFilter? filter = null)
     {
-        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
+        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct, filter);
 
         // Sorted in SQL before paging, so "sort by amount" orders the whole result and not just the page on screen (#209).
         // Date (newest or oldest first by direction) is always the final tie-break, then CreatedAt and Id, so pages never overlap.
@@ -58,9 +59,9 @@ internal sealed class TransactionRepository : ITransactionRepository
 
     public async Task<IReadOnlyList<Transaction>> ListAfterAsync(
         ITransactionRepository.TransactionKeyset? after, AccountId? accountId, DateOnly? from, DateOnly? to, int take, bool descending, bool everydayOnly,
-        string? search, CancellationToken ct = default)
+        string? search, CancellationToken ct = default, TransactionFilter? filter = null)
     {
-        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
+        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct, filter);
 
         // The same total order as ListAsync's date sort: date (direction as asked), then newest-created first, then id.
         if (after is { } k)
@@ -83,11 +84,12 @@ internal sealed class TransactionRepository : ITransactionRepository
         DateOnly? to = null,
         CancellationToken ct = default,
         bool everydayOnly = false,
-        string? search = null)
-        => await (await FilteredAsync(accountId, from, to, everydayOnly, search, ct)).CountAsync(ct);
+        string? search = null,
+        TransactionFilter? filter = null)
+        => await (await FilteredAsync(accountId, from, to, everydayOnly, search, ct, filter)).CountAsync(ct);
 
     private async Task<IQueryable<Transaction>> FilteredAsync(
-        AccountId? accountId, DateOnly? from, DateOnly? to, bool everydayOnly, string? search, CancellationToken ct)
+        AccountId? accountId, DateOnly? from, DateOnly? to, bool everydayOnly, string? search, CancellationToken ct, TransactionFilter? filter = null)
     {
         var query = _db.Transactions.AsNoTracking();
 
@@ -109,6 +111,35 @@ internal sealed class TransactionRepository : ITransactionRepository
         if (to.HasValue)
         {
             query = query.Where(t => t.EffectiveDate <= to.Value);
+        }
+
+        if (filter is { IsEmpty: false })
+        {
+            if (filter.CategoryId is { } categoryGuid)
+            {
+                var categoryId = CategoryId.From(categoryGuid);
+                query = query.Where(t => t.CategoryId == categoryId);
+            }
+
+            if (filter.UncategorizedOnly)
+            {
+                query = query.Where(t => t.CategoryId == null);
+            }
+
+            if (filter.Status is { } status)
+            {
+                query = query.Where(t => t.Status == status);
+            }
+
+            if (filter.MinAmount is { } min)
+            {
+                query = query.Where(t => t.Amount.Amount >= min);
+            }
+
+            if (filter.MaxAmount is { } max)
+            {
+                query = query.Where(t => t.Amount.Amount <= max);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(search))

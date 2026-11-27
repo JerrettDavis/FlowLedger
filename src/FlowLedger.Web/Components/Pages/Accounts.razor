@@ -117,6 +117,8 @@
                             <span class="fl-num fl-hide-md @(ch.End - ch.Start >= 0 ? "fl-pos" : "fl-neg")" style="font-size:.8rem" title="Change over @_rangePreset">@Format.SignedWithPercent(ch.End - ch.Start, ch.Start)</span>
                         }
                         <span class="fl-li__amt fl-num @(acct.BalanceAmount < 0 ? "fl-neg" : "")">@Format.Money(acct.BalanceAmount, acct.BalanceCurrency)</span>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Href="@($"accounts/{acct.Id}")"
+                                       aria-label="@($"Details for {acct.Name}")" title="Account details" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                        OnClick="() => OpenEditDialog(acct)" aria-label="@($"Edit account {acct.Name}")" />
                     </div>

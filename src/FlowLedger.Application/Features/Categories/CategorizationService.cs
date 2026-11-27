@@ -72,7 +72,8 @@ public interface ICategorizationStore
 
 public sealed record CategorizationResult(
     int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0,
-    bool Partial = false);   // true: more history exists than the processing cap, so the oldest rows were not considered
+    bool Partial = false,   // true: more history exists than the processing cap, so the oldest rows were not considered
+    int ByProviderHint = 0, int TransfersLinked = 0);
 
 /// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
 public sealed class CategorizationOptions
@@ -97,7 +98,7 @@ public sealed class CategorizationOptions
 ///  3. built-in keyword rules (<see cref="AutoCategorizer"/>)
 /// Safe to re-run any time; it is idempotent.
 /// </summary>
-public sealed class CategorizationService(
+public sealed partial class CategorizationService(
     ICategorizationStore store,
     ICategoryRepository categories,
     IAccountRepository accounts,
@@ -169,7 +170,7 @@ public sealed class CategorizationService(
         var nearby = await store.LoadWindowAsync(from, to, Max, ct);
         var learning = await store.LoadManualLearningAsync(LearningWindow, ct);
         // The targets are always part of the transfer context, whatever the window read returned.
-        var context = nearby.Concat(targets).DistinctBy(t => t.Id).ToList();
+        var context = targets.Concat(nearby).DistinctBy(t => t.Id).ToList();
         return await CategorizeAsync(allowLlm, targets, context, learning, TransactionQuota.IsPartial(nearby.Count), ct);
     }
 
@@ -179,7 +180,9 @@ public sealed class CategorizationService(
         // Only the user's own categories are evidence; Auto/Suggested rows would teach the model its own guesses.
         var real = learningRows.Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual).ToList();
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
-        var transferIds = TransferDetector.Detect(transferContext.Select(TransactionMapper.ToDto).ToList(), accountTypes);
+        var contextDtos = transferContext.Select(TransactionMapper.ToDto).ToList();
+        var transferPairs = TransferDetector.DetectPairs(contextDtos, accountTypes);
+        var transferIds = transferPairs.SelectMany(p => new[] { p.A, p.B }).ToHashSet();
 
         // merchant -> the category the USER chose most often (auto-filled rows are not evidence of intent)
         var learned = real.Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual)
@@ -229,8 +232,12 @@ public sealed class CategorizationService(
             .Where(x => x is not null && !string.Equals(x, AutoCategorizer.TransferCategory, StringComparison.OrdinalIgnoreCase))
             .Select(x => x!).ToList();
 
-        int byLearned = 0, byKeyword = 0, byModel = 0, byLlm = 0, suggested = 0, transfers = 0, left = 0;
+        int byLearned = 0, byKeyword = 0, byModel = 0, byLlm = 0, suggested = 0, transfers = 0, left = 0, byProvider = 0;
         var changedRows = new List<Transaction>();
+        var changedIds = new HashSet<Guid>();
+
+        var linked = LinkTransferLegs(transferPairs, transferContext, changedRows, changedIds);
+
         foreach (var t in uncategorized)
         {
             var before = (t.CategoryId, t.CategorySource, t.SuggestedCategoryId, t.SuggestedConfidence);
@@ -249,6 +256,12 @@ public sealed class CategorizationService(
             {
                 t.Categorize(await EnsureAsync(path), null, CategorySource.Auto);
                 byKeyword++;
+            }
+            else if (ProviderCategoryHints.PathFor(t.ProviderCategory, t.Direction.ToString()) is { } hintPath)
+            {
+                // The provider's own label is weaker than anything the user taught us or a keyword rule, but stronger than a guess.
+                t.Categorize(await EnsureAsync(hintPath), null, CategorySource.Auto, ProviderHintConfidence);
+                byProvider++;
             }
             else
             {
@@ -290,7 +303,7 @@ public sealed class CategorizationService(
                 }
             }
 
-            if ((t.CategoryId, t.CategorySource, t.SuggestedCategoryId, t.SuggestedConfidence) != before)
+            if ((t.CategoryId, t.CategorySource, t.SuggestedCategoryId, t.SuggestedConfidence) != before && changedIds.Add(t.Id))
             {
                 changedRows.Add(t);
             }
@@ -298,11 +311,14 @@ public sealed class CategorizationService(
 
         await categories.SaveChangesAsync(ct);
         await store.SaveChangedAsync(changedRows, ct);
-        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, partial);
+        return new CategorizationResult(byLearned + byKeyword + byModel + byProvider + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, partial, byProvider, linked);
     }
 
     /// <summary>Fixed confidence shown for a language-model pick (it has no calibrated probability).</summary>
     private const double LlmConfidence = 0.5;
+
+    /// <summary>Confidence recorded for a category taken from the provider's own label.</summary>
+    private const double ProviderHintConfidence = 0.6;
 
     /// <summary>Embedding-kNN top candidates keyed by normalised text; empty when disabled, under-trained, or the embedder fails.</summary>
     private async Task<IReadOnlyDictionary<string, IReadOnlyList<Prediction>>> RankSemanticAsync(

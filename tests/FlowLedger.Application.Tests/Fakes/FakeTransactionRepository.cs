@@ -30,9 +30,15 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         bool everydayOnly = false,
         string? search = null,
         TransactionSortKey sort = TransactionSortKey.Date,
-        bool descending = true)
+        bool descending = true,
+        TransactionFilter? filter = null)
     {
         var query = _store.AsEnumerable();
+        if (filter is { IsEmpty: false })
+        {
+            query = query.Where(filter.Matches);
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(t => t.Description.Contains(search, StringComparison.OrdinalIgnoreCase)

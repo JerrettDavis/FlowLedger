@@ -1,6 +1,7 @@
 using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.RecurringFlows;
+using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.BillSheet;
@@ -294,6 +295,16 @@ public sealed class BillSheetService(
             .Select(t => new SheetTxn(t.Id, t.EffectiveDate, t.Amount.Amount, $"{t.MerchantName} {t.Description}", t.MerchantName ?? t.Description))
             .ToList();
         all = all.Where(t => !IsInvestment(t)).ToList();
+
+        // Transfers (#68): a card/loan payment shows up as two legs. The paying leg may tick a bill row; the receiving leg on the
+        // liability account is dropped so it can neither pay the row twice nor be detected as a new recurring expense.
+        if (accounts is not null)
+        {
+            var types = (await accounts.ListIncludingInactiveAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
+            var dtos = all.Select(TransactionMapper.ToDto).ToList();
+            var receiving = TransferDetector.LiabilitySideLegs(dtos, TransferDetector.Detect(dtos, types), types);
+            all = all.Where(t => !receiving.Contains(t.Id)).ToList();
+        }
 
         var txns = all
             .Where(t => t.Direction == TransactionDirection.Debit

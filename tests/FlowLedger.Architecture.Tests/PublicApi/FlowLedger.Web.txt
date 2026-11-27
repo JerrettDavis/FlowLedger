@@ -22,6 +22,7 @@ class FlowLedger.Web.Components.Layout.AppBar
 class FlowLedger.Web.Components.Layout.MainLayout
 class FlowLedger.Web.Components.Layout.NavMenu
 class FlowLedger.Web.Components.Layout.ReconnectModal
+class FlowLedger.Web.Components.Pages.AccountDetail
 class FlowLedger.Web.Components.Pages.Accounts
 class FlowLedger.Web.Components.Pages.AssetsPage
 class FlowLedger.Web.Components.Pages.BudgetsPage
@@ -178,6 +179,7 @@ sealed class FlowLedger.Web.ApiClient.StrategyReportDto
 sealed class FlowLedger.Web.ApiClient.SuggestionDto
 sealed class FlowLedger.Web.ApiClient.SyncStatusDto
 sealed class FlowLedger.Web.ApiClient.TrajectoryPointDto
+sealed class FlowLedger.Web.ApiClient.TransactionColumnFilter
 sealed class FlowLedger.Web.ApiClient.TransactionPage
 sealed class FlowLedger.Web.ApiClient.TrendPointDto
 sealed class FlowLedger.Web.ApiClient.UnassignedAccountDto
@@ -227,5 +229,6 @@ static class FlowLedger.Web.Shared.OnboardingCopy
 static class FlowLedger.Web.Shared.QueryChartSvg
 static class FlowLedger.Web.Shared.SnackbarExtensions
 static class FlowLedger.Web.Shared.SvgChart
+static class FlowLedger.Web.Shared.SyncAge
 static class FlowLedger.Web.Theme.FlowLedgerTheme
 static class FlowLedger.Web.Theme.ThemeBootstrap

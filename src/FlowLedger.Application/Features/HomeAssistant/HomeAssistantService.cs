@@ -212,6 +212,28 @@ public sealed class HomeAssistantService(
             }
         }
 
-        return HomeAssistantEventDetector.Detect(today, haFlows, balances, recent, breaches, lowest, settings);
+        var activity = await DetectActivityAsync(today, accountList, visible, ct);
+        return HomeAssistantEventDetector.Detect(today, haFlows, balances, recent, breaches, lowest, settings, activity);
     }
+
+    /// <summary>Large-charge, price-increase, new-subscription and low-balance alerts from recent history.</summary>
+    private async Task<IReadOnlyList<Alerts.ActivityAlert>> DetectActivityAsync(
+        DateOnly today, IReadOnlyList<Domain.Aggregates.Account> accountList, List<Domain.ValueObjects.AccountId> visible, CancellationToken ct)
+    {
+        if (visible.Count == 0)
+        {
+            return [];
+        }
+
+        var history = await transactions.ListForAccountsAsync(visible, today.AddDays(-ActivityHistoryDays), today, ct);
+        var dtos = history.Select(Transactions.TransactionMapper.ToDto).ToList();
+        var types = accountList.ToDictionary(a => a.Id, a => a.AccountType.ToString());
+        var transferIds = Transactions.TransferDetector.Detect(dtos, types);
+        var balances = accountList.Select(a => new Alerts.BalanceInput(
+            a.Id, a.Name, a.CurrentBalance.Amount,
+            a.AccountType is AccountType.Checking or AccountType.Savings or AccountType.Cash)).ToList();
+        return Alerts.ActivityAlertRules.Build(today, dtos, transferIds, balances, new Dictionary<Guid, string>());
+    }
+
+    private const int ActivityHistoryDays = 200;
 }

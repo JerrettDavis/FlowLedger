@@ -42,6 +42,33 @@
                 }
             </MudSelect>
         </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect T="string" Value="_filterCategory" ValueChanged="OnCategoryFilterChanged" Label="Category" Clearable="true"
+                       aria-label="Filter by category">
+                <MudSelectItem T="string" Value="@UncategorizedFilter">Uncategorized</MudSelectItem>
+                @foreach (var c in _sortedCategories)
+                {
+                    <MudSelectItem T="string" Value="@c.Id.ToString()">@c.Path</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect T="string" Value="_filterStatus" ValueChanged="OnStatusFilterChanged" Label="Status" Clearable="true"
+                       aria-label="Filter by status">
+                @foreach (var s in StatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@s">@s</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="2" md="2">
+            <MudNumericField T="decimal?" Value="_minAmount" ValueChanged="OnMinAmountChanged" Label="Min amount" Min="0m"
+                             Immediate="false" HideSpinButtons="true" aria-label="Minimum amount" />
+        </MudItem>
+        <MudItem xs="6" sm="2" md="2">
+            <MudNumericField T="decimal?" Value="_maxAmount" ValueChanged="OnMaxAmountChanged" Label="Max amount" Min="0m"
+                             Immediate="false" HideSpinButtons="true" aria-label="Maximum amount" />
+        </MudItem>
         <MudItem xs="12" sm="8" md="6">
             <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Immediate="true" DebounceInterval="300" Label="Search description or merchant" Clearable="true"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
@@ -99,11 +126,28 @@
              Dense="true"
              Virtualize="false"
              RowsPerPage="@PageSize"
+             MultiSelection="true"
+             SelectedItems="_selected"
+             SelectedItemsChanged="OnSelectionChanged"
              aria-label="Transactions table">
     <ToolBarContent>
+        @if (_selected.Count > 0)
+        {
+            <MudMenu Dense="true" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Category"
+                     Label="@($"Set category for {_selected.Count} selected")" Disabled="_bulkBusy" aria-label="Set category for selected transactions"
+                     data-testid="bulk-category">
+                @foreach (var c in _sortedCategories)
+                {
+                    var target = c;
+                    <MudMenuItem OnClick="@(() => BulkSetCategory(target))">@target.Path</MudMenuItem>
+                }
+            </MudMenu>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Class="ml-2" OnClick="ClearSelection">Clear selection</MudButton>
+        }
         <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status" data-testid="tx-count">@RangeText</MudText>
     </ToolBarContent>
     <Columns>
+        <SelectColumn T="FlowLedger.Contracts.TransactionDto" ShowInHeader="true" ShowInFooter="false" />
         <TemplateColumn Title="Date" Sortable="false">
             <HeaderTemplate>
                 <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("date")"
@@ -246,6 +290,14 @@
     private Guid? _filterAccountId;
     private bool _includeHidden;
     private string? _search;
+    private const string UncategorizedFilter = "uncategorized";
+    private static readonly string[] StatusOptions = ["Posted", "Pending", "Matched", "Reconciled", "NeedsReview"];
+    private string? _filterCategory;
+    private string? _filterStatus;
+    private decimal? _minAmount;
+    private decimal? _maxAmount;
+    private HashSet<FlowLedger.Contracts.TransactionDto> _selected = [];
+    private bool _bulkBusy;
     private bool _applyToMerchant;
     private bool _categorizing;
     private static readonly int[] PageSizes = [25, 50, 100, 250];
@@ -328,6 +380,9 @@
     /// <summary>Deep link from the dashboard account strip: /transactions?account={id}.</summary>
     [SupplyParameterFromQuery(Name = "account")] public Guid? AccountQuery { get; set; }
 
+    /// <summary>Deep link from "Needs a Look": /transactions?uncategorized=true.</summary>
+    [SupplyParameterFromQuery(Name = "uncategorized")] public bool UncategorizedQuery { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -342,6 +397,11 @@
             Snackbar.Add("Couldn't load account and category filters — some dropdowns may be empty.", Severity.Warning);
         }
         _filterAccountId ??= AccountQuery;
+        if (UncategorizedQuery)
+        {
+            _filterCategory = UncategorizedFilter; // deep link from the dashboard's "Needs a Look" card
+        }
+
         await LoadAsync();
     }
 
@@ -390,7 +450,8 @@
                 includeHidden: _includeHidden,
                 search: _search,
                 sort: _sortKey,
-                descending: _sortDescending);
+                descending: _sortDescending,
+                filter: ColumnFilter);
             if (seq != _loadSeq)
             {
                 return; // a newer filter or search superseded this response
@@ -398,6 +459,7 @@
 
             _transactions = page.Items;
             _total = page.Total;
+            _selected = [];
             RecomputeVisible();
         }
         catch (Exception ex)
@@ -421,6 +483,54 @@
     private Task OnFromChanged(DateTime? value) { _fromDate = value; return LoadAsync(); }
 
     private Task OnToChanged(DateTime? value) { _toDate = value; return LoadAsync(); }
+
+    private FlowLedger.Web.ApiClient.TransactionColumnFilter? ColumnFilter =>
+        _filterCategory is null && _filterStatus is null && _minAmount is null && _maxAmount is null
+            ? null
+            : new FlowLedger.Web.ApiClient.TransactionColumnFilter(
+                Guid.TryParse(_filterCategory, out var category) ? category : null,
+                _filterCategory == UncategorizedFilter,
+                _filterStatus, _minAmount, _maxAmount);
+
+    private void OnSelectionChanged(HashSet<FlowLedger.Contracts.TransactionDto> items) => _selected = items;
+
+    private void ClearSelection() => _selected = [];
+
+    /// <summary>Sets one category on every selected row (a single server call), then reloads the page. Selection is per page.</summary>
+    private async Task BulkSetCategory(FlowLedger.Contracts.CategoryDto category)
+    {
+        if (_selected.Count == 0)
+        {
+            return;
+        }
+
+        var ids = _selected.Select(t => t.Id).ToList();
+        _bulkBusy = true;
+        try
+        {
+            var changed = await ApiClient.SetCategoryBulkAsync(ids, category.Id);
+            Snackbar.Add($"Set {changed} transaction{(changed == 1 ? "" : "s")} to {category.Path}", Severity.Success);
+            _selected = [];
+            await LoadPageAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Bulk category change failed");
+            Snackbar.AddFailure(ex, "Couldn't set the category on the selected transactions");
+        }
+        finally
+        {
+            _bulkBusy = false;
+        }
+    }
+
+    private Task OnCategoryFilterChanged(string? value) { _filterCategory = value; return LoadAsync(); }
+
+    private Task OnStatusFilterChanged(string? value) { _filterStatus = value; return LoadAsync(); }
+
+    private Task OnMinAmountChanged(decimal? value) { _minAmount = value; return LoadAsync(); }
+
+    private Task OnMaxAmountChanged(decimal? value) { _maxAmount = value; return LoadAsync(); }
 
     private Task OnAccountChanged(Guid? value) { _filterAccountId = value; return LoadAsync(); }
 
@@ -661,6 +771,10 @@
         _fromDate = null;
         _toDate = null;
         _filterAccountId = null;
+        _filterCategory = null;
+        _filterStatus = null;
+        _minAmount = null;
+        _maxAmount = null;
         _ = LoadAsync();
     }
 
