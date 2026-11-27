@@ -35,7 +35,7 @@ public sealed class RawArchiveTests : IDisposable
 
     private static RawPayloadContext Ctx(Guid? tenant) => new("GET", "/users/USR-1/accounts?page=1", 200, tenant);
 
-    private RawArchiveMaintenance Maintenance(LocalDiskObjectStorage storage, RawArchiveSettings? settings = null) =>
+    private static RawArchiveMaintenance Maintenance(LocalDiskObjectStorage storage, RawArchiveSettings? settings = null) =>
         new(storage, storage, settings ?? RawArchiveSettings.Default);
 
     [Fact]

@@ -27,37 +27,22 @@ dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
 # Analyzer severity plan (issue #113)
 #
 # Directory.Build.props sets AnalysisMode=Recommended and TreatWarningsAsErrors=true, so any
-# rule at warning severity fails the build. Rules below are either fixed in the tree (left at
-# their Recommended default of warning) or parked at suggestion with a ratchet: the rule stays
-# visible in the IDE, and moving it back to warning is the cleanup milestone for that rule.
+# rule at warning severity fails the build. The tree is clean for every rule at its Recommended
+# default of warning, including the former backlog rules CA1848/CA1873 (logging goes through
+# [LoggerMessage] source-generated partial methods), CA1859, CA1826, CA1822, CA1512, CA1845 and CA1725.
 #
-# Ratchet backlog (set to suggestion; flip to warning once the tree is clean):
-#   CA1848  use LoggerMessage delegates (~165 call sites). Migrate per-service via [LoggerMessage]
-#           source generators; high volume, low risk, so batch by project.
-#   CA1873  guard expensive logging arguments (~50 sites). Resolved for free by the CA1848 migration
-#           (generated delegates check IsEnabled), so it ratchets together with CA1848.
-#   CA1716  identifiers that collide with VB keywords (Shared namespace, parameter names such as
+# Rules still parked at suggestion (visible in the IDE; flipping one to warning is that rule's cleanup milestone):
+#   CA1716  identifiers that collide with VB keywords (Shared/Imports namespaces, parameter names such as
 #           'end'/'error'); renaming changes public signatures, defer to the #121 API pass.
 #   CA1068  CancellationToken-last parameter ordering; public signature change, defer to #121.
-#   CA1725  override/interface parameter names; renames break named arguments, defer to #121.
-#   CA1859  concrete return types for private helpers (perf micro-optimisation).
-#   CA1826  FirstOrDefault()/First() on indexable collections (micro-optimisation, empty-case semantics).
-#   CA1822, CA1711, CA1720, CA1001, CA1512, CA1845  low-value or API/lifetime-shape changes.
+#   CA1711, CA1720, CA1001  public type/identifier naming and lifetime-shape changes, defer to #121.
 # ---------------------------------------------------------------------------
 [*.cs]
-dotnet_diagnostic.CA1848.severity = suggestion
-dotnet_diagnostic.CA1873.severity = suggestion
 dotnet_diagnostic.CA1716.severity = suggestion
 dotnet_diagnostic.CA1068.severity = suggestion
-dotnet_diagnostic.CA1725.severity = suggestion
-dotnet_diagnostic.CA1859.severity = suggestion
-dotnet_diagnostic.CA1826.severity = suggestion
-dotnet_diagnostic.CA1822.severity = suggestion
 dotnet_diagnostic.CA1711.severity = suggestion
 dotnet_diagnostic.CA1720.severity = suggestion
 dotnet_diagnostic.CA1001.severity = suggestion
-dotnet_diagnostic.CA1512.severity = suggestion
-dotnet_diagnostic.CA1845.severity = suggestion
 
 # EF Core migrations are tool-generated; constant array arguments are the scaffolder's output.
 [**/Migrations/*.cs]
@@ -68,6 +53,9 @@ dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1869.severity = none
+# Test code logs ad hoc through ILogger extensions; source-generated delegates add nothing there.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
 dotnet_diagnostic.CA1875.severity = none
 dotnet_diagnostic.CA1860.severity = none
 dotnet_diagnostic.CA1816.severity = none

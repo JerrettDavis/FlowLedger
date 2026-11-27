@@ -351,7 +351,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
     private partial void LogPagesInsideOneDay(int max);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.")]
-    private partial void LogSkippingTransactionNoDate(string providerTransactionId);
+    private partial void LogSkippingTransactionNoDate(string? providerTransactionId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping Quiltt transaction: {Message}")]
     private partial void LogSkippingTransaction(string message);

@@ -32,7 +32,7 @@ public sealed partial class MxCallGuardHandler : DelegatingHandler
         _time = time ?? TimeProvider.System;
     }
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var opts = _options.CurrentValue;
         if (opts.CallsPaused)
@@ -44,7 +44,7 @@ public sealed partial class MxCallGuardHandler : DelegatingHandler
         if (opts.DailyCallBudget > 0)
         {
             var today = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
-            var used = await _ledger.CountSinceAsync(ProviderName, today, ct).ConfigureAwait(false);
+            var used = await _ledger.CountSinceAsync(ProviderName, today, cancellationToken).ConfigureAwait(false);
             if (used >= opts.DailyCallBudget)
             {
                 throw new ProviderCallBudgetExceededException($"Daily MX call budget reached ({used}/{opts.DailyCallBudget}). Nothing was sent.");
@@ -54,7 +54,7 @@ public sealed partial class MxCallGuardHandler : DelegatingHandler
         if (opts.MonthlyCallBudget > 0)
         {
             var month = new DateTimeOffset(new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc));
-            var used = await _ledger.CountSinceAsync(ProviderName, month, ct).ConfigureAwait(false);
+            var used = await _ledger.CountSinceAsync(ProviderName, month, cancellationToken).ConfigureAwait(false);
             if (used >= opts.MonthlyCallBudget)
             {
                 throw new ProviderCallBudgetExceededException($"Monthly MX call budget reached ({used}/{opts.MonthlyCallBudget}). Nothing was sent.");
@@ -66,7 +66,7 @@ public sealed partial class MxCallGuardHandler : DelegatingHandler
         string? error = null;
         try
         {
-            response = await base.SendAsync(request, ct).ConfigureAwait(false);
+            response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
