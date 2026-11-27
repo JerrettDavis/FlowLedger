@@ -188,9 +188,7 @@ if (app.Environment.IsDevelopment())
     var devKey = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value.Key;
     if (string.Equals(devKey, "dev-local-key-not-for-production", StringComparison.Ordinal))
     {
-        app.Logger.LogWarning(
-            "SECURITY: running in Development with the public dev API key, and requests without X-Tenant-Id fall back to the " +
-            "household tenant. Do not expose this instance or onboard other users until ASPNETCORE_ENVIRONMENT=Production (or at least Tenancy__RequireTenantHeader=true) and a real Api__Key are set.");
+        ApiLog.DevKeyInUse(app.Logger);
     }
 }
 
