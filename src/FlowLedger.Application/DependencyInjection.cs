@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
         services.AddScoped<FlowLedger.Application.Features.Query.AskQueryHandler>();
+        services.TryAddSingleton<FlowLedger.Application.Features.Query.AskConcurrencyGate>();   // process-local, bounded by in-flight asks
         services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.TryAddSingleton<FlowLedger.Application.Features.LocalAi.LocalAiOptions>();
         services.AddScoped<FlowLedger.Application.Features.LocalAi.LocalAiService>();
