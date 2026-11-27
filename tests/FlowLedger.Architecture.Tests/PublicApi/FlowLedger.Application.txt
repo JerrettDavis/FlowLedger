@@ -196,7 +196,9 @@ sealed class FlowLedger.Application.Features.Forecasting.GoalAffordabilityInput
 sealed class FlowLedger.Application.Features.Forecasting.GoalAffordabilityResult
 sealed class FlowLedger.Application.Features.Forecasting.OverdraftWarning
 sealed class FlowLedger.Application.Features.Forecasting.SpendingProfile
+sealed class FlowLedger.Application.Features.Goals.GetGoalStatusesHandler
 sealed class FlowLedger.Application.Features.Goals.GoalRow
+sealed class FlowLedger.Application.Features.Goals.GoalStatusRow
 sealed class FlowLedger.Application.Features.Goals.SaveGoalHandler
 sealed class FlowLedger.Application.Features.Goals.SaveGoalRequest
 sealed class FlowLedger.Application.Features.HomeAssistant.HaEvent

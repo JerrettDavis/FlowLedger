@@ -41,7 +41,8 @@ internal static class ActivityAlertRules
         IReadOnlySet<Guid> transferIds,
         IReadOnlyList<BalanceInput> balances,
         IReadOnlyDictionary<Guid, string> categoryPathById,
-        decimal lowBalanceThreshold = DefaultLowBalance)
+        decimal lowBalanceThreshold = DefaultLowBalance,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? goalsByAccount = null)
     {
         var alerts = new List<ActivityAlert>();
         var real = history
@@ -93,11 +94,26 @@ internal static class ActivityAlertRules
             }
         }
 
-        // Low balance: a liquid account that is still positive but under the threshold (overdrawn accounts already raise an overdraft alert).
-        foreach (var a in balances.Where(a => a.IsLiquid && a.Balance >= 0 && a.Balance < lowBalanceThreshold))
+        // Low balance: a liquid account, or an account an unfinished goal is linked to (#70), that is still positive but under the
+        // threshold (overdrawn accounts already raise an overdraft alert). A linked account raises one alert, which names its goals.
+        foreach (var a in balances.Where(a => a.Balance >= 0 && a.Balance < lowBalanceThreshold))
         {
+            IReadOnlyList<string>? goalNames = null;
+            if (goalsByAccount is not null && goalsByAccount.TryGetValue(a.Id, out var names) && names.Count > 0)
+            {
+                goalNames = names;
+            }
+
+            if (!a.IsLiquid && goalNames is null)
+            {
+                continue;
+            }
+
+            var detail = goalNames is null
+                ? $"{a.Name} is down to {a.Balance:C0}."
+                : $"{a.Name} is down to {a.Balance:C0}. It is the account behind your {(goalNames.Count == 1 ? "goal" : "goals")} {string.Join(", ", goalNames.Select(n => $"\"{n}\""))}.";
             alerts.Add(new ActivityAlert(ActivityAlertKinds.LowBalance, "warning", "Low balance",
-                $"{a.Name} is down to {a.Balance:C0}.", $"{ActivityAlertKinds.LowBalance}:{a.Id}:{today:yyyy-MM-dd}", a.Name, today, a.Balance));
+                detail, $"{ActivityAlertKinds.LowBalance}:{a.Id}:{today:yyyy-MM-dd}", a.Name, today, a.Balance));
         }
 
         return alerts;

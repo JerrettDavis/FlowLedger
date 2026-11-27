@@ -4,7 +4,8 @@ internal sealed record BudgetUsage(string Category, decimal Limit, decimal Spent
 
 internal sealed record GoalProgress(string Name, decimal Target, decimal Saved, DateOnly? TargetDate);
 
-public sealed record Alert(string Severity, string Title, string Detail);
+/// <param name="Kind">The wire kind for activity alerts (e.g. <c>goal_slipping</c>, <c>low_balance</c>); null for the budget and past-date goal alerts.</param>
+public sealed record Alert(string Severity, string Title, string Detail, string? Kind = null);
 
 /// <summary>Pure rules that turn budget and goal state into user-facing alerts (no I/O).</summary>
 internal static class AlertBuilder

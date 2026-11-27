@@ -233,10 +233,11 @@ public sealed class HomeAssistantService(
         var balances = accountList.Select(a => new Alerts.BalanceInput(
             a.Id, a.Name, a.CurrentBalance.Amount,
             a.AccountType is AccountType.Checking or AccountType.Savings or AccountType.Cash)).ToList();
-        var found = Alerts.ActivityAlertRules.Build(today, dtos, transferIds, balances, new Dictionary<Guid, string>()).ToList();
 
-        // Goal slip (#70): needs the goals plus the household's recent surplus.
-        var paces = (await goals.ListAsync(tenant.TenantId, ct)).Select(g => new Alerts.GoalPace(g.Id, g.Name, g.TargetAmount, g.SavedAmount, g.TargetDate)).ToList();
+        // Goals (#70): a linked goal uses its account's balance and trend; the rest share the household's recent surplus.
+        var paces = Alerts.GoalPaces.Resolve(today, await goals.ListAsync(tenant.TenantId, ct), balances, dtos);
+        var found = Alerts.ActivityAlertRules.Build(today, dtos, transferIds, balances, new Dictionary<Guid, string>(),
+            goalsByAccount: Alerts.GoalPaces.UnfinishedByAccount(paces)).ToList();
         found.AddRange(Alerts.GoalSlipRules.Build(today, paces, Alerts.GoalSlipRules.MonthlySurplus(today, dtos, transferIds)));
         return found;
     }

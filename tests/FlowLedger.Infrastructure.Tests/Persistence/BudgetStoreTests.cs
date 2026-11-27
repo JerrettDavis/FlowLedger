@@ -170,12 +170,12 @@ public sealed class BudgetStoreTests : IAsyncLifetime
         var (id, v1) = await new EfGoalStore(seed, a).UpsertAsync(a.TenantId, null, "Car", 1000m, 0m, null);
 
         await using var winner = _fixture.CreateProductionStyleContext(a);
-        var (_, v2) = await new EfGoalStore(winner, a).UpsertAsync(a.TenantId, id, "Car", 1000m, 100m, null, v1);
+        var (_, v2) = await new EfGoalStore(winner, a).UpsertAsync(a.TenantId, id, "Car", 1000m, 100m, null, expectedVersion: v1);
         v2.Should().NotBe(v1);
 
         await using var loser = _fixture.CreateProductionStyleContext(a);
         var store = new EfGoalStore(loser, a);
-        var staleUpsert = () => store.UpsertAsync(a.TenantId, id, "Car", 1000m, 5m, null, v1);
+        var staleUpsert = () => store.UpsertAsync(a.TenantId, id, "Car", 1000m, 5m, null, expectedVersion: v1);
         await staleUpsert.Should().ThrowAsync<FlowLedger.Application.Abstractions.ConcurrencyConflictException>();
         loser.ChangeTracker.Clear();
         var staleDelete = () => store.RemoveAsync(a.TenantId, id, v1);

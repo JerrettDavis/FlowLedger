@@ -9,6 +9,10 @@ internal sealed class GoalRecord
     public decimal TargetAmount { get; private set; }
     public decimal SavedAmount { get; private set; }
     public DateOnly? TargetDate { get; private set; }
+
+    /// <summary>The account the goal is tracked against, if any (#70). A DB-level composite foreign key keeps it inside the tenant.</summary>
+    public Guid? LinkedAccountId { get; private set; }
+
     public DateTimeOffset UpdatedUtc { get; private set; }
 
     /// <summary>Optimistic-concurrency token: Postgres <c>xmin</c> (#157).</summary>
@@ -16,7 +20,7 @@ internal sealed class GoalRecord
 
     private GoalRecord() { }
 
-    public static GoalRecord Create(Guid tenantId, Guid id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate) =>
+    public static GoalRecord Create(Guid tenantId, Guid id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, Guid? linkedAccountId = null) =>
         new()
         {
             TenantId = tenantId,
@@ -25,15 +29,17 @@ internal sealed class GoalRecord
             TargetAmount = targetAmount,
             SavedAmount = savedAmount,
             TargetDate = targetDate,
+            LinkedAccountId = linkedAccountId,
             UpdatedUtc = DateTimeOffset.UtcNow,
         };
 
-    public void Update(string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate)
+    public void Update(string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, Guid? linkedAccountId = null)
     {
         Name = name;
         TargetAmount = targetAmount;
         SavedAmount = savedAmount;
         TargetDate = targetDate;
+        LinkedAccountId = linkedAccountId;
         UpdatedUtc = DateTimeOffset.UtcNow;
     }
 }

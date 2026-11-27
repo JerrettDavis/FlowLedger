@@ -26,11 +26,11 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
         var rows = await db.Goals.AsNoTracking()
             .OrderBy(g => g.TargetDate == null).ThenBy(g => g.TargetDate).ThenBy(g => g.Name)
             .ToListAsync(ct);
-        return rows.Select(r => new GoalRow(r.Id, r.Name, r.TargetAmount, r.SavedAmount, r.TargetDate, r.RowVersion)).ToList();
+        return rows.Select(r => new GoalRow(r.Id, r.Name, r.TargetAmount, r.SavedAmount, r.TargetDate, r.RowVersion, r.LinkedAccountId)).ToList();
     }
 
     public async Task<(Guid Id, uint Version)> UpsertAsync(
-        Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, uint? expectedVersion = null, CancellationToken ct = default)
+        Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, Guid? linkedAccountId = null, uint? expectedVersion = null, CancellationToken ct = default)
     {
         Guard(tenantId);
         var goalId = id ?? Guid.NewGuid();
@@ -42,7 +42,7 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
                 throw new ConcurrencyConflictException("This goal was removed elsewhere. Reload it and try again.");
             }
 
-            existing = GoalRecord.Create(tenantId, goalId, name, target, saved, targetDate);
+            existing = GoalRecord.Create(tenantId, goalId, name, target, saved, targetDate, linkedAccountId);
             db.Goals.Add(existing);
         }
         else
@@ -52,7 +52,7 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
                 db.Entry(existing).Property(g => g.RowVersion).OriginalValue = version;
             }
 
-            existing.Update(name, target, saved, targetDate);
+            existing.Update(name, target, saved, targetDate, linkedAccountId);
         }
 
         await VersionedSave.SaveAsync(db, "goal", ct);

@@ -4,7 +4,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.Goals;
 
-public sealed record GoalRow(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate, uint Version = 0);
+public sealed record GoalRow(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate, uint Version = 0, Guid? LinkedAccountId = null);
 
 /// <summary>Port for per-tenant savings goals.</summary>
 public interface IGoalStore
@@ -15,12 +15,13 @@ public interface IGoalStore
     /// Creates or updates a goal and returns its id and new version. With <paramref name="expectedVersion"/> the write only applies if
     /// the row is still at that version, otherwise <c>ConcurrencyConflictException</c>; null keeps last-write-wins.
     /// </summary>
-    Task<(Guid Id, uint Version)> UpsertAsync(Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, uint? expectedVersion = null, CancellationToken ct = default);
+    Task<(Guid Id, uint Version)> UpsertAsync(Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, Guid? linkedAccountId = null, uint? expectedVersion = null, CancellationToken ct = default);
 
     Task RemoveAsync(Guid tenantId, Guid id, uint? expectedVersion = null, CancellationToken ct = default);
 }
 
-public sealed record SaveGoalRequest(Guid? Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate);
+/// <param name="LinkedAccountId">Optional account the goal is tracked against (#70): its balance becomes the goal's progress and its 90-day trend the goal's pace.</param>
+public sealed record SaveGoalRequest(Guid? Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate, Guid? LinkedAccountId = null);
 
 internal sealed class SaveGoalRequestValidator : AbstractValidator<SaveGoalRequest>
 {
@@ -40,8 +41,8 @@ public static class GoalLimits
     public const int MaxGoals = 200;
 }
 
-/// <summary>Creates or updates one goal, refusing a new one past <see cref="GoalLimits.MaxGoals"/>; updating an existing one is always allowed.</summary>
-public sealed class SaveGoalHandler(IGoalStore store, ITenantContext tenant)
+/// <summary>Creates or updates one goal, refusing a new one past <see cref="GoalLimits.MaxGoals"/>; updating an existing one is always allowed. A linked account must exist for this tenant and be active.</summary>
+public sealed class SaveGoalHandler(IGoalStore store, IAccountRepository accounts, ITenantContext tenant)
 {
     public async Task<(Guid Id, uint Version)> HandleAsync(SaveGoalRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {
@@ -52,6 +53,11 @@ public sealed class SaveGoalHandler(IGoalStore store, ITenantContext tenant)
             throw new RequestValidationException("goal", $"You can have at most {GoalLimits.MaxGoals} savings goals. Remove one before adding another.");
         }
 
-        return await store.UpsertAsync(tenant.TenantId, request.Id, request.Name.Trim(), request.TargetAmount, request.SavedAmount, request.TargetDate, expectedVersion, ct);
+        if (request.LinkedAccountId is { } linked && await accounts.GetByIdAsync(new FlowLedger.Domain.ValueObjects.AccountId(linked), ct) is not { IsActive: true })
+        {
+            throw new RequestValidationException("linkedAccountId", "The linked account was not found. Pick an account that exists, or leave the goal unlinked.");
+        }
+
+        return await store.UpsertAsync(tenant.TenantId, request.Id, request.Name.Trim(), request.TargetAmount, request.SavedAmount, request.TargetDate, request.LinkedAccountId, expectedVersion, ct);
     }
 }
