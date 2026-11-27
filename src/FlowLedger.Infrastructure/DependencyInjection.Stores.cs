@@ -73,6 +73,9 @@ public static partial class DependencyInjection
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantNetworkPolicy, HouseholdHomeAssistantNetworkPolicy>();
         services.AddSingleton<FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender, HomeAssistantWebhookSender>();
 
+        // Optional SMTP channel for alerts (Alerts:Email:*, off by default, validated on start when enabled).
+        services.AddSingleton<FlowLedger.Application.Features.Alerts.IAlertEmailSender, SmtpAlertEmailSender>();
+
         // Integrations: per-tenant definitions, encrypted secrets, delivery log.
         services.AddScoped<FlowLedger.Application.Features.Integrations.IIntegrationStore>(sp =>
             new EfIntegrationStore(

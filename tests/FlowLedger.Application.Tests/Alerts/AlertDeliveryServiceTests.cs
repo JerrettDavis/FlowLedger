@@ -87,8 +87,28 @@ public sealed class AlertDeliveryServiceTests
     private static readonly HaEvent PriceUp = new(HaEventKinds.PriceIncrease, "warning", "Price increase", "Streamly Video went up.", "price_increase:abc", "Streamly Video", new DateOnly(2026, 11, 19));
     private static readonly HaEvent Large = new(HaEventKinds.LargeCharge, "warning", "Large charge", "A large charge landed.", "large_charge:def");
 
+    private sealed class FakeEmailSender(bool enabled) : IAlertEmailSender
+    {
+        public bool IsEnabled => enabled;
+        public List<AlertEmail> Sent { get; } = [];
+        public string? Error { get; set; }
+
+        public Task<string?> SendAsync(AlertEmail email, CancellationToken ct = default)
+        {
+            if (Error is null)
+            {
+                Sent.Add(email);
+            }
+
+            return Task.FromResult(Error);
+        }
+    }
+
+    private static Task<(AlertDeliveryService Delivery, FakeTransport Transport, FakeHomeAssistantStore Store)> CreateAsync(
+        string[]? webhookEvents, params HaEvent[] alerts) => CreateAsync(webhookEvents, new FakeEmailSender(false), alerts);
+
     private static async Task<(AlertDeliveryService Delivery, FakeTransport Transport, FakeHomeAssistantStore Store)> CreateAsync(
-        string[]? webhookEvents, params HaEvent[] alerts)
+        string[]? webhookEvents, FakeEmailSender email, params HaEvent[] alerts)
     {
         var store = new FakeIntegrationStore();
         var transport = new FakeTransport();
@@ -101,7 +121,7 @@ public sealed class AlertDeliveryServiceTests
         }
 
         var claims = new FakeHomeAssistantStore(HomeAssistantSettings.Default);
-        return (new AlertDeliveryService(new FakeAlerts(alerts), claims, integrations, tenant), transport, claims);
+        return (new AlertDeliveryService(new FakeAlerts(alerts), claims, integrations, tenant, email), transport, claims);
     }
 
     [Fact]
@@ -154,5 +174,60 @@ public sealed class AlertDeliveryServiceTests
 
         failing.Should().Be(new AlertDeliveryResult(2, 0, 0, 2));
         recovered.Should().Be(new AlertDeliveryResult(2, 2, 0, 0), "the claims were released, so both alerts go out now");
+    }
+
+    [Fact]
+    public async Task An_enabled_email_channel_gets_each_alert_once_even_with_no_webhook()
+    {
+        var email = new FakeEmailSender(true);
+        var (delivery, transport, _) = await CreateAsync(null, email, PriceUp);
+
+        var first = await delivery.RunAsync();
+        var second = await delivery.RunAsync();
+
+        first.Should().Be(new AlertDeliveryResult(1, 1, 0, 0));
+        second.Should().Be(new AlertDeliveryResult(1, 0, 1, 0), "the same dedupe applies to email");
+        transport.Sent.Should().BeEmpty();
+        var sent = email.Sent.Should().ContainSingle().Subject;
+        sent.Subject.Should().Be("FlowLedger: Price increase");
+        sent.Body.Should().Contain("Streamly Video went up.");
+    }
+
+    [Fact]
+    public async Task A_disabled_email_channel_is_never_called()
+    {
+        var email = new FakeEmailSender(false);
+        var (delivery, _, _) = await CreateAsync([IntegrationEvents.AlertRaised], email, PriceUp);
+
+        await delivery.RunAsync();
+
+        email.Sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_email_the_server_rejects_is_retried_on_the_next_run_without_resending_the_webhook()
+    {
+        var email = new FakeEmailSender(true) { Error = "Could not send the alert email." };
+        var (delivery, transport, _) = await CreateAsync([IntegrationEvents.AlertRaised], email, PriceUp);
+
+        var failing = await delivery.RunAsync();
+        email.Error = null;
+        var recovered = await delivery.RunAsync();
+
+        failing.Should().Be(new AlertDeliveryResult(1, 1, 0, 0), "the webhook took it, so the alert counts as sent");
+        recovered.Should().Be(new AlertDeliveryResult(1, 1, 0, 0), "the email claim was released and now goes out");
+        email.Sent.Should().ContainSingle();
+        transport.Sent.Should().ContainSingle("the webhook already had it");
+    }
+
+    [Fact]
+    public async Task A_line_break_in_an_alert_title_cannot_add_mail_headers()
+    {
+        var email = new FakeEmailSender(true);
+        var (delivery, _, _) = await CreateAsync(null, email, new HaEvent("large_charge", "warning", "Big\r\nBcc: x@evil.example", "m", "large_charge:1"));
+
+        await delivery.RunAsync();
+
+        email.Sent.Single().Subject.Should().NotContainAny("\r", "\n");
     }
 }

@@ -11,6 +11,7 @@ public static class ActivityAlertKinds
     public const string PriceIncrease = "price_increase";
     public const string NewSubscription = "new_subscription";
     public const string LowBalance = "low_balance";
+    public const string GoalSlipping = "goal_slipping";
 }
 
 /// <summary>An alert derived from recent activity. <see cref="DedupeKey"/> is stable, so a condition fires once, not on every run.</summary>
