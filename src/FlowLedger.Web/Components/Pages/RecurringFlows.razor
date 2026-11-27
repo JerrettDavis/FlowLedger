@@ -354,22 +354,15 @@
             new DialogParameters<RecurringFlowFormDialog>
             {
                 { x => x.Flow, null },
-                { x => x.Accounts, _accounts }
+                { x => x.Accounts, _accounts },
+                // The dialog performs the create so a validation failure shows next to the field and the form stays open (#211).
+                { x => x.CreateAsync, async req => { await ApiClient.CreateRecurringFlowAsync(req); } }
             });
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateRecurringFlowRequest req })
+        if (result is { Canceled: false })
         {
-            try
-            {
-                await ApiClient.CreateRecurringFlowAsync(req);
-                Snackbar.Add("Flow created", Severity.Success);
-                await LoadAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to create recurring flow");
-                Snackbar.AddFailure(ex, fallback: "Couldn't create flow. Please try again.");
-            }
+            Snackbar.Add("Flow created", Severity.Success);
+            await LoadAsync();
         }
     }
 

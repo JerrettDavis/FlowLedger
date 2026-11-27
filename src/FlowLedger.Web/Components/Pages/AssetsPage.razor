@@ -188,21 +188,28 @@
 
     private async Task OpenCreateDialog()
     {
-        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Add Asset", FormParams(null), Wide);
+        // The dialog performs the save so a validation failure shows next to the field and the form stays open (#211).
+        var parameters = FormParams(null);
+        parameters.Add(x => x.SubmitAsync, async (object req) => { await ApiClient.CreateAssetAsync((FlowLedger.Contracts.CreateAssetRequest)req); });
+        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Add Asset", parameters, Wide);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Contracts.CreateAssetRequest req })
+        if (result is { Canceled: false })
         {
-            await Run("Asset added", () => ApiClient.CreateAssetAsync(req));
+            Snackbar.Add("Asset added", Severity.Success);
+            await LoadAsync();
         }
     }
 
     private async Task OpenEditDialog(FlowLedger.Contracts.AssetDto asset)
     {
-        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Edit Asset", FormParams(asset), Wide);
+        var parameters = FormParams(asset);
+        parameters.Add(x => x.SubmitAsync, async (object req) => { await ApiClient.UpdateAssetAsync(asset.Id, (FlowLedger.Contracts.UpdateAssetRequest)req); });
+        var dialog = await DialogService.ShowAsync<AssetFormDialog>("Edit Asset", parameters, Wide);
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Contracts.UpdateAssetRequest req })
+        if (result is { Canceled: false })
         {
-            await Run("Asset updated", () => ApiClient.UpdateAssetAsync(asset.Id, req));
+            Snackbar.Add("Asset updated", Severity.Success);
+            await LoadAsync();
         }
     }
 
