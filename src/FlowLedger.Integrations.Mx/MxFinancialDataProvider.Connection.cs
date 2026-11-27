@@ -2,8 +2,6 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
 using FlowLedger.Integrations.Mx.Mapping;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Integrations.Mx;
 

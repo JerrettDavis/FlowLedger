@@ -1,7 +1,6 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Domain.Exceptions;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;

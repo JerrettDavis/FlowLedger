@@ -1,7 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
@@ -74,8 +73,8 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     private sealed class TestRegistry(params (ConnectorDescriptor Descriptor, IFinancialDataProvider Provider)[] connectors) : IConnectorRegistry
     {
         public IReadOnlyList<ConnectorDescriptor> Enabled { get; } = connectors.Select(c => c.Descriptor).ToList();
-        public bool IsEnabled(string id) => Enabled.Any(c => c.Id == id);
-        public IFinancialDataProvider Resolve(string id) => connectors.First(c => c.Descriptor.Id == id).Provider;
+        public bool IsEnabled(ConnectorId id) => Enabled.Any(c => c.Id == id);
+        public IFinancialDataProvider Resolve(ConnectorId id) => connectors.First(c => c.Descriptor.Id == id).Provider;
     }
 
     private static (ConnectorDescriptor, IFinancialDataProvider) Connector(string name, string[] ids, Exception? failure = null, bool shared = true)
@@ -138,7 +137,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
 
         // The first connector claims the account; the second finds it linked elsewhere and skips it.
         result.AccountsUpserted.Should().Be(1);
-        (await sut.Links.ListAsync()).Should().ContainSingle().Which.ConnectorId.Should().Be("SimpleFIN");
+        (await sut.Links.ListAsync()).Should().ContainSingle().Which.ConnectorId.Value.Should().Be("SimpleFIN");
         (await _fixture.CreateDbContext(tenant).Accounts.CountAsync()).Should().Be(1);
     }
 
@@ -153,7 +152,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
 
         await sut.Service.SyncAsync();
 
-        (await sut.Links.FindByAccountAsync(legacy.Id))!.ConnectorId.Should().Be("SimpleFIN");
+        (await sut.Links.FindByAccountAsync(legacy.Id))!.ConnectorId.Value.Should().Be("SimpleFIN");
         (await _fixture.CreateDbContext(tenant).Accounts.CountAsync()).Should().Be(1, "the existing account is reused, not duplicated");
     }
 
@@ -206,12 +205,12 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     private sealed class ThrowAfterLink(IAccountConnectorLinkStore inner) : IAccountConnectorLinkStore
     {
         public Task<IReadOnlyList<AccountConnectorLink>> ListAsync(CancellationToken ct = default) => inner.ListAsync(ct);
-        public Task<AccountConnectorLink?> FindByProviderAccountAsync(string c, string p, CancellationToken ct = default) => inner.FindByProviderAccountAsync(c, p, ct);
+        public Task<AccountConnectorLink?> FindByProviderAccountAsync(ConnectorId c, string p, CancellationToken ct = default) => inner.FindByProviderAccountAsync(c, p, ct);
         public Task<AccountConnectorLink?> FindByAccountAsync(Guid a, CancellationToken ct = default) => inner.FindByAccountAsync(a, ct);
         public Task PinManualAsync(Guid a, CancellationToken ct = default) => inner.PinManualAsync(a, ct);
         public Task<bool> UnlinkAsync(Guid a, CancellationToken ct = default) => inner.UnlinkAsync(a, ct);
 
-        public async Task<bool> LinkAsync(Guid accountId, string connectorId, string providerAccountId, CancellationToken ct = default)
+        public async Task<bool> LinkAsync(Guid accountId, ConnectorId connectorId, string providerAccountId, CancellationToken ct = default)
         {
             await inner.LinkAsync(accountId, connectorId, providerAccountId, ct);
             throw new InvalidOperationException("injected fault after the link was created");

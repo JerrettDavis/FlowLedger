@@ -1,3 +1,5 @@
+using FlowLedger.SharedKernel;
+
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>
@@ -7,5 +9,5 @@ namespace FlowLedger.Application.Abstractions;
 public interface IWebhookTenantResolver
 {
     /// <summary>The owning tenant, or null when the member is unknown or (defensively) claimed by more than one tenant.</summary>
-    Task<Guid?> ResolveAsync(string providerName, string memberProviderId, CancellationToken ct = default);
+    Task<Guid?> ResolveAsync(ConnectorId connector, string memberProviderId, CancellationToken ct = default);
 }

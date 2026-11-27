@@ -11,6 +11,8 @@ interface FlowLedger.Integrations.Abstractions.IRawPayloadArchive
 interface FlowLedger.Integrations.Abstractions.IRawPayloadDecryptor
 interface FlowLedger.Integrations.Abstractions.IRecurringFlowSeedSource
 sealed class FlowLedger.Integrations.Abstractions.ConnectionHealth
+sealed class FlowLedger.Integrations.Abstractions.ConnectorCallGuardHandler
+sealed class FlowLedger.Integrations.Abstractions.ConnectorCallPolicy
 sealed class FlowLedger.Integrations.Abstractions.ConnectorDescriptor
 sealed class FlowLedger.Integrations.Abstractions.FatalProviderException
 sealed class FlowLedger.Integrations.Abstractions.InvalidWebhookSignatureException

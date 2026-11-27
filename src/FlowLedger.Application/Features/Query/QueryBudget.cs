@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace FlowLedger.Application.Features.Query;
 
 /// <summary>

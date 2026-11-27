@@ -2,7 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using FlowLedger.Application.Features.Integrations;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.Outbound;
 
 /// <summary>
 /// The one outbound HTTP path for integrations. It reuses the Home Assistant connect guard (<see cref="HomeAssistantWebhookSender.CreateHandler"/>):

@@ -1,7 +1,5 @@
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Observability;
-using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace FlowLedger.Worker.Scheduling;

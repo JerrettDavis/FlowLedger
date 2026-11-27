@@ -3,7 +3,6 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.Events;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Events;
-using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;

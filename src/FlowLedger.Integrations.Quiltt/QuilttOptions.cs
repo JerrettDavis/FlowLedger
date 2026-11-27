@@ -55,4 +55,13 @@ public sealed class QuilttOptions
     public TimeSpan WebhookTolerance { get; set; } = TimeSpan.FromMinutes(5);
 
     public bool IsProduction => string.Equals(Environment, "production", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Hard cap on Quiltt API calls per UTC day, counted from the provider call ledger. 0 = unlimited.</summary>
+    public int DailyCallBudget { get; set; } = 500;
+
+    /// <summary>Hard cap on Quiltt API calls per UTC month. 0 = unlimited.</summary>
+    public int MonthlyCallBudget { get; set; } = 5000;
+
+    /// <summary>Kill switch: when true NO call is sent to Quiltt (config reload takes effect immediately).</summary>
+    public bool CallsPaused { get; set; }
 }

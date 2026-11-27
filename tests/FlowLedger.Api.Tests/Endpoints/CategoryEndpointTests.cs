@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Application.Features.Categories;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
@@ -194,16 +193,14 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>();
 
-        var categoryId = CategoryId.New();
-        var category = new Category(
-            categoryId,
+        var category = Category.CreateSystem(
             TenantId.From(FlowLedgerApiFactory.DemoTenantId),
             new CategoryPath("system-test"),
-            "System Test Category",
-            isSystem: true);
+            "System Test Category");
+        var categoryId = category.Id;
 
         db.Set<Category>().Add(category);
         await db.SaveChangesAsync();
-        return categoryId.Value;
+        return categoryId;
     }
 }

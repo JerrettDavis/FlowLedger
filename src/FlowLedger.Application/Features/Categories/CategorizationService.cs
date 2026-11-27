@@ -77,6 +77,8 @@ public sealed record CategorizationResult(
 /// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
 public sealed class CategorizationOptions
 {
+    public const string SectionName = "Categorization";
+
     /// <summary>
     /// Predictions at or above this probability are applied as Auto categories. Default 1.01 = auto-apply OFF (suggest only):
     /// held-out-merchant cross-validation on real data measured only ~60% precision at 0.70 and ~72% at 0.80.

@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Observability;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Quartz;
 
 namespace FlowLedger.Worker.Scheduling;

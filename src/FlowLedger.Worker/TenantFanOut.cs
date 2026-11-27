@@ -1,7 +1,4 @@
 using FlowLedger.Application.Features.Users;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Worker;
 

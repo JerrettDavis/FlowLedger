@@ -7,6 +7,8 @@ namespace FlowLedger.Infrastructure.Ai;
 /// <summary>Settings for the local model server (section "Ai:Ollama"). Nothing here ever points off-machine by default.</summary>
 internal sealed class OllamaOptions
 {
+    public const string SectionName = "Ai:Ollama";
+
     public string BaseUrl { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "qwen3:8b";
     /// <summary>Generous: the first question after the model was unloaded must wait for it to load into memory.</summary>

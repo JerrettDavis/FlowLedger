@@ -1,5 +1,6 @@
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
+using FlowLedger.Infrastructure.Outbound;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;

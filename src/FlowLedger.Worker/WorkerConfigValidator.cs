@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Quartz;
 
 namespace FlowLedger.Worker;

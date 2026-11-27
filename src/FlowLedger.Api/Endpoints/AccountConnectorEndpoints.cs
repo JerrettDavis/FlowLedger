@@ -1,7 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;

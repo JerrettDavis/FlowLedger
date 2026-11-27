@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FlowLedger.Application;
 using FlowLedger.Application.Features.LocalAi;
-using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.SharedKernel;
 using Microsoft.Extensions.Configuration;

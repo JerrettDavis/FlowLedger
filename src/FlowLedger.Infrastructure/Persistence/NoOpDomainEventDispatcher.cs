@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// Real handler wiring will be added in later milestones when application feature
 /// handlers are implemented.
 /// </summary>
-public sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher
+internal sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher
 {
     public Task DispatchAsync(IReadOnlyList<IDomainEvent> events, CancellationToken cancellationToken = default)
         => Task.CompletedTask;

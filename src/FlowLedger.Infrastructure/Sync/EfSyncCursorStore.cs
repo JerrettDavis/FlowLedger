@@ -24,20 +24,20 @@ internal sealed class EfSyncCursorStore : ISyncCursorStore
     }
 
     public async Task<string> GetAsync(
-        string providerName,
+        ConnectorId connector,
         string providerAccountId,
         CancellationToken ct = default)
     {
         var record = await _db.SyncCursors
             .FirstOrDefaultAsync(
-                r => r.ProviderName == providerName && r.ProviderAccountId == providerAccountId,
+                r => r.ProviderName == connector.Value && r.ProviderAccountId == providerAccountId,
                 ct);
 
         return record?.CursorValue ?? string.Empty;
     }
 
     public async Task SetAsync(
-        string providerName,
+        ConnectorId connector,
         string providerAccountId,
         string cursorValue,
         CancellationToken ct = default)
@@ -46,14 +46,14 @@ internal sealed class EfSyncCursorStore : ISyncCursorStore
 
         var record = await _db.SyncCursors
             .FirstOrDefaultAsync(
-                r => r.ProviderName == providerName && r.ProviderAccountId == providerAccountId,
+                r => r.ProviderName == connector.Value && r.ProviderAccountId == providerAccountId,
                 ct);
 
         if (record is null)
         {
             record = SyncCursorRecord.Create(
                 _tenant.TenantId,
-                providerName,
+                connector.Value,
                 providerAccountId,
                 cursorValue,
                 now);
@@ -68,7 +68,7 @@ internal sealed class EfSyncCursorStore : ISyncCursorStore
     }
 
     public async Task MarkSuccessfulAsync(
-        string providerName,
+        ConnectorId connector,
         IReadOnlyCollection<string> providerAccountIds,
         CancellationToken ct = default)
     {
@@ -79,7 +79,7 @@ internal sealed class EfSyncCursorStore : ISyncCursorStore
 
         var now = DateTimeOffset.UtcNow;
         var records = await _db.SyncCursors
-            .Where(r => r.ProviderName == providerName && providerAccountIds.Contains(r.ProviderAccountId))
+            .Where(r => r.ProviderName == connector.Value && providerAccountIds.Contains(r.ProviderAccountId))
             .ToListAsync(ct);
         foreach (var record in records)
         {

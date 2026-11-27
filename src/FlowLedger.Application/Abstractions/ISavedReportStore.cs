@@ -1,5 +1,3 @@
-using FlowLedger.Application.Features.Query;
-
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>Persistence for user-saved views and reports (tenant-scoped).</summary>

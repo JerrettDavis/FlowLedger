@@ -1,5 +1,4 @@
 using FlowLedger.Api.Middleware;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;

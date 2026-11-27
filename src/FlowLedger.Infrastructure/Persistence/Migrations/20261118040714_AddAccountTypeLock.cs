@@ -2,28 +2,27 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FlowLedger.Infrastructure.Persistence.Migrations
+namespace FlowLedger.Infrastructure.Persistence.Migrations;
+
+/// <inheritdoc />
+internal partial class AddAccountTypeLock : Migration
 {
     /// <inheritdoc />
-    public partial class AddAccountTypeLock : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.AddColumn<bool>(
-                name: "type_locked_by_user",
-                table: "accounts",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
-        }
+        migrationBuilder.AddColumn<bool>(
+            name: "type_locked_by_user",
+            table: "accounts",
+            type: "boolean",
+            nullable: false,
+            defaultValue: false);
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(
-                name: "type_locked_by_user",
-                table: "accounts");
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropColumn(
+            name: "type_locked_by_user",
+            table: "accounts");
     }
 }

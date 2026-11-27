@@ -1,5 +1,4 @@
 using FlowLedger.Application.Abstractions;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlowLedger.Infrastructure.Persistence;
 

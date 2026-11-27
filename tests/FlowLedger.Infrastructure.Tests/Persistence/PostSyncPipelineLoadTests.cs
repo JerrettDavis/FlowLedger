@@ -1,12 +1,10 @@
 using System.Data.Common;
 using FlowLedger.Application.Features.Transactions;
-using FlowLedger.Contracts;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
 using FlowLedger.Infrastructure.Tests.Helpers;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

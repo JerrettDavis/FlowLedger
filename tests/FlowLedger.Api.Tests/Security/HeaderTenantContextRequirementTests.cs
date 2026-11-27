@@ -1,6 +1,5 @@
 using FlowLedger.Api.Auth;
 using FlowLedger.Api.Tenancy;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;

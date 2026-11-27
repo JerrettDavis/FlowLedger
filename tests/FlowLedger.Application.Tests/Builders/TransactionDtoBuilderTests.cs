@@ -1,4 +1,3 @@
-using FlowLedger.Application.Features.Transactions;
 using FlowLedger.TestSupport;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;

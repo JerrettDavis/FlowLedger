@@ -6,7 +6,6 @@ using FlowLedger.Api.Tenancy;
 using FlowLedger.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.RateLimiting;
 using Quartz;
 
 namespace FlowLedger.Api;
@@ -94,7 +93,10 @@ internal static class ServiceRegistration
 
             options.DefaultPolicy = policy;
             options.FallbackPolicy = policy;
+            options.AddPolicy(HouseholdPolicy.Name, HouseholdPolicy.Build());
         });
+        services.AddScoped<IAuthorizationHandler, HouseholdOperatorHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, HouseholdAuthorizationResultHandler>();
 
         services.AddOptions<ApiOptions>()
             .BindConfiguration(ApiOptions.SectionName)

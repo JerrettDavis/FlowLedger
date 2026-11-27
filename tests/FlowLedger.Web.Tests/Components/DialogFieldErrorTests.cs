@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using Bunit;
-using FlowLedger.Contracts;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components.Dialogs;
 using FluentAssertions;
