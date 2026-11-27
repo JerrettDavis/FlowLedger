@@ -55,7 +55,7 @@ public sealed class ScheduledSyncJobRetryTests
         var services = new ServiceCollection();
         services.AddScoped<IFinancialSyncService>(_ => sync);
         services.AddScoped<IProviderConnectionStore>(_ => connection is null ? new FakeStore() : new FakeStore(connection));
-        services.AddSingleton(new SyncRetryPolicy(clock));
+        services.AddSingleton(new SyncRetryPolicy(clock, new FlowLedger.Infrastructure.Sync.SyncRetryOptions()));
         services.AddScoped<SyncAttemptGate>();
         var job = new ScheduledSyncJob(services.BuildServiceProvider(), NullLogger<ScheduledSyncJob>.Instance,
             Options.Create(new JobScheduleOptions { Enabled = true, CronExpression = "0 0 */4 * * ?" }));

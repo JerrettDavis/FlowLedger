@@ -243,7 +243,7 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
         await using var _ = db;
         // e.g. an extensible vendor status we do not recognise, or one of several connections needing repair.
         provider.Health = ConnectionHealth.FromIssue(ProviderIssue.Of(ProviderIssueKind.Unknown, "odd status", repairRef: "c1"));
-        var gate = new SyncAttemptGate(store, new SyncRetryPolicy());
+        var gate = new SyncAttemptGate(store, new SyncRetryPolicy(FlowLedger.TestSupport.TestClock.Provider, new SyncRetryOptions()));
 
         for (var i = 0; i < 10; i++)
         {

@@ -1,3 +1,4 @@
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
@@ -36,7 +37,7 @@ public sealed class CategorizationServiceTests
         _savings = Account.Create(tenantId, "Savings", AccountType.Savings, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         await _accounts.AddAsync(_checking);
         await _accounts.AddAsync(_savings);
-        return new CategorizationService(new Store(_txs), _categories, _accounts, _tenant);
+        return new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, new CategorizationOptions(), new LocalAiOptions());
     }
 
     private Transaction Add(Account account, decimal amount, TransactionDirection dir, string desc, int day = 5)
@@ -197,7 +198,7 @@ public sealed class CategorizationServiceTests
             Add(_checking, 2000, TransactionDirection.Credit, $"Quark Industries {i}").Categorize(pay.CategoryId, "Quark Industries " + i);
         }
 
-        return (new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, options), dining.CategoryId, pay.CategoryId);
+        return (new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, options ?? new CategorizationOptions(), new LocalAiOptions()), dining.CategoryId, pay.CategoryId);
     }
 
     [Fact]

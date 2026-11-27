@@ -4,6 +4,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Infrastructure;
 
@@ -46,10 +47,10 @@ public static partial class DependencyInjection
         services.AddScoped<FinancialSyncService>();
         services.AddScoped<IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();
         services.AddScoped<FlowLedger.Application.Features.Duplicates.IDuplicateStore, FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore>();
-        services.AddSingleton(new FlowLedger.Application.Features.Duplicates.DuplicateOptions
-        {
-            AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto,
-        });
+        services.AddOptions<FlowLedger.Application.Features.Duplicates.DuplicateOptions>()
+            .Configure(o => o.AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto) // blank/unparseable compose passthrough = default (true)
+            .ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FlowLedger.Application.Features.Duplicates.DuplicateOptions>>().Value);
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         services.AddScoped<MultiConnectorSyncService>();
         services.AddScoped<IFinancialSyncService>(sp => BuildSyncService(sp, configuration));

@@ -81,7 +81,7 @@ public sealed class CategorizationLocalAiTests
     }
 
     private CategorizationService Service(ITextEmbedder? embedder, ILocalLlm? llm = null, LocalAiOptions? ai = null) =>
-        new(new Store(_txs), _categories, _accounts, _tenant, null, embedder, ai ?? new LocalAiOptions(), llm);
+        new(new Store(_txs), _categories, _accounts, _tenant, new CategorizationOptions(), ai ?? new LocalAiOptions(), embedder, llm);
 
     [Fact]
     public async Task Semantic_step_suggests_a_category_for_an_unseen_look_alike_and_never_auto_applies()

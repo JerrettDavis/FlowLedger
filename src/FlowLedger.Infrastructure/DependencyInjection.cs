@@ -163,7 +163,12 @@ public static partial class DependencyInjection
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System); // one injectable clock for handlers and sync (#127); tests replace it
-        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
+        services.AddOptions<SyncRetryOptions>()
+            .BindConfiguration(SyncRetryOptions.SectionName)
+            .Validate(o => o.BaseDelay > TimeSpan.Zero && o.MaxDelay >= o.BaseDelay && o.MaxRetryAfter > TimeSpan.Zero && o.MaxRetryableFailures > 0 && o.MaxBoundedFailures > 0,
+                "Sync:Retry delays must be positive, MaxDelay at least BaseDelay, and the failure caps positive.")
+            .ValidateOnStart();
+        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<SyncRetryOptions>>().Value));
         services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();

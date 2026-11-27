@@ -159,7 +159,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         await using (db)
         {
             var service = new FlowLedger.Application.Features.Categories.CategorizationService(
-                new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant);
+                new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant, new FlowLedger.Application.Features.Categories.CategorizationOptions(), new FlowLedger.Application.Features.LocalAi.LocalAiOptions());
             log.Sql.Clear();
 
             var result = await service.RunAsync();
@@ -184,7 +184,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         var store = new CategorizationStore(db);
         return new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
             new FixedSync(result), db,
-            new FlowLedger.Application.Features.Categories.CategorizationService(store, new CategoryRepository(db), new AccountRepository(db), tenant),
+            new FlowLedger.Application.Features.Categories.CategorizationService(store, new CategoryRepository(db), new AccountRepository(db), tenant, new FlowLedger.Application.Features.Categories.CategorizationOptions(), new FlowLedger.Application.Features.LocalAi.LocalAiOptions()),
             new MerchantAliasService(new EfMerchantAliasStore(db, tenant), store),
             new FlowLedger.Application.Features.Categories.CategoryRuleService(new EfCategoryRuleStore(db, tenant), store, new CategoryRepository(db), tenant),
             new TransactionEnrichmentService(store),

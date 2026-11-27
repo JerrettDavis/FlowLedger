@@ -103,14 +103,14 @@ public sealed partial class CategorizationService(
     ICategoryRepository categories,
     IAccountRepository accounts,
     ITenantContext tenant,
-    CategorizationOptions? options = null,
+    CategorizationOptions options,
+    LocalAiOptions localAi,
     ITextEmbedder? embedder = null,
-    LocalAiOptions? localAi = null,
     ILocalLlm? llm = null,
     IRowVersionGuard? guard = null)
 {
-    private readonly CategorizationOptions _options = options ?? new CategorizationOptions();
-    private readonly LocalAiOptions _localAi = localAi ?? new LocalAiOptions();
+    private readonly CategorizationOptions _options = options ?? throw new ArgumentNullException(nameof(options));
+    private readonly LocalAiOptions _localAi = localAi ?? throw new ArgumentNullException(nameof(localAi));
 
     private const int Max = TransactionQuota.ProcessingCap;
 
