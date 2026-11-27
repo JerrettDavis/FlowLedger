@@ -170,6 +170,47 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Export_csv_streams_every_matching_row_in_list_order_and_equals_the_csv_built_from_the_list()
+    {
+        var account = await CreateAccount();
+        // Paging beyond one export page of 500 rows, and the keyset tie-breaks, are covered against the real store in Infrastructure.Tests.
+        for (var i = 0; i < 12; i++)
+        {
+            var request = new CreateTransactionRequest(account.Id, 10m + i, "USD", i % 3 == 0 ? "Credit" : "Debit", $"Row {i}, \"quoted\"",
+                new DateOnly(2026, 1, 10 + (i % 4)), null, null, null, null);
+            (await _client.PostAsJsonAsync("/api/transactions", request)).EnsureSuccessStatusCode();
+        }
+
+        var response = await _client.GetAsync("/api/transactions/export.csv");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+        response.Content.Headers.ContentDisposition!.FileName.Should().StartWith("flowledger-transactions-");
+        var listed = (await _client.GetFromJsonAsync<List<TransactionDto>>("/api/transactions?take=100"))!;
+        listed.Should().HaveCount(12);
+        (await response.Content.ReadAsStringAsync()).Should().Be(TransactionCsv.Build(listed));
+    }
+
+    [Fact]
+    public async Task Export_csv_honours_the_list_filters_and_order()
+    {
+        var account = await CreateAccount();
+        for (var i = 0; i < 6; i++)
+        {
+            (await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
+                account.Id, 5m + i, "USD", "Debit", i < 3 ? $"Coffee {i}" : $"Rent {i}", new DateOnly(2026, 2, 1 + i), null, null, null, null))).EnsureSuccessStatusCode();
+        }
+
+        var csv = await _client.GetStringAsync("/api/transactions/export.csv?search=coffee");
+
+        var lines = csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(1 + 3, "the header and the three coffee rows");
+        lines[1].Should().Contain("Coffee 2", "newest first by default");
+    }
+
     private static CreateTransactionRequest ValidRequest(Guid accountId) =>
         new(accountId, 50m, "USD", "Debit", "Coffee Shop",
             new DateOnly(2026, 1, 15), null, null, null, null);

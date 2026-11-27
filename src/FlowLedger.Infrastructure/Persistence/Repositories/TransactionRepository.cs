@@ -56,6 +56,27 @@ internal sealed class TransactionRepository : ITransactionRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Transaction>> ListAfterAsync(
+        ITransactionRepository.TransactionKeyset? after, AccountId? accountId, DateOnly? from, DateOnly? to, int take, bool descending, bool everydayOnly,
+        string? search, CancellationToken ct = default)
+    {
+        var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
+
+        // The same total order as ListAsync's date sort: date (direction as asked), then newest-created first, then id.
+        if (after is { } k)
+        {
+            var (date, created, id) = (k.EffectiveDate, k.CreatedAt, k.Id);
+            query = descending
+                ? query.Where(t => t.EffectiveDate < date
+                    || (t.EffectiveDate == date && (t.CreatedAt < created || (t.CreatedAt == created && t.Id.CompareTo(id) > 0))))
+                : query.Where(t => t.EffectiveDate > date
+                    || (t.EffectiveDate == date && (t.CreatedAt < created || (t.CreatedAt == created && t.Id.CompareTo(id) > 0))));
+        }
+
+        var ordered = descending ? query.OrderByDescending(t => t.EffectiveDate) : query.OrderBy(t => t.EffectiveDate);
+        return await ordered.ThenByDescending(t => t.CreatedAt).ThenBy(t => t.Id).Take(take).ToListAsync(ct);
+    }
+
     public async Task<int> CountMatchingAsync(
         AccountId? accountId = null,
         DateOnly? from = null,

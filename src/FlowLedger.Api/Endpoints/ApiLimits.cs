@@ -18,6 +18,9 @@ internal static class ApiLimits
     /// <summary>Buffer size for streaming a generated file back to the client.</summary>
     public const int FileStreamBufferBytes = 4 * Kibibyte;
 
+    /// <summary>Rows read per page when a transaction export streams.</summary>
+    public const int ExportPageRows = 500;
+
     /// <summary>Entries the per-process webhook replay map holds before it evicts the oldest.</summary>
     public const int WebhookReplayEntries = 4 * Kibibyte;
 
