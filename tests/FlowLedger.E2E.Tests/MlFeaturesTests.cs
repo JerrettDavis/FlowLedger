@@ -17,16 +17,8 @@ using Microsoft.Playwright;
 public class MlFeaturesTests : E2ETestBase
 {
     private static string ApiUrl => (Environment.GetEnvironmentVariable("E2E_API_URL") ?? "http://localhost:5001").TrimEnd('/');
-    private static string ApiKey => Environment.GetEnvironmentVariable("E2E_API_KEY") ?? "dev-local-key-not-for-production";
-    private static string TenantId => Environment.GetEnvironmentVariable("E2E_TENANT_ID") ?? "00000000-0000-0000-0000-000000000001";
 
-    private static HttpClient Api()
-    {
-        var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
-        http.DefaultRequestHeaders.Add("X-Tenant-Id", TenantId);
-        return http;
-    }
+    private static HttpClient Api() => E2EApi.CreateClient();
 
     private static string Today(int daysAgo = 0) => DateOnly.FromDateTime(DateTime.Now).AddDays(-daysAgo).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

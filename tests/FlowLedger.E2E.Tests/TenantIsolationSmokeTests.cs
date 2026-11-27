@@ -2,25 +2,20 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Playwright;
 
 namespace FlowLedger.E2E.Tests;
 
 /// <summary>
 /// Two-user isolation smoke test against the real stack (#138): data created by one tenant must be invisible to another tenant
-/// over the API, and must not appear in the web UI, which here serves the household tenant. The exhaustive route sweep lives in
+/// over the API, and must not appear in the web UI, where the signed-in user (OIDC) is mapped to the household tenant. The exhaustive route sweep lives in
 /// Api.Tests (TenantIsolationMatrixTests); this proves the same boundary holds through the composed containers.
 /// </summary>
 [Collection("E2E Collection")]
 [Trait("Category", "E2E")]
 public class TenantIsolationSmokeTests : E2ETestBase
 {
-    private static HttpClient Client(Guid tenant)
-    {
-        var http = new HttpClient { BaseAddress = new Uri((Environment.GetEnvironmentVariable("E2E_API_URL") ?? "http://localhost:5001").TrimEnd('/') + "/") };
-        http.DefaultRequestHeaders.Add("X-Api-Key", Environment.GetEnvironmentVariable("E2E_API_KEY") ?? string.Empty);
-        http.DefaultRequestHeaders.Add("X-Tenant-Id", tenant.ToString());
-        return http;
-    }
+    private static HttpClient Client(Guid tenant) => E2EApi.CreateClient(tenant);
 
     [E2EFact(DisplayName = "Tenant isolation: one tenant's account is invisible to another tenant, over the API and in the UI")]
     public async Task One_tenants_account_is_invisible_to_another_tenant()
@@ -46,11 +41,18 @@ public class TenantIsolationSmokeTests : E2ETestBase
         (await tenantB.GetStringAsync("api/accounts")).Should().NotContain(secretName);
         (await tenantB.GetAsync($"api/accounts/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        // The web UI serves a different tenant (the household), so the account must not be rendered there either.
+        // Positive control: the signed-in browser is the household owner, so an account in the household tenant is rendered.
+        var householdName = $"ZZ-HOUSEHOLD-{Guid.NewGuid():N}";
+        using var household = Client(E2EApi.HouseholdTenantId);
+        (await household.PostAsJsonAsync("api/accounts", new { name = householdName, accountType = "Checking", startingBalance = 10m, currency = "USD" }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // The web UI serves the household tenant, so the other tenant's account must not be rendered there.
         await NavigateAsync("/accounts");
         await WaitForLoadAsync();
         await AssertNoErrorAlertVisible();
-        (await Page!.ContentAsync()).Should().NotContain(secretName);
+        await Assertions.Expect(Page!.GetByText(householdName).First).ToBeVisibleAsync();
+        (await Page.ContentAsync()).Should().NotContain(secretName);
         AssertNoPageErrors();
     }
 }
