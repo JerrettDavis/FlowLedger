@@ -148,6 +148,10 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         ["GET /api/data/status"] = Case(c => Json(c.B, HttpMethod.Get, "/api/data/status"), HttpStatusCode.Forbidden),
         ["POST /api/data/backup-now"] = Case(c => Json(c.B, HttpMethod.Post, "/api/data/backup-now"), HttpStatusCode.Forbidden),
         ["POST /api/data/import"] = Case(c => Json(c.B, HttpMethod.Post, "/api/data/import"), HttpStatusCode.Forbidden),
+        ["GET /api/data/tenants"] = Case(c => Json(c.B, HttpMethod.Get, "/api/data/tenants"), HttpStatusCode.Forbidden),
+        ["POST /api/data/tenants/{tenantId:guid}/offboard"] = Case(c => Json(c.B, HttpMethod.Post, $"/api/data/tenants/{TenantIsolationMatrixTests.TenantA}/offboard",
+            new { confirmTenantId = TenantIsolationMatrixTests.TenantA }), HttpStatusCode.Forbidden),
+        ["POST /api/data/reencrypt-secrets"] = Case(c => Json(c.B, HttpMethod.Post, "/api/data/reencrypt-secrets"), HttpStatusCode.Forbidden),
         ["POST /api/integrations/mx/connect-token"] = Case(c => Json(c.B, HttpMethod.Post, "/api/integrations/mx/connect-token"), HttpStatusCode.Forbidden),
     };
 
@@ -157,6 +161,10 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         "POST /api/users/link",
         "POST /api/users/link-code",
         "DELETE /api/users/identities/{userId:guid}",
+        // Need an enabled connector, a stubbed Quiltt API and a fake model: see TenantIsolationConnectorProbeTests (own host).
+        "GET /api/integrations/connectors/{connectorId}/available-accounts",
+        "POST /api/integrations/quiltt/session",
+        "POST /api/query/ask",
     };
 
     public Task InitializeAsync() => factory.ResetAsync();
