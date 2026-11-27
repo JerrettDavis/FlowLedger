@@ -23,7 +23,7 @@ internal static class DataEndpoints
         {
             var runs = await store.RecentAsync(10, ct);
             var lastOk = runs.FirstOrDefault(r => r.Ok);
-            var last = runs.FirstOrDefault();
+            var last = runs is { Count: > 0 } ? runs[0] : null;
             // Healthy = last run succeeded, was < 36h ago, and (if configured) reached off-site.
             var stale = last is null || !last.Ok || DateTimeOffset.UtcNow - last.FinishedUtc > TimeSpan.FromHours(36);
             var usage = await ledger.GetUsageAsync(MxProvider, DateTimeOffset.UtcNow, ct);
@@ -163,12 +163,12 @@ internal static class DataEndpoints
             {
                 var result = await erasure.EraseAsync(tenantId, ct);
                 // Audit line: ids and counts only (Guids and integers cannot carry log-forging text).
-                audit.LogWarning("Tenant {TenantId} offboarded: {Rows} rows across {Tables} tables, {Files} files erased", tenantId, result.TotalRows, result.RowsDeleted.Count, result.FilesDeleted);
+                ApiLog.TenantOffboarded(audit, tenantId, result.TotalRows, result.RowsDeleted.Count, result.FilesDeleted);
                 return Results.Ok(new { tenantId, rowsDeleted = result.RowsDeleted, totalRows = result.TotalRows, filesDeleted = result.FilesDeleted, erasedUtc = result.ErasedUtc });
             }
             catch (FlowLedger.Application.Features.Users.TenantErasureRefusedException ex)
             {
-                audit.LogWarning("Tenant {TenantId} offboarding refused", tenantId);
+                ApiLog.TenantOffboardingRefused(audit, tenantId);
                 return Results.Problem(title: "Offboarding refused", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
         })
@@ -181,7 +181,7 @@ internal static class DataEndpoints
         {
             var conn = cfg.GetConnectionString("flowledger")!;
             var result = await SecretReencryptor.FromConfiguration(cfg, conn).RunAsync(ct);
-            loggers.CreateLogger("SecretRotation").LogWarning("Secrets re-encrypted: {Resealed} resealed, {Current} already current, {Unreadable} unreadable", result.Resealed, result.AlreadyCurrent, result.Unreadable);
+            ApiLog.SecretsReencrypted(loggers.CreateLogger("SecretRotation"), result.Resealed, result.AlreadyCurrent, result.Unreadable);
             return Results.Ok(new { resealed = result.Resealed, alreadyCurrent = result.AlreadyCurrent, unreadable = result.Unreadable });
         })
         .WithName("ReencryptSecrets")

@@ -97,7 +97,7 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Audit event {Action} could not be recorded.", action);
+            ApiLog.AuditNotRecorded(logger, ex, action);
         }
     }
 }
