@@ -59,8 +59,13 @@ The repository is initialised automatically on first use. Other restic backends 
 With `Backup__Restic__Repository` unset the UI shows "No off-site backup configured" and, in production, a red warning chip.
 
 Other settings: `Backup__Enabled` (default true), `Backup__CronExpression` (default `0 15 3 * * ?`),
-`Backup__Directory`, `Backup__KeepLocalSnapshots` (default 30; pruning happens only after a confirmed off-site copy and never
-touches `premigrate-*` snapshots or the raw archive), `Backup__DrillAfterBackup` (default true).
+`Backup__Directory`, `Backup__KeepLocalSnapshots` (default 30; same as `Backup__Retention__KeepLocalSnapshots`), `Backup__DrillAfterBackup` (default true).
+
+**Backup expiry (#189).** The scheduled job enforces `Backup__Retention__*` after a clean run (and, with an off-site repository, once the copy is confirmed; "Back up now" never deletes):
+`KeepLocalSnapshots` (30; never a snapshot younger than 7 days), `PremigrateMaxAgeDays` (90; newest `premigrate-*` always kept, 0 = keep forever), and for the off-site repository
+`ResticForget` (true) with `ResticKeepDaily` / `ResticKeepWeekly` / `ResticKeepMonthly` (7 / 4 / 6), run as `restic forget --tag flowledger --host flowledger --keep-daily N --keep-weekly N --keep-monthly N --prune`.
+A failed forget is shown in the run's off-site detail and logged; it does not fail the backup. The raw archive is never pruned. This is what bounds how long an erased tenant's data can survive in backups: see
+[data inventory and retention](../privacy/data-inventory-and-retention.md#backup-expiry-policy).
 
 ### Failure alerts
 

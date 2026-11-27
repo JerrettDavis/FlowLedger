@@ -16,9 +16,13 @@ public sealed record BackupSettings(
     string? ResticPasswordFile,
     string ResticExecutable,
     int KeepLocalSnapshots,
-    bool DrillAfterBackup)
+    bool DrillAfterBackup,
+    BackupRetention? Retention = null)
 {
     public bool OffsiteConfigured => !string.IsNullOrWhiteSpace(ResticRepository);
+
+    /// <summary>The expiry policy (#189). When none was supplied, the defaults apply with this record's <see cref="KeepLocalSnapshots"/>.</summary>
+    public BackupRetention EffectiveRetention => Retention ?? BackupRetention.Default with { KeepLocalSnapshots = KeepLocalSnapshots };
 
     public static BackupSettings From(IConfiguration c) => new(
         c["Backup:Directory"] ?? DatabaseSnapshotService.DefaultBackupRoot(),
@@ -26,8 +30,9 @@ public sealed record BackupSettings(
         c["Backup:Restic:Repository"],
         c["Backup:Restic:PasswordFile"],
         c["Backup:Restic:Executable"] ?? "restic",
-        int.TryParse(c["Backup:KeepLocalSnapshots"], out var k) ? k : 30,
-        !bool.TryParse(c["Backup:DrillAfterBackup"], out var d) || d);
+        BackupRetention.From(c).KeepLocalSnapshots,
+        !bool.TryParse(c["Backup:DrillAfterBackup"], out var d) || d,
+        BackupRetention.From(c));
 }
 
 /// <summary>
@@ -189,9 +194,14 @@ public sealed partial class BackupRunner
                 offsiteDetail = "No off-site repository configured (Backup:Restic:Repository).";
             }
 
-            if (allowPrune && error is null && offsiteOk == true)
+            // Expiry (#189) runs only from the scheduled job, only after a clean run, and with an off-site repository only once that copy is confirmed.
+            if (allowPrune && error is null && (offsiteOk == true || !_settings.OffsiteConfigured))
             {
                 Prune();
+                if (offsiteOk == true)
+                {
+                    offsiteDetail = await ExpireOffsiteAsync(offsiteDetail, ct);
+                }
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -330,19 +340,48 @@ public sealed partial class BackupRunner
         }
     }
 
-    /// <summary>Removes the oldest scheduled snapshots beyond the keep count. Never premigrate-*; never the raw archive.</summary>
+    /// <summary>
+    /// Off-site expiry (#189): <c>restic forget --prune</c> with the keep-daily/weekly/monthly policy, scoped to this job's tag and host. A failure
+    /// does not fail the backup (the new copy is safe) but is appended to the recorded detail and logged so a retention gap is visible.
+    /// </summary>
+    private async Task<string?> ExpireOffsiteAsync(string? detail, CancellationToken ct)
+    {
+        var args = _settings.EffectiveRetention.ResticForgetArguments();
+        if (args is null)
+        {
+            return detail;
+        }
+
+        var env = new Dictionary<string, string> { ["RESTIC_REPOSITORY"] = _settings.ResticRepository! };
+        if (!string.IsNullOrWhiteSpace(_settings.ResticPasswordFile))
+        {
+            env["RESTIC_PASSWORD_FILE"] = _settings.ResticPasswordFile!;
+        }
+
+        var (code, output) = await ExecAsync(args, env, ct);
+        if (code == 0)
+        {
+            return detail + "; retention applied (restic forget --prune)";
+        }
+
+        LogOffsiteExpiryFailed(_logger, code);
+        return detail + "; retention FAILED: " + Truncate(Redact(output));
+    }
+
+    /// <summary>Removes expired local snapshots (see <see cref="BackupRetention"/>). Never the raw archive.</summary>
     private void Prune()
     {
-        if (_settings.KeepLocalSnapshots <= 0 || !Directory.Exists(_settings.BackupRoot))
+        if (!Directory.Exists(_settings.BackupRoot))
         {
             return;
         }
 
-        var old = Directory.GetDirectories(_settings.BackupRoot, "backup-*")
-            .OrderByDescending(d => d, StringComparer.Ordinal)
-            .Skip(_settings.KeepLocalSnapshots)
-            .Where(d => DateTime.UtcNow - Directory.GetCreationTimeUtc(d) > TimeSpan.FromDays(7)); // never delete recent snapshots
-        foreach (var d in old)
+        static IEnumerable<SnapshotFolder> Folders(string root, string pattern) =>
+            Directory.GetDirectories(root, pattern).Select(SnapshotFolder.FromDirectory);
+
+        var doomed = _settings.EffectiveRetention.SelectLocalSnapshotsToDelete(
+            Folders(_settings.BackupRoot, "backup-*"), Folders(_settings.BackupRoot, "premigrate-*"), DateTimeOffset.UtcNow);
+        foreach (var d in doomed)
         {
             try
             {
@@ -378,6 +417,9 @@ public sealed partial class BackupRunner
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not send the backup result notification")]
     private static partial void LogCouldNotNotifyBackupResult(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Off-site retention (restic forget --prune) failed with exit code {ExitCode}; old copies are not being expired")]
+    private static partial void LogOffsiteExpiryFailed(ILogger logger, int exitCode);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not prune old snapshot {Dir}")]
     private static partial void LogCouldNotPruneOldSnapshot(ILogger logger, Exception exception, string? dir);

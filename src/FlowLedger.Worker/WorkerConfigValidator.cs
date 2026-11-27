@@ -72,6 +72,15 @@ internal static class WorkerConfigValidator
             errors.Add($"Backup:KeepLocalSnapshots must be a positive integer but is '{keep}'.");
         }
 
+        foreach (var key in new[] { "Backup:Retention:KeepLocalSnapshots", "Backup:Retention:PremigrateMaxAgeDays", "Backup:Retention:ResticKeepDaily", "Backup:Retention:ResticKeepWeekly", "Backup:Retention:ResticKeepMonthly" })
+        {
+            var minimum = key.EndsWith("KeepLocalSnapshots", StringComparison.Ordinal) ? 1 : 0;
+            if (config[key] is { Length: > 0 } raw && (!int.TryParse(raw, out var v) || v < minimum))
+            {
+                errors.Add($"{key} must be {(minimum == 1 ? "a positive" : "a non-negative")} integer but is '{raw}'.");
+            }
+        }
+
         if (bool.TryParse(config["Backup:RequireOffsite"], out var requireOffsite) && requireOffsite
             && string.IsNullOrWhiteSpace(config["Backup:Restic:Repository"]))
         {
