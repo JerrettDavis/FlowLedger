@@ -162,6 +162,17 @@ internal sealed partial class DataEnvironmentGuardService : IHostedService
 
         _state.Current = await DataEnvironmentGuard.EnsureAsync(conn, expected, adopt, cancellationToken);
         LogDataEnvironmentVerified(_logger, _state.Current);
+
+        // #135: a new OIDC install gets a generated (non-constant) household tenant id; everyone else keeps the configured one.
+        var oidc = !string.IsNullOrWhiteSpace(_config["Auth:Oidc:Authority"]) && !string.IsNullOrWhiteSpace(_config["Auth:Oidc:ClientId"]);
+        var household = await HouseholdTenantBootstrap.EnsureAsync(
+            _config, conn, mayGenerate: oidc, _sp.GetService<HouseholdTenantConfigProvider>(), _logger, cancellationToken);
+        if (oidc && household is null && !HouseholdTenantBootstrap.HasExplicitId(_config)
+            && _sp.GetService<IHostEnvironment>() is { } hostEnv && !hostEnv.IsDevelopment()
+            && !(bool.TryParse(_config["Tenancy:AllowWellKnownLegacyTenantId"], out var allowWellKnown) && allowWellKnown))
+        {
+            throw new InvalidOperationException(HouseholdTenantBootstrap.ExistingInstallMessage);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

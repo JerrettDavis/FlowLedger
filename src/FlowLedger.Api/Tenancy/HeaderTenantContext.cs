@@ -21,7 +21,16 @@ public sealed class HeaderTenantContext : ITenantContext
     public Guid TenantId { get; }
     public Guid UserId { get; }
 
-    public HeaderTenantContext(IHttpContextAccessor accessor, IOptions<ApiOptions> apiOptions, TenantOverride tenantOverride)
+    /// <summary>Per-request marker so a child scope created inside the same request does not re-consume the single-use nonce.</summary>
+    private const string VerifiedItemKey = "FlowLedger.TenantAssertion.Verified";
+
+    public HeaderTenantContext(
+        IHttpContextAccessor accessor,
+        IOptions<ApiOptions> apiOptions,
+        TenantOverride tenantOverride,
+        TenantNonceCache? nonces = null,
+        TimeProvider? clock = null,
+        IConfiguration? configuration = null)
     {
         var http = accessor.HttpContext;
 
@@ -29,7 +38,9 @@ public sealed class HeaderTenantContext : ITenantContext
         {
             // Background/job execution — no request to fail closed on. Run against the
             // single configured household tenant.
-            var householdTenant = tenantOverride.TenantId ?? apiOptions.Value.EffectiveTenantId;
+            // #135: the id may have been generated for a new install (stored in system_settings and surfaced as Tenancy:LegacyTenantId).
+            var householdTenant = tenantOverride.TenantId
+                ?? (configuration is null ? apiOptions.Value.EffectiveTenantId : FlowLedger.Infrastructure.TenancySettings.Legacy(configuration).LegacyTenantId);
             TenantId = householdTenant;
             UserId = householdTenant;
             return;
@@ -47,11 +58,22 @@ public sealed class HeaderTenantContext : ITenantContext
         var signingKey = apiOptions.Value.TenantSigningKey;
         if (apiOptions.Value.EffectiveRequireSignedTenant || !string.IsNullOrEmpty(signingKey))
         {
+            var alreadyVerified = http.Items.TryGetValue(VerifiedItemKey, out var marker) && marker is Guid verified && verified == tenantId;
             if (string.IsNullOrEmpty(signingKey)
-                || !TenantAssertion.Verify(signingKey, tenantId, http.Request.Headers["X-Tenant-Sig"].ToString(), DateTimeOffset.UtcNow))
+                || (!alreadyVerified && !TenantAssertion.Check(
+                    signingKey,
+                    tenantId,
+                    http.Request.Headers["X-Tenant-Sig"].ToString(),
+                    (clock ?? TimeProvider.System).GetUtcNow(),
+                    http.Request.Method,
+                    http.Request.PathBase.Add(http.Request.Path).Value ?? string.Empty,
+                    apiOptions.Value.EffectiveAcceptLegacyTenantSignature,
+                    nonces)))
             {
                 throw new TenantResolutionException();
             }
+
+            http.Items[VerifiedItemKey] = tenantId;
         }
 
         TenantId = tenantId;

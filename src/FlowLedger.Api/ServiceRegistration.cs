@@ -107,6 +107,11 @@ internal static class ServiceRegistration
         services.AddOptions<ApiOptions>().PostConfigure<IConfiguration, Microsoft.Extensions.Hosting.IHostEnvironment>(
             (o, cfg, env) => o.EffectiveRequireSignedTenant = FlowLedger.ServiceDefaults.MultiUserSettings.RequireSignedTenant(cfg, env));
 
+        // #135: v1 tenant signatures stay accepted (default true) for one release so api/web version skew cannot break; blank/unparseable = default.
+        services.AddOptions<ApiOptions>().PostConfigure<IConfiguration>(
+            (o, cfg) => o.EffectiveAcceptLegacyTenantSignature = !bool.TryParse(cfg["Api:AcceptLegacyTenantSignature"], out var accept) || accept);
+        services.AddSingleton<TenantNonceCache>();
+
         // #145: the API's own sign-up policy (closed sign-up cannot be bypassed by calling /api/users/resolve; gates billable provisioning).
         services.AddSingleton(sp => SignUpPolicy.From(sp.GetRequiredService<IConfiguration>()));
         return services;

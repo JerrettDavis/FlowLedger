@@ -124,6 +124,12 @@ public static partial class MultiUserSettings
         return WellKnownTenantId;
     }
 
+    /// <summary>True when some household tenant id is configured (any of the three keys holds a non-empty GUID).</summary>
+    public static bool HasConfiguredLegacyTenant(IConfiguration cfg) =>
+        LegacyTenantKeys.Any(key => Guid.TryParse(cfg[key], out var id) && id != Guid.Empty);
+
+    private static readonly string[] LegacyTenantKeys = ["Tenancy:LegacyTenantId", "Api:TenantId", "Worker:TenantId"];
+
     /// <summary>Throws (or warns) for every unsafe multi-user combination. Call once at startup of Api and Web, after the logger exists.</summary>
     public static void Validate(IConfiguration cfg, IHostEnvironment env, ILogger logger)
     {
@@ -191,7 +197,9 @@ public static partial class MultiUserSettings
 
     public static void ValidateHouseholdTenant(IConfiguration cfg, IHostEnvironment env, ILogger logger)
     {
-        if (env.IsDevelopment() || ConfiguredLegacyTenant(cfg) != WellKnownTenantId)
+        // Unset is decided later by the API once the database is reachable (#135): a new install generates a random id, an existing one that holds
+        // data under the constant is refused there unless allowed. Only an id configured AS the constant is judged here.
+        if (env.IsDevelopment() || !HasConfiguredLegacyTenant(cfg) || ConfiguredLegacyTenant(cfg) != WellKnownTenantId)
         {
             return;
         }

@@ -228,11 +228,21 @@ public sealed class MultiUserSettingsTests
     // ── #135 household tenant id ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Oidc_with_the_well_known_household_tenant_is_refused_in_production()
+    public void Oidc_with_the_well_known_household_tenant_configured_is_refused_in_production()
     {
-        var act = () => MultiUserSettings.Validate(Cfg(OidcOn1, OidcOn2, Signing), new Env("Production"), new CaptureLogger());
+        var act = () => MultiUserSettings.Validate(
+            Cfg(OidcOn1, OidcOn2, Signing, ("Api:TenantId", "00000000-0000-0000-0000-000000000001")), new Env("Production"), new CaptureLogger());
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*well-known*Tenancy:AllowWellKnownLegacyTenantId*");
+    }
+
+    [Fact]
+    public void An_unset_household_tenant_is_decided_by_the_api_at_startup_not_by_the_settings_check()
+    {
+        // #135: a new install gets a random id generated once (HouseholdTenantBootstrap); an existing one holding data under the constant is refused there.
+        var act = () => MultiUserSettings.Validate(Cfg(OidcOn1, OidcOn2, Signing), new Env("Production"), new CaptureLogger());
+
+        act.Should().NotThrow();
     }
 
     [Fact]
@@ -240,7 +250,7 @@ public sealed class MultiUserSettingsTests
     {
         var log = new CaptureLogger();
 
-        MultiUserSettings.Validate(Cfg(OidcOn1, OidcOn2, Signing, (MultiUserSettings.AllowWellKnownTenantKey, "true"), ("Auth:Oidc:AllowedEmails:0", "a@x.com")),
+        MultiUserSettings.Validate(Cfg(OidcOn1, OidcOn2, Signing, (MultiUserSettings.AllowWellKnownTenantKey, "true"), ("Api:TenantId", "00000000-0000-0000-0000-000000000001"), ("Auth:Oidc:AllowedEmails:0", "a@x.com")),
             new Env("Production"), log);
 
         log.Entries.Should().Contain(e => e.Level == LogLevel.Warning && e.Message.Contains("publicly known"));

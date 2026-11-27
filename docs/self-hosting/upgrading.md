@@ -71,5 +71,15 @@ Notes:
 - Rolling: restart api and web together after setting the signing key; a web without the key against an api that requires it gets 401s.
 - Revocation: unlinking a login ends its session within **5 minutes** (HTTP requests and open Blazor circuits are both re-validated against the
   API at that interval; an unreachable API never signs anyone out).
-- Not changed here: the signature is still over `{tenant}.{timestamp}` only (no method/path binding, no replay cache) and the household tenant id
-  is configured, not generated and stored. Both remain on the #135 follow-up list.
+- Tenant signature v2 (#135). The Web app now signs `v2.{timestamp}.{nonce}.{mac}` over tenant, timestamp, a random nonce, the HTTP method and the
+  request path; the API accepts each nonce once inside the 60-second window (bounded in-memory cache, 100,000 entries) and rejects a header replayed
+  or presented for another endpoint. The query string is not signed. **Upgrade the API first**: it accepts both v1 and v2 while
+  `Api:AcceptLegacyTenantSignature` is true (the default for this release; compose: `API__ACCEPTLEGACYTENANTSIGNATURE`), so an old web keeps working. A new
+  web against an old API gets 401s. Once api and web are both upgraded set `API__ACCEPTLEGACYTENANTSIGNATURE=false`; the default flips in a later release.
+  The replay cache is per API process, so run one API replica (the supported topology) or accept replay protection per replica.
+- Household tenant id for new installs (#135). With OIDC on and **no** `Api:TenantId`/`Tenancy:LegacyTenantId`/`Worker:TenantId` configured, an empty database
+  (no accounts, no tenants) gets a random id generated on the first API start and stored in `system_settings` (`household_tenant_id`); the api and worker
+  read it from there on every start. Compose no longer defaults `API__TENANTID` for the api and worker, so a new OIDC install needs no tenant setting at all.
+  An install that already holds data and has no configured id is refused at start unless `TENANCY__ALLOWWELLKNOWNLEGACYTENANTID=true` (its data lives
+  under the constant). An explicitly configured id always wins. Single-household (non-OIDC) installs are unchanged: api and web must agree on a
+  configured id, and the default stays the constant. The worker only reads the stored id; start the api once before the worker on a brand-new OIDC install.
