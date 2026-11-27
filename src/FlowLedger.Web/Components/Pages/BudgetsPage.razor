@@ -36,13 +36,14 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">Add or change a budget</MudText>
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudSelect T="string" @bind-Value="_category" Label="Category" Style="min-width:min(240px,100%)" Margin="Margin.Dense">
+            <MudSelect T="string" Value="_category" ValueChanged="OnCategoryChanged" Label="Category" Style="min-width:min(240px,100%)" Margin="Margin.Dense">
                 @foreach (var c in Choices)
                 {
                     <MudSelectItem Value="@c">@c@(SpentFor(c) > 0 ? $"  ({Format.Money(SpentFor(c))} this month)" : "")</MudSelectItem>
                 }
             </MudSelect>
             <MudNumericField T="decimal" @bind-Value="_limit" Label="Monthly limit" Min="0" Style="max-width:180px" Margin="Margin.Dense" />
+            <MudCheckBox T="bool" @bind-Value="_rollover" Label="Roll over unspent" Dense="true" aria-label="Roll over what is left unspent into next month" data-testid="budget-rollover" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Budget(_category) is not null)" aria-describedby="budget-reason">Save budget</MudButton>
         </div>
         <SubmitReason Id="budget-reason" Reason="@FormRules.Budget(_category)" />
@@ -62,12 +63,19 @@ else
                         <MudText Typo="Typo.subtitle2">@b.Category</MudText>
                         <div class="d-flex align-center gap-2">
                             <MudText Typo="Typo.body2" Color="@(b.Over ? Color.Error : Color.Default)" Class="fl-num">
-                                @Format.Money(b.Spent) of @Format.Money(b.MonthlyLimit)
+                                @Format.Money(b.Spent) of @Format.Money(b.MonthlyLimit + b.Carried)
                                 @(b.Over ? $" — over by {Format.Money(-b.Remaining)}" : $" — {Format.Money(b.Remaining)} left")
                             </MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => Edit(b))" aria-label="@($"Edit budget for {b.Category}")" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(b.Category, b.Version))" aria-label="@($"Remove budget for {b.Category}")" />
                         </div>
                     </div>
+                    @if (b.Rollover)
+                    {
+                        <MudText Typo="Typo.caption" Class="fl-muted" data-testid="budget-carried">
+                            Rollover on: @Format.Money(b.Carried) carried from last month on top of the @Format.Money(b.MonthlyLimit) limit.
+                        </MudText>
+                    }
                     <MudProgressLinear Value="@Math.Min(100, b.PercentUsed)" Color="@(b.Over ? Color.Error : b.PercentUsed >= 80 ? Color.Warning : Color.Success)" Size="Size.Medium" Class="mt-1"
                                        aria-valuetext="@($"{ChartSummary.ProgressText(b.Category, b.PercentUsed, "of budget used")}{(b.Over ? ", over budget" : "")}")" />
                 </div>
@@ -92,6 +100,7 @@ else
     private bool _loading = true;
     private string? _category;
     private decimal _limit;
+    private bool _rollover;
 
     private IEnumerable<string> Choices => _data is null
         ? []
@@ -126,6 +135,28 @@ else
         _loading = false;
     }
 
+    // Picking a category that already has a budget shows its current rollover setting, so saving never switches it off by accident.
+    private void OnCategoryChanged(string? category)
+    {
+        _category = category;
+        if (_data?.Budgets.FirstOrDefault(b => b.Category == category) is { } existing)
+        {
+            _limit = existing.MonthlyLimit;
+            _rollover = existing.Rollover;
+        }
+        else
+        {
+            _rollover = false;
+        }
+    }
+
+    private void Edit(FlowLedger.Web.ApiClient.BudgetStatusDto budget)
+    {
+        _category = budget.Category;
+        _limit = budget.MonthlyLimit;
+        _rollover = budget.Rollover;
+    }
+
     private void Suggest(string category, decimal spent)
     {
         _category = category;
@@ -137,7 +168,7 @@ else
         try
         {
             var expected = _data?.Budgets.FirstOrDefault(b => b.Category == _category!.Trim())?.Version;
-            await ApiClient.SetBudgetAsync(_category!, _limit, expected);
+            await ApiClient.SetBudgetAsync(_category!, _limit, expected, rollover: _rollover);
             Snackbar.Add("Budget saved.", Severity.Success);
             await LoadAsync();
         }

@@ -8,17 +8,18 @@ namespace FlowLedger.Application.Features.Alerts;
 
 /// <summary>Computed alerts: budgets at/over their limit, goals past their target date, and (when history is available) large charges, price increases, new subscriptions and low balances.</summary>
 public sealed class GetAlertsHandler(
-    IBudgetStore budgets, IGoalStore goals, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock,
+    EffectiveBudgetService budgets, IGoalStore goals, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock,
     ITransactionRepository? transactions = null, IAccountRepository? accounts = null)
 {
     private const int HistoryDays = 200;
 
     public async Task<IReadOnlyList<Alert>> HandleAsync(CancellationToken ct = default)
     {
-        var budgetRows = await budgets.ListAsync(tenant.TenantId, ct);
+        var budgetRows = await budgets.ListAsync(null, ct);
         var spent = await spend.HandleAsync(ct);
 
-        var usage = budgetRows.Select(b => new BudgetUsage(b.Category, b.MonthlyLimit, MonthlySpend.SpentFor(b.Category, spent)));
+        // Rollover applied: a budget with last month's leftover is judged against the larger limit.
+        var usage = budgetRows.Select(b => new BudgetUsage(b.Row.Category, b.EffectiveLimit, MonthlySpend.SpentFor(b.Row.Category, spent)));
         var progress = (await goals.ListAsync(tenant.TenantId, ct)).Select(g => new GoalProgress(g.Name, g.TargetAmount, g.SavedAmount, g.TargetDate));
 
         var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);

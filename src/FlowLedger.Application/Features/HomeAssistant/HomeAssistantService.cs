@@ -22,7 +22,7 @@ public sealed class HomeAssistantService(
     IAccountRepository accounts,
     IRecurringFlowRepository flows,
     ITransactionRepository transactions,
-    IBudgetStore budgets,
+    EffectiveBudgetService budgets,
     GetMonthlySpendByCategoryHandler spend,
     GetForecastHandler forecast,
     ITenantContext tenant,
@@ -194,21 +194,21 @@ public sealed class HomeAssistantService(
 
         var breaches = new List<HaBudgetBreach>();
         var spent = await spend.HandleAsync(ct);
-        foreach (var b in await budgets.ListAsync(tenant.TenantId, ct))
+        foreach (var b in await budgets.ListAsync(null, ct))
         {
-            if (b.MonthlyLimit <= 0)
+            if (b.EffectiveLimit <= 0)
             {
                 continue;
             }
 
-            var used = MonthlySpend.SpentFor(b.Category, spent);
-            if (used > b.MonthlyLimit)
+            var used = MonthlySpend.SpentFor(b.Row.Category, spent);
+            if (used > b.EffectiveLimit)
             {
-                breaches.Add(new HaBudgetBreach(b.Category, true));
+                breaches.Add(new HaBudgetBreach(b.Row.Category, true));
             }
-            else if (used / b.MonthlyLimit * 100m >= BudgetWarnPercent)
+            else if (used / b.EffectiveLimit * 100m >= BudgetWarnPercent)
             {
-                breaches.Add(new HaBudgetBreach(b.Category, false));
+                breaches.Add(new HaBudgetBreach(b.Row.Category, false));
             }
         }
 

@@ -34,7 +34,7 @@ internal static class BudgetEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            var version = await handler.HandleAsync(request.Category.Trim(), request.MonthlyLimit, expected, ct);
+            var version = await handler.HandleAsync(request.Category.Trim(), request.MonthlyLimit, expected, ct, request.Rollover);
             response.Headers.ETag = $"\"{version}\"";
             return Results.NoContent();
         })

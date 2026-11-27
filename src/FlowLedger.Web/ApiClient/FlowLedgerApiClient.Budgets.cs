@@ -12,11 +12,11 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task SetBudgetAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default)
+    public async Task SetBudgetAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default, bool? rollover = null)
     {
         await ExecuteAsync("save budget", async () =>
         {
-            var response = await SendVersionedAsync(HttpMethod.Put, "/api/budgets", new { category, monthlyLimit }, expectedVersion, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, "/api/budgets", new { category, monthlyLimit, rollover }, expectedVersion, ct);
             ThrowIfChangedElsewhere(response, "budget");
             if (!response.IsSuccessStatusCode)
             {

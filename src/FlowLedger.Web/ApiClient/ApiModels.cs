@@ -119,7 +119,7 @@ public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerch
 /// <summary>One row's category before a change, as the server reports it so an Undo can put it back.</summary>
 public sealed record CategoryRestoreDto(Guid TransactionId, Guid? CategoryId, bool Manual, double? Confidence);
 
-public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0);
+public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0, bool Rollover = false, decimal Carried = 0m);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
 

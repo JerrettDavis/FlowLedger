@@ -24,10 +24,10 @@ internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenan
     {
         Guard(tenantId);
         var rows = await db.Budgets.AsNoTracking().OrderBy(b => b.Category).ToListAsync(ct);
-        return rows.Select(r => new BudgetRow(r.Category, r.MonthlyLimit, r.RowVersion)).ToList();
+        return rows.Select(r => new BudgetRow(r.Category, r.MonthlyLimit, r.RowVersion, r.Rollover, r.CarriedAmount, r.CarriedForMonth)).ToList();
     }
 
-    public async Task<uint> SetAsync(Guid tenantId, string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default)
+    public async Task<uint> SetAsync(Guid tenantId, string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default, bool? rollover = null)
     {
         Guard(tenantId);
         var existing = await db.Budgets.SingleOrDefaultAsync(b => b.Category == category, ct);
@@ -38,7 +38,7 @@ internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenan
                 throw new ConcurrencyConflictException("This budget was removed elsewhere. Reload it and try again.");
             }
 
-            existing = BudgetRecord.Create(tenantId, category, monthlyLimit);
+            existing = BudgetRecord.Create(tenantId, category, monthlyLimit, rollover ?? false);
             db.Budgets.Add(existing);
         }
         else
@@ -49,8 +49,26 @@ internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenan
             }
 
             existing.SetLimit(monthlyLimit);
+            if (rollover is { } roll)
+            {
+                existing.SetRollover(roll);
+            }
         }
 
+        await VersionedSave.SaveAsync(db, "budget", ct);
+        return existing.RowVersion;
+    }
+
+    public async Task<uint> SetCarriedAsync(Guid tenantId, string category, decimal carriedAmount, string month, CancellationToken ct = default)
+    {
+        Guard(tenantId);
+        var existing = await db.Budgets.SingleOrDefaultAsync(b => b.Category == category, ct);
+        if (existing is null)
+        {
+            return 0;
+        }
+
+        existing.SetCarried(carriedAmount, month);
         await VersionedSave.SaveAsync(db, "budget", ct);
         return existing.RowVersion;
     }

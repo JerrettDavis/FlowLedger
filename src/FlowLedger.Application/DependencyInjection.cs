@@ -85,6 +85,9 @@ public static class DependencyInjection
         // Forecasting
         services.AddSingleton<IForecastEngine, ForecastEngine>();
 
+        // Budgets (rollover applied once, shared by the budgets page, alerts and Home Assistant)
+        services.AddScoped<FlowLedger.Application.Features.Budgets.EffectiveBudgetService>();
+
         // Home Assistant and outbound integrations
         services.AddScoped<FlowLedger.Application.Features.HomeAssistant.HomeAssistantService>();
         services.AddScoped<FlowLedger.Application.Features.Integrations.IntegrationService>();

@@ -52,6 +52,59 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     [Fact]
+    public async Task A_rollover_budget_carries_last_months_unspent_amount_and_alerts_use_the_larger_limit()
+    {
+        var accountResponse = await _client.PostAsJsonAsync(
+            "/api/accounts", FlowLedger.TestSupport.Builders.CreateAccountRequestBuilder.A().Named("Rollover Account").OfType("Checking").StartingAt(0m).Build());
+        accountResponse.EnsureSuccessStatusCode();
+        var accountId = (await accountResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var categoryResponse = await _client.PostAsJsonAsync(
+            "/api/categories", FlowLedger.TestSupport.Builders.CreateCategoryRequestBuilder.A().AtPath("RolloverFood").Named("Rollover Food").Build());
+        categoryResponse.EnsureSuccessStatusCode();
+        var categoryId = (await categoryResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        async Task AddSpendAsync(decimal amount, DateOnly date)
+        {
+            var created = await _client.PostAsJsonAsync("/api/transactions",
+                new FlowLedger.Contracts.CreateTransactionRequest(accountId, amount, "USD", "Debit", "Rollover Cafe " + date, date, null, null, null, null));
+            created.EnsureSuccessStatusCode();
+            var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            (await _client.PutAsJsonAsync($"/api/transactions/{id}/category", new { categoryId, applyToMerchant = false })).EnsureSuccessStatusCode();
+        }
+
+        var thisMonth = new DateOnly(factory.ServerToday.Year, factory.ServerToday.Month, 1);
+        await AddSpendAsync(40m, thisMonth.AddMonths(-1).AddDays(3)); // last month: 40 of the 100 limit spent, 60 left over
+        await AddSpendAsync(130m, thisMonth);                          // this month: 130, over the base limit but under 100 + 60
+
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "RolloverFood", monthlyLimit = 100m, rollover = true })).EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/budgets"));
+        var budget = doc.RootElement.GetProperty("budgets").EnumerateArray().Single(b => b.GetProperty("category").GetString() == "RolloverFood");
+        budget.GetProperty("rollover").GetBoolean().Should().BeTrue();
+        budget.GetProperty("monthlyLimit").GetDecimal().Should().Be(100m, "the limit the user set is unchanged");
+        budget.GetProperty("carried").GetDecimal().Should().Be(60m);
+        budget.GetProperty("remaining").GetDecimal().Should().Be(30m, "160 effective limit minus 130 spent");
+        budget.GetProperty("over").GetBoolean().Should().BeFalse();
+
+        // The carried amount is stored: reading again (or editing with the version the read returned) still works.
+        var version = budget.GetProperty("version").GetUInt32();
+        (await Send(HttpMethod.Put, "/api/budgets", new { category = "RolloverFood", monthlyLimit = 100m }, $"\"{version}\"")).StatusCode
+            .Should().Be(HttpStatusCode.NoContent);
+
+        using var alerts = JsonDocument.Parse(await _client.GetStringAsync("/api/alerts"));
+        alerts.RootElement.EnumerateArray().Select(a => a.GetProperty("title").GetString())
+            .Should().NotContain(t => t != null && t.Contains("RolloverFood", StringComparison.Ordinal) && t.Contains("over budget", StringComparison.Ordinal),
+                "130 is over the 100 limit but not over the 160 the rollover allows");
+
+        // Turning rollover off drops the carry and the budget is judged against the base limit again.
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "RolloverFood", monthlyLimit = 100m, rollover = false })).EnsureSuccessStatusCode();
+        using var off = JsonDocument.Parse(await _client.GetStringAsync("/api/budgets"));
+        var plain = off.RootElement.GetProperty("budgets").EnumerateArray().Single(b => b.GetProperty("category").GetString() == "RolloverFood");
+        plain.GetProperty("carried").GetDecimal().Should().Be(0m);
+        plain.GetProperty("over").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Put_goal_with_zero_target_returns_validation_problem_keyed_goal()
     {
         var response = await _client.PutAsJsonAsync("/api/goals", new { name = "Car", targetAmount = 0m, savedAmount = 0m });
