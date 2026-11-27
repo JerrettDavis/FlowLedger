@@ -68,6 +68,43 @@ public sealed class BillSheetServiceTests
     }
 
     [Fact]
+    public async Task Refresh_ticks_a_mortgage_row_from_the_paying_leg_and_ignores_the_receiving_leg_of_the_transfer()
+    {
+        var store = new InMemoryStore();
+        var txns = new FakeTransactionRepository();
+        var accounts = new FakeAccountRepository();
+        var tenant = TenantId.New();
+        var mortgage = Account.Create(tenant, "Mortgage", AccountType.Mortgage, new Money(200000m, "USD"));
+        var checking = Account.Create(tenant, "Checking", AccountType.Checking, new Money(5000m, "USD"));
+        await accounts.AddAsync(mortgage);
+        await accounts.AddAsync(checking);
+        var svc = new BillSheetService(store, txns, accounts);
+
+        var payingLegs = new List<Guid>();
+        var receivingLegs = new List<Guid>();
+        for (var i = 0; i < 4; i++)
+        {
+            var d = ThisMonth.AddMonths(-i).AddDays(9);
+            var paying = Transaction.RecordActual(tenant, checking.AccountId, new Money(1500m, "USD"),
+                TransactionDirection.Debit, "Harbor Home Loan", d, d, TransactionSource.MxAggregation);
+            var receiving = Transaction.RecordActual(tenant, mortgage.AccountId, new Money(1500m, "USD"),
+                TransactionDirection.Debit, "Harbor Home Loan", d, d, TransactionSource.MxAggregation);
+            await txns.AddAsync(paying);
+            await txns.AddAsync(receiving);
+            payingLegs.Add(paying.Id);
+            receivingLegs.Add(receiving.Id);
+        }
+
+        await svc.RefreshAsync();
+
+        var bills = await store.ListBillsAsync(includeInactive: true);
+        bills.Should().ContainSingle(b => b.Name.Contains("Harbor", StringComparison.OrdinalIgnoreCase), "the receiving leg is not a second recurring expense");
+        var payments = await store.ListPaymentsAsync(ThisMonth.AddMonths(-6), ThisMonth);
+        payments.Where(p => p.TransactionId is not null).Select(p => p.TransactionId!.Value)
+            .Should().NotBeEmpty().And.OnlyContain(id => payingLegs.Contains(id) && !receivingLegs.Contains(id));
+    }
+
+    [Fact]
     public async Task Import_maps_headers_sections_totals_and_manual_marks()
     {
         var (svc, store, _) = Make();

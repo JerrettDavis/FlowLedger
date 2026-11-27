@@ -65,6 +65,20 @@ public static class TransferDetector
         return result;
     }
 
+    /// <summary>
+    /// The legs of detected transfers that sit on a liability account (the card/loan/mortgage side of a payment). A bill sheet
+    /// ticks a bill from the paying leg only; the receiving leg must neither pay a bill row a second time nor look like a new
+    /// recurring expense.
+    /// </summary>
+    public static HashSet<Guid> LiabilitySideLegs(
+        IReadOnlyList<TransactionDto> transactions,
+        IReadOnlySet<Guid> transferIds,
+        IReadOnlyDictionary<Guid, string> accountTypeById)
+        => transactions
+            .Where(t => transferIds.Contains(t.Id) && accountTypeById.TryGetValue(t.AccountId, out var type) && LiabilityTypes.Contains(type))
+            .Select(t => t.Id)
+            .ToHashSet();
+
     private static int Day(TransactionDto t) => (t.PostedDate ?? t.EffectiveDate).DayNumber;
 
     private static bool IsMatch(TransactionDto a, TransactionDto b, IReadOnlyDictionary<Guid, string> types)
