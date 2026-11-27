@@ -97,7 +97,15 @@ internal sealed class JobExclusionTriggerListener(JobExclusion exclusion, JobFir
         => ValueTask.CompletedTask;
 
     public async ValueTask TriggerComplete(ITrigger trigger, IJobExecutionContext context, SchedulerInstruction triggerInstructionCode, CancellationToken cancellationToken = default)
-        => await exclusion.ExitAsync(context.FireInstanceId);
+    {
+        // Confirm the fire-time claim while the lock is still held; a run that never gets here (its process died) stays unconfirmed and is re-fired.
+        if (gate is not null)
+        {
+            await gate.CompleteAsync(context, cancellationToken);
+        }
+
+        await exclusion.ExitAsync(context.FireInstanceId);
+    }
 
     public ValueTask TriggerRetriesExhausted(ITrigger trigger, IJobExecutionContext context, JobExecutionException exception, CancellationToken cancellationToken = default)
         => ValueTask.CompletedTask;

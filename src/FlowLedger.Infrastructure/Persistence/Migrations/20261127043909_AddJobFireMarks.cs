@@ -17,6 +17,9 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                 {
                     job = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     last_fire_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    owner = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    claimed_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    completed_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     updated_utc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>

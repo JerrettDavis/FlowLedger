@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FlowLedger.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FlowLedgerDbContext))]
-    [Migration("20261127042609_AddJobFireMarks")]
+    [Migration("20261127043909_AddJobFireMarks")]
     partial class AddJobFireMarks
     {
         /// <inheritdoc />
@@ -1066,9 +1066,22 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("job");
 
+                    b.Property<DateTimeOffset>("ClaimedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_utc");
+
+                    b.Property<DateTimeOffset?>("CompletedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_utc");
+
                     b.Property<DateTimeOffset>("LastFireUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_fire_utc");
+
+                    b.Property<string>("Owner")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("owner");
 
                     b.Property<DateTimeOffset>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone")

@@ -112,6 +112,7 @@ internal static class WorkerHostBuilderFactory
         // two worker processes (rolling deploy, accidental second replica) from running the same job at once.
         builder.Services.AddSingleton<JobRunHistory>();
         builder.Services.AddSingleton<JobExclusion>();
+        builder.Services.AddSingleton(JobFireGateOptions.From(builder.Configuration));
         builder.Services.AddSingleton<JobFireGate>();
         builder.Services.AddSingleton<JobRunRecorder>();
         builder.Services.AddSingleton(JobRetryOptions.From(builder.Configuration));
