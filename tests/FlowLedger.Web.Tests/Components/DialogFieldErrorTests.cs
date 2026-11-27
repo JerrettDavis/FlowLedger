@@ -282,6 +282,20 @@ public sealed class DialogFieldErrorTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Split_dialog_amount_inputs_carry_the_display_currency_symbol()
+    {
+        var provider = Provider();
+        _ = Services.GetRequiredService<IDialogService>().ShowAsync<SplitDialog>("Split", new DialogParameters<SplitDialog>
+        {
+            { x => x.Description, "Coffee" },
+            { x => x.Total, 10m },
+        });
+        await provider.WaitForAssertionAsync(() => provider.Markup.Should().Contain("Split transaction"));
+
+        provider.FindAll(".mud-input-adornment-start").Select(a => a.TextContent.Trim()).Should().Contain("$");
+    }
+
+    [Fact]
     public async Task Money_inputs_carry_the_display_currency_symbol_as_an_adornment()
     {
         var provider = await OpenFlowDialogAsync(_ => Task.CompletedTask);

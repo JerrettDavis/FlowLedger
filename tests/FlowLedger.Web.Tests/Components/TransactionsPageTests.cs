@@ -83,6 +83,16 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void The_amount_filters_show_the_display_currency_symbol()
+    {
+        var cut = RenderPage(new Handler());
+
+        cut.WaitForAssertion(() => cut.FindAll(".mud-input-adornment-start").Select(a => a.TextContent.Trim()).Should().Contain("$"));
+        cut.Find("input[aria-label='Minimum amount']").ParentElement!.QuerySelector(".mud-input-adornment-start")!.TextContent.Trim().Should().Be("$");
+        cut.Find("input[aria-label='Maximum amount']").ParentElement!.QuerySelector(".mud-input-adornment-start")!.TextContent.Trim().Should().Be("$");
+    }
+
+    [Fact]
     public void The_grid_shows_the_server_total_not_just_what_was_loaded()
     {
         var handler = new Handler { ServerTotal = 1234 };

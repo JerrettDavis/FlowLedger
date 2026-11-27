@@ -68,7 +68,7 @@
 
             <MudText Typo="Typo.subtitle2" Class="mb-1">Record a valuation</MudText>
             <MudGrid Class="mb-2">
-                <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_amount" Label="Value" Format="F2" Min="0m" aria-label="New valuation amount" /></MudItem>
+                <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_amount" Label="Value" Format="F2" Min="0m" Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="New valuation amount" /></MudItem>
                 <MudItem xs="6" sm="3"><MudDatePicker @bind-Date="_asOf" Label="As of" aria-label="Valuation date" /></MudItem>
                 <MudItem xs="6" sm="3"><MudTextField @bind-Value="_source" Label="Source" Placeholder="Appraiser, receipt…" aria-label="Valuation source" /></MudItem>
                 <MudItem xs="6" sm="3" Class="d-flex align-center">
