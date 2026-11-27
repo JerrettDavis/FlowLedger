@@ -64,6 +64,8 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
         var added = 0;
         var skipped = 0;
         var flows = 0;
+        var changed = new List<Guid>();
+        var changedKnown = true;
         var failures = new List<Exception>();
 
         foreach (var connector in connectors)
@@ -76,6 +78,14 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
                 added += r.TransactionsAdded;
                 skipped += r.TransactionsSkipped;
                 flows += r.RecurringFlowsAdded;
+                if (r.ChangedTransactionIds is { } ids)
+                {
+                    changed.AddRange(ids);
+                }
+                else
+                {
+                    changedKnown = false;   // a connector that does not report ids: the post-sync steps must fall back to the whole window
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -90,7 +100,7 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
         }
 
-        return new SyncResult(accounts, added, skipped, flows);
+        return new SyncResult(accounts, added, skipped, flows, changedKnown ? changed : null);
     }
 
     private static Exception NoUsableConnector() => new NeedsUserActionProviderException(

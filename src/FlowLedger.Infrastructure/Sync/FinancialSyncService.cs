@@ -221,8 +221,18 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         }
     }
 
+    /// <summary>Ids of transactions this sync inserted or settled in place; carried out in <see cref="SyncResult.ChangedTransactionIds"/> so post-sync steps touch only these (#163).</summary>
+    private readonly List<Guid> _changedTransactionIds = [];
+
+    private bool Track(Transaction t)
+    {
+        _changedTransactionIds.Add(t.Id);
+        return true;
+    }
+
     private async Task<SyncResult> SyncCoreAsync(CancellationToken ct)
     {
+        _changedTransactionIds.Clear();
         EnsureTenantMayUseProvider();
         var tenantId = TenantId.From(_tenant.TenantId);
         _logger.LogInformation("Starting sync for tenant {TenantId} via {Provider}", tenantId, _provider.ProviderName);
@@ -316,7 +326,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
         // failed sync (cursors advanced, then an error) does not start a fresh minimum-interval window.
         await _cursorStore.MarkSuccessfulAsync(_provider.ProviderName, providerIdToAccount.Keys.ToList(), ct);
 
-        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded);
+        var result = new SyncResult(accountsUpserted, transactionsAdded, transactionsSkipped, recurringFlowsAdded, _changedTransactionIds.Distinct().ToList());
         _logger.LogInformation(
             "Sync complete: {AccountsUpserted} accounts, {TxAdded} transactions added, {TxSkipped} skipped, {RfAdded} recurring flows added",
             result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped, result.RecurringFlowsAdded);
@@ -569,7 +579,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     if (existingByFp.TryGetValue(x.Fingerprint.Value, out var row))
                     {
                         // Same provider id seen before: pending -> posted transition in place.
-                        if (!x.ProviderTx.IsPending && row.Settle(x.ProviderTx.PostedDate))
+                        if (!x.ProviderTx.IsPending && row.Settle(x.ProviderTx.PostedDate) && Track(row))
                         {
                             settled++;
                         }
@@ -607,7 +617,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                             }
                         }
 
-                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount))
+                        if (pending is not null && pending.Settle(x.ProviderTx.PostedDate, x.Fingerprint, finalAmount) && Track(pending))
                         {
                             PendingSettlement.RemoveSettleCandidate(settleCandidates, pending);
                             settled++;
@@ -625,6 +635,7 @@ internal sealed class FinancialSyncService : IFinancialSyncService
                     EnsureQuotaRoom(stored, toInsert.Count);
                     stored += toInsert.Count;
                     await _db.Transactions.AddRangeAsync(toInsert, ct);
+                    _changedTransactionIds.AddRange(toInsert.Select(t => t.Id));
                     added += toInsert.Count;
                     foreach (var inserted in toInsert.Where(t => t.AccountId == account.AccountId
                                  && t.Status == TransactionStatus.Pending && t.Source == TransactionSource.MxAggregation))

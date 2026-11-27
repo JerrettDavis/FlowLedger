@@ -16,6 +16,16 @@ public interface ICategorizationStore
     Task SaveAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Untracked rows with exactly these ids (the rows a sync inserted or settled, #163). Stores should override with an indexed lookup; the
+    /// default filters the newest-first window, which is correct but loads it.
+    /// </summary>
+    async Task<IReadOnlyList<Transaction>> LoadByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+    {
+        var wanted = ids as ISet<Guid> ?? ids.ToHashSet();
+        return (await LoadAsync(TransactionQuota.ProcessingCap, ct)).Where(t => wanted.Contains(t.Id)).ToList();
+    }
+
+    /// <summary>
     /// Newest-first transactions WITHOUT change tracking. Use for whole-history analysis; mutate the rows you change and pass
     /// them to <see cref="SaveChangedAsync"/>. Default falls back to the tracked load for simple stores.
     /// </summary>
