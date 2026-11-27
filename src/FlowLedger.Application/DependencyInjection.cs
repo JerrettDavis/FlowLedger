@@ -32,6 +32,9 @@ public static class DependencyInjection
         services.AddScoped<ListTransactionsHandler>();
         services.AddScoped<GetTransactionHandler>();
         services.AddScoped<GetProcessingWindowHandler>();
+        // Process-local, bounded: per-tenant data version + small result cache (#160). Replicas see a write after the cache TTL.
+        services.TryAddSingleton<FlowLedger.Application.Abstractions.ITenantDataVersion, FlowLedger.Application.Abstractions.TenantDataVersion>();
+        services.TryAddSingleton<FlowLedger.Application.Abstractions.TenantResultCache>();
         services.AddScoped<FlowLedger.Application.Abstractions.IReferenceValidator, FlowLedger.Application.Abstractions.ReferenceValidator>();
         services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
