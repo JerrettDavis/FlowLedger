@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Contracts;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -209,6 +210,76 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
         var lines = csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         lines.Should().HaveCount(1 + 3, "the header and the three coffee rows");
         lines[1].Should().Contain("Coffee 2", "newest first by default");
+    }
+
+    // ── Column filters and bulk category (#72, #67) ───────────────────────────
+
+    private static async Task<CategoryDto> CreateCategory(HttpClient client, string path)
+    {
+        var response = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest(path, path, null));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CategoryDto>())!;
+    }
+
+    [Fact]
+    public async Task List_filters_by_uncategorized_amount_range_and_status_and_the_total_follows_them()
+    {
+        var account = await CreateAccount();
+        foreach (var (name, amount) in new[] { ("Small", 5m), ("Medium", 50m), ("Large", 500m) })
+        {
+            (await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
+                account.Id, amount, "USD", "Debit", name, new DateOnly(2026, 2, 1), null, null, null, null))).EnsureSuccessStatusCode();
+        }
+
+        var between = await _client.GetAsync("/api/transactions?minAmount=10&maxAmount=100");
+        (await between.Content.ReadFromJsonAsync<List<TransactionDto>>())!.Select(t => t.Description).Should().Equal("Medium");
+        between.Headers.GetValues("X-Total-Count").Single().Should().Be("1");
+
+        var uncategorized = await _client.GetFromJsonAsync<List<TransactionDto>>("/api/transactions?uncategorized=true");
+        uncategorized!.Should().HaveCount(3);
+
+        (await _client.GetAsync("/api/transactions?status=NotAStatus")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await _client.GetAsync("/api/transactions?minAmount=50&maxAmount=5")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Bulk_category_sets_the_category_on_selected_rows_and_the_category_filter_finds_them()
+    {
+        var account = await CreateAccount();
+        var first = await CreateTransaction(account.Id);
+        var second = await CreateTransaction(account.Id);
+        var untouched = await CreateTransaction(account.Id);
+        var category = await CreateCategory(_client, "bulk-target");
+
+        var response = await _client.PostAsJsonAsync("/api/transactions/bulk-category", new { transactionIds = new[] { first.Id, second.Id }, categoryId = category.Id });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + first.Id)).GetProperty("categoryId").GetGuid().Should().Be(category.Id);
+        var filtered = await _client.GetFromJsonAsync<List<TransactionDto>>($"/api/transactions?categoryId={category.Id}");
+        filtered!.Select(t => t.Id).Should().BeEquivalentTo([first.Id, second.Id]);
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + untouched.Id)).GetProperty("categoryId").ValueKind
+            .Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Bulk_category_cannot_touch_another_tenants_transactions_or_categories()
+    {
+        var account = await CreateAccount();
+        var mine = await CreateTransaction(account.Id);
+        var myCategory = await CreateCategory(_client, "mine-only");
+        using var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var theirCategory = await CreateCategory(other, "theirs-only");
+
+        var intoMine = await other.PostAsJsonAsync("/api/transactions/bulk-category", new { transactionIds = new[] { mine.Id }, categoryId = theirCategory.Id });
+        intoMine.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await intoMine.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("changed").GetInt32().Should().Be(0, "another tenant's row is invisible");
+
+        var foreignCategory = await _client.PostAsJsonAsync("/api/transactions/bulk-category", new { transactionIds = new[] { mine.Id }, categoryId = theirCategory.Id });
+        foreignCategory.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        (await _client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/transactions/" + mine.Id)).GetProperty("categoryId").ValueKind
+            .Should().Be(System.Text.Json.JsonValueKind.Null);
+        myCategory.Id.Should().NotBe(Guid.Empty);
     }
 
     private static CreateTransactionRequest ValidRequest(Guid accountId) =>
