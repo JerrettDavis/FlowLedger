@@ -18,7 +18,13 @@ internal sealed class BalanceHistoryReader(FlowLedgerDbContext db, TimeProvider?
             inWindow = inWindow.Where(s => s.CapturedAt < toUtc);
         }
 
-        var rows = await inWindow
+        // Collapse to one row per account per (UTC) day IN SQL: a sync every few hours writes many snapshots a day, and only the last of
+        // each day is ever used, so the others are not transferred (#160).
+        var lastTimes = inWindow
+            .GroupBy(s => new { s.AccountId, Day = s.CapturedAt.UtcDateTime.Date })
+            .Select(g => new { g.Key.AccountId, Last = g.Max(x => x.CapturedAt) });
+        var lastOfDay = inWindow.Join(lastTimes, s => new { s.AccountId, s.CapturedAt }, l => new { l.AccountId, CapturedAt = l.Last }, (s, l) => s);
+        var rows = await lastOfDay
             .OrderBy(s => s.CapturedAt)
             .Select(s => new { s.AccountId, s.Balance, s.CapturedAt })
             .ToListAsync(ct);
