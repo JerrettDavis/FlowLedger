@@ -73,6 +73,7 @@ sealed class FlowLedger.Application.Abstractions.ConcurrencyConflictException
 sealed class FlowLedger.Application.Abstractions.ConnectionIssueInfo
 sealed class FlowLedger.Application.Abstractions.ConnectorUsage
 sealed class FlowLedger.Application.Abstractions.DiscoveredProviderAccount
+sealed class FlowLedger.Application.Abstractions.ITransactionRepository+TransactionKeyset
 sealed class FlowLedger.Application.Abstractions.LocalAiDownload
 sealed class FlowLedger.Application.Abstractions.LocalAiModelInfo
 sealed class FlowLedger.Application.Abstractions.LocalAiRuntimeStatus

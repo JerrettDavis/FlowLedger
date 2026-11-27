@@ -39,25 +39,26 @@ internal static class TransactionEndpoints
             .WithName("GetProcessingWindow")
             .WithSummary("Whether more transactions are stored than the whole-history engines process (results are then partial)");
 
-        group.MapGet("/export.csv", async (
+        group.MapGet("/export.csv", (
             [AsParameters] ListTransactionsQuery query,
             ListTransactionsHandler handler,
             CancellationToken ct) =>
         {
-            const int Page = 500, Cap = TransactionQuota.ProcessingCap;
-            var all = new List<TransactionDto>();
-            for (var skip = 0; all.Count < Cap; skip += Page)
+            // Streamed page by page with keyset paging (#160): memory is one page however large the export, and no page rescans the ones before it.
+            return Results.Stream(async body =>
             {
-                var batch = await handler.HandleAsync(query with { Skip = skip, Take = Page }, ct);
-                all.AddRange(batch);
-                if (batch.Count < Page)
+                await using var writer = new StreamWriter(body, new System.Text.UTF8Encoding(false), ApiLimits.FileStreamBufferBytes, leaveOpen: true);
+                await writer.WriteAsync(TransactionCsv.HeaderLine.AsMemory(), ct);
+                await foreach (var page in handler.PagesAsync(query, ApiLimits.ExportPageRows, TransactionQuota.ProcessingCap, ct))
                 {
-                    break;
+                    foreach (var row in page)
+                    {
+                        await writer.WriteAsync(TransactionCsv.Row(row).AsMemory(), ct);
+                    }
                 }
-            }
 
-            return Results.File(System.Text.Encoding.UTF8.GetBytes(TransactionCsv.Build(all)), "text/csv; charset=utf-8",
-                $"flowledger-transactions-{DateTime.UtcNow:yyyyMMdd}.csv");
+                await writer.FlushAsync(ct);
+            }, "text/csv; charset=utf-8", $"flowledger-transactions-{DateTime.UtcNow:yyyyMMdd}.csv");
         })
         .WithName("ExportTransactionsCsv")
         .WithSummary("Download transactions (filtered like the list) as CSV");

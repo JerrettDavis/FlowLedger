@@ -56,6 +56,26 @@ public interface ITransactionRepository
         string? search = null)
         => (await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search)).Count;
 
+    /// <summary>
+    /// A position in the date-ordered list: the row after which the next page starts. Keyset paging reads the next page from here with an
+    /// index range instead of an OFFSET that rescans (and, under concurrent inserts, skips or repeats) the rows before it (#160).
+    /// </summary>
+    public sealed record TransactionKeyset(DateOnly EffectiveDate, DateTimeOffset CreatedAt, Guid Id);
+
+    /// <summary>
+    /// The page of up to <paramref name="take"/> transactions that follows <paramref name="after"/> (null = the first page) in the same
+    /// date order as <see cref="ListAsync"/> (<paramref name="descending"/> true: newest first), with the same filters. Stores should
+    /// override with a keyset query; the default pages the full list in memory, which is correct but loads it.
+    /// </summary>
+    async Task<IReadOnlyList<Transaction>> ListAfterAsync(
+        TransactionKeyset? after, AccountId? accountId, DateOnly? from, DateOnly? to, int take, bool descending, bool everydayOnly, string? search,
+        CancellationToken ct = default)
+    {
+        var all = await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search, TransactionSortKey.Date, descending);
+        var start = after is null ? 0 : all.ToList().FindIndex(t => t.Id == after.Id) + 1;
+        return all.Skip(start).Take(take).ToList();
+    }
+
     // search: case-insensitive match on description, merchant name or notes, applied by the store before paging.
 
     // everydayOnly: when no account is given, leave out transactions of disabled accounts and of hidden accounts
