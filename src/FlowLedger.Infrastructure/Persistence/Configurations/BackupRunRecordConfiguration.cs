@@ -20,5 +20,6 @@ internal sealed class BackupRunRecordConfiguration : IEntityTypeConfiguration<Ba
         builder.Property(r => r.OffsiteDetail).HasColumnName("offsite_detail");
         builder.Property(r => r.DrillOk).HasColumnName("drill_ok");
         builder.Property(r => r.Error).HasColumnName("error");
+        builder.Property(r => r.DrillDetail).HasColumnName("drill_detail").HasColumnType("jsonb");
     }
 }

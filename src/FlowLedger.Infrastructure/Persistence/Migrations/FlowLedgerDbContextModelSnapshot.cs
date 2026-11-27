@@ -707,6 +707,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("DrillDetail")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("drill_detail");
+
                     b.Property<bool?>("DrillOk")
                         .HasColumnType("boolean")
                         .HasColumnName("drill_ok");

@@ -14,11 +14,14 @@ internal sealed class BackupRunRecord
     public bool? DrillOk { get; private set; }
     public string? Error { get; private set; }
 
+    /// <summary>The restore drill's per-table counts and raw-archive check as JSON (null when no drill ran). Read back by the Data page.</summary>
+    public string? DrillDetail { get; private set; }
+
     private BackupRunRecord() { }
 
     public static BackupRunRecord Create(
         DateTimeOffset startedUtc, DateTimeOffset finishedUtc, bool ok, string? snapshotDir, long rows,
-        bool? offsiteOk, string? offsiteDetail, bool? drillOk, string? error) =>
+        bool? offsiteOk, string? offsiteDetail, bool? drillOk, string? error, string? drillDetail = null) =>
         new()
         {
             StartedUtc = startedUtc,
@@ -30,5 +33,6 @@ internal sealed class BackupRunRecord
             OffsiteDetail = offsiteDetail,
             DrillOk = drillOk,
             Error = error,
+            DrillDetail = drillDetail,
         };
 }

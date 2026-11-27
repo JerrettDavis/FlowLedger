@@ -106,6 +106,63 @@ else
         </MudItem>
 
         <MudItem xs="12">
+            <MudPaper Class="pa-4" Outlined="true" data-testid="restore-drill">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Restore drill</MudText>
+                @if (LastDrillRun is not { Drill: { } drill } drillRun)
+                {
+                    <MudText Typo="Typo.body2" Class="fl-muted" data-testid="restore-drill-none">
+                        No restore drill has been recorded yet. After each scheduled backup FlowLedger restores it into a scratch database and
+                        checks the row counts, then deletes the scratch copy.
+                    </MudText>
+                }
+                else
+                {
+                    var restoredOk = drill.Tables.Count(t => t.Ok);
+                    var changed = drill.Tables.Where(t => t.LiveRows is { } live && live != t.RestoredRows).ToList();
+                    <MudText Typo="Typo.body2" Color="@(drillRun.DrillOk == true ? Color.Success : Color.Error)" data-testid="restore-drill-result">
+                        @(drillRun.DrillOk == true ? "Passed" : "FAILED") · @Ago(drillRun.FinishedUtc) ·
+                        @restoredOk of @drill.Tables.Count tables restored with exactly the rows the backup recorded.
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="fl-muted mt-1" data-testid="restore-drill-live">
+                        @(changed.Count == 0
+                            ? "The live database holds the same number of rows in every table."
+                            : $"{changed.Count} table{(changed.Count == 1 ? "" : "s")} {(changed.Count == 1 ? "has" : "have")} a different live row count now than in the restored copy (normal if you added or removed data since the backup).")
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="fl-muted mt-1" data-testid="restore-drill-raw">
+                        @(drill.RawArchiveChecked
+                            ? $"Raw provider archive: {Format.Count(drill.RawObjectsVerified)} object{(drill.RawObjectsVerified == 1 ? "" : "s")} hash-verified" + (drill.RawObjectsSealed > 0 ? $", {Format.Count(drill.RawObjectsSealed)} encrypted object{(drill.RawObjectsSealed == 1 ? "" : "s")} counted only." : ".")
+                            : "Raw provider archive: not checked (no raw archive folder is configured).")
+                    </MudText>
+                    @foreach (var problem in drill.Problems)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@problem</MudAlert>
+                    }
+                    <MudSimpleTable Dense="true" Class="mt-3" aria-label="Restore drill row counts per table" data-testid="restore-drill-tables">
+                        <thead>
+                            <tr>
+                                <th scope="col">Table</th>
+                                <th scope="col" class="fl-num">In backup</th>
+                                <th scope="col" class="fl-num">Restored</th>
+                                <th scope="col" class="fl-num">Live now</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in drill.Tables.OrderBy(t => t.Ok ? 1 : 0).ThenBy(t => t.LiveRows is { } l && l != t.RestoredRows ? 0 : 1).ThenBy(t => t.Table, StringComparer.Ordinal))
+                            {
+                                <tr class="@(t.Ok ? "" : "fl-neg")">
+                                    <td>@t.Table</td>
+                                    <td class="fl-num">@Format.Count(t.ExpectedRows)</td>
+                                    <td class="fl-num">@Format.Count(t.RestoredRows)@(t.Ok ? "" : " ✗")</td>
+                                    <td class="fl-num">@(t.LiveRows is { } live ? Format.Count(live) : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">Recent backup runs</MudText>
                 <div class="fl-list">
@@ -130,6 +187,10 @@ else
 
 @code {
     private FlowLedger.Web.ApiClient.DataStatusDto? _status;
+
+    /// <summary>The newest recorded run that carries a restore drill (a run with drills turned off has none).</summary>
+    private FlowLedger.Web.ApiClient.BackupRunDto? LastDrillRun => _status?.Backup.Runs.FirstOrDefault(r => r.Drill is not null);
+
     private bool _loading = true;
     private bool _running;
     private bool _exporting;

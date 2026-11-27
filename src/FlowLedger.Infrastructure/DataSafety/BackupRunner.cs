@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,13 @@ public sealed record BackupSettings(
         !bool.TryParse(c["Backup:DrillAfterBackup"], out var d) || d);
 }
 
+/// <summary>
+/// What a restore drill found, kept with the backup run so the Data page can show it: every table's row count in the backup, after the
+/// restore, and live at drill time, plus the raw provider-payload archive check.
+/// </summary>
+public sealed record RestoreDrillSummary(
+    IReadOnlyList<DrillTableResult> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, IReadOnlyList<string> Problems);
+
 public sealed record BackupRunResult(
     bool Ok,
     DateTimeOffset StartedUtc,
@@ -38,7 +46,8 @@ public sealed record BackupRunResult(
     bool? OffsiteOk,
     string? OffsiteDetail,
     bool? DrillOk,
-    string? Error);
+    string? Error,
+    RestoreDrillSummary? Drill = null);
 
 /// <summary>Durable history of backup runs (<c>backup_runs</c>, host-wide, through EF; shown in the UI).</summary>
 public sealed class BackupRunStore
@@ -51,7 +60,8 @@ public sealed class BackupRunStore
     {
         await using var db = _host.Create();
         db.BackupRuns.Add(BackupRunRecord.Create(
-            r.StartedUtc, r.FinishedUtc, r.Ok, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error));
+            r.StartedUtc, r.FinishedUtc, r.Ok, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error,
+            r.Drill is null ? null : JsonSerializer.Serialize(r.Drill, DrillJson)));
         await db.SaveChangesAsync(ct);
     }
 
@@ -60,7 +70,27 @@ public sealed class BackupRunStore
         await using var db = _host.Create();
         var rows = await db.BackupRuns.AsNoTracking().OrderByDescending(r => r.Id).Take(limit).ToListAsync(ct);
         return rows.Select(r => new BackupRunResult(
-            r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error)).ToList();
+            r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error, ReadDrill(r.DrillDetail))).ToList();
+    }
+
+    private static readonly JsonSerializerOptions DrillJson = new(JsonSerializerDefaults.Web);
+
+    /// <summary>The stored drill detail, or null when there is none or it cannot be read (a run's history must always list).</summary>
+    private static RestoreDrillSummary? ReadDrill(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<RestoreDrillSummary>(json, DrillJson);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }
 
@@ -116,6 +146,7 @@ public sealed partial class BackupRunner
         bool? offsiteOk = null;
         string? offsiteDetail = null;
         bool? drillOk = null;
+        RestoreDrillSummary? drillSummary = null;
         string? error = null;
 
         try
@@ -129,6 +160,7 @@ public sealed partial class BackupRunner
             {
                 var drill = await SnapshotRestoreDrill.RunAsync(_connectionString, snapDir, "flowledger_drill_" + Guid.NewGuid().ToString("N")[..8], keep: false, ct: ct, rawArchiveDir: _settings.ObjectsDir);
                 drillOk = drill.Ok;
+                drillSummary = new RestoreDrillSummary(drill.Tables, drill.RawArchiveChecked, drill.RawObjectsVerified, drill.RawObjectsSealed, drill.Problems);
                 if (!drill.Ok)
                 {
                     error = "Restore drill failed: " + string.Join("; ", drill.Problems);
@@ -159,7 +191,7 @@ public sealed partial class BackupRunner
             LogBackupRunFailed(_logger, ex);
         }
 
-        var result = new BackupRunResult(error is null, started, DateTimeOffset.UtcNow, dir, rows, offsiteOk, offsiteDetail, drillOk, error);
+        var result = new BackupRunResult(error is null, started, DateTimeOffset.UtcNow, dir, rows, offsiteOk, offsiteDetail, drillOk, error, drillSummary);
         try
         {
             await _store.AddAsync(result, CancellationToken.None);

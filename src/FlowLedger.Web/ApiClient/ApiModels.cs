@@ -98,7 +98,14 @@ public sealed record ConnectResult(string MemberId, string Provider);
 /// </summary>
 public sealed record BackupRunDto(
     bool Ok, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, string? SnapshotDir, long Rows,
-    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error);
+    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error, RestoreDrillDto? Drill = null);
+
+/// <summary>One table in a restore drill: rows in the backup, rows after restoring it, and rows in the live database at drill time.</summary>
+public sealed record DrillTableDto(string Table, long ExpectedRows, long RestoredRows, long? LiveRows, bool Ok);
+
+/// <summary>What the last restore drill found (kept with the backup run).</summary>
+public sealed record RestoreDrillDto(
+    List<DrillTableDto> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, List<string> Problems);
 
 public sealed record BackupStatusDto(
     bool Healthy, bool Stale, bool OffsiteConfigured, DateTimeOffset? LastSuccessUtc,
