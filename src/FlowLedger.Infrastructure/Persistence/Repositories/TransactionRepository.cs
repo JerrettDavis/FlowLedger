@@ -23,13 +23,34 @@ internal sealed class TransactionRepository : ITransactionRepository
         int take = 100,
         CancellationToken ct = default,
         bool everydayOnly = false,
-        string? search = null)
+        string? search = null,
+        TransactionSortKey sort = TransactionSortKey.Date,
+        bool descending = true)
     {
         var query = await FilteredAsync(accountId, from, to, everydayOnly, search, ct);
 
-        return await query
-            .OrderByDescending(t => t.EffectiveDate)
+        // Sorted in SQL before paging, so "sort by amount" orders the whole result and not just the page on screen (#209).
+        // Date (newest or oldest first by direction) is always the final tie-break, then CreatedAt and Id, so pages never overlap.
+        IOrderedQueryable<Transaction> ordered = (sort, descending) switch
+        {
+            (TransactionSortKey.Merchant, false) => query.OrderBy(t => t.MerchantName ?? t.SuggestedName ?? t.Description),
+            (TransactionSortKey.Merchant, true) => query.OrderByDescending(t => t.MerchantName ?? t.SuggestedName ?? t.Description),
+            (TransactionSortKey.Description, false) => query.OrderBy(t => t.Description),
+            (TransactionSortKey.Description, true) => query.OrderByDescending(t => t.Description),
+            (TransactionSortKey.Amount, false) => query.OrderBy(t => t.Amount.Amount),
+            (TransactionSortKey.Amount, true) => query.OrderByDescending(t => t.Amount.Amount),
+            (_, false) => query.OrderBy(t => t.EffectiveDate),
+            _ => query.OrderByDescending(t => t.EffectiveDate),
+        };
+
+        if (sort != TransactionSortKey.Date)
+        {
+            ordered = descending ? ordered.ThenByDescending(t => t.EffectiveDate) : ordered.ThenBy(t => t.EffectiveDate);
+        }
+
+        return await ordered
             .ThenByDescending(t => t.CreatedAt)
+            .ThenBy(t => t.Id)
             .Skip(skip)
             .Take(take)
             .ToListAsync(ct);

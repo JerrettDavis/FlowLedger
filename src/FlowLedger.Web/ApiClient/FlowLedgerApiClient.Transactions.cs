@@ -35,9 +35,11 @@ public sealed partial class FlowLedgerApiClient
         int take = 100,
         CancellationToken ct = default,
         bool includeHidden = false,
-        string? search = null)
+        string? search = null,
+        string? sort = null,
+        bool descending = true)
     {
-        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search);
+        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search, sort, descending);
         return await ExecuteAsync("load transactions", async () =>
         {
             var response = await _http.GetAsync(url, ct);
@@ -58,9 +60,16 @@ public sealed partial class FlowLedgerApiClient
     }
 
     private static string TransactionsUrl(
-        Guid? accountId, DateOnly? from, DateOnly? to, int skip, int take, bool includeHidden, string? search)
+        Guid? accountId, DateOnly? from, DateOnly? to, int skip, int take, bool includeHidden, string? search,
+        string? sort = null, bool descending = true)
     {
         var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(sort))
+        {
+            qs.Add($"sort={Uri.EscapeDataString(sort)}");
+            qs.Add($"dir={(descending ? "desc" : "asc")}");
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             qs.Add($"search={Uri.EscapeDataString(search.Trim())}");

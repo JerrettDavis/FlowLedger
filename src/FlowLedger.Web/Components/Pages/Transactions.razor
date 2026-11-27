@@ -93,7 +93,7 @@
              Items="Visible"
              Filterable="true"
              FilterMode="DataGridFilterMode.ColumnFilterRow"
-             SortMode="SortMode.Multiple"
+             SortMode="SortMode.None"
              Hover="true"
              Striped="false"
              Dense="true"
@@ -104,12 +104,20 @@
         <MudText Typo="Typo.body2" Class="ml-auto mud-text-secondary" role="status" data-testid="tx-count">@RangeText</MudText>
     </ToolBarContent>
     <Columns>
-        <TemplateColumn Title="Date" Sortable="true" SortBy="x => x.EffectiveDate">
+        <TemplateColumn Title="Date" Sortable="false">
+            <HeaderTemplate>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("date")"
+                           OnClick='() => SortByAsync("date")' aria-label="@SortLabel("date", "Date")" data-testid="sort-date">Date</MudButton>
+            </HeaderTemplate>
             <CellTemplate>
                 <MudText Typo="Typo.body2">@Format.DayMonth(context.Item.EffectiveDate)</MudText>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Merchant" Sortable="true" SortBy="x => string.IsNullOrWhiteSpace(x.MerchantName) ? x.SuggestedName : x.MerchantName">
+        <TemplateColumn Title="Merchant" Sortable="false">
+            <HeaderTemplate>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("merchant")"
+                           OnClick='() => SortByAsync("merchant")' aria-label="@SortLabel("merchant", "Merchant")" data-testid="sort-merchant">Merchant</MudButton>
+            </HeaderTemplate>
             <CellTemplate>
                 @{
                     var row = context.Item;
@@ -157,12 +165,20 @@
                 </div>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Description" Sortable="true" SortBy="x => x.Description" HeaderClass="fl-hide-md" CellClass="fl-hide-md">
+        <TemplateColumn Title="Description" Sortable="false" HeaderClass="fl-hide-md" CellClass="fl-hide-md">
+            <HeaderTemplate>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("description")"
+                           OnClick='() => SortByAsync("description")' aria-label="@SortLabel("description", "Description")" data-testid="sort-description">Description</MudButton>
+            </HeaderTemplate>
             <CellTemplate>
                 <span class="fl-cell-truncate fl-desc-cell" title="@context.Item.Description">@context.Item.Description</span>
             </CellTemplate>
         </TemplateColumn>
-        <TemplateColumn Title="Amount" Sortable="true" SortBy="x => x.Amount">
+        <TemplateColumn Title="Amount" Sortable="false">
+            <HeaderTemplate>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Class="fl-sort-btn" EndIcon="@SortIcon("amount")"
+                           OnClick='() => SortByAsync("amount")' aria-label="@SortLabel("amount", "Amount")" data-testid="sort-amount">Amount</MudButton>
+            </HeaderTemplate>
             <CellTemplate>
                 <MudText Class="fl-num" Color="@Format.Delta(context.Item.Direction == "Credit" ? context.Item.Amount : -context.Item.Amount)">
                     @Format.Signed(context.Item.Amount, context.Item.Direction == "Credit")
@@ -255,6 +271,34 @@
 
     private List<FlowLedger.Contracts.TransactionDto> Visible => _visible;
 
+    // Server-side sort (#209): the order applies to the whole result, not only the page on screen. Newest first until a header is clicked.
+    private string _sortKey = "date";
+    private bool _sortDescending = true;
+
+    private Task SortByAsync(string key)
+    {
+        // Same column flips direction; a new column starts descending for amount/date and ascending for text.
+        if (_sortKey == key)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortKey = key;
+            _sortDescending = key is "date" or "amount";
+        }
+
+        return LoadAsync();
+    }
+
+    private string SortIcon(string key) =>
+        _sortKey != key ? Icons.Material.Filled.UnfoldMore
+        : _sortDescending ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.ArrowUpward;
+
+    private string SortLabel(string key, string title) =>
+        _sortKey != key ? $"Sort by {title}"
+        : $"Sort by {title}, currently {(_sortDescending ? "descending" : "ascending")}";
+
     private Task OnSearchChanged(string? value)
     {
         _search = value;
@@ -344,7 +388,9 @@
                 skip: _page * PageSize,
                 take: PageSize,
                 includeHidden: _includeHidden,
-                search: _search);
+                search: _search,
+                sort: _sortKey,
+                descending: _sortDescending);
             if (seq != _loadSeq)
             {
                 return; // a newer filter or search superseded this response
