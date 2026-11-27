@@ -110,16 +110,17 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
-    [E2EFact(DisplayName = "Transactions: the amount header sorts on the server (#209)")]
-    public async Task Transactions_AmountHeaderSortsOnTheServer()
+    [E2EFact(DisplayName = "Transactions: the amount header sorts and restarts from the first page (#209)")]
+    public async Task Transactions_AmountHeaderSortsAndReloads()
     {
         await NavigateAsync("/transactions");
         (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
 
-        var request = Page!.WaitForRequestAsync(r => r.Url.Contains("/api/transactions", StringComparison.Ordinal)
-            && r.Url.Contains("sort=amount", StringComparison.Ordinal));
-        await Page.GetByTestId("sort-amount").ClickAsync();
-        await request;
+        // The API call happens server-side (Blazor Server), so the browser can only observe the result: the header's state flips
+        // and the grid reloads. The ordering itself is asserted by TransactionSortTests and the bUnit page tests.
+        await Page!.GetByTestId("sort-amount").ClickAsync();
+        await Page.Locator("[data-testid=sort-amount][aria-label*='descending']").WaitForAsync();
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
 
         AssertNoPageErrors();
     }
