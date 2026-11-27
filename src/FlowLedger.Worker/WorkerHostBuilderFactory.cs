@@ -3,12 +3,7 @@ using FlowLedger.Infrastructure;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Worker.Jobs;
 using FlowLedger.Worker.Scheduling;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 using Quartz;
 
 namespace FlowLedger.Worker;

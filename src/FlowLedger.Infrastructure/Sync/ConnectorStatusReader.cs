@@ -1,5 +1,4 @@
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.SharedKernel;

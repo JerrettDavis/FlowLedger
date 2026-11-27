@@ -1,6 +1,5 @@
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;

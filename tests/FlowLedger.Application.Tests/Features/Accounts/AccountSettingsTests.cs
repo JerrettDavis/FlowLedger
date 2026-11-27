@@ -1,7 +1,6 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
-using FlowLedger.Domain.ValueObjects;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 

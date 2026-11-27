@@ -1,9 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Application.Features.Accounts;
-using FlowLedger.Application.Features.Categories;
-using FlowLedger.Application.Features.RecurringFlows;
-using FlowLedger.Application.Features.Transactions;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;

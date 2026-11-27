@@ -1,5 +1,4 @@
 using FlowLedger.Application.Features.Users;
-using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

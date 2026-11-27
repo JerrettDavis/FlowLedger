@@ -1,5 +1,4 @@
 using FlowLedger.Integrations.Abstractions;
-using FluentAssertions;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 

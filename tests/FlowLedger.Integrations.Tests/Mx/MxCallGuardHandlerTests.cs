@@ -1,7 +1,6 @@
 using System.Net;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FlowLedger.Integrations.Tests.Mx;
@@ -46,7 +45,8 @@ public sealed class MxCallGuardHandlerTests
         var handler = new ConnectorCallGuardHandler(
             ledger, ConnectorIds.Mx, "Mx:Provider:CallsPaused",
             () => new ConnectorCallPolicy(opts.CallsPaused, opts.DailyCallBudget, opts.MonthlyCallBudget),
-            NullLogger<ConnectorCallGuardHandler>.Instance) { InnerHandler = inner };
+            NullLogger<ConnectorCallGuardHandler>.Instance)
+        { InnerHandler = inner };
         return (new HttpClient(handler) { BaseAddress = new Uri("https://mx.example") }, inner, ledger);
     }
 

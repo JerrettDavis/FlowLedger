@@ -1,0 +1,27 @@
+# Banned APIs (Microsoft.CodeAnalysis.BannedApiAnalyzers, issue #113). Format: <doc-id>;<message shown with RS0030>.
+# Every entry states why. Add an entry only when the replacement exists and the tree is already clean;
+# a legitimate exception needs an inline #pragma warning disable RS0030 with a reason (see CONTRIBUTING.md).
+#
+# Not banned yet: DateTime.UtcNow / DateTimeOffset.UtcNow (about 100 production reads that still need a TimeProvider seam, tracked in #127/#144).
+
+# A local-time clock makes server results depend on the host time zone; the product stores and compares UTC only.
+# (DateTime.Now / DateTime.Today stay allowed: the Blazor UI deliberately shows the viewer's own calendar day.)
+P:System.DateTimeOffset.Now;Use TimeProvider.GetUtcNow() (UTC, injectable in tests).
+
+# Blocking on a task inside async code risks thread-pool starvation and deadlocks, and wraps failures in AggregateException.
+M:System.Runtime.CompilerServices.TaskAwaiter.GetResult();Await the task instead of blocking on it.
+M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult();Await the task instead of blocking on it.
+M:System.Threading.Tasks.Task.Wait();Await the task instead of blocking on it.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan);Await the task (Task.WaitAsync for a timeout) instead of blocking on it.
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[]);Use await Task.WhenAll(...).
+
+# Hosts log through ILogger ([LoggerMessage]); raw console writes bypass levels, scopes, redaction and OpenTelemetry.
+M:System.Console.WriteLine(System.String);Log through ILogger. CLI command output is the only exception (suppress with a reason).
+M:System.Console.WriteLine(System.Object);Log through ILogger. CLI command output is the only exception (suppress with a reason).
+M:System.Console.Write(System.String);Log through ILogger. CLI command output is the only exception (suppress with a reason).
+
+# One JSON stack: System.Text.Json.
+N:Newtonsoft.Json;Use System.Text.Json.
+
+# Environment.Exit skips hosted-service shutdown (flush, lease release); stop the host instead.
+M:System.Environment.Exit(System.Int32);Stop the host (IHostApplicationLifetime.StopApplication) so services shut down cleanly.

@@ -4,7 +4,6 @@ using System.Text.Json;
 using FlowLedger.Api.Auth;
 using FlowLedger.ServiceDefaults;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace FlowLedger.Api.Tests.Security;
 

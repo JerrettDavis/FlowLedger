@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Application.Features.Query;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.SharedKernel;

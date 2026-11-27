@@ -1,13 +1,7 @@
-using FlowLedger.Application.Abstractions;
-using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
-using FlowLedger.Infrastructure.Persistence;
-using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Integrations.Abstractions;
-using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Infrastructure.Sync;
 

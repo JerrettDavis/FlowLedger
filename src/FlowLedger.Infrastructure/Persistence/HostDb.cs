@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using FlowLedger.Infrastructure.Events;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 

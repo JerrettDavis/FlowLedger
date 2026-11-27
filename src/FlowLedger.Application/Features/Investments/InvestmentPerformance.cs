@@ -1,5 +1,4 @@
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 

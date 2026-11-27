@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using FlowLedger.Api.Endpoints;
-using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Infrastructure.Events;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,9 +1,7 @@
-using FlowLedger.Worker;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Quartz;
 
 namespace FlowLedger.Worker.Tests;

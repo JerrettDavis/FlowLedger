@@ -1,7 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Quiltt;
-using Microsoft.AspNetCore.Http;
 
 namespace FlowLedger.Api.Endpoints;
 

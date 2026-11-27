@@ -1,4 +1,3 @@
-using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.Contracts;
 using FlowLedger.Integrations.Mx.Mapping;

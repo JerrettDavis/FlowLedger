@@ -3,7 +3,6 @@ using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
 using FlowLedger.Integrations.Quiltt;
 using FlowLedger.Integrations.SimpleFin;
-using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

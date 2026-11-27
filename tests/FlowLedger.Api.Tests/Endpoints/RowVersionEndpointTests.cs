@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Api.Endpoints;
-using FlowLedger.Application.Features.Accounts;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;

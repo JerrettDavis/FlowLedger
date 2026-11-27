@@ -4,7 +4,6 @@ using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx.CostControl;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

@@ -1,6 +1,5 @@
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Goals;
-using FlowLedger.Application.Features.Query;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Budgets;

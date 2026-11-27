@@ -1,6 +1,3 @@
-using FlowLedger.Application.Features.Accounts;
-using Microsoft.AspNetCore.Http;
-
 namespace FlowLedger.Api.Endpoints;
 
 /// <summary>

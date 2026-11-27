@@ -1,6 +1,5 @@
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Mx;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WireMock.RequestBuilders;

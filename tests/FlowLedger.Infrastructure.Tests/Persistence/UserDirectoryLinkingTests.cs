@@ -1,6 +1,4 @@
 using FlowLedger.Application.Features.Users;
-using FlowLedger.Infrastructure.DataSafety;
-using FlowLedger.Infrastructure.Events;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Persistence;
 using FluentAssertions;

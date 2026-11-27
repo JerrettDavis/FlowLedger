@@ -1,10 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Application.Features.Categories;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
-using FlowLedger.SharedKernel;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 

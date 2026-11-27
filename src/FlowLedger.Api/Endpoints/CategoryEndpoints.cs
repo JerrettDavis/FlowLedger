@@ -1,6 +1,5 @@
 using FlowLedger.Application.Features.Categories;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlowLedger.Api.Endpoints;

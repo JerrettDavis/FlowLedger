@@ -1,6 +1,5 @@
 using System.Diagnostics.Metrics;
 using FlowLedger.Application.Abstractions;
-using FlowLedger.Contracts;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.TestSupport;

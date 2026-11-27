@@ -1,4 +1,3 @@
-using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
 using FlowLedger.Integrations.Quiltt;

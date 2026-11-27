@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Routing;
 
 namespace FlowLedger.Architecture.Tests;
 
