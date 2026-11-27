@@ -17,6 +17,7 @@ public sealed class ShippedMigrationsGuardTests
     private static readonly string[] KnownDestructive =
     [
         "20261114050656_DedupeDetectedBills", // deletes duplicate auto-detected bill rows (reviewed; a database that old needs DestructiveMigrations confirmed once)
+        "20261127063616_UnifyMoneyPrecision", // reviewed: Up only WIDENS money columns to numeric(19,4) (from (18,4)/(18,2)), no data loss, no raw SQL; the flag comes from the narrowing AlterColumns in Down, which never runs on upgrade
     ];
 
     [Fact]
