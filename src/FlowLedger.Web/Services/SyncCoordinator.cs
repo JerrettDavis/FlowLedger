@@ -11,7 +11,7 @@ namespace FlowLedger.Web.Services;
 /// Hidden tabs never sync (the Worker covers that daily). The server still enforces single-flight, its minimum interval and the
 /// provider call budget; any failure or throttle backs the browser off so it never hammers a limited API.
 /// </summary>
-public sealed class SyncCoordinator(
+public sealed partial class SyncCoordinator(
     FlowLedgerApiClient api,
     ISnackbar snackbar,
     IJSRuntime js,
@@ -70,7 +70,7 @@ public sealed class SyncCoordinator(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Connect & Sync failed");
+            LogConnectAndSyncFailed(ex);
             Announcement = "Sync failed";
             snackbar.AddFailure(ex, "Sync failed");
         }
@@ -122,7 +122,7 @@ public sealed class SyncCoordinator(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Connect bank failed");
+            LogConnectBankFailed(ex);
             snackbar.AddFailure(ex, "Connect failed");
         }
     }
@@ -152,7 +152,7 @@ public sealed class SyncCoordinator(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Quiltt connect failed");
+            LogQuilttConnectFailed(ex);
             snackbar.AddFailure(ex, "Connect failed");
         }
     }
@@ -172,7 +172,7 @@ public sealed class SyncCoordinator(
         catch (ObjectDisposedException) { }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Auto-sync loop stopped");
+            LogAutoSyncLoopStopped(ex);
         }
     }
 
@@ -208,7 +208,7 @@ public sealed class SyncCoordinator(
         catch (Exception ex)
         {
             _backoffUntil = DateTimeOffset.UtcNow + AutoSyncBackoff;
-            logger.LogWarning(ex, "Auto-sync check failed; backing off for {Backoff}", AutoSyncBackoff);
+            LogAutoSyncCheckFailed(ex, AutoSyncBackoff);
         }
     }
 
@@ -238,7 +238,7 @@ public sealed class SyncCoordinator(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Sync failed");
+            LogSyncFailed(ex);
             if (auto)
             {
                 // Throttled / budget / needs-reauth / provider outage: stay quiet and back off.
@@ -263,4 +263,22 @@ public sealed class SyncCoordinator(
         Announcement = announcement;
         Changed?.Invoke();
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Connect & Sync failed")]
+    private partial void LogConnectAndSyncFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Connect bank failed")]
+    private partial void LogConnectBankFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Quiltt connect failed")]
+    private partial void LogQuilttConnectFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Auto-sync loop stopped")]
+    private partial void LogAutoSyncLoopStopped(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Auto-sync check failed; backing off for {Backoff}")]
+    private partial void LogAutoSyncCheckFailed(Exception exception, TimeSpan backoff);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Sync failed")]
+    private partial void LogSyncFailed(Exception exception);
 }

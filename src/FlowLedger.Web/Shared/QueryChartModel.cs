@@ -124,7 +124,7 @@ public sealed record ChartModel(IReadOnlyList<string> Categories, IReadOnlyList<
     }
 
     /// <summary>A 9th hue is never invented: surplus series fold into "Other".</summary>
-    private static IReadOnlyList<ChartSeries> FoldExtra(List<ChartSeries> series, int width)
+    private static List<ChartSeries> FoldExtra(List<ChartSeries> series, int width)
     {
         if (series.Count <= MaxSeries)
         {

@@ -62,7 +62,7 @@ public sealed partial class FlowLedgerApiClient
             var response = await _http.PostAsJsonAsync("/api/recurring-flows", request, JsonOptions, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} creating recurring flow", (int)response.StatusCode);
+                LogNonSuccessCreatingRecurringFlow((int)response.StatusCode);
                 throw new ApiClientException(
                     $"Couldn't create recurring flow (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
@@ -85,7 +85,7 @@ public sealed partial class FlowLedgerApiClient
             ThrowIfChangedElsewhere(response, "recurring flow");
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} updating recurring flow {Id}", (int)response.StatusCode, id);
+                LogNonSuccessUpdatingRecurringFlow((int)response.StatusCode, id);
                 throw new ApiClientException(
                     $"Couldn't update recurring flow (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
@@ -103,7 +103,7 @@ public sealed partial class FlowLedgerApiClient
             ThrowIfChangedElsewhere(response, "recurring flow");
             if (response.StatusCode != HttpStatusCode.NotFound && !response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} deleting recurring flow {Id}", (int)response.StatusCode, id);
+                LogNonSuccessDeletingRecurringFlow((int)response.StatusCode, id);
                 throw new ApiClientException(
                     $"Couldn't delete recurring flow (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
