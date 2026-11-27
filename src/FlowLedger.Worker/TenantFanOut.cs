@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace FlowLedger.Worker;
 
 /// <summary>Runs a unit of work once per tenant, each in its own DI scope with that tenant active. A failing tenant never blocks the others.</summary>
-internal static class TenantFanOut
+internal static partial class TenantFanOut
 {
     public static async Task ForEachTenantAsync(
         IServiceProvider root, ILogger logger, Func<IServiceProvider, Guid, Task> work, CancellationToken ct)
@@ -35,7 +35,7 @@ internal static class TenantFanOut
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Background work failed for tenant {TenantId}; continuing with the next tenant.", tenant);
+                LogTenantFailed(logger, ex, tenant);
             }
         }
 
@@ -53,4 +53,7 @@ internal static class TenantFanOut
         await Parallel.ForEachAsync(tenants, new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = ct },
             async (tenant, _) => await RunOne(tenant));
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Background work failed for tenant {TenantId}; continuing with the next tenant.")]
+    private static partial void LogTenantFailed(ILogger logger, Exception exception, Guid tenantId);
 }

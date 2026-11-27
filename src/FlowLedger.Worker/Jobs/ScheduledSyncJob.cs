@@ -19,7 +19,7 @@ namespace FlowLedger.Worker.Jobs;
 /// by <see cref="SyncRetryPolicy"/>, never by ad hoc catch blocks here.
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledSyncJob : IJob
+public sealed partial class ScheduledSyncJob : IJob
 {
     // JobDataMap key used to pass the IServiceProvider from tests.
     internal const string ServiceProviderKey = "ServiceProvider";
@@ -43,12 +43,11 @@ public sealed class ScheduledSyncJob : IJob
     {
         if (!_options.Enabled)
         {
-            _logger.LogInformation(
-                "ScheduledSyncJob: disabled via configuration (ScheduledSync:Enabled=false). Skipping.");
+            LogDisabled();
             return;
         }
 
-        _logger.LogInformation("ScheduledSyncJob: starting incremental sync.");
+        LogStarting();
 
         // One DI scope per tenant (DbContext, tenant context, sync service); a failing tenant never blocks the others.
         await FlowLedger.Worker.TenantFanOut.ForEachTenantAsync(_services, _logger, async (sp, tenantId) =>
@@ -58,7 +57,7 @@ public sealed class ScheduledSyncJob : IJob
             var gate = sp.GetService<SyncAttemptGate>();
             if (gate is not null && await gate.CheckAsync(SyncTrigger.Scheduled, cancellationToken) is { Allowed: false, Blocking: { } blocked })
             {
-                _logger.LogInformation("ScheduledSyncJob: tenant {TenantId} skipped — {Reason}", tenantId, blocked.Reason);
+                LogTenantSkipped(tenantId, blocked.Reason);
                 return;
             }
 
@@ -67,29 +66,46 @@ public sealed class ScheduledSyncJob : IJob
             try
             {
                 var result = await syncService.SyncAsync(cancellationToken);
-                _logger.LogInformation(
-                    "ScheduledSyncJob: tenant {TenantId} sync complete — {AccountsUpserted} accounts, " +
-                    "{TransactionsAdded} added, {TransactionsSkipped} skipped.",
-                    tenantId, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+                LogTenantSyncComplete(tenantId, result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
             }
             catch (Exception ex) when (ex is FlowLedger.Application.Abstractions.SyncThrottledException
                                           or FlowLedger.Application.Abstractions.SyncAlreadyRunningException)
             {
-                _logger.LogInformation("ScheduledSyncJob: tenant {TenantId} skipped — {Reason}", tenantId, ex.Message);
+                LogTenantSkipped(tenantId, ex.Message);
             }
             catch (ProviderException ex)
             {
                 // Already classified and persisted by the sync service; the next fire consults the retry policy.
-                _logger.LogWarning("ScheduledSyncJob: tenant {TenantId} sync failed ({Kind}): {Message}",
-                    tenantId, ProviderIssue.FromException(ex).Kind, ex.Message);
+                LogTenantSyncFailed(tenantId, ProviderIssue.FromException(ex).Kind, ex.Message);
             }
             catch (Exception ex)
             {
                 // Log and continue — Quartz treats an unhandled exception as a job failure; a graceful
                 // log-and-continue is safer for transient provider errors.
-                _logger.LogError(ex,
-                    "ScheduledSyncJob: sync faulted for tenant {TenantId}. It will retry on the next scheduled interval.", tenantId);
+                LogTenantSyncFaulted(ex, tenantId);
             }
         }, cancellationToken);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message =
+        "ScheduledSyncJob: disabled via configuration (ScheduledSync:Enabled=false). Skipping.")]
+    private partial void LogDisabled();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "ScheduledSyncJob: starting incremental sync.")]
+    private partial void LogStarting();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "ScheduledSyncJob: tenant {TenantId} skipped — {Reason}")]
+    private partial void LogTenantSkipped(Guid tenantId, string reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message =
+        "ScheduledSyncJob: tenant {TenantId} sync complete — {AccountsUpserted} accounts, " +
+        "{TransactionsAdded} added, {TransactionsSkipped} skipped.")]
+    private partial void LogTenantSyncComplete(Guid tenantId, int accountsUpserted, int transactionsAdded, int transactionsSkipped);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "ScheduledSyncJob: tenant {TenantId} sync failed ({Kind}): {Message}")]
+    private partial void LogTenantSyncFailed(Guid tenantId, ProviderIssueKind kind, string message);
+
+    [LoggerMessage(Level = LogLevel.Error, Message =
+        "ScheduledSyncJob: sync faulted for tenant {TenantId}. It will retry on the next scheduled interval.")]
+    private partial void LogTenantSyncFaulted(Exception exception, Guid tenantId);
 }
