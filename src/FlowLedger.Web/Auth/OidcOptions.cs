@@ -43,7 +43,14 @@ public sealed class OidcOptions
     /// <summary>True when a login the allowlist already admitted (or that no allowlist applies to) may be given a brand-new tenant.</summary>
     public bool AllowsNewTenants => FlowLedger.ServiceDefaults.MultiUserSettings.AllowsNewTenants(SignUpMode, HasAllowlist);
 
-    public bool HasAllowlist => AllowedEmails.Length > 0 || AllowedEmailDomains.Length > 0;
+    /// <summary>Effective <c>Auth:Session:AbsoluteMaxDays</c> (#159): a session ends this many days after sign-in however active it is. 0 or less disables the cap.</summary>
+    public int SessionAbsoluteMaxDays { get; set; } = AuthSetup.DefaultSessionAbsoluteMaxDays;
+
+    /// <summary>Effective <c>Auth:Session:LegacyCookieName</c> (#159): keep the pre-<c>__Host-</c> cookie name <c>flowledger.auth</c> outside Development.</summary>
+    public bool LegacyCookieName { get; set; }
+
+    // Blank entries (an unset compose passthrough such as Auth__Oidc__AllowedEmails__0=) must not count as an allowlist.
+    public bool HasAllowlist => AllowedEmails.Any(e => !string.IsNullOrWhiteSpace(e)) || AllowedEmailDomains.Any(d => !string.IsNullOrWhiteSpace(d));
 
     /// <summary>True when no allowlist is configured, or the verified email satisfies it.</summary>
     public bool IsEmailAllowed(string? email, bool emailVerified)
