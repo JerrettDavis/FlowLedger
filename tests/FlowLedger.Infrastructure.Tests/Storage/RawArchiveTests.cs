@@ -172,4 +172,92 @@ public sealed class RawArchiveTests : IDisposable
         };
         await act.Should().ThrowAsync<ArgumentException>();
     }
+
+    private async Task<string> WriteLegacyAsync(string name)
+    {
+        var dir = Path.Combine(_root, "raw", "MX", "2025", "03", "04");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllBytesAsync(Path.Combine(dir, name), Payload);
+        await File.WriteAllTextAsync(Path.Combine(dir, name[..^".json".Length] + ".meta.json"), """{"method":"GET","pathAndQuery":"/legacy","statusCode":200}""");
+        return $"raw/MX/2025/03/04/{name}";
+    }
+
+    [Fact]
+    public async Task Sealing_the_archive_requires_a_key_and_changes_nothing_without_one()
+    {
+        var storage = Storage();
+        var legacyKey = await WriteLegacyAsync("1-Old-x.json");
+
+        var act = () => Maintenance(storage).SealPlaintextAsync();
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        File.ReadAllBytes(Path.Combine(_root, legacyKey)).Should().Equal(Payload);
+    }
+
+    [Fact]
+    public async Task Sealing_encrypts_legacy_and_plaintext_objects_in_place_keeps_keys_readable_and_is_idempotent()
+    {
+        var storage = Storage();
+        var legacyKey = await WriteLegacyAsync("1-Old-x.json");
+        var attributed = await new ObjectStorageRawPayloadArchive(storage).ArchiveAsync("MX", "Before", Payload, Ctx(_tenantA));
+        var unattributed = await new ObjectStorageRawPayloadArchive(storage).ArchiveAsync("MX", "Hook", Payload, Ctx(null));
+        var maintenance = Maintenance(storage, Sealed());
+
+        var first = await maintenance.SealPlaintextAsync();
+        var second = await maintenance.SealPlaintextAsync();
+
+        first.Sealed.Should().Be(3);
+        second.Sealed.Should().Be(0);
+        second.AlreadySealed.Should().Be(3);
+        foreach (var key in new[] { legacyKey, attributed, unattributed })
+        {
+            var onDisk = await File.ReadAllBytesAsync(Path.Combine(_root, key));
+            IRawPayloadDecryptor.IsEncrypted(onDisk).Should().BeTrue(key);
+            Encoding.UTF8.GetString(onDisk).Should().NotContain("Secret Checking");
+            (await maintenance.ReadAsync(key)).Should().Equal(Payload, "the same key still opens, now through decryption");
+        }
+
+        Directory.GetFiles(_root, "*.sealing", SearchOption.AllDirectories).Should().BeEmpty("temp copies are removed after verification");
+        File.ReadAllText(Path.Combine(_root, legacyKey[..^".json".Length] + ".meta.json")).Should().Contain("/legacy", "sidecars are left alone");
+
+        // The legacy replay layout keeps working after sealing.
+        using var replay = new HttpMessageInvoker(new MxArchiveReplayHandler(Path.Combine(_root, "raw", "MX"), maintenance));
+        var response = await replay.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://never.invalid/legacy"), CancellationToken.None);
+        (await response.Content.ReadAsByteArrayAsync()).Should().Equal(Payload);
+    }
+
+    [Fact]
+    public async Task An_interrupted_seal_is_repaired_from_the_temp_copy_on_the_next_run()
+    {
+        var storage = Storage();
+        var key = await new ObjectStorageRawPayloadArchive(storage, Sealed()).ArchiveAsync("MX", "Crash", Payload, Ctx(_tenantA));
+        var good = await File.ReadAllBytesAsync(Path.Combine(_root, key));
+        // Simulate a crash mid-overwrite: the original is truncated, the verified sealed temp copy exists.
+        await File.WriteAllBytesAsync(Path.Combine(_root, key + ".sealing"), good);
+        await File.WriteAllBytesAsync(Path.Combine(_root, key), []);
+        var maintenance = Maintenance(storage, Sealed());
+
+        var result = await maintenance.SealPlaintextAsync();
+
+        result.Recovered.Should().Be(1);
+        (await maintenance.ReadAsync(key)).Should().Equal(Payload);
+        File.Exists(Path.Combine(_root, key + ".sealing")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task New_storage_directories_are_owner_only_on_unix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;   // there is no unix mode on Windows; ACLs are inherited
+        }
+
+        var storage = Storage();
+        var key = await new ObjectStorageRawPayloadArchive(storage).ArchiveAsync("MX", "Mode", Payload, Ctx(_tenantA));
+
+        const UnixFileMode ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        File.GetUnixFileMode(_root).Should().Be(ownerOnly);
+        File.GetUnixFileMode(Path.GetDirectoryName(Path.Combine(_root, key))!).Should().Be(ownerOnly);
+        File.GetUnixFileMode(Path.Combine(_root, key)).Should().Be(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
 }
