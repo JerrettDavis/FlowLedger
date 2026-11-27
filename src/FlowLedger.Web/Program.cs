@@ -74,6 +74,9 @@ var trustForwardedHeaders = builder.AddFlowLedgerForwardedHeaders();
 
 var app = builder.Build();
 
+// #135/#145/#159: fail closed (or warn) for unsafe multi-user settings (signed tenant assertion, sign-up policy, household tenant id).
+MultiUserSettings.Validate(app.Configuration, app.Environment, app.Logger);
+
 app.UseFlowLedgerForwardedHeaders(trustForwardedHeaders);
 
 // ── Middleware ───────────────────────────────────────────────────────────────

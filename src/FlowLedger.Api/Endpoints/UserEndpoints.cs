@@ -8,20 +8,31 @@ namespace FlowLedger.Api.Endpoints;
 /// </summary>
 internal static class UserEndpoints
 {
-    internal sealed record ResolveUserRequest(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false);
+    internal sealed record ResolveUserRequest(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false, bool AllowProvisioning = true);
 
     internal static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/users").WithTags("Users").RequireRateLimiting("api");
 
-        group.MapPost("/resolve", async (ResolveUserRequest req, IUserDirectory users, IConfiguration cfg, CancellationToken ct) =>
+        group.MapPost("/resolve", async (ResolveUserRequest req, IUserDirectory users, IConfiguration cfg, FlowLedger.Api.Auth.SignUpPolicy signUp, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(req.Issuer) || string.IsNullOrWhiteSpace(req.Subject))
             {
                 return Results.Problem(title: "issuer and subject are required", statusCode: StatusCodes.Status400BadRequest);
             }
 
-            var user = await users.ResolveAsync(new ExternalIdentity(req.Issuer.Trim(), req.Subject.Trim(), req.Email, req.DisplayName, req.EmailVerified), ct);
+            // #145: an unknown login may only create a tenant when BOTH the Web app (allowlist) and the API's own sign-up policy allow it.
+            ResolvedUser user;
+            try
+            {
+                user = await users.ResolveAsync(new ExternalIdentity(req.Issuer.Trim(), req.Subject.Trim(), req.Email, req.DisplayName, req.EmailVerified,
+                    req.AllowProvisioning && signUp.AllowsNewTenants), ct);
+            }
+            catch (SignUpClosedException)
+            {
+                return Results.Problem(title: "Sign-up is closed for this login", statusCode: StatusCodes.Status403Forbidden);
+            }
+
             // isHousehold: this login maps to the household (legacy) tenant, the only one allowed to see /api/data (backups, export).
             var isHousehold = user.TenantId == FlowLedger.Infrastructure.TenancySettings.Legacy(cfg).LegacyTenantId;
             return Results.Ok(new { userId = user.UserId, tenantId = user.TenantId, email = user.Email, displayName = user.DisplayName, created = user.Created, isHousehold });

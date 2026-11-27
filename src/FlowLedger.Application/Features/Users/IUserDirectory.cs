@@ -1,7 +1,11 @@
 namespace FlowLedger.Application.Features.Users;
 
 /// <summary>An identity asserted by an external OpenID Connect provider (authentik, Keycloak, Entra, Google, ...).</summary>
-public sealed record ExternalIdentity(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false);
+/// <param name="AllowProvisioning">False when the caller's sign-up policy (#145) does not let an unknown login create a tenant: such a login is refused with <see cref="SignUpClosedException"/> instead. Known logins and the configured household owner are unaffected.</param>
+public sealed record ExternalIdentity(string Issuer, string Subject, string? Email, string? DisplayName, bool EmailVerified = false, bool AllowProvisioning = true);
+
+/// <summary>An unknown login tried to sign in while sign-up is closed to it (<c>Auth:SignUp:Mode</c>).</summary>
+public sealed class SignUpClosedException() : InvalidOperationException("Sign-up is closed: this login has no account and is not invited.");
 
 /// <summary>A FlowLedger user and the tenant (data partition) it owns.</summary>
 public sealed record ResolvedUser(Guid UserId, Guid TenantId, string? Email, string? DisplayName, bool Created);

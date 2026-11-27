@@ -18,9 +18,72 @@ public static class AuthSetup
     public const string UserClaim = "fl_user";
     public const string IdentityClientName = "flowledger-identity";
 
+    /// <summary>Unix seconds when the sign-in happened (#159). Stamped on first sight for cookies issued before the cap existed.</summary>
+    public const string SessionStartClaim = "fl_session_start";
+
+    public const string LegacyCookieName = "flowledger.auth";
+    public const string HostCookieName = "__Host-flowledger.auth";
+
+    /// <summary>Default <c>Auth:Session:AbsoluteMaxDays</c>.</summary>
+    public const int DefaultSessionAbsoluteMaxDays = 30;
+
+    /// <summary>
+    /// The auth cookie name. <c>__Host-</c> makes browsers reject the cookie unless it is Secure, Path=/ and has no Domain, so a sibling
+    /// subdomain cannot plant or shadow it. Development (plain http on localhost) and the explicit legacy flag keep the old name.
+    /// Switching the name signs every existing session out once.
+    /// </summary>
+    public static string CookieName(bool isDevelopment, bool legacyName) => isDevelopment || legacyName ? LegacyCookieName : HostCookieName;
+
+    /// <summary>
+    /// Whether the session has outlived the absolute cap: true = expired, false = within it (or no cap), null = the principal carries no start stamp
+    /// (a cookie issued before #159: the caller stamps it on first sight instead of signing everyone out).
+    /// </summary>
+    public static bool? IsPastAbsoluteLifetime(ClaimsPrincipal? principal, DateTimeOffset now, int maxDays)
+    {
+        if (maxDays <= 0)
+        {
+            return false;
+        }
+
+        if (!long.TryParse(principal?.FindFirst(SessionStartClaim)?.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds))
+        {
+            return null;
+        }
+
+        return now - DateTimeOffset.FromUnixTimeSeconds(seconds) >= TimeSpan.FromDays(maxDays);
+    }
+
+    /// <summary>Cookie <c>OnValidatePrincipal</c>: absolute lifetime cap first, then the login -> tenant mapping re-check.</summary>
+    public static async Task ValidateSessionAsync(CookieValidatePrincipalContext ctx, int maxDays)
+    {
+        var now = (ctx.HttpContext.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
+        switch (IsPastAbsoluteLifetime(ctx.Principal, now, maxDays))
+        {
+            case true:
+                ctx.RejectPrincipal();
+                await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            case null when ctx.Principal is not null:
+                var stamped = ctx.Principal.Clone();
+                ((ClaimsIdentity)stamped.Identity!).AddClaim(new Claim(SessionStartClaim, now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)));
+                ctx.ReplacePrincipal(stamped);
+                ctx.ShouldRenew = true;
+                break;
+        }
+
+        await TenantMappingValidator.ValidateAsync(ctx);
+    }
+
     public static OidcOptions AddFlowLedgerAuth(this WebApplicationBuilder builder)
     {
         var oidc = builder.Configuration.GetSection(OidcOptions.SectionName).Get<OidcOptions>() ?? new OidcOptions();
+        if (oidc.Enabled)
+        {
+            oidc.SignUpMode = FlowLedger.ServiceDefaults.MultiUserSettings.ResolveSignUpMode(builder.Configuration);
+            oidc.SessionAbsoluteMaxDays = FlowLedger.ServiceDefaults.MultiUserSettings.Int(builder.Configuration, FlowLedger.ServiceDefaults.MultiUserSettings.SessionAbsoluteMaxDaysKey, DefaultSessionAbsoluteMaxDays);
+            oidc.LegacyCookieName = FlowLedger.ServiceDefaults.MultiUserSettings.Flag(builder.Configuration, FlowLedger.ServiceDefaults.MultiUserSettings.SessionLegacyCookieNameKey);
+        }
+
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddHttpContextAccessor();
 
@@ -41,15 +104,19 @@ public static class AuthSetup
             })
             .AddCookie(o =>
             {
-                o.Cookie.Name = "flowledger.auth";
+                // #159: __Host- (Secure, Path=/, no Domain) outside Development; Auth:Session:LegacyCookieName=true keeps the old name.
+                o.Cookie.Name = CookieName(builder.Environment.IsDevelopment(), oidc.LegacyCookieName);
                 o.Cookie.HttpOnly = true;
                 o.Cookie.SameSite = SameSiteMode.Lax;
+                o.Cookie.Path = "/";
+                o.Cookie.Domain = null;
                 // Secure-only outside Development (remote access must go through a TLS proxy); plain-http localhost dev still works.
                 o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 o.ExpireTimeSpan = TimeSpan.FromDays(14);
                 o.SlidingExpiration = true;
-                // Re-check login -> tenant every few minutes so an unlinked/moved login loses the old tenant's data.
-                o.Events.OnValidatePrincipal = TenantMappingValidator.ValidateAsync;
+                // #159: sliding expiry alone never ends an active session; the absolute cap (Auth:Session:AbsoluteMaxDays) does, then the
+                // login -> tenant mapping is re-checked every few minutes so an unlinked/moved login loses the old tenant's data.
+                o.Events.OnValidatePrincipal = ctx => ValidateSessionAsync(ctx, oidc.SessionAbsoluteMaxDays);
             })
             .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, o =>
             {
@@ -105,10 +172,18 @@ public static class AuthSetup
                                 email = principal.FindFirstValue("email"),
                                 emailVerified = string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase),
                                 displayName = principal.FindFirstValue(oidc.NameClaim) ?? principal.FindFirstValue("name") ?? principal.FindFirstValue("preferred_username"),
+                                // #145: an unknown login only gets a new tenant when the sign-up mode allows it (Open, or InviteOnly + allowlist hit).
+                                allowProvisioning = oidc.AllowsNewTenants,
                             }),
                         };
                         req.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
                         using var resp = await http.SendAsync(req, ctx.HttpContext.RequestAborted);
+                        if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            ctx.Fail("Sign-up is closed: this account is not registered and is not on the FlowLedger invite list.");
+                            return;
+                        }
+
                         resp.EnsureSuccessStatusCode();
                         var user = await resp.Content.ReadFromJsonAsync<ResolveResponse>(cancellationToken: ctx.HttpContext.RequestAborted)
                                    ?? throw new InvalidOperationException("Empty user-resolution response.");
@@ -116,6 +191,8 @@ public static class AuthSetup
                         var id = (ClaimsIdentity)principal.Identity!;
                         id.AddClaim(new Claim(TenantClaim, user.TenantId.ToString()));
                         id.AddClaim(new Claim(UserClaim, user.UserId.ToString()));
+                        // #159: when this session began; the absolute lifetime cap counts from here and survives sliding renewals.
+                        id.AddClaim(new Claim(SessionStartClaim, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)));
                         if (user.IsHousehold)
                         {
                             id.AddClaim(new Claim(HouseholdAccess.Claim, "true"));

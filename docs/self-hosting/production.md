@@ -19,7 +19,8 @@ provider on (`Mx__Enabled`, `SimpleFin__Enabled`, `Quiltt__Enabled`) in a non-de
 2. **Sign-in.** Configure OIDC (`Auth__Oidc__*`, [multi-user-auth.md](multi-user-auth.md)). Without
    it the Web UI has no login and refuses to start outside Development. Set
    `AUTH__ALLOWANONYMOUS=true` only on a trusted single-user host where every port stays bound
-   to `127.0.0.1`. For multi-user stacks also set `Api__TenantSigningKey` (same value on api and web).
+   to `127.0.0.1`. With OIDC on, `API__TENANTSIGNINGKEY` (same value on api and web, >= 32 characters) is **required** and the stack refuses
+   to start without it; decide who may sign up (`AUTH__OIDC__ALLOWEDEMAILS__0`, see [Multi-user hardening](#multi-user-hardening-secure-defaults)).
 3. **TLS and proxy.** Put a TLS reverse proxy in front of the Web UI
    ([TLS termination](#tls-termination)) and, if the proxy is the only path to the Web port, set
    `ForwardedHeaders__Enabled=true` ([Reverse proxy / TLS](#reverse-proxy--tls)).
@@ -54,6 +55,7 @@ provider on (`Mx__Enabled`, `SimpleFin__Enabled`, `Quiltt__Enabled`) in a non-de
 - [ ] `POSTGRES_PASSWORD` is a strong random value (compose refuses to start without one).
 - [ ] `API__KEY` is a strong random value (not `dev-local-key-not-for-production`).
 - [ ] OIDC sign-in is configured, or `AUTH__ALLOWANONYMOUS=true` is set deliberately on a trusted single-user host.
+- [ ] With OIDC: `API__TENANTSIGNINGKEY` is set, `API__TENANTID` is a random GUID (or `TENANCY__ALLOWWELLKNOWNLEGACYTENANTID=true` acknowledges an existing install), sign-up is InviteOnly/Closed (no `AUTH__SIGNUP__LEGACYOPEN`), and no startup Warning about open sign-up or unsigned tenants remains.
 - [ ] Postgres and Redis ports are not exposed to the public internet; Postgres uses TLS if remote.
 - [ ] TLS termination is in place; all HTTP redirects to HTTPS; only the Web UI (and provider webhook endpoints) are exposed.
 - [ ] `ForwardedHeaders__Enabled=true` if a proxy terminates TLS in front of the Web app.
@@ -244,6 +246,23 @@ more than one web replica each would use a different ring and sign-in would brea
 - [ ] Secrets are stored in a secrets manager, not in `.env` on the server.
 - [ ] OTLP telemetry is wired up for observability (`OTEL_EXPORTER_OTLP_ENDPOINT`).
 - [ ] Backups are configured for the `postgres_data` volume.
+
+## Multi-user hardening (secure defaults)
+
+When OIDC sign-in is on, outside Development (full upgrade table and opt-outs: [upgrading.md](upgrading.md#upgrading-to-the-multi-user-secure-defaults-135-145-159)):
+
+- **Signed tenant assertion (#135).** The shared `Api__Key` can act as any tenant unless the API also demands the Web app's signature over the
+  tenant id. `Api:RequireSignedTenant` therefore defaults to true; startup fails unless `Api:TenantSigningKey` is set (same value on api and web,
+  >= 32 characters, different from `Api:Key`). The api learns that OIDC is on from `Auth:Oidc:Authority`/`ClientId` (compose passes them).
+- **Household tenant id (#135).** The household/admin tenant gates `/api/data/*` and billable provisioning, so with OIDC on it must not be the
+  well-known `00000000-0000-0000-0000-000000000001`. Use a random GUID on a new install; an existing install keeps its id and sets
+  `Tenancy__AllowWellKnownLegacyTenantId=true`.
+- **Sign-up (#145).** `Auth:SignUp:Mode` is `Open`, `InviteOnly` (default) or `Closed`. InviteOnly admits only logins whose verified email is on
+  `Auth:Oidc:AllowedEmails` / `AllowedEmailDomains`; existing logins and the configured household owner always sign in. `Auth:SignUp:LegacyOpen=true`
+  restores open sign-up (startup Warning). Prefer also restricting the application at the IdP. Email trust: leave `Tenancy:TrustUnverifiedEmail` off.
+- **Sessions (#159).** `Auth:Session:AbsoluteMaxDays` (default 30) caps a session from sign-in; the cookie is `__Host-flowledger.auth` (it is
+  always Secure outside Development, so terminate TLS at the proxy and set `ForwardedHeaders__Enabled=true` as in
+  [Reverse proxy / TLS](#reverse-proxy--tls) so the app builds https redirect URIs). Unlinking a login ends its session within 5 minutes.
 
 ## Reverse proxy / TLS
 

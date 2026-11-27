@@ -34,6 +34,8 @@ internal static class QuilttEndpoints
         group.MapPost("/session", async (
                 IConnectorRegistry connectors,
                 IProviderConnectionStore connections,
+                FlowLedger.Api.Auth.SignUpPolicy signUp,
+                IHouseholdTenantAccess household,
                 CancellationToken ct) =>
             {
                 if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name)
@@ -49,6 +51,16 @@ internal static class QuilttEndpoints
 
                 // One profile per tenant: reuse it, create it only the first time.
                 var existing = await connections.GetMemberProviderIdAsync(quiltt.ProviderName, ct);
+
+                // #145: creating a profile is billable on the operator's account. With open sign-up the tenant may belong to a stranger, so
+                // only the household may create one unless Quiltt:AllowOpenSignupTenants=true. Existing profiles are reused as before.
+                if (existing is null && signUp.BlocksUninvitedBillableProvisioning && !household.IsHouseholdTenant)
+                {
+                    return Results.Problem(
+                        title: "Bank linking via Quiltt is limited to invited tenants while sign-up is open (Quiltt:AllowOpenSignupTenants)",
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
                 var session = await quiltt.CreateSessionAsync(existing, ct);
                 if (existing is null)
                 {
