@@ -305,6 +305,24 @@ public sealed class SourceRuleTests
         Assert.True(offenders.Count == 0, $"Use ConstantTime.SecretEquals (or add a reasoned allow-list entry) in: {string.Join(", ", offenders)}");
     }
 
+    // ── Options go through IOptions + ValidateOnStart, never new XOptions() in DI (#108) ─
+
+    [Fact]
+    public void Dependency_injection_files_do_not_construct_options_by_hand()
+    {
+        var ctor = new Regex(@"new\s+[\w.]*Options\s*(\(|\{)");
+        var offenders = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+            .SelectMany(d => SourceFiles(Path.GetFileName(d)))
+            .Where(f => Path.GetFileName(f).StartsWith("DependencyInjection", StringComparison.Ordinal)
+                        || Path.GetFileName(f).StartsWith("ServiceRegistration", StringComparison.Ordinal))
+            .Where(f => ctor.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Register options with AddOptions<T>().BindConfiguration(...).ValidateOnStart() instead of new XOptions() in: {string.Join(", ", offenders)}");
+    }
+
     // ── Endpoint limits live in ApiLimits (#121) ─────────────────────────────
 
     private static readonly Regex NumericLiteral = new(@"(?<![\w.])\d[\d_]*(?:\.\d+)?(?:[lLmMuUfFdD]{0,2})(?![\w.])", RegexOptions.Compiled);

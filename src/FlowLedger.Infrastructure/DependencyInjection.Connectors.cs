@@ -77,9 +77,12 @@ public static partial class DependencyInjection
     /// <summary>Local LLM (Ollama) for "ask a question" -> query. Loopback by default; data never leaves the machine.</summary>
     private static void AddQueryTranslator(IServiceCollection services, IConfiguration configuration)
     {
-        var ollama = new FlowLedger.Infrastructure.Ai.OllamaOptions();
-        configuration.GetSection("Ai:Ollama").Bind(ollama);
-        services.AddSingleton(ollama);
+        services.AddOptions<FlowLedger.Infrastructure.Ai.OllamaOptions>()
+            .BindConfiguration(FlowLedger.Infrastructure.Ai.OllamaOptions.SectionName)
+            .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _) && o.TimeoutSeconds > 0,
+                "Ai:Ollama:BaseUrl must be an absolute URL and TimeoutSeconds positive.")
+            .ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FlowLedger.Infrastructure.Ai.OllamaOptions>>().Value);
         services.AddHttpClient<FlowLedger.Application.Features.Query.IQueryTranslator, FlowLedger.Infrastructure.Ai.OllamaQueryTranslator>(
             (sp, c) =>
             {
