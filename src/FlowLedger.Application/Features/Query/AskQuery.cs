@@ -191,7 +191,7 @@ internal static class QueryPrompt
 /// Plain-English question to validated query. The model's output is only ever fed to the read-only in-memory query engine, and
 /// it is parsed AND executed here; on a parse/run error the error is sent back to the model for up to <see cref="MaxAttempts"/> tries.
 /// </summary>
-public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets, TimeProvider? clock = null)
+public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets, TimeProvider? clock = null, QueryBudget? budget = null)
 {
     public const int MaxAttempts = 3;
     public const int MaxQuestionLength = 500;
@@ -253,7 +253,7 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
             {
                 try
                 {
-                    var result = QueryEngine.Execute(query, tables, today);   // parse + semantic check against the real data
+                    var result = QueryEngine.Execute(query, tables, today, budget, ct);   // parse + semantic check against the real data
                     if (!IsEmpty(result) || !query.Contains('"'))
                     {
                         return new AskQueryResult(question, query, null, attempt);

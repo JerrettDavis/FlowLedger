@@ -33,10 +33,11 @@ public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportReq
 }
 
 /// <summary>Runs an ad-hoc query against the caller's own data.</summary>
-public sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider? clock = null)
+public sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider? clock = null, QueryBudget? budget = null)
 {
     public async Task<QueryResult> HandleAsync(string query, CancellationToken ct = default)
-        => QueryEngine.Execute(query, await datasets.BuildAsync(ct), DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime));
+        => QueryEngine.Execute(
+            query, await datasets.BuildAsync(ct), DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime), budget, ct);
 }
 
 public sealed class GetQuerySchemaHandler
@@ -78,7 +79,7 @@ public sealed class SaveReportHandler(ISavedReportStore store)
 }
 
 /// <summary>Runs every panel of a saved or preset report; a failing panel reports its error instead of failing the report.</summary>
-public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider? clock = null)
+public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider? clock = null, QueryBudget? budget = null)
 {
     /// <summary>
     /// Narrows a panel query to a date window by inserting a date filter right after the dataset name; only datasets that
@@ -128,9 +129,13 @@ public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvi
         {
             try
             {
-                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(ApplyRange(p.Query, from, to), tables, today), null);
+                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(ApplyRange(p.Query, from, to), tables, today, budget, ct), null);
             }
             catch (QueryException ex)
+            {
+                return new PanelResultDto(p.Title, p.Query, p.Viz, null, ex.Message);
+            }
+            catch (QueryBudgetExceededException ex)
             {
                 return new PanelResultDto(p.Title, p.Query, p.Viz, null, ex.Message);
             }
