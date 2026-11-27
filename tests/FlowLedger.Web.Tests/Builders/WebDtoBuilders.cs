@@ -75,3 +75,27 @@ public sealed class ProblemExtensionsBuilder
 
     public static implicit operator ProblemExtensions(ProblemExtensionsBuilder builder) => builder.Build();
 }
+
+/// <summary>Builds <see cref="ConnectorLinkDto"/>: a healthy "Bank" link made at a fixed instant.</summary>
+public sealed class ConnectorLinkDtoBuilder
+{
+    private static readonly DateTimeOffset At = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    private string _institution = "Bank";
+    private string _status = "ok";
+    private DateTimeOffset _linkedAt = At;
+    private DateTimeOffset _updatedAt = At;
+    private ConnectionIssueDto? _issue;
+
+    public static ConnectorLinkDtoBuilder A() => new();
+
+    public ConnectorLinkDtoBuilder WithInstitution(string institution) { _institution = institution; return this; }
+    public ConnectorLinkDtoBuilder WithStatus(string status) { _status = status; return this; }
+    public ConnectorLinkDtoBuilder LinkedAt(DateTimeOffset linkedAt) { _linkedAt = linkedAt; return this; }
+    public ConnectorLinkDtoBuilder UpdatedAt(DateTimeOffset updatedAt) { _updatedAt = updatedAt; return this; }
+    public ConnectorLinkDtoBuilder WithIssue(ConnectionIssueDto? issue) { _issue = issue; return this; }
+
+    public ConnectorLinkDto Build() => new(_institution, _status, _linkedAt, _updatedAt, _issue);
+
+    public static implicit operator ConnectorLinkDto(ConnectorLinkDtoBuilder builder) => builder.Build();
+}

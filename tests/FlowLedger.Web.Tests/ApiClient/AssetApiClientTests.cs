@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Web.ApiClient;
 using FluentAssertions;
 
@@ -15,7 +16,8 @@ public sealed class AssetApiClientTests
     }
 
     private static CreateAssetRequest Req() =>
-        new("Laptop", "Electronics", 1000m, "USD", null, null, null, null, null, null, null, null, null, null, null, null, null);
+        CreateAssetRequestBuilder.A().Named("Laptop").InCategory("Electronics").Worth(1000m).PurchasedOn(null, null).MadeBy(null, null)
+            .Valued(null).Build();
 
     [Fact]
     public async Task CreateAssetAsync_surfaces_the_api_problem_detail_on_400()

@@ -49,9 +49,9 @@ public sealed class TransactionDtoBuilder
     public TransactionDtoBuilder Described(string description) { _description = description; return this; }
     public TransactionDtoBuilder WithStatus(string status) { _status = status; return this; }
     public TransactionDtoBuilder FromSource(string source) { _source = source; return this; }
-    public TransactionDtoBuilder WithCategory(Guid categoryId) { _categoryId = categoryId; return this; }
-    public TransactionDtoBuilder WithMerchant(string merchant) { _merchantName = merchant; return this; }
-    public TransactionDtoBuilder WithNotes(string notes) { _notes = notes; return this; }
+    public TransactionDtoBuilder WithCategory(Guid? categoryId) { _categoryId = categoryId; return this; }
+    public TransactionDtoBuilder WithMerchant(string? merchant) { _merchantName = merchant; return this; }
+    public TransactionDtoBuilder WithNotes(string? notes) { _notes = notes; return this; }
     public TransactionDtoBuilder WithFingerprint(string fingerprint) { _fingerprint = fingerprint; return this; }
 
     /// <summary>Sets both the effective and posted date (the usual case for a settled transaction).</summary>

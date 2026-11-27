@@ -301,8 +301,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     private static CreateTransactionRequest ValidRequest(Guid accountId) =>
-        new(accountId, 50m, "USD", "Debit", "Coffee Shop",
-            new DateOnly(2026, 1, 15), null, null, null, null);
+        CreateTransactionRequestBuilder.A().OnAccount(accountId).WithAmount(50m).Described("Coffee Shop").On(new DateOnly(2026, 1, 15)).Build();
 
     private async Task<AccountDto> CreateAccount(string name = "Test Account")
     {

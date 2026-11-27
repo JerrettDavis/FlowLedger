@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Security;
@@ -58,7 +59,7 @@ public sealed class TenantOffboardingTests(FlowLedgerApiFactory factory) : IAsyn
     {
         var victim = await NewUserTenantAsync();
         var victimClient = factory.CreateAuthenticatedClient(victim);
-        (await victimClient.PostAsJsonAsync("/api/accounts", new FlowLedger.Contracts.CreateAccountRequest("Mine", "Checking", 10m, "USD", null, null)))
+        (await victimClient.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Mine").StartingAt(10m).Build()))
             .StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.OK);
         var household = factory.CreateAuthenticatedClient(FlowLedgerApiFactory.DemoTenantId);
 

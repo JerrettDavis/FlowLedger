@@ -26,8 +26,8 @@ public sealed class SpendingInsightsAnalyzerTests
 
     private static TransactionDto Tx(decimal amount, string dir, string date, Guid? cat, Guid? account = null,
         string? merchant = null, string[]? tags = null, string desc = "x") =>
-        new(Guid.NewGuid(), account ?? Card, amount, "USD", dir, desc, "Posted", "Manual",
-            DateOnly.Parse(date), DateOnly.Parse(date), cat, merchant, null, null, TestClock.Instant, null, tags);
+        TransactionDtoBuilder.A().OnAccount(account ?? Card).WithAmount(amount).WithDirection(dir).Described(desc).FromSource("Manual")
+            .On(DateOnly.Parse(date)).WithCategory(cat).WithMerchant(merchant).WithCreatedAt(TestClock.Instant).WithTags(tags).Build();
 
     private static BreakdownResult Run(IReadOnlyList<TransactionDto> txs, BreakdownQuery q) =>
         SpendingInsightsAnalyzer.Analyze(q, txs, Cats, Names, Types);

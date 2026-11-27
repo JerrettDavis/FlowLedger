@@ -10,22 +10,8 @@ public sealed class RecurringFlowHandlersTests
     private readonly FakeRecurringFlowRepository _repo = new();
     private readonly FakeTenantContext _tenant = new();
 
-    private static CreateRecurringFlowRequest MonthlyRentRequest(Guid? accountId = null) => new(
-        accountId ?? Guid.NewGuid(),
-        "Rent",
-        1500m,
-        "USD",
-        "Debit",
-        "Fixed",
-        "Monthly",
-        1,    // DayOfMonth
-        null, // SecondDayOfMonth
-        null, // IntervalWeeks
-        null, // AnchorDayOfWeek
-        new DateOnly(2026, 1, 1),
-        null,
-        null,
-        "Landlord");
+    private static CreateRecurringFlowRequest MonthlyRentRequest(Guid? accountId = null) =>
+        CreateRecurringFlowRequestBuilder.A().OnAccount(accountId ?? Guid.NewGuid()).WithAmount(1500m).WithCounterparty("Landlord").Build();
 
     [Fact]
     public async Task CreateRecurringFlow_EndDate_is_inclusive_so_the_last_charge_is_forecast()

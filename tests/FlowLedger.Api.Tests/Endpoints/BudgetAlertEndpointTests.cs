@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -66,7 +67,7 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
         async Task AddSpendAsync(decimal amount, DateOnly date)
         {
             var created = await _client.PostAsJsonAsync("/api/transactions",
-                new FlowLedger.Contracts.CreateTransactionRequest(accountId, amount, "USD", "Debit", "Rollover Cafe " + date, date, null, null, null, null));
+                CreateTransactionRequestBuilder.A().OnAccount(accountId).WithAmount(amount).Described("Rollover Cafe " + date).On(date).Build());
             created.EnsureSuccessStatusCode();
             var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
             (await _client.PutAsJsonAsync($"/api/transactions/{id}/category", new { categoryId, applyToMerchant = false })).EnsureSuccessStatusCode();

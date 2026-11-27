@@ -49,7 +49,7 @@ public sealed class IntegrationSaveRequestBuilder
     public IntegrationSaveRequestBuilder Authenticating(IntegrationAuth auth, string? user = null, string? credential = null) { _auth = auth; _authUser = user; _credential = credential; return this; }
     public IntegrationSaveRequestBuilder ClearingCredential(bool clear = true) { _clearCredential = clear; return this; }
     public IntegrationSaveRequestBuilder WithHeaders(Dictionary<string, string>? headers) { _headers = headers; return this; }
-    public IntegrationSaveRequestBuilder ForEvents(params string[] events) { _events = events; return this; }
+    public IntegrationSaveRequestBuilder ForEvents(params string[]? events) { _events = events; return this; }
     public IntegrationSaveRequestBuilder SoapEndpoint(string? endpoint) { _soapEndpoint = endpoint; return this; }
 
     public IntegrationSaveRequest Build() => new(_name, _kind, _enabled, _url, _auth, _authUser, _credential, _clearCredential, _headers, _events, _soapEndpoint);

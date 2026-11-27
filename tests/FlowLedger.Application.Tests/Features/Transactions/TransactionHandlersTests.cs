@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Transactions;
@@ -9,17 +10,9 @@ public sealed class TransactionHandlersTests
     private readonly FakeTransactionRepository _repo = new();
     private readonly FakeTenantContext _tenant = new();
 
-    private static CreateTransactionRequest ValidRequest(Guid? accountId = null) => new(
-        accountId ?? Guid.NewGuid(),
-        150m,
-        "USD",
-        "Debit",
-        "Grocery Store",
-        new DateOnly(2026, 6, 1),
-        new DateOnly(2026, 6, 1),
-        null,
-        null,
-        null);
+    private static CreateTransactionRequest ValidRequest(Guid? accountId = null) =>
+        CreateTransactionRequestBuilder.A().OnAccount(accountId ?? Guid.NewGuid()).WithAmount(150m).Described("Grocery Store")
+            .On(new DateOnly(2026, 6, 1)).PostedOn(new DateOnly(2026, 6, 1)).Build();
 
     // ── CreateTransactionHandler ──────────────────────────────────────────────
 

@@ -11,7 +11,11 @@ public sealed class ChartModelTests
         => cells.Select(c => (object?)JsonSerializer.SerializeToElement(c)).ToList();
 
     private static QueryResult Result(string[] names, string[] types, params List<object?>[] rows)
-        => new(names.Zip(types, (n, t) => QueryColumnBuilder.A().WithName(n).WithType(t).Build()).ToList(), rows.Select(r => (IReadOnlyList<object?>)r).ToList(), false, 0);
+        => QueryResultBuilder.A()
+            .WithColumns(names.Zip(types, (n, t) => QueryColumnBuilder.A().WithName(n).WithType(t).Build()).ToList())
+            .WithRows(rows.Select(r => (IReadOnlyList<object?>)r).ToList())
+            .WithElapsedMs(0)
+            .Build();
 
     [Fact]
     public void Multiple_value_columns_become_series()

@@ -31,10 +31,9 @@ public sealed class TenantLimitsTests
     }
 
     private static SaveReportRequest Report(string name) =>
-        new(name, null, "View", [ReportPanelBuilder.A()
-                                             .WithQuery("transactions | take 1")
-                                             .WithViz(VizSpecBuilder.A().WithKind("table").Build())
-                                             .Build()]);
+        SaveReportRequestBuilder.A().Named(name).OfKind("View")
+            .WithPanels(ReportPanelBuilder.A().WithQuery("transactions | take 1").WithViz(VizSpecBuilder.A().WithKind("table").Build()).Build())
+            .Build();
 
     [Fact]
     public void EnsureRoom_allows_up_to_the_limit_and_refuses_beyond_it()

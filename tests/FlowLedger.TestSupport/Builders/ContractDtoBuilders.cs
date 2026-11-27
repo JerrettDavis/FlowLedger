@@ -1,3 +1,4 @@
+using FlowLedger.Application.Features.Strategies;
 using FlowLedger.Application.Features.Transactions;
 
 namespace FlowLedger.TestSupport.Builders;
@@ -833,4 +834,36 @@ public sealed class VizSpecBuilder
     public VizSpec Build() => new(_kind, _x, _y, _seriesBy, _stacked);
 
     public static implicit operator VizSpec(VizSpecBuilder builder) => builder.Build();
+}
+
+/// <summary>Builds <see cref="GoalRequest"/>: a 12,000 target reached by saving 1,000 a month, no scenario levers.</summary>
+public sealed class GoalRequestBuilder
+{
+    private decimal _target = 12000m;
+    private decimal _saved;
+    private decimal _monthly = 1000m;
+    private decimal _apy;
+    private int _deadlineMonths;
+    private decimal _extraMonthly;
+    private decimal _incomeRaisePct;
+    private decimal _spendCutPct;
+    private decimal _lumpSum;
+    private decimal _scenarioApy;
+
+    public static GoalRequestBuilder A() => new();
+
+    public GoalRequestBuilder WithTarget(decimal target) { _target = target; return this; }
+    public GoalRequestBuilder WithSaved(decimal saved) { _saved = saved; return this; }
+    public GoalRequestBuilder WithMonthly(decimal monthly) { _monthly = monthly; return this; }
+    public GoalRequestBuilder WithApy(decimal apy) { _apy = apy; return this; }
+    public GoalRequestBuilder WithDeadlineMonths(int deadlineMonths) { _deadlineMonths = deadlineMonths; return this; }
+    public GoalRequestBuilder WithExtraMonthly(decimal extraMonthly) { _extraMonthly = extraMonthly; return this; }
+    public GoalRequestBuilder WithIncomeRaisePct(decimal incomeRaisePct) { _incomeRaisePct = incomeRaisePct; return this; }
+    public GoalRequestBuilder WithSpendCutPct(decimal spendCutPct) { _spendCutPct = spendCutPct; return this; }
+    public GoalRequestBuilder WithLumpSum(decimal lumpSum) { _lumpSum = lumpSum; return this; }
+    public GoalRequestBuilder WithScenarioApy(decimal scenarioApy) { _scenarioApy = scenarioApy; return this; }
+
+    public GoalRequest Build() => new(_target, _saved, _monthly, _apy, _deadlineMonths, _extraMonthly, _incomeRaisePct, _spendCutPct, _lumpSum, _scenarioApy);
+
+    public static implicit operator GoalRequest(GoalRequestBuilder builder) => builder.Build();
 }

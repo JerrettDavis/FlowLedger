@@ -1,4 +1,5 @@
 using FlowLedger.Application.Features.Strategies;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Strategies;
@@ -9,7 +10,8 @@ public class GoalPlannerTests
 
     private static GoalRequest Req(decimal target = 12000, decimal saved = 0, decimal monthly = 1000, decimal apy = 0, int deadline = 0,
         decimal extra = 0, decimal raise = 0, decimal cut = 0, decimal lump = 0, decimal scApy = 0) =>
-        new(target, saved, monthly, apy, deadline, extra, raise, cut, lump, scApy);
+        GoalRequestBuilder.A().WithTarget(target).WithSaved(saved).WithMonthly(monthly).WithApy(apy).WithDeadlineMonths(deadline)
+            .WithExtraMonthly(extra).WithIncomeRaisePct(raise).WithSpendCutPct(cut).WithLumpSum(lump).WithScenarioApy(scApy).Build();
 
     private static readonly GoalContext Ctx = new(5000m, 4000m, []);
 

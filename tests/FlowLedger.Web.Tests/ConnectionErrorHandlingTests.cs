@@ -77,13 +77,13 @@ public sealed class ConnectionErrorHandlingTests
     {
         var links = new List<ConnectorLinkDto>
         {
-            new("A", "ok", Now, Now, null),
-            new("B", "x", Now, Now, ConnectionIssueDtoBuilder.A().WithKind("RateLimited").Build()),
-            new("C", "x", Now, Now, ConnectionIssueDtoBuilder.A()
+            ConnectorLinkDtoBuilder.A().WithInstitution("A").LinkedAt(Now).UpdatedAt(Now).Build(),
+            ConnectorLinkDtoBuilder.A().WithInstitution("B").WithStatus("x").LinkedAt(Now).UpdatedAt(Now).WithIssue(ConnectionIssueDtoBuilder.A().WithKind("RateLimited").Build()).Build(),
+            ConnectorLinkDtoBuilder.A().WithInstitution("C").WithStatus("x").LinkedAt(Now).UpdatedAt(Now).WithIssue(ConnectionIssueDtoBuilder.A()
                                                     .WithKind("ReauthRequired")
                                                     .WithRetryable(false)
                                                     .WithRequiresUserAction(true)
-                                                    .Build()),
+                                                    .Build()).Build(),
         };
         ConnectionHealth.Worst(links)!.Kind.Should().Be("ReauthRequired");
         ConnectionHealth.Worst([links[0]]).Should().BeNull();

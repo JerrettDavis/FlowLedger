@@ -85,10 +85,10 @@ public sealed class IntegrationServiceTests
     }
 
     private static IntegrationSaveRequest Rest(string url = "https://api.example.com/v1", IntegrationAuth auth = IntegrationAuth.None, string? credential = null, string? user = null)
-        => new("Example API", IntegrationKind.Rest, true, url, auth, user, credential, false, null, null, null);
+        => IntegrationSaveRequestBuilder.A().Named("Example API").OfKind(IntegrationKind.Rest).At(url).Authenticating(auth, user, credential).Build();
 
     private static IntegrationSaveRequest Webhook(string[]? events = null)
-        => new("Hook", IntegrationKind.Webhook, true, "https://hooks.example.com/in", IntegrationAuth.None, null, null, false, null, events, null);
+        => IntegrationSaveRequestBuilder.A().Named("Hook").OfKind(IntegrationKind.Webhook).At("https://hooks.example.com/in").ForEvents(events).Build();
 
     // ── definitions ──────────────────────────────────────────────────────────────
 

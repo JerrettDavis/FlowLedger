@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Bunit;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components.Pages;
 using FlowLedger.Web.Shared;
@@ -183,8 +184,8 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     }
 
     private static TransactionDto Tx(string merchant, Guid? id = null) =>
-        new(id ?? Guid.NewGuid(), AccountId, 5m, "USD", "Debit", merchant.ToUpperInvariant() + " #1", "Posted", "x",
-            new DateOnly(2026, 1, 1), null, null, merchant, null, null, DateTimeOffset.UnixEpoch);
+        TransactionDtoBuilder.A().WithId(id ?? Guid.NewGuid()).OnAccount(AccountId).WithAmount(5m).Described(merchant.ToUpperInvariant() + " #1")
+            .FromSource("x").Unposted(new DateOnly(2026, 1, 1)).WithMerchant(merchant).WithCreatedAt(DateTimeOffset.UnixEpoch).Build();
 
     [Fact]
     public void Merchant_match_counts_other_rows_from_the_same_merchant_case_insensitively()
