@@ -18,6 +18,7 @@ the first tag is cut; until then everything is "Unreleased".
 - Issue/PR templates, CODEOWNERS, third-party notices, licence and repository metadata.
 
 - Durable `job_runs` history (shown in `/api/data/status`) and bounded retry with jitter for failed backup/valuation/Home Assistant jobs.
+- Budget rollover (per-budget flag, carried amount stored per month), a Subscriptions page with price-change flags, and `alert.raised` webhook delivery (#70); Undo and an exact count for "apply to same merchant" on the transactions grid (#72); MX category coverage in the provider-category hints (#67); the last restore drill, with live vs restored row counts and the raw-archive check, on the Data page (#62); `/api/sync/estimate` counts only accounts the active connector feeds (#65).
 
 ### Changed
 - Multi-user secure defaults when OIDC is on (#135, #145, #159), each with a legacy opt-out documented in `docs/self-hosting/upgrading.md`: signed tenant assertion required (`API__TENANTSIGNINGKEY`), household tenant id must not be the well-known constant, sign-up defaults to InviteOnly (`AUTH__SIGNUP__MODE`, `AUTH__SIGNUP__LEGACYOPEN`), absolute session cap `AUTH__SESSION__ABSOLUTEMAXDAYS` (30), and a `__Host-` session cookie (signs everyone out once).
