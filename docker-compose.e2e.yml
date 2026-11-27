@@ -1,0 +1,64 @@
+# E2E overlay (#138): the browser E2E suite runs against an OIDC-authenticated stack, like a real multi-user install.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full up --build -d
+#
+# What this adds to the base stack:
+#   * idp: navikt/mock-oauth2-server (pinned by digest). It auto-completes the login (no form) and issues a verified email
+#     (e2e-owner@flowledger.test) that the API maps to the seeded household tenant via Tenancy__LegacyOwnerEmail, so the signed-in
+#     browser sees the same data the suite seeds through the API.
+#   * api/web: OIDC enabled, ASPNETCORE_ENVIRONMENT stays Production (real guards: signed tenant assertion, __Host- cookie,
+#     persisted data-protection keys). Only RequireHttpsMetadata is relaxed, because the mock IdP is plain http.
+#
+# Required environment (the workflow / a local shell sets these; none is a real secret):
+#   POSTGRES_PASSWORD, API__KEY
+#   API__TENANTSIGNINGKEY  >= 32 chars, different from API__KEY (tests sign direct API calls with it: E2E_TENANT_SIGNING_KEY)
+#   API__TENANTID          a household tenant id other than the well-known 00000000-0000-0000-0000-000000000001 (= E2E_TENANT_ID)
+#
+# The IdP issuer is http://idp:8080/default. "idp" resolves inside compose through the network alias; the Playwright
+# Chromium resolves it with --host-resolver-rules="MAP idp 127.0.0.1" (E2ETestBase) and reaches the published port 8080.
+services:
+  idp:
+    profiles: [full]
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10@sha256:65d4ed47ce094cc3849e41e03499bfb32372d69c726ec22b3d5a19eba9bc787e
+    restart: unless-stopped
+    networks:
+      frontend:
+        aliases: [idp]
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      JSON_CONFIG: >-
+        {
+          "interactiveLogin": false,
+          "tokenCallbacks": [
+            {
+              "issuerId": "default",
+              "requestMappings": [
+                {
+                  "requestParam": "grant_type",
+                  "match": "*",
+                  "claims": {
+                    "sub": "e2e-owner",
+                    "email": "e2e-owner@flowledger.test",
+                    "email_verified": true,
+                    "name": "E2E Owner"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+
+  api:
+    environment:
+      Auth__Oidc__Authority: http://idp:8080/default
+      Auth__Oidc__ClientId: flowledger-e2e
+      Tenancy__LegacyOwnerEmail: e2e-owner@flowledger.test
+
+  web:
+    environment:
+      Auth__Oidc__Authority: http://idp:8080/default
+      Auth__Oidc__ClientId: flowledger-e2e
+      Auth__Oidc__ClientSecret: e2e-not-a-secret
+      Auth__Oidc__RequireHttpsMetadata: "false"

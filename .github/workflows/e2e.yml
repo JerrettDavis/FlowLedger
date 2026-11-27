@@ -1,3 +1,15 @@
+# E2E stack (#138): the browser suites run against an OIDC-authenticated stack, like a real multi-user install, not an anonymous one.
+#
+#   docker-compose.yml + docker-compose.e2e.yml (every compose command passes both -f files) start, besides postgres/redis/migrate/worker:
+#   * idp  - navikt/mock-oauth2-server (pinned by digest) that completes the login on its own and issues the verified email
+#            e2e-owner@flowledger.test. The api maps that email to the household tenant (Tenancy__LegacyOwnerEmail).
+#   * api/web - Production environment with Auth__Oidc__* set, so the real guards apply: Api__TenantSigningKey (api and web), a
+#            non-well-known household tenant id (API__TENANTID), the __Host- session cookie, a persisted key ring.
+#   The IdP issuer is http://idp:8080/default: containers reach it through a network alias, Chromium through
+#   --host-resolver-rules="MAP idp 127.0.0.1" (E2EAuth) and the published port 8080.
+#   The test process signs in once (E2EAuth, saved storage state reused by every test) and seeds the household tenant over the API with
+#   signed X-Tenant-Sig headers (E2EApi, key E2E_TENANT_SIGNING_KEY). E2E_REQUIRE_AUTH=true makes an unauthenticated stack a failure.
+#   TenantIsolationSmokeTests is the two-tenant isolation check through the composed containers.
 name: E2E Tests
 
 on:
@@ -17,8 +29,9 @@ jobs:
     env:
       POSTGRES_PASSWORD: ci_test_password
       API__KEY: ci-integration-key-not-for-production-0123456789
-      # The ephemeral CI stack has no identity provider.
-      AUTH__ALLOWANONYMOUS: "true"
+      # OIDC stack (see the comment block at the top of this file). Throwaway values, not secrets.
+      API__TENANTSIGNINGKEY: ci-e2e-tenant-signing-key-0123456789abcdef
+      API__TENANTID: e2e00000-0000-4000-8000-000000000001
 
     steps:
       - name: Checkout
@@ -36,7 +49,7 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Start full stack
-        run: docker compose --profile full up --build -d
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full up --build -d
 
       - name: Wait for API health
         run: |
@@ -69,7 +82,10 @@ jobs:
           E2E_BASE_URL: http://localhost:5002
           E2E_API_URL: http://localhost:5001
           E2E_API_KEY: ci-integration-key-not-for-production-0123456789
-          E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+          E2E_TENANT_ID: e2e00000-0000-4000-8000-000000000001
+          E2E_TENANT_SIGNING_KEY: ci-e2e-tenant-signing-key-0123456789abcdef
+          # Fail (never silently run anonymous) unless the stack redirects to the identity provider.
+          E2E_REQUIRE_AUTH: "true"
 
       # Guard against a green run with no E2E tests discovered or executed (e.g. a renamed trait/filter).
       # E2E tests are E2EFact/E2ETheory: skipped when unconfigured, and E2E_REQUIRED=true turns a missing
@@ -95,11 +111,11 @@ jobs:
 
       - name: Show compose logs on failure
         if: failure()
-        run: docker compose --profile full logs --tail=100
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full logs --tail=100
 
       - name: Tear down stack
         if: always()
-        run: docker compose --profile full down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full down -v
 
   ui-a11y:
     name: UI accessibility (axe, keyboard)
@@ -107,8 +123,9 @@ jobs:
     env:
       POSTGRES_PASSWORD: ci_test_password
       API__KEY: ci-integration-key-not-for-production-0123456789
-      # The ephemeral CI stack has no identity provider.
-      AUTH__ALLOWANONYMOUS: "true"
+      # OIDC stack (see the comment block at the top of this file). Throwaway values, not secrets.
+      API__TENANTSIGNINGKEY: ci-e2e-tenant-signing-key-0123456789abcdef
+      API__TENANTID: e2e00000-0000-4000-8000-000000000001
 
     steps:
       - name: Checkout
@@ -126,7 +143,7 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Start full stack
-        run: docker compose --profile full up --build -d
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full up --build -d
 
       - name: Wait for API health
         run: |
@@ -160,7 +177,10 @@ jobs:
           E2E_BASE_URL: http://localhost:5002
           E2E_API_URL: http://localhost:5001
           E2E_API_KEY: ci-integration-key-not-for-production-0123456789
-          E2E_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+          E2E_TENANT_ID: e2e00000-0000-4000-8000-000000000001
+          E2E_TENANT_SIGNING_KEY: ci-e2e-tenant-signing-key-0123456789abcdef
+          # Fail (never silently run anonymous) unless the stack redirects to the identity provider.
+          E2E_REQUIRE_AUTH: "true"
 
       # Guard against a green run with no E2E tests discovered or executed (e.g. a renamed trait/filter).
       # E2E tests are E2EFact/E2ETheory: skipped when unconfigured, and E2E_REQUIRED=true turns a missing
@@ -186,8 +206,8 @@ jobs:
 
       - name: Show compose logs on failure
         if: failure()
-        run: docker compose --profile full logs --tail=100
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full logs --tail=100
 
       - name: Tear down stack
         if: always()
-        run: docker compose --profile full down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml --profile full down -v
