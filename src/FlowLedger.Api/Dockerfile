@@ -1,11 +1,13 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Build context: repo root  (docker build -f src/FlowLedger.Api/Dockerfile .)
 
 # ── Stage 1: restore ─────────────────────────────────────────────────────────
-# Copy only the manifest files first so the restore layer is cached until a
+# Copy only the manifest files (csproj + packages.lock.json) first so the restore layer is cached until a
 # .csproj or central-package file changes.
 FROM mcr.microsoft.com/dotnet/sdk:10.0.404@sha256:8c6edfb26c85153f236d26efebd9ad349aec403583f343f201ee67838b23658d AS restore
 WORKDIR /src
+# Locked restore everywhere below (the publish stage inherits it): a drifting dependency fails the build (#190).
+ENV RestoreLockedMode=true
 
 # Central build / package management files
 COPY global.json                  global.json
@@ -15,20 +17,20 @@ COPY .editorconfig                .editorconfig
 COPY Directory.Packages.props     Directory.Packages.props
 
 # Project files needed to restore the API's dependency tree
-COPY src/FlowLedger.Api/FlowLedger.Api.csproj                                         src/FlowLedger.Api/
-COPY src/FlowLedger.Application/FlowLedger.Application.csproj                         src/FlowLedger.Application/
-COPY src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj                   src/FlowLedger.Infrastructure/
-COPY src/FlowLedger.Contracts/FlowLedger.Contracts.csproj                                 src/FlowLedger.Contracts/
-COPY src/FlowLedger.Domain/FlowLedger.Domain.csproj                                   src/FlowLedger.Domain/
-COPY src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj                       src/FlowLedger.SharedKernel/
-COPY src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj                 src/FlowLedger.ServiceDefaults/
-COPY src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractions.csproj  src/FlowLedger.Integrations.Abstractions/
-COPY src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj                 src/FlowLedger.Integrations.Mx/
-COPY src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj   src/FlowLedger.Integrations.Simulated/
-COPY src/FlowLedger.Integrations.SimpleFin/FlowLedger.Integrations.SimpleFin.csproj   src/FlowLedger.Integrations.SimpleFin/
-COPY src/FlowLedger.Integrations.Quiltt/FlowLedger.Integrations.Quiltt.csproj         src/FlowLedger.Integrations.Quiltt/
+COPY src/FlowLedger.Api/FlowLedger.Api.csproj src/FlowLedger.Api/packages.lock.json src/FlowLedger.Api/
+COPY src/FlowLedger.Application/FlowLedger.Application.csproj src/FlowLedger.Application/packages.lock.json src/FlowLedger.Application/
+COPY src/FlowLedger.Infrastructure/FlowLedger.Infrastructure.csproj src/FlowLedger.Infrastructure/packages.lock.json src/FlowLedger.Infrastructure/
+COPY src/FlowLedger.Contracts/FlowLedger.Contracts.csproj src/FlowLedger.Contracts/packages.lock.json src/FlowLedger.Contracts/
+COPY src/FlowLedger.Domain/FlowLedger.Domain.csproj src/FlowLedger.Domain/packages.lock.json src/FlowLedger.Domain/
+COPY src/FlowLedger.SharedKernel/FlowLedger.SharedKernel.csproj src/FlowLedger.SharedKernel/packages.lock.json src/FlowLedger.SharedKernel/
+COPY src/FlowLedger.ServiceDefaults/FlowLedger.ServiceDefaults.csproj src/FlowLedger.ServiceDefaults/packages.lock.json src/FlowLedger.ServiceDefaults/
+COPY src/FlowLedger.Integrations.Abstractions/FlowLedger.Integrations.Abstractions.csproj src/FlowLedger.Integrations.Abstractions/packages.lock.json src/FlowLedger.Integrations.Abstractions/
+COPY src/FlowLedger.Integrations.Mx/FlowLedger.Integrations.Mx.csproj src/FlowLedger.Integrations.Mx/packages.lock.json src/FlowLedger.Integrations.Mx/
+COPY src/FlowLedger.Integrations.Simulated/FlowLedger.Integrations.Simulated.csproj src/FlowLedger.Integrations.Simulated/packages.lock.json src/FlowLedger.Integrations.Simulated/
+COPY src/FlowLedger.Integrations.SimpleFin/FlowLedger.Integrations.SimpleFin.csproj src/FlowLedger.Integrations.SimpleFin/packages.lock.json src/FlowLedger.Integrations.SimpleFin/
+COPY src/FlowLedger.Integrations.Quiltt/FlowLedger.Integrations.Quiltt.csproj src/FlowLedger.Integrations.Quiltt/packages.lock.json src/FlowLedger.Integrations.Quiltt/
 
-RUN dotnet restore src/FlowLedger.Api/FlowLedger.Api.csproj
+RUN dotnet restore --locked-mode src/FlowLedger.Api/FlowLedger.Api.csproj
 
 # ── Stage 2: publish ──────────────────────────────────────────────────────────
 FROM restore AS publish

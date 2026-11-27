@@ -37,6 +37,7 @@ internal sealed class AuditMiddleware(RequestDelegate next, ILogger<AuditMiddlew
         ["ReencryptSecrets"] = "secrets.reencrypt",
         ["SealRawArchive"] = "archive.seal",
         ["OffboardTenant"] = "tenant.offboard",
+        ["DeleteMyData"] = "tenant.self_delete",
         ["DeactivateAccount"] = "account.deactivate",
         ["DeactivateAsset"] = "asset.deactivate",
         ["DeactivateRecurringFlow"] = "recurring.deactivate",

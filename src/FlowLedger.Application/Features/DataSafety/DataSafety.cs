@@ -84,21 +84,21 @@ public sealed record ExportDataOutcome(string? ZipPath, bool AllTenants, string?
 }
 
 /// <summary>
-/// Export scope rules (#139): the default stays the whole database (disaster recovery); <c>scope=tenant</c> exports only the caller's tenant;
-/// an explicit tenant id exports that tenant.
+/// Export scope rules (#139): the DEFAULT is the caller's own tenant (also <c>scope=tenant</c>); the whole-database dump is the explicit
+/// <c>scope=all</c> (disaster recovery only); an explicit tenant id exports that tenant. Callers are gated by the endpoint, not here.
 /// </summary>
 public sealed class ExportDataHandler(IDataArchive archive, ITenantContext tenant)
 {
     public async Task<ExportDataOutcome> HandleAsync(string? scope, Guid? tenantId, CancellationToken ct = default)
     {
-        var all = scope is null || string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase);
-        var own = string.Equals(scope, "tenant", StringComparison.OrdinalIgnoreCase);
+        var all = string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase);
+        var own = scope is null || string.Equals(scope, "tenant", StringComparison.OrdinalIgnoreCase);
         if (!all && !own)
         {
             return new ExportDataOutcome(null, false, "scope must be 'all' or 'tenant'");
         }
 
-        Guid? only = tenantId ?? (own ? tenant.TenantId : null);
+        Guid? only = tenantId ?? (all ? null : tenant.TenantId);
         var zip = await archive.ExportAsync(only, ct);
         return new ExportDataOutcome(zip, only is null, null);
     }

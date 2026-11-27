@@ -109,6 +109,14 @@ internal sealed partial class MxApiClient
         return result;
     }
 
+    /// <summary>DELETE /users/{userGuid}: removes the user, its members and every aggregated record at MX (tenant erasure, #189).</summary>
+    public async Task DeleteUserAsync(string userGuid, CancellationToken ct)
+    {
+        using var response = await SendAsync(
+            HttpMethod.Delete, $"/users/{userGuid}", request: (object?)null, jsonTypeInfo: null, "DeleteUser", ct)
+            .ConfigureAwait(false);
+    }
+
     // ── Members ────────────────────────────────────────────────────────────────
 
     /// <summary>POST /users/{userGuid}/members — creates a member for the given institution.</summary>

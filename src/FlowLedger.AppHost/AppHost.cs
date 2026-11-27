@@ -121,6 +121,15 @@ static IResourceBuilder<T> WithMxConfig<T>(
         }
     }
 
+    foreach (var key in new[] { "KeepLocalSnapshots", "PremigrateMaxAgeDays", "ResticForget", "ResticKeepDaily", "ResticKeepWeekly", "ResticKeepMonthly" })
+    {
+        var value = configuration[$"Backup:Retention:{key}"];
+        if (!string.IsNullOrEmpty(value))
+        {
+            resource = resource.WithEnvironment($"Backup__Retention__{key}", value);
+        }
+    }
+
     foreach (var key in new[] { "Repository", "PasswordFile", "Executable" })
     {
         var value = configuration[$"Backup:Restic:{key}"];

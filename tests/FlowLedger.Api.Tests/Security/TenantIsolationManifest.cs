@@ -126,6 +126,8 @@ internal static class TenantIsolationManifest
         ["GET /api/users/identities"] = List(),
         ["GET /openapi/{documentName}.json"] = Global("API description"),
         ["POST /api/accounts"] = Written(),
+        // #189: acts only on the caller's own tenant (id from the tenant context, never the body); proven by SelfServiceErasureTests.
+        ["POST /api/account/delete-my-data"] = Written(),
         ["POST /api/assets"] = Written(),
         ["POST /api/assets/{id:guid}/refresh"] = ById("Asset"),
         ["POST /api/assets/{id:guid}/valuations"] = ById("Asset"),

@@ -63,10 +63,9 @@ public sealed class DataSafetyHandlerTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("all")]
     [InlineData("ALL")]
-    public async Task Default_and_all_export_the_whole_database(string? scope)
+    public async Task Explicit_scope_all_exports_the_whole_database(string scope)
     {
         var archive = new Archive();
 
@@ -77,18 +76,29 @@ public sealed class DataSafetyHandlerTests
         archive.ExportedFor.Should().BeNull();
     }
 
-    [Fact]
-    public async Task Tenant_scope_exports_the_callers_tenant_and_an_explicit_id_wins()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("tenant")]
+    public async Task Default_and_tenant_scope_export_only_the_callers_tenant(string? scope)
     {
         var tenant = new FakeTenantContext();
         var archive = new Archive();
-        var handler = new ExportDataHandler(archive, tenant);
 
-        (await handler.HandleAsync("tenant", null)).AllTenants.Should().BeFalse();
+        var outcome = await new ExportDataHandler(archive, tenant).HandleAsync(scope, null);
+
+        outcome.Refused.Should().BeFalse();
+        outcome.AllTenants.Should().BeFalse();
         archive.ExportedFor.Should().Be(tenant.TenantId);
+    }
 
+    [Fact]
+    public async Task An_explicit_tenant_id_wins_over_the_callers_tenant()
+    {
+        var archive = new Archive();
         var other = Guid.NewGuid();
-        await handler.HandleAsync(null, other);
+
+        await new ExportDataHandler(archive, new FakeTenantContext()).HandleAsync(null, other);
+
         archive.ExportedFor.Should().Be(other);
     }
 

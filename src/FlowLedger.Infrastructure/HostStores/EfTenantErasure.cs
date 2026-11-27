@@ -20,16 +20,16 @@ internal sealed class EfTenantErasure(
     // Tables that carry a tenant_id column but are not tenant data to delete here.
     private static readonly HashSet<string> NeverTouch = new(StringComparer.Ordinal) { "__EFMigrationsHistory", "tenants" };
 
+    public string? RefusalFor(Guid tenantId) =>
+        tenantId == Guid.Empty ? "A tenant id is required."
+        : tenantId == protectedTenantId ? "The household tenant cannot be erased."
+        : null;
+
     public async Task<TenantErasureResult> EraseAsync(Guid tenantId, CancellationToken ct = default)
     {
-        if (tenantId == Guid.Empty)
+        if (RefusalFor(tenantId) is { } refusal)
         {
-            throw new TenantErasureRefusedException("A tenant id is required.");
-        }
-
-        if (tenantId == protectedTenantId)
-        {
-            throw new TenantErasureRefusedException("The household tenant cannot be erased.");
+            throw new TenantErasureRefusedException(refusal);
         }
 
         var catalog = TenantDataCatalog.FromModel(db.Model);

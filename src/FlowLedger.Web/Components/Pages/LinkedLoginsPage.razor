@@ -3,6 +3,7 @@
 @inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Linked logins — FlowLedger</PageTitle>
 
@@ -61,6 +62,30 @@ else
             <MudButton Variant="Variant.Filled" OnClick="Redeem" Disabled="@(string.IsNullOrWhiteSpace(_enter))">Link this login</MudButton>
         </div>
     </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4" Outlined="true">
+        <MudText Typo="Typo.subtitle1" Class="mb-1">Delete my data</MudText>
+        @if (_deleted is not null)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-2">Your data was deleted (@_deleted.TotalRows rows). Sign out to finish.</MudAlert>
+            <form method="post" action="/auth/logout">
+                <AntiforgeryToken />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Sign out</MudButton>
+            </form>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-2 fl-muted">
+                Permanently erases everything stored for this account: accounts, transactions, budgets, saved reports, linked logins and archived bank responses.
+                Bank connections are revoked where the provider allows it (otherwise remove them at your bank-linking provider). It cannot be undone, and copies in
+                backups are removed as those backups expire.
+            </MudText>
+            <div class="d-flex align-center gap-3 flex-wrap">
+                <MudTextField T="string" Immediate="true" @bind-Value="_confirmDelete" Label="Type DELETE MY DATA" Margin="Margin.Dense" Style="max-width:260px" />
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteMyData" Disabled="@(_confirmDelete != "DELETE MY DATA" || _deleting)">Delete everything</MudButton>
+            </div>
+        }
+    </MudPaper>
 }
 
 @code {
@@ -69,6 +94,29 @@ else
     private FlowLedger.Web.ApiClient.FlowLedgerApiClient.LinkCodeDto? _code;
     private string? _enter;
     private Guid _me;
+    private string? _confirmDelete;
+    private bool _deleting;
+    private FlowLedger.Web.ApiClient.FlowLedgerApiClient.DeleteMyDataResult? _deleted;
+
+    private async Task DeleteMyData()
+    {
+        if (!await DialogService.ConfirmAsync("Delete my data", "Permanently delete everything stored for this account? This cannot be undone.", "Delete everything"))
+        {
+            return;
+        }
+
+        _deleting = true;
+        try
+        {
+            _deleted =await ApiClient.DeleteMyDataAsync(_confirmDelete ?? string.Empty);
+            if (_deleted is null)
+            {
+                Snackbar.Add("The data was not deleted. The household account cannot be deleted from here.", Severity.Warning);
+            }
+        }
+        catch (Exception ex) { Snackbar.AddFailure(ex); }
+        finally { _deleting = false; }
+    }
 
     protected override async Task OnInitializedAsync()
     {

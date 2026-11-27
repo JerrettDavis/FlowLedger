@@ -32,6 +32,7 @@ public static partial class DependencyInjection
                 sp.GetRequiredService<FlowLedgerDbContext>(),
                 TenancySettings.Legacy(configuration).LegacyTenantId,
                 sp.GetServices<FlowLedger.Application.Features.Users.ITenantFileEraser>()));
+        services.AddScoped<FlowLedger.Application.Features.Users.ITenantProviderRevocation, FlowLedger.Infrastructure.Sync.ProviderTenantRevocation>();
 
         // Provider call ledger (append-only; feeds budgets + the usage page).
         services.AddSingleton<ProviderCallLedger>(sp => new ProviderCallLedger(sp.GetRequiredService<HostDb>()));

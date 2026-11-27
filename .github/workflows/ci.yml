@@ -42,7 +42,7 @@ jobs:
         run: node --test "tests/js/**/*.test.mjs"
 
       - name: Restore packages
-        run: dotnet restore
+        run: dotnet restore --locked-mode
 
       - name: Check formatting
         run: dotnet format --verify-no-changes --no-restore

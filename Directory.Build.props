@@ -24,6 +24,9 @@
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Deterministic>true</Deterministic>
+    <!-- NuGet lock files (#190): every project commits a packages.lock.json; CI and every Dockerfile restore in locked mode, so a
+         floating or tampered dependency fails the restore instead of silently changing the build. Refresh: see CONTRIBUTING.md. -->
+    <RestorePackagesWithLockFile Condition="'$(MSBuildProjectExtension)' == '.csproj'">true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true' Or '$(CI)' == 'true'">

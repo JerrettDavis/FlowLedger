@@ -21,6 +21,9 @@ updates:
         patterns:
           - "*"
 
+  # NuGet lock files (#190): every project commits packages.lock.json and Dependabot's nuget ecosystem updates it in the same PR as the
+  # version bump (it runs a lock-aware restore). CI restores with --locked-mode, so a bump PR that lacks the lock change fails visibly.
+  # The Web project's Blazor assets pack is pinned in Directory.Build.targets (see CONTRIBUTING.md): bump it with the aspnet image.
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:

@@ -14,6 +14,10 @@ permissions:
   security-events: write
   actions: read
 
+# NuGet lock files (#190): implicit restores in build/test steps must match the committed packages.lock.json too.
+env:
+  RestoreLockedMode: true
+
 jobs:
   codeql:
     name: CodeQL Analysis (C#)
@@ -41,7 +45,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore --locked-mode
       - name: Check for vulnerable packages
         run: |
           output=$(dotnet list package --vulnerable --include-transitive 2>&1)

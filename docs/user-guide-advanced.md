@@ -502,7 +502,7 @@ information message if they open the URL, and the API returns 403 regardless.
   whether an off-site restic copy is configured, last run, rows backed up, restore drill
   result and off-site result.
 - **Back up now**: runs a backup immediately and verifies it.
-- **Export all data (.zip)**: one CSV per table plus a manifest with hashes.
+- **Export my data (.zip)**: your tenant's rows, one CSV per table plus a manifest with hashes. **Full database dump (disaster recovery)** is the whole-database bundle that can be imported into an empty database.
 - **Bank connection usage**: provider calls today and this month against your configured
   budgets, per-endpoint counts and a pause (kill switch) indicator.
 - **Recent backup runs**.
@@ -513,7 +513,7 @@ information message if they open the URL, and the API returns 403 regardless.
 2. If the off-site copy says "NOT configured", set it up per
    [Backups and recovery](self-hosting/backups-and-recovery.md#turning-on-off-site-backups-restic--backblaze-b2).
 3. Click **Back up now** before risky changes (for example before switching to real data).
-4. Click **Export all data** for a portable copy.
+4. Click **Full database dump (disaster recovery)** for a restorable copy (or **Export my data** for your own rows).
 
 **Restore**
 

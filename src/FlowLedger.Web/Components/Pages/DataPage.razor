@@ -60,8 +60,11 @@ else
                 <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" Disabled="_running" OnClick="BackupNow">
                     @(_running ? "Backing up…" : "Back up now")
                 </MudButton>
-                <MudButton Class="mt-3 ml-2" Variant="Variant.Outlined" Disabled="_exporting" OnClick="ExportAll">
-                    @(_exporting ? "Exporting…" : "Export all data (.zip)")
+                <MudButton Class="mt-3 ml-2" Variant="Variant.Outlined" Disabled="_exporting" OnClick="ExportMine">
+                    @(_exporting ? "Exporting…" : "Export my data (.zip)")
+                </MudButton>
+                <MudButton Class="mt-3 ml-2" Variant="Variant.Text" Disabled="_exporting" OnClick="ExportWholeDatabase">
+                    Full database dump (disaster recovery)
                 </MudButton>
                 <div class="d-flex align-center mt-3" style="gap:8px;flex-wrap:wrap">
                     <DateRangeSelector Label="Transactions range" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
@@ -70,7 +73,7 @@ else
                     </MudButton>
                 </div>
                 <MudText Typo="Typo.caption" Class="d-block mt-2 fl-muted">
-                    The export holds one CSV per table plus a hashed manifest. It can be imported into an empty database (POST /api/data/import).
+                    "Export my data" holds your tenant's rows only (one CSV per table plus a hashed manifest) and cannot be re-imported. The full database dump covers every tenant, needs the admin token, and is the file to import into an empty database (POST /api/data/import).
                 </MudText>
             </MudPaper>
         </MudItem>
@@ -292,17 +295,21 @@ else
         }
     }
 
-    private async Task ExportAll()
+    private Task ExportMine() => Export(ApiClient.ExportMyDataAsync, "flowledger-export");
+
+    private Task ExportWholeDatabase() => Export(ApiClient.ExportWholeDatabaseAsync, "flowledger-full-database");
+
+    private async Task Export(Func<CancellationToken, Task<byte[]?>> download, string filePrefix)
     {
         _exporting = true;
         try
         {
-            var bytes = await ApiClient.ExportAllAsync();
+            var bytes = await download(CancellationToken.None);
             if (bytes is not null)
             {
                 using var ms = new MemoryStream(bytes);
                 using var reference = new DotNetStreamReference(ms);
-                await JS.InvokeVoidAsync("flowledgerDownload", $"flowledger-export-{DateTime.Now:yyyyMMdd-HHmm}.zip", reference);
+                await JS.InvokeVoidAsync("flowledgerDownload", $"{filePrefix}-{DateTime.Now:yyyyMMdd-HHmm}.zip", reference);
             }
         }
         catch (Exception ex)

@@ -19,6 +19,20 @@ internal sealed class BackupOptions
     public bool RequireOffsite { get; set; }
     public ResticOptions Restic { get; set; } = new();
 
+    /// <summary>Backup expiry policy (#189); see <see cref="FlowLedger.Infrastructure.DataSafety.BackupRetention"/>.</summary>
+    public RetentionOptions Retention { get; set; } = new();
+
+    public sealed class RetentionOptions
+    {
+        /// <summary>Overrides <c>Backup:KeepLocalSnapshots</c> when set.</summary>
+        public int? KeepLocalSnapshots { get; set; }
+        public int PremigrateMaxAgeDays { get; set; } = 90;
+        public bool ResticForget { get; set; } = true;
+        public int ResticKeepDaily { get; set; } = 7;
+        public int ResticKeepWeekly { get; set; } = 4;
+        public int ResticKeepMonthly { get; set; } = 6;
+    }
+
     public sealed class ResticOptions
     {
         public string? Repository { get; set; }
@@ -56,6 +70,29 @@ internal sealed class BackupOptionsValidator : IValidateOptions<BackupOptions>
         if (o.KeepLocalSnapshots < 1)
         {
             errors.Add($"Backup:KeepLocalSnapshots must be a positive integer but is {o.KeepLocalSnapshots}.");
+        }
+
+        var r = o.Retention;
+        if (r.KeepLocalSnapshots is < 1)
+        {
+            errors.Add($"Backup:Retention:KeepLocalSnapshots must be a positive integer but is {r.KeepLocalSnapshots}.");
+        }
+
+        foreach (var (key, value) in new[]
+        {
+            ("PremigrateMaxAgeDays", r.PremigrateMaxAgeDays), ("ResticKeepDaily", r.ResticKeepDaily),
+            ("ResticKeepWeekly", r.ResticKeepWeekly), ("ResticKeepMonthly", r.ResticKeepMonthly),
+        })
+        {
+            if (value < 0)
+            {
+                errors.Add($"Backup:Retention:{key} must be zero or a positive integer but is {value}.");
+            }
+        }
+
+        if (r.ResticForget && r.ResticKeepDaily == 0 && r.ResticKeepWeekly == 0 && r.ResticKeepMonthly == 0)
+        {
+            errors.Add("Backup:Retention:ResticForget is on but ResticKeepDaily, ResticKeepWeekly and ResticKeepMonthly are all 0: restic refuses a forget with no keep rule. Set one, or set ResticForget=false.");
         }
 
         if (o.Directory is { } dir && dir.Length > 0 && string.IsNullOrWhiteSpace(dir))

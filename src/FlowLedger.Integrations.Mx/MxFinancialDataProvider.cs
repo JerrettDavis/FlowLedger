@@ -17,7 +17,7 @@ namespace FlowLedger.Integrations.Mx;
 /// single opaque id. The member ref's <c>ProviderId</c> is <c>{userGuid}|{memberGuid}</c> and each
 /// account's <c>ProviderId</c> is <c>{userGuid}|{accountGuid}</c> (see <see cref="MxCompositeId"/>).
 /// </summary>
-public sealed partial class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdResolver
+public sealed partial class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdResolver, IProviderTenantRevoker
 {
     private readonly MxApiClient _client;
     private readonly MxWebhookVerifier _webhookVerifier;

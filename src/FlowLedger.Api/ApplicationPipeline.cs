@@ -80,6 +80,7 @@ internal static class ApplicationPipeline
 
         app.MapStatusEndpoints();
         app.MapUserEndpoints();
+        app.MapPrivacyEndpoints();
         app.MapEnvironmentEndpoints();
         app.MapDataEndpoints();
         app.MapCategorizationEndpoints();

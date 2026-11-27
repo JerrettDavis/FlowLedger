@@ -3,10 +3,12 @@ enum FlowLedger.Integrations.Abstractions.ConnectionStatus
 enum FlowLedger.Integrations.Abstractions.ConnectorTraits
 enum FlowLedger.Integrations.Abstractions.ProviderCapabilities
 enum FlowLedger.Integrations.Abstractions.ProviderIssueKind
+enum FlowLedger.Integrations.Abstractions.ProviderRevocationOutcome
 interface FlowLedger.Integrations.Abstractions.IConnectorRegistry
 interface FlowLedger.Integrations.Abstractions.IFinancialDataProvider
 interface FlowLedger.Integrations.Abstractions.IMemberIdResolver
 interface FlowLedger.Integrations.Abstractions.IProviderCallLedger
+interface FlowLedger.Integrations.Abstractions.IProviderTenantRevoker
 interface FlowLedger.Integrations.Abstractions.IRawPayloadArchive
 interface FlowLedger.Integrations.Abstractions.IRawPayloadDecryptor
 interface FlowLedger.Integrations.Abstractions.IRecurringFlowSeedSource
