@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.Infrastructure.Scheduling;
 using Quartz;
 
 namespace FlowLedger.Worker.Scheduling;

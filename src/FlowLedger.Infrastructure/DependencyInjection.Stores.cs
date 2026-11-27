@@ -1,9 +1,9 @@
-using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Outbound;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
+using FlowLedger.Infrastructure.Scheduling;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

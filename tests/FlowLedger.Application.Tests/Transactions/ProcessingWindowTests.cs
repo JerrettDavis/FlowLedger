@@ -1,6 +1,6 @@
-using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Duplicates;
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;

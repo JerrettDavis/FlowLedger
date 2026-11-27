@@ -1,5 +1,5 @@
-using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Categories;
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;

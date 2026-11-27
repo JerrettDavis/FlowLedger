@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
-using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.Infrastructure.Scheduling;
 using FlowLedger.Worker.Scheduling;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

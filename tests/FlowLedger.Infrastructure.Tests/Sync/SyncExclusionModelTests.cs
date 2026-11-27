@@ -93,34 +93,34 @@ public sealed class SyncExclusionModelTests
             switch (op.Kind)
             {
                 case Kind.Start:
-                {
-                    var callsBefore = providers[t].Calls;
-                    var task = Service(t).SyncAsync();
-                    if (models[t].Running)
                     {
-                        (await Assert.ThrowsAsync<SyncAlreadyRunningException>(() => task)).Should().NotBeNull();
-                        providers[t].Calls.Should().Be(callsBefore, "a refused second sync must not reach the provider");
-                    }
-                    else if (models[t].LastCommit is { } last && last + MinInterval > clock.GetUtcNow())
-                    {
-                        (await Assert.ThrowsAsync<SyncThrottledException>(() => task)).Should().NotBeNull();
-                        providers[t].Calls.Should().Be(callsBefore, "a sync inside the minimum interval must not reach the provider");
-                    }
-                    else
-                    {
-                        // The guard checks the interval before it calls the provider: wait until the provider call has started.
-                        while (providers[t].Calls == callsBefore && !task.IsCompleted)
+                        var callsBefore = providers[t].Calls;
+                        var task = Service(t).SyncAsync();
+                        if (models[t].Running)
                         {
-                            await Task.Yield();
+                            (await Assert.ThrowsAsync<SyncAlreadyRunningException>(() => task)).Should().NotBeNull();
+                            providers[t].Calls.Should().Be(callsBefore, "a refused second sync must not reach the provider");
+                        }
+                        else if (models[t].LastCommit is { } last && last + MinInterval > clock.GetUtcNow())
+                        {
+                            (await Assert.ThrowsAsync<SyncThrottledException>(() => task)).Should().NotBeNull();
+                            providers[t].Calls.Should().Be(callsBefore, "a sync inside the minimum interval must not reach the provider");
+                        }
+                        else
+                        {
+                            // The guard checks the interval before it calls the provider: wait until the provider call has started.
+                            while (providers[t].Calls == callsBefore && !task.IsCompleted)
+                            {
+                                await Task.Yield();
+                            }
+
+                            task.IsCompleted.Should().BeFalse("an allowed sync is waiting on the provider");
+                            models[t].Running = true;
+                            inflight[t] = task;
                         }
 
-                        task.IsCompleted.Should().BeFalse("an allowed sync is waiting on the provider");
-                        models[t].Running = true;
-                        inflight[t] = task;
+                        break;
                     }
-
-                    break;
-                }
 
                 case Kind.Finish when models[t].Running:
                     providers[t].Release(true);
