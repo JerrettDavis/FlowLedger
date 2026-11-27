@@ -84,10 +84,16 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     private sealed record Sut(MultiConnectorSyncService Service, FlowLedgerDbContext Db, IAccountConnectorLinkStore Links, TestTenantContext Tenant);
 
     private Sut Build(Guid householdTenant, TestTenantContext tenant, params (ConnectorDescriptor, IFinancialDataProvider)[] connectors)
+        => BuildWith(householdTenant, tenant, production: false, decorate: null, connectors);
+
+    private Sut BuildWith(
+        Guid householdTenant, TestTenantContext tenant, bool production, Func<IAccountConnectorLinkStore, IAccountConnectorLinkStore>? decorate,
+        params (ConnectorDescriptor, IFinancialDataProvider)[] connectors)
     {
         _tenants.Add(tenant.TenantId);
-        var db = _fixture.CreateDbContext(tenant);
-        var links = new FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore(db, tenant);
+        var db = production ? _fixture.CreateProductionStyleContext(tenant) : _fixture.CreateDbContext(tenant);
+        var realLinks = new FlowLedger.Infrastructure.Persistence.Repositories.EfAccountConnectorLinkStore(db, tenant);
+        IAccountConnectorLinkStore links = decorate is null ? realLinks : decorate(realLinks);
         var cfg = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Tenancy:LegacyTenantId"] = householdTenant.ToString() })
             .Build();
@@ -194,5 +200,48 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
 
         var viaConnect = () => sut.Service.ConnectAsync();
         await viaConnect.Should().ThrowAsync<NeedsUserActionProviderException>();
+    }
+
+    /// <summary>Delegates, then throws once the link row exists: the fault the atomicity guarantee is about (#180).</summary>
+    private sealed class ThrowAfterLink(IAccountConnectorLinkStore inner) : IAccountConnectorLinkStore
+    {
+        public Task<IReadOnlyList<AccountConnectorLink>> ListAsync(CancellationToken ct = default) => inner.ListAsync(ct);
+        public Task<AccountConnectorLink?> FindByProviderAccountAsync(string c, string p, CancellationToken ct = default) => inner.FindByProviderAccountAsync(c, p, ct);
+        public Task<AccountConnectorLink?> FindByAccountAsync(Guid a, CancellationToken ct = default) => inner.FindByAccountAsync(a, ct);
+        public Task PinManualAsync(Guid a, CancellationToken ct = default) => inner.PinManualAsync(a, ct);
+        public Task<bool> UnlinkAsync(Guid a, CancellationToken ct = default) => inner.UnlinkAsync(a, ct);
+
+        public async Task<bool> LinkAsync(Guid accountId, string connectorId, string providerAccountId, CancellationToken ct = default)
+        {
+            await inner.LinkAsync(accountId, connectorId, providerAccountId, ct);
+            throw new InvalidOperationException("injected fault after the link was created");
+        }
+    }
+
+    [DockerFact]
+    public async Task A_failure_after_the_link_is_created_rolls_back_the_account_and_the_link_together()
+    {
+        var tenant = TestTenantContext.New();
+        var sut = BuildWith(tenant.TenantId, tenant, production: true, decorate: l => new ThrowAfterLink(l), Connector("SimpleFIN", ["fault-1"]));
+
+        var act = () => sut.Service.SyncAsync();
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*injected fault*");
+
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.Accounts.CountAsync()).Should().Be(0, "the account was created in the same transaction as the failed link");
+        (await verify.AccountConnectorLinks.CountAsync()).Should().Be(0, "no orphan link survives");
+    }
+
+    [DockerFact]
+    public async Task Account_and_link_commit_together_under_the_production_retrying_execution_strategy()
+    {
+        var tenant = TestTenantContext.New();
+        var sut = BuildWith(tenant.TenantId, tenant, production: true, decorate: null, Connector("SimpleFIN", ["ok-1", "ok-2"]));
+
+        (await sut.Service.SyncAsync()).AccountsUpserted.Should().Be(2);
+
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.Accounts.CountAsync()).Should().Be(2);
+        (await verify.AccountConnectorLinks.CountAsync()).Should().Be(2);
     }
 }

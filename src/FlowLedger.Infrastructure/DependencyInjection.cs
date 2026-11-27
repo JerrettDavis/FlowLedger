@@ -82,15 +82,21 @@ public static class DependencyInjection
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".
-        services.AddDbContext<FlowLedgerDbContext>((serviceProvider, options) =>
+        // One bounded, named NpgsqlDataSource per host: the request contexts, the host-wide stores and the singletons all draw from the same
+        // pool (Database:MaxPoolSize, timeouts, Application Name), so connection use no longer scales with the number of stores (#180).
+        services.AddSingleton(_ =>
         {
             var connectionString = configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException(
                     "Required connection string 'flowledger' was not found. " +
                     "Ensure the Aspire Postgres resource is configured and the " +
                     "connection string is injected via Aspire service defaults.");
-
-            options.UseNpgsql(connectionString, npgsql =>
+            return DatabaseDataSource.Create(connectionString, DatabaseConnectionOptions.From(configuration));
+        });
+        services.AddSingleton(sp => new HostDb(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
+        services.AddDbContext<FlowLedgerDbContext>((serviceProvider, options) =>
+        {
+            options.UseNpgsql(serviceProvider.GetRequiredService<Npgsql.NpgsqlDataSource>(), npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
                 npgsql.EnableRetryOnFailure(maxRetryCount: 5);
@@ -324,22 +330,16 @@ public static class DependencyInjection
                 sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>());
         });
 
-        services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>
+        services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfUserDirectory(
-                new FlowLedger.Infrastructure.Persistence.HostDb(
-                    configuration.GetConnectionString("flowledger")
-                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")),
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>(),
                 TenancySettings.Legacy(configuration)));
-        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
+        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfWebhookReplayStore(
-                new FlowLedger.Infrastructure.Persistence.HostDb(
-                    configuration.GetConnectionString("flowledger")
-                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
-        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
+        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfTenantRegistry(
-                new FlowLedger.Infrastructure.Persistence.HostDb(
-                    configuration.GetConnectionString("flowledger")
-                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
         services.AddScoped<FlowLedger.Application.Features.Users.ITenantErasure>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfTenantErasure(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext>(),
@@ -360,22 +360,16 @@ public static class DependencyInjection
             FlowLedger.Infrastructure.Persistence.Repositories.EfRecurringDismissalStore>();
 
         // -- Provider call ledger (append-only; feeds budgets + the usage page) --
-        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.ProviderCallLedger(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.ProviderCallLedger>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.ProviderCallLedger(sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
         // -- Audit log of sensitive actions (append-only, host-wide EF table) --
-        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IAuditLog>(_ =>
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IAuditLog>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfAuditLog(
-                new FlowLedger.Infrastructure.Persistence.HostDb(
-                    configuration.GetConnectionString("flowledger")
-                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
         // -- Durable background job run history (host-wide EF table; worker writes, API reads) --
-        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(_ =>
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfJobRunStore(
-                new FlowLedger.Infrastructure.Persistence.HostDb(
-                    configuration.GetConnectionString("flowledger")
-                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();
