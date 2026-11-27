@@ -44,6 +44,24 @@ internal sealed class CategorizationStore(FlowLedgerDbContext db) : ICategorizat
             .Take(max)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Transaction>> LoadWindowAsync(DateOnly from, DateOnly to, int max, CancellationToken ct = default)
+        => await db.Transactions.AsNoTracking()
+            .Where(TransactionStatusExtensions.RealTransaction)
+            .Where(t => (t.PostedDate ?? t.EffectiveDate) >= from && (t.PostedDate ?? t.EffectiveDate) <= to)
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenBy(t => t.Id)
+            .Take(max)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Transaction>> LoadManualLearningAsync(int max, CancellationToken ct = default)
+        => await db.Transactions.AsNoTracking()
+            .Where(TransactionStatusExtensions.RealTransaction)
+            .Where(t => t.CategoryId != null && t.CategorySource == CategorySource.Manual)
+            .OrderByDescending(t => t.EffectiveDate)
+            .ThenBy(t => t.Id)
+            .Take(max)
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<Transaction>> LoadByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
     {
         var rows = new List<Transaction>(ids.Count);
