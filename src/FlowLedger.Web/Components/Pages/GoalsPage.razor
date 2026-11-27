@@ -69,6 +69,7 @@ else
     private List<FlowLedger.Web.ApiClient.GoalDto>? _goals;
     private bool _loading = true;
     private Guid? _editId;
+    private uint? _editVersion;
     private string? _name;
     private decimal _target;
     private decimal _saved;
@@ -100,20 +101,20 @@ else
 
     private void Edit(FlowLedger.Web.ApiClient.GoalDto g)
     {
-        _editId = g.Id; _name = g.Name; _target = g.TargetAmount; _saved = g.SavedAmount;
+        _editId = g.Id; _editVersion = g.Version; _name = g.Name; _target = g.TargetAmount; _saved = g.SavedAmount;
         _date = g.TargetDate?.ToDateTime(TimeOnly.MinValue);
     }
 
     private void Reset()
     {
-        _editId = null; _name = null; _target = 0; _saved = 0; _date = null;
+        _editId = null; _editVersion = null; _name = null; _target = 0; _saved = 0; _date = null;
     }
 
     private async Task Save()
     {
         try
         {
-            await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null);
+            await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null, _editVersion);
             Snackbar.Add("Goal saved.", Severity.Success);
             Reset();
             await LoadAsync();
@@ -121,6 +122,11 @@ else
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                Reset(); // the edit form holds a stale version; start over from what is stored now
+                await LoadAsync();
+            }
         }
     }
 
@@ -133,12 +139,16 @@ else
 
         try
         {
-            await ApiClient.DeleteGoalAsync(g.Id);
+            await ApiClient.DeleteGoalAsync(g.Id, g.Version);
             await LoadAsync();
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 }

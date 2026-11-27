@@ -66,30 +66,30 @@ public static class DataEnvironmentGuard
     public static async Task<DataEnvironment> EnsureAsync(
         string connectionString, DataEnvironment expected, bool adoptExistingAsProduction, CancellationToken ct = default)
     {
-        await using var conn = new NpgsqlConnection(connectionString);
-        await conn.OpenAsync(ct);
-
-        await using (var create = new NpgsqlCommand(
-            "CREATE TABLE IF NOT EXISTS system_settings (key text PRIMARY KEY, value text NOT NULL, updated_utc timestamptz NOT NULL DEFAULT now())", conn))
+        try
         {
-            await create.ExecuteNonQueryAsync(ct);
+            return await EnsureCoreAsync(connectionString, expected, adoptExistingAsProduction, ct);
         }
-
-        string? marker;
-        await using (var get = new NpgsqlCommand("SELECT value FROM system_settings WHERE key = @k", conn))
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UndefinedTable)
         {
-            get.Parameters.AddWithValue("k", SettingKey);
-            marker = (string?)await get.ExecuteScalarAsync(ct);
+            // The schema comes from the EF migrations, which a separate migration job (or the API) may not have applied yet when a
+            // host such as the worker starts first. An unmigrated database holds no data and no marker, so there is nothing to
+            // contradict; the first host that starts after the migration stamps the marker.
+            return expected;
         }
+    }
+
+    private static async Task<DataEnvironment> EnsureCoreAsync(
+        string connectionString, DataEnvironment expected, bool adoptExistingAsProduction, CancellationToken ct)
+    {
+        // The schema (including system_settings) comes from the EF migrations.
+        await using var db = new HostDb(connectionString).Create();
+
+        var marker = await db.SystemSettings.AsNoTracking().Where(s => s.Key == SettingKey).Select(s => s.Value).SingleOrDefaultAsync(ct);
 
         if (marker is null)
         {
-            var hasData = false;
-            await using (var probe = new NpgsqlCommand(
-                "SELECT to_regclass('accounts') IS NOT NULL AND EXISTS (SELECT 1 FROM accounts)", conn))
-            {
-                hasData = (bool)(await probe.ExecuteScalarAsync(ct))!;
-            }
+            var hasData = await db.Accounts.AsNoTracking().AnyAsync(ct);
 
             if (hasData && expected == DataEnvironment.Production && !adoptExistingAsProduction)
             {
@@ -99,7 +99,7 @@ public static class DataEnvironmentGuard
                     "To deliberately adopt this database as production set DataEnvironment:AdoptExistingAsProduction=true.");
             }
 
-            await WriteAsync(conn, expected, ct);
+            await WriteAsync(db, expected, ct);
             return expected;
         }
 
@@ -117,19 +117,17 @@ public static class DataEnvironmentGuard
 
         if (actual != expected)
         {
-            await WriteAsync(conn, expected, ct);
+            await WriteAsync(db, expected, ct);
         }
 
         return expected;
     }
 
-    private static async Task WriteAsync(NpgsqlConnection conn, DataEnvironment env, CancellationToken ct)
+    private static async Task WriteAsync(FlowLedgerDbContext db, DataEnvironment env, CancellationToken ct)
     {
-        await using var cmd = new NpgsqlCommand(
-            "INSERT INTO system_settings (key, value) VALUES (@k, @v) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_utc = now()", conn);
-        cmd.Parameters.AddWithValue("k", SettingKey);
-        cmd.Parameters.AddWithValue("v", env.ToString().ToLowerInvariant());
-        await cmd.ExecuteNonQueryAsync(ct);
+        var value = env.ToString().ToLowerInvariant();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO system_settings (key, value) VALUES ({SettingKey}, {value}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_utc = now()", ct);
     }
 }
 

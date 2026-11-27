@@ -73,4 +73,98 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
             .Should().Contain(a => a.GetProperty("title").GetString() == "Goal \"Late\" is past its target date"
                 && a.GetProperty("severity").GetString() == "warning");
     }
+
+    // ── Optimistic concurrency (#157) ─────────────────────────────────────────
+
+    private Task<HttpResponseMessage> Send(HttpMethod method, string url, object? body, string? ifMatch)
+    {
+        var message = new HttpRequestMessage(method, url);
+        if (body is not null)
+        {
+            message.Content = JsonContent.Create(body);
+        }
+
+        if (ifMatch is not null)
+        {
+            message.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return _client.SendAsync(message);
+    }
+
+    private async Task<uint> BudgetVersion(string category)
+    {
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/budgets"));
+        return doc.RootElement.GetProperty("budgets").EnumerateArray()
+            .Single(b => b.GetProperty("category").GetString() == category).GetProperty("version").GetUInt32();
+    }
+
+    [Fact]
+    public async Task Budget_put_with_current_if_match_succeeds_and_returns_a_new_etag()
+    {
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "Fuel", monthlyLimit = 100m })).EnsureSuccessStatusCode();
+        var version = await BudgetVersion("Fuel");
+
+        var response = await Send(HttpMethod.Put, "/api/budgets", new { category = "Fuel", monthlyLimit = 120m }, $"\"{version}\"");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var next = await BudgetVersion("Fuel");
+        next.Should().NotBe(version);
+        response.Headers.ETag!.Tag.Should().Be($"\"{next}\"");
+    }
+
+    [Fact]
+    public async Task Budget_put_and_delete_with_a_stale_if_match_return_409_problem_and_change_nothing()
+    {
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "Rent", monthlyLimit = 1000m })).EnsureSuccessStatusCode();
+        var stale = await BudgetVersion("Rent");
+        (await Send(HttpMethod.Put, "/api/budgets", new { category = "Rent", monthlyLimit = 1100m }, $"\"{stale}\"")).EnsureSuccessStatusCode();
+
+        var put = await Send(HttpMethod.Put, "/api/budgets", new { category = "Rent", monthlyLimit = 1 }, $"\"{stale}\"");
+        var delete = await Send(HttpMethod.Delete, "/api/budgets?category=Rent", null, $"\"{stale}\"");
+
+        put.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        put.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/budgets"));
+        doc.RootElement.GetProperty("budgets").EnumerateArray()
+            .Single(b => b.GetProperty("category").GetString() == "Rent").GetProperty("monthlyLimit").GetDecimal().Should().Be(1100m);
+    }
+
+    [Fact]
+    public async Task Budget_writes_without_if_match_stay_last_write_wins_and_a_malformed_one_is_400()
+    {
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "Misc", monthlyLimit = 10m })).EnsureSuccessStatusCode();
+
+        (await _client.PutAsJsonAsync("/api/budgets", new { category = "Misc", monthlyLimit = 20m })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await Send(HttpMethod.Put, "/api/budgets", new { category = "Misc", monthlyLimit = 30m }, "\"nope\"")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Send(HttpMethod.Delete, "/api/budgets?category=Misc", null, "\"nope\"")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Goal_put_and_delete_honour_if_match()
+    {
+        var created = await _client.PutAsJsonAsync("/api/goals", new { name = "Trip", targetAmount = 500m, savedAmount = 0m });
+        created.EnsureSuccessStatusCode();
+        using var createdDoc = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var id = createdDoc.RootElement.GetProperty("id").GetGuid();
+        var v1 = createdDoc.RootElement.GetProperty("version").GetUInt32();
+        created.Headers.ETag!.Tag.Should().Be($"\"{v1}\"");
+
+        var ok = await Send(HttpMethod.Put, "/api/goals", new { id, name = "Trip", targetAmount = 500m, savedAmount = 50m }, $"\"{v1}\"");
+        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var stalePut = await Send(HttpMethod.Put, "/api/goals", new { id, name = "Trip", targetAmount = 500m, savedAmount = 99m }, $"\"{v1}\"");
+        var staleDelete = await Send(HttpMethod.Delete, $"/api/goals/{id}", null, $"\"{v1}\"");
+
+        stalePut.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        stalePut.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+        staleDelete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var list = JsonDocument.Parse(await _client.GetStringAsync("/api/goals"));
+        var goal = list.RootElement.EnumerateArray().Single(g => g.GetProperty("id").GetGuid() == id);
+        goal.GetProperty("savedAmount").GetDecimal().Should().Be(50m);
+
+        var current = goal.GetProperty("version").GetUInt32();
+        (await Send(HttpMethod.Delete, $"/api/goals/{id}", null, $"\"{current}\"")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
 }

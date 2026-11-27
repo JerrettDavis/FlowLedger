@@ -19,7 +19,7 @@ that fails when an invariant has no test. No property-based, fuzz, stateful-mode
 | INV-08 | Migrations preserve data; the EF model equals the snapshot | None found (no migration upgrade-path or model-drift test) | Upgrade tests, `HasPendingModelChanges` check |
 | INV-09 | At most one sync per (tenant, connection); the cursor advances only after a durable commit | `tests/FlowLedger.Infrastructure.Tests/Sync/GuardedSyncServiceTests.cs`, `tests/FlowLedger.Worker.Tests/TenantFanOutTests.cs` (the latter is timing-based) | Small TLA+ model of lock, cursor commit, retry and crash; deterministic concurrency tests gated on `TaskCompletionSource` |
 | INV-10 | A webhook event is accepted at most once (signature, timestamp, replay window) | `tests/FlowLedger.Integrations.Tests/Mx/MxWebhookVerifierTests.cs`, `tests/FlowLedger.Api.Tests/Endpoints/WebhookReplayGuardTests.cs`; no HTTP-level negative tests for every endpoint | Property test over replay windows; HTTP negative tests |
-| INV-11 | Snapshot export and restore is lossless, including ad-hoc tables | `tests/FlowLedger.Infrastructure.Tests/Persistence/AdHocSchemaTests.cs` (`AdHocSchemaRestoreTests`), `DatabaseSnapshotTests.cs` | Round-trip property test on random data |
+| INV-11 | Snapshot export and restore is lossless, including the host-wide tables | `tests/FlowLedger.Infrastructure.Tests/Persistence/AdHocSchemaTests.cs` (`AdHocSchemaRestoreTests`), `DatabaseSnapshotTests.cs` | Round-trip property test on random data |
 
 ## Why these
 
