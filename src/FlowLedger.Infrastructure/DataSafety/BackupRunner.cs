@@ -126,7 +126,7 @@ public sealed partial class BackupRunner
 
             if (_settings.DrillAfterBackup)
             {
-                var drill = await SnapshotRestoreDrill.RunAsync(_connectionString, snapDir, "flowledger_drill_" + Guid.NewGuid().ToString("N")[..8], keep: false, ct: ct);
+                var drill = await SnapshotRestoreDrill.RunAsync(_connectionString, snapDir, "flowledger_drill_" + Guid.NewGuid().ToString("N")[..8], keep: false, ct: ct, rawArchiveDir: _settings.ObjectsDir);
                 drillOk = drill.Ok;
                 if (!drill.Ok)
                 {

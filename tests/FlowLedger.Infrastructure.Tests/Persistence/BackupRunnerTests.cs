@@ -80,6 +80,8 @@ public sealed class BackupRunnerTests : IAsyncLifetime
         drill.Ok.Should().BeTrue(string.Join("; ", drill.Problems));
         drill.Tables.Single(t => t.Table == "accounts").RestoredRows.Should().Be(2);
         drill.Tables.Should().OnlyContain(t => t.Ok);
+        drill.Tables.Should().OnlyContain(t => t.LiveRows != null, "the drill compares each restored table with the live database");
+        drill.Tables.Single(t => t.Table == "accounts").LiveRows.Should().Be(2);
         manifest.Tables.Count.Should().BeGreaterThan(5);
     }
 

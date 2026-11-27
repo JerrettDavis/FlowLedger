@@ -110,6 +110,7 @@ database), and compares counts taken just before the backup, so run it against a
 
 * Aspire/dev: a verified `premigrate-*` snapshot is taken automatically before any pending migration is applied to a database that has data; startup aborts if it fails.
 * Concurrent starters: auto-migration (Development, or `Database__MigrateOnStartup=true`) runs under a Postgres advisory lock (`flowledger:migration`). A second API starting at the same time waits (up to `Database__MigrationLockTimeoutSeconds`, default 300), then finds the schema current and migrates nothing. Verified by an integration test with two concurrent starters on an empty database.
+* Destructive migrations: before applying, the pending migrations' operations are scanned for `DropTable`, `DropColumn`, `DropSchema`, `DeleteData`, narrowing/type-changing `AlterColumn` and raw SQL with `DROP`/`DELETE`/`TRUNCATE`. On a database that already has applied migrations, startup (and `--migrate`) **refuses** unless you take a backup and set `Database__AllowDestructiveMigrations=true`, or confirm one migration with `Database__ConfirmedDestructiveMigrations=<migration id>` (comma-separated; `*` for all).
 * Rollback policy: migrations are **forward-only**; there is no supported "down" path. Write schema changes expand/contract (add the new column or table first, ship code that works with both shapes, remove the old one in a later release) so the previous release keeps working against the new schema. To undo a bad release, stop the stack, restore the `premigrate-*` snapshot or the last verified backup (see Restore below), and start the previous release image. Do not edit `__EFMigrationsHistory` by hand.
 * Not yet done: a one-shot `migrate` compose service that api/worker wait on (`service_completed_successfully`), and a CI upgrade test from the previous release image with data present. Until then the worker can start against a pre-migration schema if it is started without the api; its `/ready`-style probe is the heartbeat only, so start the api first.
 * Compose/production: `eng/scripts/migrate.sh|ps1` now takes a `pg_dump` first (via `docker compose exec postgres`) and aborts if it fails or is empty. Use `SKIP_BACKUP=1` / `-SkipBackup` only for a brand-new empty database. (These scripts have not been run end-to-end yet.)
@@ -134,6 +135,10 @@ The export zip is deleted from the server as soon as it has been sent.
 4. Restore the raw archive directory from the same restic snapshot to `ObjectStorage:RootPath` to keep the free re-ingest
    path (`Mx:Provider:ReplayArchivePath`) working.
 5. Run **Back up now** and confirm the Data & Backups page is green.
+
+### What the scheduled restore drill checks
+
+After each scheduled backup the drill restores the snapshot into a scratch database and verifies: (a) every file hash and per-table row count against the manifest; (b) the raw payload archive: each plain object under `ObjectStorage:RootPath/raw` must hash to the SHA-256 prefix in its key (encrypted objects are counted, not hashed); (c) the live row count of every drilled table is read alongside the restored count (`LiveRows`), so a live table that holds fewer rows than the restore shows up as `LiveBehindRestore`. Live may legitimately be ahead of an older snapshot. Any failure marks the run failed.
 
 ## Switching from demo/sandbox to real data
 
