@@ -64,14 +64,14 @@ public sealed class JobTraceTests
         var logger = new ScopeCapturingLogger();
         string? baggageSeen = null;
 
-        await JobTrace.RunAsync("ScheduledSyncJob", "fire-1", 2, logger, _ =>
+        await JobTrace.RunAsync("TraceTestSyncJob", "fire-1", 2, logger, _ =>
         {
             using var inner = child.StartActivity("db command");
             baggageSeen = Activity.Current?.GetBaggageItem(JobTrace.CorrelationKey);
             return ValueTask.CompletedTask;
         }, CancellationToken.None);
 
-        var job = stopped.Single(a => a.OperationName == "job ScheduledSyncJob");
+        var job = stopped.Single(a => a.OperationName == "job TraceTestSyncJob");
         var db = stopped.Single(a => a.OperationName == "db command");
         job.Parent.Should().BeNull("a run is a root span");
         db.TraceId.Should().Be(job.TraceId, "work done inside the run is part of the run's trace");
@@ -87,11 +87,11 @@ public sealed class JobTraceTests
         var stopped = new List<Activity>();
         using var listener = Listen(stopped);
 
-        var act = async () => await JobTrace.RunAsync("ScheduledBackupJob", "fire-2", 1, NullLogger.Instance,
+        var act = async () => await JobTrace.RunAsync("TraceTestBackupJob", "fire-2", 1, NullLogger.Instance,
             _ => throw new InvalidOperationException("boom"), CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
-        stopped.Single(a => a.OperationName == "job ScheduledBackupJob").Status.Should().Be(ActivityStatusCode.Error);
+        stopped.Single(a => a.OperationName == "job TraceTestBackupJob").Status.Should().Be(ActivityStatusCode.Error);
     }
 
     [Fact]
@@ -106,12 +106,11 @@ public sealed class JobTraceTests
             .AddSingleton<IConfiguration>(new ConfigurationBuilder().Build())
             .BuildServiceProvider();
 
-        await JobTrace.RunAsync("ScheduledHomeAssistantJob", "fire-3", 1, NullLogger.Instance,
+        await JobTrace.RunAsync("TraceTestHaJob", "fire-3", 1, NullLogger.Instance,
             ct => new ValueTask(TenantFanOut.ForEachTenantAsync(services, NullLogger.Instance, (_, _) => Task.CompletedTask, ct)), CancellationToken.None);
 
-        var job = stopped.Single(s => s.OperationName == "job ScheduledHomeAssistantJob");
-        var tenants = stopped.Where(s => s.OperationName == "tenant work").ToList();
+        var job = stopped.Single(s => s.OperationName == "job TraceTestHaJob");
+        var tenants = stopped.Where(s => s.OperationName == "tenant work" && s.TraceId == job.TraceId).ToList();
         tenants.Select(t => t.GetTagItem("tenant.id")).Should().BeEquivalentTo(new object[] { a.ToString(), b.ToString() });
-        tenants.Should().OnlyContain(t => t.TraceId == job.TraceId);
     }
 }
