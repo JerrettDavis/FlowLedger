@@ -36,6 +36,7 @@ WORKDIR /src
 
 # Copy the full source (everything not excluded by .dockerignore)
 COPY src/ src/
+COPY BannedSymbols.txt BannedSymbols.txt
 
 RUN dotnet publish src/FlowLedger.Api/FlowLedger.Api.csproj \
         --no-restore \
