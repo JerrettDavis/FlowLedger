@@ -96,6 +96,23 @@ public sealed class ActivityAlertRulesTests
         alerts[0].DedupeKey.Should().Be($"low_balance:{low.Id}:2026-11-20");
     }
 
+    [Fact]
+    public void A_low_account_behind_an_unfinished_goal_alerts_once_naming_its_goals_even_when_not_liquid()
+    {
+        var liquid = new BalanceInput(Guid.NewGuid(), "Savings", 40m, true);
+        var brokerage = new BalanceInput(Guid.NewGuid(), "Brokerage", 60m, false);
+        var plain = new BalanceInput(Guid.NewGuid(), "Wallet", 20m, false);
+        var goals = new Dictionary<Guid, IReadOnlyList<string>> { [liquid.Id] = ["Trip", "Car"], [brokerage.Id] = ["House"] };
+
+        var alerts = ActivityAlertRules.Build(Today, [], NoTransfers, [liquid, brokerage, plain], NoCategories, goalsByAccount: goals)
+            .Where(a => a.Kind == ActivityAlertKinds.LowBalance).ToList();
+
+        alerts.Select(a => a.Subject).Should().BeEquivalentTo(["Savings", "Brokerage"], "one alert per account, none for the unlinked non-liquid wallet");
+        alerts.Single(a => a.Subject == "Savings").Detail.Should().Contain("goals \"Trip\", \"Car\"");
+        alerts.Single(a => a.Subject == "Brokerage").Detail.Should().Contain("goal \"House\"");
+        alerts.Single(a => a.Subject == "Savings").DedupeKey.Should().Be($"low_balance:{liquid.Id}:2026-11-20");
+    }
+
     [Theory]
     [InlineData(500, 120, true, 880)]
     [InlineData(500, 620, true, 500)]

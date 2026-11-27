@@ -136,7 +136,8 @@ public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, deci
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
 
-public sealed record GoalDto(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete, DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0);
+public sealed record GoalDto(Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete, DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0,
+    Guid? LinkedAccountId = null, string? LinkedAccountName = null, decimal? CurrentAmount = null, decimal? AccountMonthlyTrend = null);
 
 public sealed record DebtRowDto(string Name, decimal Balance, decimal AnnualRatePercent, decimal MinimumPayment);
 
@@ -146,7 +147,7 @@ public sealed record PayoffPlanDto(string Strategy, bool Feasible, int Months, d
 
 public sealed record DebtPlanDto(PayoffPlanDto Avalanche, PayoffPlanDto Snowball);
 
-public sealed record AlertDto(string Severity, string Title, string Detail);
+public sealed record AlertDto(string Severity, string Title, string Detail, string? Kind = null);
 
 public sealed record DuplicateScanDto(int Total, int AutoMergeable, List<DuplicateSuggestionDto> Suggestions);
 

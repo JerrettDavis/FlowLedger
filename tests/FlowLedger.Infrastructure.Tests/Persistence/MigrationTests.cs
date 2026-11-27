@@ -27,6 +27,7 @@ public sealed class MigrationTests : IAsyncLifetime
     private const string AccountMode = "20261119030000_AddAccountModeAndHiddenTransactions";
     private const string BeforeCompositeFks = "20261126162838_MoveDuplicatesToEf";
     private const string CompositeFks = "20261126163503_AddCompositeTenantForeignKeys";
+    private const string GoalLinkedAccount = "20261127142646_AddGoalLinkedAccount";
 
     private static readonly Guid Tenant = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
@@ -375,7 +376,31 @@ public sealed class MigrationTests : IAsyncLifetime
         await ExecAsync(cs, $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = '{CompositeFks}'");
         var again = () => MigrateToAsync(cs, null);
         await again.Should().NotThrowAsync();
-        (await ScalarAsync<long>(cs, "SELECT count(*) FROM pg_constraint WHERE conname ~ '^fk_.*_tenant$'")).Should().Be(10);
+        // 10 from the composite-FK migration plus savings_goals.linked_account_id (#70).
+        (await ScalarAsync<long>(cs, "SELECT count(*) FROM pg_constraint WHERE conname ~ '^fk_.*_tenant$'")).Should().Be(11);
+    }
+
+    [DockerFact]
+    public async Task Goal_linked_account_migration_is_idempotent_and_keeps_the_link_inside_the_tenant()
+    {
+        var cs = await NewDatabaseAsync();
+        await MigrateToAsync(cs, null);
+
+        // Re-apply it over an existing column and constraint: every statement must be a no-op.
+        await ExecAsync(cs, $"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = '{GoalLinkedAccount}'");
+        var again = () => MigrateToAsync(cs, null);
+        await again.Should().NotThrowAsync();
+        (await ScalarAsync<long>(cs, "SELECT count(*) FROM pg_constraint WHERE conname = 'fk_savings_goals_linked_account_tenant' AND convalidated")).Should().Be(1);
+
+        // A goal may link to an account of its own tenant, may stay unlinked, and may not point at another tenant's account.
+        var mine = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        await InsertRowAsync(cs, "accounts", new() { ["id"] = mine, ["tenant_id"] = Tenant, ["name"] = "Mine", ["account_type"] = "Savings" });
+        await InsertRowAsync(cs, "accounts", new() { ["id"] = other, ["tenant_id"] = OtherTenant, ["name"] = "Theirs", ["account_type"] = "Savings" });
+        await InsertRowAsync(cs, "savings_goals", new() { ["tenant_id"] = Tenant, ["id"] = Guid.NewGuid(), ["name"] = "Linked", ["target_amount"] = 100m, ["saved_amount"] = 0m, ["linked_account_id"] = mine });
+        await InsertRowAsync(cs, "savings_goals", new() { ["tenant_id"] = Tenant, ["id"] = Guid.NewGuid(), ["name"] = "Unlinked", ["target_amount"] = 100m, ["saved_amount"] = 0m });
+        var crossTenant = () => InsertRowAsync(cs, "savings_goals", new() { ["tenant_id"] = Tenant, ["id"] = Guid.NewGuid(), ["name"] = "Stolen", ["target_amount"] = 100m, ["saved_amount"] = 0m, ["linked_account_id"] = other });
+        await crossTenant.Should().ThrowAsync<Exception>();
     }
 
     [DockerFact]

@@ -12,7 +12,7 @@ else if (_alerts is { Count: > 0 })
     <div class="mb-4" role="region" aria-label="Alerts">
         @foreach (var a in _alerts)
         {
-            <MudAlert Severity="@(a.Severity == "error" ? Severity.Error : Severity.Warning)" Dense="true" Class="mb-1">
+            <MudAlert Severity="@(a.Severity switch { "error" => Severity.Error, "info" => Severity.Info, _ => Severity.Warning })" Dense="true" Class="mb-1">
                 <strong>@a.Title</strong> — @a.Detail
             </MudAlert>
         }

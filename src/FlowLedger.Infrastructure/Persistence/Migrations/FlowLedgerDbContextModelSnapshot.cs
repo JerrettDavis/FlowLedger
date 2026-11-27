@@ -859,6 +859,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("LinkedAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_account_id");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")

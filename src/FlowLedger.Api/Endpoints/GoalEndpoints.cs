@@ -10,26 +10,29 @@ internal static class GoalEndpoints
 {
     internal sealed record GoalStatus(
         Guid Id, string Name, decimal TargetAmount, decimal SavedAmount, decimal Remaining, double PercentComplete,
-        DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0);
+        DateOnly? TargetDate, decimal? MonthlyNeeded, bool Complete, uint Version = 0,
+        Guid? LinkedAccountId = null, string? LinkedAccountName = null, decimal? CurrentAmount = null, decimal? AccountMonthlyTrend = null);
 
     internal static IEndpointRouteBuilder MapGoalEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/goals").WithTags("Goals").RequireRateLimiting("api");
 
-        group.MapGet("/", async (IGoalStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapGet("/", async (GetGoalStatusesHandler handler, TimeProvider clock, CancellationToken ct) =>
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var goals = (await store.ListAsync(tenant.TenantId, ct)).Select(g =>
+            var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+            var goals = (await handler.HandleAsync(ct)).Select(g =>
             {
-                var remaining = Math.Max(0, g.TargetAmount - g.SavedAmount);
+                // Progress is measured on CurrentAmount: the linked account's balance when the goal is linked, else the saved amount.
+                var remaining = Math.Max(0, g.TargetAmount - g.CurrentAmount);
                 return new GoalStatus(g.Id, g.Name, g.TargetAmount, g.SavedAmount, remaining,
-                    (double)Math.Min(100m, g.SavedAmount / g.TargetAmount * 100m), g.TargetDate,
-                    GoalMath.MonthlyNeeded(remaining, g.TargetDate, today), remaining == 0, g.Version);
+                    (double)Math.Min(100m, g.CurrentAmount / g.TargetAmount * 100m), g.TargetDate,
+                    GoalMath.MonthlyNeeded(remaining, g.TargetDate, today), remaining == 0, g.Version,
+                    g.LinkedAccountId, g.LinkedAccountName, g.CurrentAmount, g.AccountMonthlyTrend);
             }).ToList();
             return Results.Ok(goals);
         })
         .WithName("ListGoals")
-        .WithSummary("Savings goals with progress");
+        .WithSummary("Savings goals with progress (a goal linked to an account is measured on that account's balance)");
 
         group.MapPut("/", async (
             [FromBody] SaveGoalRequest r, IValidator<SaveGoalRequest> validator, SaveGoalHandler handler,

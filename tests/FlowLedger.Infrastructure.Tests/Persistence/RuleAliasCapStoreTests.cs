@@ -96,7 +96,8 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         await budgets.HandleAsync("Cat1", 99m);
 
         var goals = new FlowLedger.Application.Features.Goals.SaveGoalHandler(
-            new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, tenantContext), tenantContext);
+            new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, tenantContext),
+            new FlowLedger.Infrastructure.Persistence.Repositories.AccountRepository(db), tenantContext);
         Guid first = default;
         for (var i = 0; i < FlowLedger.Application.Features.Goals.GoalLimits.MaxGoals; i++)
         {

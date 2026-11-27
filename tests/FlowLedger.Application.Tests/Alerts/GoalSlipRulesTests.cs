@@ -11,9 +11,9 @@ public sealed class GoalSlipRulesTests
     private static readonly Guid Checking = Guid.NewGuid();
     private static readonly IReadOnlySet<Guid> NoTransfers = new HashSet<Guid>();
 
-    private static TransactionDto Tx(bool credit, decimal amount, int daysAgo)
+    private static TransactionDto Tx(bool credit, decimal amount, int daysAgo, Guid? account = null)
     {
-        var b = TransactionDtoBuilder.A().OnAccount(Checking).WithAmount(amount).WithStatus("Posted").On(Today.AddDays(-daysAgo));
+        var b = TransactionDtoBuilder.A().OnAccount(account ?? Checking).WithAmount(amount).WithStatus("Posted").On(Today.AddDays(-daysAgo));
         return (credit ? b.Credit() : b.Debit()).Build();
     }
 
@@ -76,6 +76,91 @@ public sealed class GoalSlipRulesTests
 
         GoalSlipRules.Build(Today, [a], 1000m).Should().BeEmpty();
         GoalSlipRules.Build(Today, [a, b], 1000m).Select(x => x.Subject).Should().BeEquivalentTo(["A", "B"]);
+    }
+
+    // --- #70: a goal linked to an account uses THAT account's balance and 90-day trend instead of the household pace ---
+
+    private static GoalPace Linked(string name, decimal target, decimal balance, decimal? trend, DateOnly? date)
+    {
+        var account = Guid.NewGuid();
+        return new GoalPace(Guid.NewGuid(), name, target, Math.Max(0m, balance), date, new LinkedAccountPace(account, "Savings", balance, trend));
+    }
+
+    [Fact]
+    public void A_linked_goal_is_projected_on_its_accounts_own_trend_not_the_household_surplus()
+    {
+        var onTrack = Linked("Fund", 12_000m, 6_000m, 1_000m, Today.AddMonths(8));  // 6 months at 1000: fine, whatever the household does
+        var slipping = Linked("Boat", 12_000m, 6_000m, 250m, Today.AddMonths(8));  // 24 months at 250: late
+
+        var alerts = GoalSlipRules.Build(Today, [onTrack, slipping], 100_000m);
+
+        alerts.Should().ContainSingle().Which.Subject.Should().Be("Boat");
+        alerts[0].Detail.Should().Contain("Savings's 90-day trend").And.Contain("6,000");
+        alerts[0].Amount.Should().Be(6_000m, "the amount is what the account still has to gain");
+    }
+
+    [Fact]
+    public void A_linked_goal_does_not_use_up_the_household_surplus_of_the_other_goals()
+    {
+        var linked = Linked("Fund", 50_000m, 0m, 5_000m, Today.AddMonths(24));
+        var plain = Goal("Trip", 5_000m, 0m, Today.AddMonths(6)); // alone it gets the full 1000: 5 months, fine
+
+        GoalSlipRules.Build(Today, [linked, plain], 1000m).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_linked_goal_with_a_falling_account_slips_and_a_funded_one_does_not()
+    {
+        GoalSlipRules.Build(Today, [Linked("Fund", 1_000m, 100m, -50m, Today.AddMonths(3))], null).Should().ContainSingle()
+            .Which.Detail.Should().Contain("will not finish");
+        GoalSlipRules.Build(Today, [Linked("Done", 1_000m, 1_200m, -50m, Today.AddMonths(3))], null).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_linked_goal_with_no_trend_falls_back_to_the_household_pace_on_the_account_balance()
+    {
+        var goal = Linked("Fund", 12_000m, 3_000m, null, Today.AddMonths(6)); // 9000 left at 1000/month: 9 months, late
+
+        var alert = GoalSlipRules.Build(Today, [goal], 1000m).Should().ContainSingle().Subject;
+
+        alert.Detail.Should().Contain("current pace").And.NotContain("90-day");
+        alert.Amount.Should().Be(9_000m);
+        GoalSlipRules.Build(Today, [goal], null).Should().BeEmpty("no pace at all can be claimed");
+    }
+
+    [Fact]
+    public void Resolve_takes_progress_from_the_account_balance_and_the_pace_from_its_trend()
+    {
+        var account = Guid.NewGuid();
+        var linkedGoal = new FlowLedger.Application.Features.Goals.GoalRow(Guid.NewGuid(), "Fund", 10_000m, 100m, Today.AddMonths(12), 0, account);
+        var plainGoal = new FlowLedger.Application.Features.Goals.GoalRow(Guid.NewGuid(), "Trip", 2_000m, 400m, null);
+        var missing = new FlowLedger.Application.Features.Goals.GoalRow(Guid.NewGuid(), "Orphan", 2_000m, 700m, null, 0, Guid.NewGuid());
+        BalanceInput[] balances = [new(account, "Savings", 2_500m, true)];
+        List<TransactionDto> history = [.. Enumerable.Range(0, 4).Select(m => Tx(true, 600m, 5 + m * 30, account))];
+
+        var paces = GoalPaces.Resolve(Today, [linkedGoal, plainGoal, missing], balances, history);
+
+        paces[0].Saved.Should().Be(2_500m, "the linked account's balance replaces the hand-entered 100");
+        paces[0].Linked!.MonthlyTrend.Should().Be(600m, "three 600 credits fall inside the last 90 days, over three months");
+        paces[1].Saved.Should().Be(400m);
+        paces[1].Linked.Should().BeNull();
+        paces[2].Saved.Should().Be(700m, "a link to an account that is gone keeps the hand-entered amount");
+        paces[2].Linked.Should().BeNull();
+    }
+
+    [Fact]
+    public void Unfinished_goals_are_grouped_by_their_account_for_the_low_balance_alert()
+    {
+        var shared = Guid.NewGuid();
+        IReadOnlyList<GoalPace> paces =
+        [
+            new(Guid.NewGuid(), "B", 1000m, 10m, null, new LinkedAccountPace(shared, "Savings", 10m, null)),
+            new(Guid.NewGuid(), "A", 1000m, 10m, null, new LinkedAccountPace(shared, "Savings", 10m, null)),
+            new(Guid.NewGuid(), "Done", 5m, 10m, null, new LinkedAccountPace(shared, "Savings", 10m, null)),
+            Goal("Plain", 1000m, 0m, null),
+        ];
+
+        GoalPaces.UnfinishedByAccount(paces).Should().ContainSingle().Which.Value.Should().Equal("A", "B");
     }
 
     [Fact]

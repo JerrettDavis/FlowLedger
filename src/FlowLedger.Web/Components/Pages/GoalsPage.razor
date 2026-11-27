@@ -30,8 +30,16 @@ else
                           Error="@(_feedback.Has("name") || _feedback.Has("goal"))" ErrorText="@(_feedback.For("name") ?? _feedback.For("goal"))" />
             <MudNumericField T="decimal" Immediate="true" Value="_target" ValueChanged="OnTargetChanged" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense"
                              Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Target" />
+            <MudSelect T="Guid?" @bind-Value="_linkedAccountId" ToStringFunc="@AccountName" Label="Track with account (optional)" Style="min-width:min(240px,100%)" Margin="Margin.Dense" Clearable="true"
+                       HelperText="@(_linkedAccountId is null ? null : "Progress follows this account's balance.")" aria-label="Track with account"
+                       Error="@_feedback.Has("linkedAccountId")" ErrorText="@_feedback.For("linkedAccountId")">
+                @foreach (var a in _accounts)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)a.Id)">@a.Name (@Format.Money(a.BalanceAmount))</MudSelectItem>
+                }
+            </MudSelect>
             <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense"
-                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Saved so far" />
+                             Disabled="@(_linkedAccountId is not null)" Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Saved so far" />
             <MudDatePicker @bind-Date="_date" Label="Target date (optional)" Margin="Margin.Dense" Style="max-width:200px" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Goal(_name, _target) is not null)" aria-describedby="goal-reason">Save goal</MudButton>
             @if (_editId is not null)
@@ -56,7 +64,7 @@ else
                         <MudText Typo="Typo.subtitle2">@g.Name @(g.Complete ? "🎉" : "")</MudText>
                         <div class="d-flex align-center gap-2">
                             <MudText Typo="Typo.body2" Class="fl-num">
-                                @Format.Money(g.SavedAmount) of @Format.Money(g.TargetAmount)
+                                @Format.Money(g.CurrentAmount ?? g.SavedAmount) of @Format.Money(g.TargetAmount)
                                 @(g.TargetDate is { } d ? $" · by {d:MMM yyyy}" : "")
                                 @(g.MonthlyNeeded is { } m ? $" · {Format.Money(m)}/mo needed" : "")
                             </MudText>
@@ -64,6 +72,12 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(g))" aria-label="@($"Remove {g.Name}")" />
                         </div>
                     </div>
+                    @if (g.LinkedAccountName is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="fl-muted fl-num">
+                            Tracking @g.LinkedAccountName@(g.AccountMonthlyTrend is { } t ? $" · {(t >= 0 ? "+" : "")}{Format.Money(t)}/mo over the last 90 days" : " · not enough history for a trend yet")
+                        </MudText>
+                    }
                     <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1"
                                        aria-valuetext="@($"{ChartSummary.ProgressText(g.Name, g.PercentComplete, "complete")}{(g.Complete ? ", goal reached" : "")}")" />
                 </div>
@@ -81,6 +95,11 @@ else
     private decimal _target;
     private decimal _saved;
     private DateTime? _date;
+    private Guid? _linkedAccountId;
+
+    // The select shows what ToStringFunc returns for the chosen value, so map the id to the account's name (never the raw GUID).
+    private string AccountName(Guid? id) => id is { } v ? _accounts.FirstOrDefault(a => a.Id == v)?.Name ?? "" : "";
+    private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private readonly FormFeedback _feedback = new();
 
     // Editing a field clears the previous server verdict, so a stale message never sits next to a corrected value.
@@ -117,18 +136,27 @@ else
     {
         _loading = true;
         _goals = await ApiClient.GetGoalsAsync();
+        try
+        {
+            _accounts = (await ApiClient.GetAccountsAsync()).Where(a => a.IsActive).ToList();
+        }
+        catch (Exception ex) when (ex is FlowLedger.Web.ApiClient.ApiClientException or HttpRequestException or TaskCanceledException)
+        {
+            _accounts = []; // the picker is optional: goals still work without it
+        }
+
         _loading = false;
     }
 
     private void Edit(FlowLedger.Web.ApiClient.GoalDto g)
     {
-        _editId = g.Id; _editVersion = g.Version; _name = g.Name; _target = g.TargetAmount; _saved = g.SavedAmount;
+        _editId = g.Id; _editVersion = g.Version; _name = g.Name; _target = g.TargetAmount; _saved = g.SavedAmount; _linkedAccountId = g.LinkedAccountId;
         _date = g.TargetDate?.ToDateTime(TimeOnly.MinValue);
     }
 
     private void Reset()
     {
-        _editId = null; _editVersion = null; _name = null; _target = 0; _saved = 0; _date = null;
+        _editId = null; _editVersion = null; _name = null; _target = 0; _saved = 0; _date = null; _linkedAccountId = null;
         _feedback.Clear();
     }
 
@@ -137,7 +165,7 @@ else
         _feedback.Clear();
         try
         {
-            await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null, _editVersion);
+            await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null, _editVersion, _linkedAccountId);
             Snackbar.Add("Goal saved.", Severity.Success);
             Reset();
             await LoadAsync();

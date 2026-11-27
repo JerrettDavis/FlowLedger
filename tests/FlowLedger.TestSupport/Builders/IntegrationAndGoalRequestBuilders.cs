@@ -11,6 +11,7 @@ public sealed class SaveGoalRequestBuilder
     private decimal _targetAmount = 1000m;
     private decimal _savedAmount;
     private DateOnly? _targetDate;
+    private Guid? _linkedAccountId;
 
     public static SaveGoalRequestBuilder A() => new();
 
@@ -20,7 +21,9 @@ public sealed class SaveGoalRequestBuilder
     public SaveGoalRequestBuilder Saved(decimal savedAmount) { _savedAmount = savedAmount; return this; }
     public SaveGoalRequestBuilder By(DateOnly? targetDate) { _targetDate = targetDate; return this; }
 
-    public SaveGoalRequest Build() => new(_id, _name, _targetAmount, _savedAmount, _targetDate);
+    public SaveGoalRequestBuilder LinkedTo(Guid? accountId) { _linkedAccountId = accountId; return this; }
+
+    public SaveGoalRequest Build() => new(_id, _name, _targetAmount, _savedAmount, _targetDate, _linkedAccountId);
 
     public static implicit operator SaveGoalRequest(SaveGoalRequestBuilder builder) => builder.Build();
 }

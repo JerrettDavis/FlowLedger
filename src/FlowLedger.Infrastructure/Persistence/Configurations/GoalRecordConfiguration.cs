@@ -16,6 +16,7 @@ internal sealed class GoalRecordConfiguration : IEntityTypeConfiguration<GoalRec
         builder.Property(r => r.TargetAmount).HasColumnName("target_amount").HasPrecision(19, 4);
         builder.Property(r => r.SavedAmount).HasColumnName("saved_amount").HasPrecision(19, 4);
         builder.Property(r => r.TargetDate).HasColumnName("target_date").HasColumnType("date");
+        builder.Property(r => r.LinkedAccountId).HasColumnName("linked_account_id");
         builder.Property(r => r.RowVersion).HasColumnName("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
         builder.Property(r => r.UpdatedUtc).HasColumnName("updated_utc").HasDefaultValueSql("now()");
     }
