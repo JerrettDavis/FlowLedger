@@ -42,7 +42,8 @@ public interface ICategorizationStore
 }
 
 public sealed record CategorizationResult(
-    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
+    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0,
+    bool Partial = false);   // true: more history exists than the processing cap, so the oldest rows were not considered
 
 /// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
 public sealed class CategorizationOptions
@@ -99,7 +100,7 @@ public sealed class CategorizationService(
         var uncategorized = real.Where(t => t.CategoryId is null).ToList();
         if (uncategorized.Count == 0)
         {
-            return new CategorizationResult(0, 0, 0, 0, 0);
+            return new CategorizationResult(0, 0, 0, 0, 0, Partial: TransactionQuota.IsPartial(txs.Count));
         }
 
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
@@ -222,7 +223,7 @@ public sealed class CategorizationService(
 
         await categories.SaveChangesAsync(ct);
         await store.SaveChangedAsync(changedRows, ct);
-        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm);
+        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, TransactionQuota.IsPartial(txs.Count));
     }
 
     /// <summary>Fixed confidence shown for a language-model pick (it has no calibrated probability).</summary>

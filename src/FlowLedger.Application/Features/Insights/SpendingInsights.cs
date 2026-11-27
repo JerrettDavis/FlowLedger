@@ -32,7 +32,8 @@ public sealed record BreakdownResult(
     IReadOnlyList<TrendPoint> Trend,
     IReadOnlyList<BreakdownTransaction> Transactions,
     int TransfersExcluded,
-    decimal NonSpendingExcluded = 0);
+    decimal NonSpendingExcluded = 0,
+    bool Partial = false);   // true: the period holds more rows than the processing cap, so the oldest were left out
 
 /// <summary>
 /// Pure spending/income breakdown (Mint-style). Transfers between own accounts are excluded, splits contribute one row per
@@ -265,10 +266,11 @@ public sealed class GetSpendingBreakdownHandler(
             ? await repo.ListAllAsync(MaxTransactions, ct)
             : await repo.ListAsync(null, q.From.AddDays(-span - TransferPadDays), q.To.AddDays(TransferPadDays), 0, MaxTransactions, ct);
         var dtos = loaded.Select(TransactionMapper.ToDto).ToList();
-        return SpendingInsightsAnalyzer.Analyze(
+        var result = SpendingInsightsAnalyzer.Analyze(
             q, dtos, cats,
             accountEntities.ToDictionary(a => a.Id, a => a.Name),
             accountEntities.ToDictionary(a => a.Id, a => a.AccountType.ToString()),
             await AccountVisibility.ExcludedIdsAsync(accounts, q.AccountIds, ct));
+        return TransactionQuota.IsPartial(loaded.Count) ? result with { Partial = true } : result;
     }
 }
