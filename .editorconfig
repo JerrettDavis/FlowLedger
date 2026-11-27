@@ -50,7 +50,8 @@ dotnet_diagnostic.CA1001.severity = suggestion
 # ---------------------------------------------------------------------------
 # Meziantou.Analyzer (#113): pinned in Directory.Packages.props, referenced for production projects only (Directory.Build.props).
 # A CURATED set. Measured against this tree (3.0.340): the rules below are ON because each protects a runtime property and the tree is
-# clean for them; every other rule that reports here is parked with its reason. Flip one on only together with its cleanup.
+# clean for them; every other rule is parked at none in eng/meziantou.globalconfig (the package's none.editorconfig plus the ON list), and
+# the rules that actually report here carry their own reason below, which overrides that file. Flip one on only together with its cleanup.
 #   ON  MA0009 regex match timeout (ReDoS)            MA0011 IFormatProvider / culture on Parse and ToLower
 #       MA0023 RegexOptions.ExplicitCapture           MA0054 keep the inner exception when rethrowing
 #       MA0061 override must not change defaults      MA0074 explicit StringComparison on path matching
