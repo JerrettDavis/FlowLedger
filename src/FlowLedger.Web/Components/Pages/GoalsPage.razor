@@ -30,7 +30,7 @@ else
                           Error="@(_feedback.Has("name") || _feedback.Has("goal"))" ErrorText="@(_feedback.For("name") ?? _feedback.For("goal"))" />
             <MudNumericField T="decimal" Immediate="true" Value="_target" ValueChanged="OnTargetChanged" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense"
                              Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Target" />
-            <MudSelect T="Guid?" @bind-Value="_linkedAccountId" Label="Track with account (optional)" Style="min-width:min(240px,100%)" Margin="Margin.Dense" Clearable="true"
+            <MudSelect T="Guid?" @bind-Value="_linkedAccountId" ToStringFunc="@AccountName" Label="Track with account (optional)" Style="min-width:min(240px,100%)" Margin="Margin.Dense" Clearable="true"
                        HelperText="@(_linkedAccountId is null ? null : "Progress follows this account's balance.")" aria-label="Track with account"
                        Error="@_feedback.Has("linkedAccountId")" ErrorText="@_feedback.For("linkedAccountId")">
                 @foreach (var a in _accounts)
@@ -75,7 +75,7 @@ else
                     @if (g.LinkedAccountName is not null)
                     {
                         <MudText Typo="Typo.caption" Class="fl-muted fl-num">
-                            Tracking @g.LinkedAccountName@(g.AccountMonthlyTrend is { } t ? $" · {(t >= 0 ? "+" : "")}{Format.Money(t)}/mo over the last 90 days" : " · not enough history for a trend yet")
+                            Tracking @g.LinkedAccountName@(g.AccountMonthlyTrend is { } t ? $" Â· {(t >= 0 ? "+" : "")}{Format.Money(t)}/mo over the last 90 days" : " Â· not enough history for a trend yet")
                         </MudText>
                     }
                     <MudProgressLinear Value="@g.PercentComplete" Color="@(g.Complete ? Color.Success : Color.Primary)" Size="Size.Medium" Class="mt-1"
@@ -96,6 +96,9 @@ else
     private decimal _saved;
     private DateTime? _date;
     private Guid? _linkedAccountId;
+
+    // The select shows what ToStringFunc returns for the chosen value, so map the id to the account's name (never the raw GUID).
+    private string AccountName(Guid? id) => id is { } v ? _accounts.FirstOrDefault(a => a.Id == v)?.Name ?? "" : "";
     private List<FlowLedger.Contracts.AccountDto> _accounts = [];
     private readonly FormFeedback _feedback = new();
 

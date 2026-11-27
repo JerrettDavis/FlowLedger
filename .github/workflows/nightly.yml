@@ -133,7 +133,7 @@ jobs:
       - name: Run TLC on SyncLock (fails on any invariant or property violation)
         working-directory: docs/architecture/inv-09-sync-lock
         run: |
-          java -cp "$RUNNER_TEMP/tla/tla2tools.jar" tlc2.TLC -config SyncLock.cfg -workers auto -metadir "$RUNNER_TEMP/tlc-states" SyncLock.tla | tee "$RUNNER_TEMP/tlc.log"
+          java -cp "$RUNNER_TEMP/tla/tla2tools.jar" tlc2.TLC -config SyncLock.cfg -metadir "$RUNNER_TEMP/tlc-states" SyncLock.tla | tee "$RUNNER_TEMP/tlc.log"
           grep -q "Model checking completed. No error has been found." "$RUNNER_TEMP/tlc.log"
 
   report-failure:

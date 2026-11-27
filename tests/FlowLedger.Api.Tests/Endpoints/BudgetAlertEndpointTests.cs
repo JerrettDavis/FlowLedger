@@ -178,6 +178,21 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     [Fact]
+    public async Task A_goal_cannot_be_linked_to_another_tenants_account()
+    {
+        var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var foreign = await other.PostAsJsonAsync(
+            "/api/accounts", FlowLedger.TestSupport.Builders.CreateAccountRequestBuilder.A().Named("Foreign").OfType("Savings").StartingAt(10m).Build());
+        foreign.EnsureSuccessStatusCode();
+        var foreignId = (await foreign.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var response = await _client.PutAsJsonAsync("/api/goals", new { name = "Steal", targetAmount = 1000m, savedAmount = 0m, linkedAccountId = foreignId });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, "another tenant's account looks like a missing one, never a server error");
+        (await _client.GetStringAsync("/api/goals")).Should().NotContain("Steal");
+    }
+
+    [Fact]
     public async Task A_goal_can_be_unlinked_again_and_goes_back_to_its_saved_amount()
     {
         var account = await CreateAccountAsync("Temp Link", 400m);

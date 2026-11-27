@@ -15,8 +15,6 @@ public sealed class GetAlertsHandler(
     EffectiveBudgetService budgets, IGoalStore goals, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock,
     ITransactionRepository? transactions = null, IAccountRepository? accounts = null)
 {
-    private const int HistoryDays = 200;
-
     public async Task<IReadOnlyList<Alert>> HandleAsync(CancellationToken ct = default)
     {
         var budgetRows = await budgets.ListAsync(null, ct);
@@ -57,7 +55,7 @@ public sealed class GetAlertsHandler(
             return null;
         }
 
-        return (await transactions.ListForAccountsAsync(visible, today.AddDays(-HistoryDays), today, ct)).Select(TransactionMapper.ToDto).ToList();
+        return (await transactions.ListForAccountsAsync(visible, today.AddDays(-LinkedAccountTrend.HistoryDays), today, ct)).Select(TransactionMapper.ToDto).ToList();
     }
 
     private static IEnumerable<Alert> Activity(

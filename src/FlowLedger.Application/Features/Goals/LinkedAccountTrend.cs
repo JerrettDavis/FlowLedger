@@ -13,6 +13,9 @@ internal static class LinkedAccountTrend
     /// <summary>The window the trend looks at.</summary>
     public const int TrendDays = 90;
 
+    /// <summary>How far back callers load transactions for the trend (the trend window plus slack). Shared so the goals page and the alerts agree.</summary>
+    public const int HistoryDays = 200;
+
     /// <summary>The window expressed in months, the divisor for the monthly figure.</summary>
     public const int TrendMonths = 3;
 

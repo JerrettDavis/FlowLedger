@@ -34,7 +34,7 @@ public sealed class GetGoalStatusesHandler(
             .Select(a => a.AccountId).ToList();
         IReadOnlyList<TransactionDto> history = linkedVisible.Count == 0
             ? []
-            : (await transactions.ListForAccountsAsync(linkedVisible, today.AddDays(-(LinkedAccountTrend.TrendDays + 10)), today, ct)).Select(TransactionMapper.ToDto).ToList();
+            : (await transactions.ListForAccountsAsync(linkedVisible, today.AddDays(-LinkedAccountTrend.HistoryDays), today, ct)).Select(TransactionMapper.ToDto).ToList();
 
         var paces = GoalPaces.Resolve(today, rows, balances, history).ToDictionary(p => p.Id);
         return rows.Select(g =>
