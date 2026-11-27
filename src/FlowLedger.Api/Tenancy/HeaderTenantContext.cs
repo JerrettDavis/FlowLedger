@@ -40,7 +40,7 @@ public sealed class HeaderTenantContext : ITenantContext
             // single configured household tenant.
             // #135: the id may have been generated for a new install (stored in system_settings and surfaced as Tenancy:LegacyTenantId).
             var householdTenant = tenantOverride.TenantId
-                ?? (configuration is null ? apiOptions.Value.EffectiveTenantId : FlowLedger.Infrastructure.TenancySettings.Legacy(configuration).LegacyTenantId);
+                ?? (configuration is null ? apiOptions.Value.EffectiveTenantId : FlowLedger.ServiceDefaults.MultiUserSettings.ConfiguredLegacyTenant(configuration));
             TenantId = householdTenant;
             UserId = householdTenant;
             return;

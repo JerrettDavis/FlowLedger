@@ -20,6 +20,7 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
     private readonly HttpClient _http;
     private readonly SimpleFinOptions _options;
     private readonly ILogger<SimpleFinFinancialDataProvider> _logger;
+    private readonly TimeProvider _time;
     private Task<SfResponse>? _cached;
     private Task<bool>? _backfill;
     private DateTimeOffset _fetchedAt;
@@ -29,8 +30,9 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
     private const string BackfillMarker = "|bf";
 
     public SimpleFinFinancialDataProvider(
-        HttpClient http, IOptions<SimpleFinOptions> options, ILogger<SimpleFinFinancialDataProvider> logger)
+        HttpClient http, IOptions<SimpleFinOptions> options, ILogger<SimpleFinFinancialDataProvider> logger, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _http = http;
         _options = options.Value;
         _logger = logger;
@@ -90,7 +92,7 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
         var dated = acct.Transactions.Where(SimpleFinMapper.HasUsableDate).ToList();
         var skipped = acct.Transactions.Count - dated.Count;
         var items = dated
-            .Select(t => SimpleFinMapper.ToTransaction(acct, t))
+            .Select(t => SimpleFinMapper.ToTransaction(acct, t, _time))
             .Where(t => t.PostedDate >= floor)
             .OrderBy(t => t.PostedDate)
             .ToList();
@@ -189,7 +191,7 @@ public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvi
     {
         const int window = Window;
         var days = Math.Clamp(_options.HistoryDays, 1, window);
-        var now = DateTimeOffset.UtcNow;
+        var now = _time.GetUtcNow();
         var start = now.AddDays(-days).ToUnixTimeSeconds();
         using var resp = await _http.GetAsync($"accounts?start-date={start}&pending=1", ct).ConfigureAwait(false);
 

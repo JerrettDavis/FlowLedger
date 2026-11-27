@@ -78,12 +78,12 @@ internal static class SimpleFinMapper
     /// <summary>True when the row has a real date (posted, or at least transacted_at); otherwise it would move to "now" on every sync.</summary>
     public static bool HasUsableDate(SfTransaction t) => t.Posted > 0 || t.TransactedAt is > 0;
 
-    public static ProviderTransaction ToTransaction(SfAccount a, SfTransaction t)
+    public static ProviderTransaction ToTransaction(SfAccount a, SfTransaction t, TimeProvider time)
     {
         var currency = ProviderCurrency.Normalize(a.Currency)
             ?? throw new UnknownCurrencyException($"SimpleFIN account {AccountId(a)} reports no usable ISO currency.");
         var pending = t.Pending == true || t.Posted <= 0;
-        var epoch = t.Posted > 0 ? t.Posted : (t.TransactedAt ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var epoch = t.Posted > 0 ? t.Posted : (t.TransactedAt ?? time.GetUtcNow().ToUnixTimeSeconds());
         var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime);
         var desc = string.IsNullOrWhiteSpace(t.Description) ? "UNKNOWN" : t.Description.Trim();
         return new ProviderTransaction(
