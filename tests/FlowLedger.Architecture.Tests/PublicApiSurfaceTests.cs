@@ -1,4 +1,5 @@
 using System.Reflection;
+using FluentAssertions;
 
 namespace FlowLedger.Architecture.Tests;
 
@@ -14,6 +15,25 @@ public sealed class PublicApiSurfaceTests
     [Fact]
     public void Application_public_surface_matches_baseline() =>
         AssertBaseline(typeof(FlowLedger.Application.Abstractions.IDomainEventDispatcher).Assembly);
+
+    /// <summary>
+    /// #121: use-case handlers are internal (the Api and Worker see them through InternalsVisibleTo); only Contracts and the
+    /// ports stay public. The cap can only be lowered: a new public Application type has to displace an existing one or be argued
+    /// in a review that raises it on purpose.
+    /// </summary>
+    private const int ApplicationPublicTypeCap = 304;
+
+    [Fact]
+    public void Application_handlers_are_internal_and_the_public_type_count_stays_capped()
+    {
+        var assembly = typeof(FlowLedger.Application.Abstractions.IDomainEventDispatcher).Assembly;
+        var exported = assembly.GetExportedTypes();
+
+        exported.Where(t => t.IsClass && t.Name.EndsWith("Handler", StringComparison.Ordinal))
+            .Select(t => t.FullName)
+            .Should().BeEmpty("handlers are internal; hosts reach them through InternalsVisibleTo");
+        exported.Length.Should().BeLessThanOrEqualTo(ApplicationPublicTypeCap);
+    }
 
     [Fact]
     public void Infrastructure_public_surface_matches_baseline() =>
