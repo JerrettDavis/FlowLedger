@@ -53,13 +53,23 @@ single-container compose deployment. Two small guarantees are built on one table
   upsert (`last_fire_utc` only ever moves forward). A second replica that fires the same slot, even seconds after the first
   finished (when the lock is free again), is vetoed. A misfired firing is mapped back to the slot it was due for. Retries of a
   slot do not claim again.
-- **Catch-up after downtime.** On startup, each cron job whose latest due slot is newer than its mark is run ONCE (never a burst),
-  through the same claim. The very first start on a database only records the current slot. `Worker:CatchUp:Enabled=false` turns it
-  off.
+- **The claim is a lease, confirmed when the run ends.** The row records `owner`, `claimed_utc` and `completed_utc`; the listener
+  confirms the claim in `TriggerComplete`. A run whose process died never confirms, so once its lease
+  (`Worker:FireGate:LeaseSeconds`, default 600) runs out the slot is reclaimable and the catch-up check re-fires it once. The
+  advisory lock still prevents any overlap with a run that is alive.
+- **Catch-up after downtime, and for abandoned claims.** At startup and then every `Worker:CatchUp:IntervalMinutes` (default 5),
+  each cron job whose latest due slot is newer than its mark, or whose claim for that slot is unconfirmed past its lease, is run
+  ONCE (never a burst), through the same claim. The very first start on a database only records the current slot.
+  `Worker:CatchUp:Enabled=false` turns this off.
+- **If the marks table is unreachable** the claim is retried (`Worker:FireGate:Attempts`, default 3, `RetryDelayMs` 250) and the
+  firing is then SKIPPED (fail closed): every job here has external side effects (provider calls, off-site backup copy, Home
+  Assistant push), and the catch-up check re-fires the slot once the database is back. Set `Worker:FireGate:OnStoreFailure=Run`
+  (or `Worker:FireGate:Jobs:<JobName>:OnStoreFailure=Run`) to prefer a possible duplicate run over a skipped one. Every decision is
+  counted on `flowledger.job.firegate{job,outcome}` (`claimed`, `duplicate`, `store_failed_skipped`, `store_failed_ran`,
+  `complete_failed`); alert on the `store_failed_*` outcomes.
 
-The claim is taken when a run starts, so a run that crashes mid-way is not repeated automatically for that slot (the existing
-retry settings cover failures the job reports; the sync job also has its own per-connection back-off). If the marks table cannot be
-reached the job runs anyway rather than never running.
+A run that fails (throws) still confirms its slot: failures are surfaced by the job history and the retry settings above, not by
+re-claiming the slot.
 
 ## JSON logs
 
