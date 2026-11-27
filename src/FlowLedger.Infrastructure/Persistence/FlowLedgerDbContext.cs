@@ -66,6 +66,10 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<AccountConnectorLinkRecord> AccountConnectorLinks => Set<AccountConnectorLinkRecord>();
     internal DbSet<OutboxMessageRecord> OutboxMessages => Set<OutboxMessageRecord>();
 
+    // Host-wide tables (#154): no tenant column and no query filter; reached only through HostDb.
+    internal DbSet<ProviderApiCallRecord> ProviderApiCalls => Set<ProviderApiCallRecord>();
+    internal DbSet<BackupRunRecord> BackupRuns => Set<BackupRunRecord>();
+
     // ── Constructors ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -114,6 +118,8 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new MergedTransactionRecordConfiguration());
         modelBuilder.ApplyConfiguration(new DuplicateDismissalRecordConfiguration());
         modelBuilder.ApplyConfiguration(new OutboxMessageRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new ProviderApiCallRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new BackupRunRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the

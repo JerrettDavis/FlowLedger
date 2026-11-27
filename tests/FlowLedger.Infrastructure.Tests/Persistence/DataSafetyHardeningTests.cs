@@ -51,7 +51,7 @@ public sealed class DataSafetyHardeningTests : IAsyncLifetime
     public async Task After_import_new_ledger_and_backup_rows_can_still_be_inserted()
     {
         var now = TestClock.Instant;
-        var sourceLedger = new NpgsqlProviderCallLedger(_fixture.ConnectionString);
+        var sourceLedger = new ProviderCallLedger(_fixture.ConnectionString);
         for (var i = 0; i < 3; i++)
         {
             await sourceLedger.RecordAsync(new ProviderCallRecord("MX", "GET", "/users", 200, 5, 10, now));
@@ -69,7 +69,7 @@ public sealed class DataSafetyHardeningTests : IAsyncLifetime
         }
 
         // Without a sequence reset these inserts reuse id 1 and fail with a duplicate key.
-        var targetLedger = new NpgsqlProviderCallLedger(target);
+        var targetLedger = new ProviderCallLedger(target);
         await targetLedger.RecordAsync(new ProviderCallRecord("MX", "GET", "/after-import", 200, 5, 10, now));
         (await targetLedger.CountSinceAsync("MX", now.AddHours(-1))).Should().Be(4);
 

@@ -45,15 +45,12 @@ public sealed class TenantScopeGuardTests
     public void Every_EF_table_has_a_tenant_id_column_or_is_listed_as_global()
     {
         using var ctx = Context();
-        var globalTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            // OpenIddict / identity style tables would be listed here with a reason; none exist in the EF model today.
-        };
+        var globalTables = FlowLedger.Infrastructure.Persistence.HostWideEntities.Tables;
         var offenders = ctx.Model.GetEntityTypes()
             .Where(e => e.GetTableName() is not null && !e.IsOwned())
             .Where(e => e.GetProperties().All(p => p.GetColumnName() != "tenant_id"))
             .Select(e => e.GetTableName()!)
-            .Where(t => !globalTables.Contains(t))
+            .Where(t => !globalTables.ContainsKey(t))
             .Distinct()
             .ToList();
 
@@ -66,8 +63,6 @@ public sealed class TenantScopeGuardTests
     private static readonly Dictionary<string, string> GlobalAdHocTables = new(StringComparer.OrdinalIgnoreCase)
     {
         ["system_settings"] = "host-wide key/value settings",
-        ["provider_api_calls"] = "provider API call accounting for the whole host (cost control)",
-        ["backup_runs"] = "host backup history",
         ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
         ["tenants"] = "the tenant registry itself (#169), keyed by id; erasure keeps its row as the audit record",
         ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
@@ -99,7 +94,6 @@ public sealed class TenantScopeGuardTests
         ["SnapshotImport.cs"] = "whole-database restore, never per tenant",
         ["SnapshotRestoreDrill.cs"] = "whole-database restore drill, never per tenant",
         ["NpgsqlJobRunStore.cs"] = "host-wide background job run history, no tenant column",
-        ["NpgsqlProviderCallLedger.cs"] = "provider API call accounting for the whole host (cost control), no tenant column",
         ["DataEnvironmentGuard.cs"] = "host-wide environment fingerprint in system_settings",
         ["EfTenantErasure.cs"] = "tenant erasure (#169): every DELETE is keyed by the tenant column; the other statements read schema metadata or the tenant registry",
         ["NpgsqlTenantRegistry.cs"] = "the tenant registry (#169) is keyed by id, not tenant_id",
