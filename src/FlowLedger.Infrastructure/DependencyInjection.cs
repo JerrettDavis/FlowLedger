@@ -134,6 +134,9 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddHttpClient<FlowLedger.Application.Features.Strategies.IMarketRateProvider, FlowLedger.Infrastructure.Strategies.FredMarketRateProvider>(c => c.DefaultRequestHeaders.UserAgent.ParseAdd("FlowLedger-RateFetcher/1.0"));
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        // SQL GROUP BY aggregation for the dashboard (#160); the handler falls back to the query engine when this is not registered.
+        services.AddScoped<FlowLedger.Application.Features.Query.ITransactionAggregateStore, EfTransactionAggregateStore>();
+        services.AddScoped<FlowLedger.Application.Features.Query.TransactionAggregates>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();
