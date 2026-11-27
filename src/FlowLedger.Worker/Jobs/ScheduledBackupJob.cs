@@ -6,7 +6,7 @@ namespace FlowLedger.Worker.Jobs;
 
 /// <summary>Daily verified backup: snapshot, restore drill, encrypted off-site copy. Failures are recorded and visible in the UI.</summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledBackupJob : IJob
+internal sealed class ScheduledBackupJob : IJob
 {
     private readonly BackupRunner _runner;
     private readonly DataRetention _retention;

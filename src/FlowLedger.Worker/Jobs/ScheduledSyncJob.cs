@@ -19,7 +19,7 @@ namespace FlowLedger.Worker.Jobs;
 /// by <see cref="SyncRetryPolicy"/>, never by ad hoc catch blocks here.
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledSyncJob : IJob
+internal sealed class ScheduledSyncJob : IJob
 {
     // JobDataMap key used to pass the IServiceProvider from tests.
     internal const string ServiceProviderKey = "ServiceProvider";

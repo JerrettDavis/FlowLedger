@@ -9,7 +9,7 @@ namespace FlowLedger.Worker;
 /// (a typo'd flag or cron would quietly disable backups, or fail only when Quartz builds the trigger). Collects every
 /// problem so the operator fixes them in one pass, and is run before any service is registered.
 /// </summary>
-public static class WorkerConfigValidator
+internal static class WorkerConfigValidator
 {
     private static readonly (string Key, string Label)[] CronKeys =
     [
