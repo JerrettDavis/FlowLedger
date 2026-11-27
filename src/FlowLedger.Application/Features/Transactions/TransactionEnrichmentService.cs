@@ -13,11 +13,14 @@ public sealed class TransactionEnrichmentService(ICategorizationStore store)
 {
     private const int Max = TransactionQuota.ProcessingCap;
 
-    public async Task<EnrichmentResult> RunAsync(CancellationToken ct = default)
+    public Task<EnrichmentResult> RunAsync(CancellationToken ct = default) => RunForAsync(null, ct);
+
+    /// <summary>Enriches just <paramref name="onlyIds"/> (the rows a sync touched); null means the whole processing window.</summary>
+    public async Task<EnrichmentResult> RunForAsync(IReadOnlyCollection<Guid>? onlyIds, CancellationToken ct = default)
     {
         int tagged = 0, named = 0;
         var changedRows = new List<FlowLedger.Domain.Aggregates.Transaction>();
-        foreach (var t in await store.LoadAsync(Max, ct))
+        foreach (var t in onlyIds is null ? await store.LoadAsync(Max, ct) : await store.LoadByIdsAsync(onlyIds, ct))
         {
             if (!t.Status.IsReal())
             {

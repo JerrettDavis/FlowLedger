@@ -131,7 +131,10 @@ public sealed class CategoryRuleService(
     }
 
     /// <summary>Applies all rules. Idempotent; returns how many transactions changed category.</summary>
-    public async Task<int> ApplyAsync(CancellationToken ct = default)
+    public Task<int> ApplyAsync(CancellationToken ct = default) => ApplyToAsync(null, ct);
+
+    /// <summary>Applies all rules to just <paramref name="onlyIds"/> (the rows a sync touched); null means the whole processing window.</summary>
+    public async Task<int> ApplyToAsync(IReadOnlyCollection<Guid>? onlyIds, CancellationToken ct = default)
     {
         var rules = await store.ListAsync(ct);
         if (rules.Count == 0)
@@ -145,7 +148,7 @@ public sealed class CategoryRuleService(
         var createdCategory = false;
 
         var changedRows = new List<Transaction>();
-        foreach (var t in await transactions.LoadAsync(Max, ct))
+        foreach (var t in onlyIds is null ? await transactions.LoadAsync(Max, ct) : await transactions.LoadByIdsAsync(onlyIds, ct))
         {
             if (!t.Status.IsReal())
             {

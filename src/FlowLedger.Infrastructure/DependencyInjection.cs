@@ -306,7 +306,8 @@ public static class DependencyInjection
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.MerchantAliasService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Categories.CategoryRuleService>(),
                 sp.GetRequiredService<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>(),
-                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>());
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>>(),
+                sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>().TenantId);
 
             // Then detect recurring income/bills (after categories exist, so transfers/trades are excluded).
             // Config: RecurringFlows:AutoAdd (default true) adds only fixed-amount, very regular patterns.

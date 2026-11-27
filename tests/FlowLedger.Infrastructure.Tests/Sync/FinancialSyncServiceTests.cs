@@ -52,6 +52,28 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [DockerFact]
+    public async Task SyncAsync_carries_exactly_the_inserted_transaction_ids_out_for_the_post_sync_steps()
+    {
+        var tenant = TestTenantContext.New();
+        await using var db = _fixture.CreateDbContext(tenant);
+        var syncService = CreateSyncService(db, tenant);
+
+        var first = await syncService.SyncAsync();
+
+        await using var verifyDb = _fixture.CreateDbContext(tenant);
+        var stored = await verifyDb.Transactions.Select(t => t.Id).ToListAsync();
+        first.ChangedTransactionIds.Should().NotBeNull();
+        first.ChangedTransactionIds!.Should().BeEquivalentTo(stored, "every row the first sync added is reported, nothing else");
+        first.ChangedTransactionIds.Count.Should().Be(first.TransactionsAdded);
+
+        // A second sync over unchanged provider data reports no ids at all.
+        await using var db2 = _fixture.CreateDbContext(tenant);
+        var second = await CreateSyncService(db2, tenant).SyncAsync();
+        second.TransactionsAdded.Should().Be(0);
+        second.ChangedTransactionIds.Should().BeEmpty();
+    }
+
+    [DockerFact]
     public async Task SyncAsync_FirstRun_PopulatesAccountsAndTransactions()
     {
         // Arrange
