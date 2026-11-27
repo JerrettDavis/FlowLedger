@@ -370,6 +370,9 @@ public static class DependencyInjection
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(sp =>
             new FlowLedger.Infrastructure.DataSafety.EfJobRunStore(
                 sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>()));
+        services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobFireMarks>(sp =>
+            new FlowLedger.Infrastructure.DataSafety.EfJobFireMarks(
+                sp.GetRequiredService<FlowLedger.Infrastructure.Persistence.HostDb>(), sp.GetService<TimeProvider>()));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();

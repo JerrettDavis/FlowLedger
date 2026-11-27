@@ -1056,6 +1056,26 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("integrations", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.JobFireMarkRecord", b =>
+                {
+                    b.Property<string>("Job")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("job");
+
+                    b.Property<DateTimeOffset>("LastFireUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_fire_utc");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_utc");
+
+                    b.HasKey("Job");
+
+                    b.ToTable("job_fire_marks", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.JobRunRecord", b =>
                 {
                     b.Property<long>("Id")

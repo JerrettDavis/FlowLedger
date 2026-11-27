@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// configuration section. A value the connection string already sets (<c>Maximum Pool Size=</c>, <c>Timeout=</c>, ...) always wins,
 /// so an operator can still tune everything with one string.
 /// </summary>
-public sealed class DatabaseConnectionOptions
+internal sealed class DatabaseConnectionOptions
 {
     public const string SectionName = "Database";
 
@@ -34,7 +34,7 @@ public sealed class DatabaseConnectionOptions
 }
 
 /// <summary>Builds the shared, bounded, named <see cref="NpgsqlDataSource"/> (#180).</summary>
-public static class DatabaseDataSource
+internal static class DatabaseDataSource
 {
     public static string Normalize(string connectionString, DatabaseConnectionOptions options)
     {

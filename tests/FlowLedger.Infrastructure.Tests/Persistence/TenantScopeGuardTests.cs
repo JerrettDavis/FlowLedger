@@ -145,6 +145,7 @@ public sealed class TenantScopeGuardTests
         ["EfWebhookReplayStore.cs"] = "webhook replay hashes (#152): host-wide, no tenant data",
         ["DataRetention.cs"] = "host-wide maintenance: blanks old merge snapshots and deletes expired link codes across all tenants (#181)",
         ["ReadinessChecks.cs"] = "host-wide readiness probes (migration history, backup freshness); no tenant data is returned",
+        ["JobFireMarks.cs"] = "host-wide last cron fire time per background job (#187); no tenant data",
     };
 
     /// <summary>Literal fragments that are not complete statements: (file, text in the literal, reason).</summary>

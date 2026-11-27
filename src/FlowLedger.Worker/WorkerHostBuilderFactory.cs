@@ -112,6 +112,7 @@ internal static class WorkerHostBuilderFactory
         // two worker processes (rolling deploy, accidental second replica) from running the same job at once.
         builder.Services.AddSingleton<JobRunHistory>();
         builder.Services.AddSingleton<JobExclusion>();
+        builder.Services.AddSingleton<JobFireGate>();
         builder.Services.AddSingleton<JobRunRecorder>();
         builder.Services.AddSingleton(JobRetryOptions.From(builder.Configuration));
         builder.Services.AddSingleton<JobRetryScheduler>();
@@ -131,6 +132,8 @@ internal static class WorkerHostBuilderFactory
             .WithMetrics(metrics => metrics.AddMeter(Quartz.Diagnostics.QuartzInstrumentation.MeterName));
 
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        // After the scheduler has started: run once for a cron fire time missed while no worker was up, then keep the persisted marks (#187).
+        builder.Services.AddHostedService<JobCatchUpService>();
         builder.Services.AddHostedService<WorkerHeartbeat>();
 
         // Transactional outbox dispatcher (#92): delivers committed domain events to handlers with retry and dead-lettering.

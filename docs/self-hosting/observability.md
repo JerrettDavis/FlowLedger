@@ -41,8 +41,25 @@ A failed backup, asset-valuation or Home Assistant run is retried with exponenti
 The sync job is not retried here on purpose (every retry is a billable provider call; it applies its own per-connection
 back-off). A retry is a one-off trigger carrying `retryAttempt`; the per-job advisory lock still prevents overlap.
 
-Still not done (#187): a persistent Quartz job store (needs the QRTZ_ tables, so a missed fire time is still lost if the worker
-is down at that moment) and exactly-once-per-fire-time across replicas.
+### Missed fire times and replicas (#187)
+
+The scheduler keeps its triggers in memory (Quartz RAMJobStore), and a persistent store (AdoJobStore with the QRTZ_ tables and
+cluster check-ins) was deliberately not adopted: every trigger here is a static cron entry rebuilt from configuration on each start,
+there is no job or trigger state worth persisting, and a clustered store adds schema, clock-skew and recovery settings to a
+single-container compose deployment. Two small guarantees are built on one table instead, `job_fire_marks` (`job`, `last_fire_utc`,
+`updated_utc`; created by an ordinary EF migration, so the `migrate` service applies it):
+
+- **Once per fire time across replicas.** After taking the per-job advisory lock, a firing claims its cron slot with one conditional
+  upsert (`last_fire_utc` only ever moves forward). A second replica that fires the same slot, even seconds after the first
+  finished (when the lock is free again), is vetoed. A misfired firing is mapped back to the slot it was due for. Retries of a
+  slot do not claim again.
+- **Catch-up after downtime.** On startup, each cron job whose latest due slot is newer than its mark is run ONCE (never a burst),
+  through the same claim. The very first start on a database only records the current slot. `Worker:CatchUp:Enabled=false` turns it
+  off.
+
+The claim is taken when a run starts, so a run that crashes mid-way is not repeated automatically for that slot (the existing
+retry settings cover failures the job reports; the sync job also has its own per-connection back-off). If the marks table cannot be
+reached the job runs anyway rather than never running.
 
 ## JSON logs
 
