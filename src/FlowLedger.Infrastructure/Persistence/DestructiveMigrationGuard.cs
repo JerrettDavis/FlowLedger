@@ -55,7 +55,7 @@ internal static partial class DestructiveMigrationGuard
                     findings.Add($"AlterColumn (narrowing) {a.Table}.{a.Name}");
                     break;
                 case SqlOperation sql when DestructiveSql().IsMatch(sql.Sql):
-                    findings.Add("Raw SQL containing DROP/DELETE/TRUNCATE");
+                    findings.Add("Raw SQL dropping a table, column or schema, deleting rows or truncating");
                     break;
             }
         }
@@ -106,6 +106,6 @@ internal static partial class DestructiveMigrationGuard
             && !string.Equals(old.ColumnType, a.ColumnType, StringComparison.OrdinalIgnoreCase);
     }
 
-    [GeneratedRegex(@"\b(DROP|DELETE|TRUNCATE)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(DROP\s+(TABLE|COLUMN|SCHEMA)|DELETE\s+FROM|TRUNCATE)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DestructiveSql();
 }

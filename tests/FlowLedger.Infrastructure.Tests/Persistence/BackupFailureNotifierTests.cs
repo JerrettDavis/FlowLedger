@@ -3,6 +3,7 @@ using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Observability;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -37,7 +38,7 @@ public sealed class BackupFailureNotifierTests
         new ConfigurationBuilder().AddInMemoryCollection(kv.ToDictionary(k => k.Item1, k => (string?)k.Item2)).Build();
 
     private static BackupRunResult Result(bool ok, string? error = null) =>
-        new(ok, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 0, null, null, null, error);
+        new(ok, TestClock.Instant, TestClock.Instant, null, 0, null, null, null, error);
 
     private static long CountBackupMetric(Func<Task> act, string outcome)
     {

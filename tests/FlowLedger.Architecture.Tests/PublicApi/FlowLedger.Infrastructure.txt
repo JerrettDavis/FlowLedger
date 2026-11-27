@@ -17,6 +17,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.AddSyncCursorStore
 class FlowLedger.Infrastructure.Persistence.Migrations.AddTransactionCategorySource
 class FlowLedger.Infrastructure.Persistence.Migrations.AddTransactionCategorySuggestion
 class FlowLedger.Infrastructure.Persistence.Migrations.AddTransactionDateCreatedIndex
+class FlowLedger.Infrastructure.Persistence.Migrations.AddTransactionProviderCategoryAndTransferLink
 class FlowLedger.Infrastructure.Persistence.Migrations.AddTransactionTagsAndSuggestedName
 class FlowLedger.Infrastructure.Persistence.Migrations.DedupeDetectedBills
 class FlowLedger.Infrastructure.Persistence.Migrations.InitialCreate
@@ -45,6 +46,7 @@ sealed class FlowLedger.Infrastructure.Ai.Local.CatalogModel
 sealed class FlowLedger.Infrastructure.Ai.Local.EmbeddingSpec
 sealed class FlowLedger.Infrastructure.Ai.Local.LlmSpec
 sealed class FlowLedger.Infrastructure.Ai.Local.ModelFile
+sealed class FlowLedger.Infrastructure.DataSafety.BackupFailureNotifier
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunResult
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunStore
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunner
