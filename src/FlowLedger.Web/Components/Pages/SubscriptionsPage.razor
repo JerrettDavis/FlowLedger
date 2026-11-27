@@ -37,7 +37,7 @@ else
         <MudText Typo="Typo.subtitle1" Class="fl-muted">@Format.Money(_data.YearlyTotal) a year</MudText>
     </div>
 
-    <MudSimpleTable Dense="true" Hover="true" aria-label="Detected subscriptions" data-testid="subscriptions-table">
+    <MudSimpleTable Dense="true" Hover="true" Class="fl-stack" aria-label="Detected subscriptions" data-testid="subscriptions-table">
         <thead>
             <tr>
                 <th scope="col">Subscription</th>
@@ -58,10 +58,10 @@ else
                             @s.Cadence@(s.Status == "Lapsed" ? " · possibly cancelled" : "") · @s.Charges charges
                         </MudText>
                     </td>
-                    <td class="fl-num">@Format.Money(s.Amount)@(s.Cadence == "Yearly" ? " / yr" : "")</td>
-                    <td class="fl-num fl-hide-md">@Format.Money(s.MonthlyCost)</td>
-                    <td class="fl-hide-md">@Format.FullDate(s.LastCharged)</td>
-                    <td class="fl-hide-md">@(s.Status == "Lapsed" ? "–" : Format.FullDate(s.NextExpected))</td>
+                    <td class="fl-num" data-label="Charge">@Format.Money(s.Amount)@(s.Cadence == "Yearly" ? " / yr" : "")</td>
+                    <td class="fl-num fl-hide-md" data-label="Per month">@Format.Money(s.MonthlyCost)</td>
+                    <td class="fl-hide-md" data-label="Last charged">@Format.FullDate(s.LastCharged)</td>
+                    <td class="fl-hide-md" data-label="Next expected">@(s.Status == "Lapsed" ? "–" : Format.FullDate(s.NextExpected))</td>
                     <td>
                         @if (s.PriceChange is { } change)
                         {
