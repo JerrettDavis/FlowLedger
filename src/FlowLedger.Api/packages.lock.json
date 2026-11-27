@@ -17,6 +17,12 @@
           "FluentValidation": "12.2.0"
         }
       },
+      "Meziantou.Analyzer": {
+        "type": "Direct",
+        "requested": "[3.0.340, )",
+        "resolved": "3.0.340",
+        "contentHash": "0Dj49/kQSH0UgitHPNUH9o76+2Awo0TEvnOnSKaYG11vWdu85zmutX3es7ltfPeDddIzPx8mhjBVFq5LfrRmAQ=="
+      },
       "Microsoft.AspNetCore.OpenApi": {
         "type": "Direct",
         "requested": "[10.0.15, )",
