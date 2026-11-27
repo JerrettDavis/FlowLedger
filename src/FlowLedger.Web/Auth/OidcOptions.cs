@@ -34,6 +34,15 @@ public sealed class OidcOptions
 
     public string[] AllowedEmailDomains { get; set; } = [];
 
+    /// <summary>
+    /// Effective <c>Auth:SignUp:Mode</c> (#145), filled in by <see cref="AuthSetup.AddFlowLedgerAuth"/>: whether a login with no account yet may create a
+    /// tenant. The secure default is <see cref="FlowLedger.ServiceDefaults.SignUpMode.InviteOnly"/>; <c>Auth:SignUp:LegacyOpen=true</c> restores open sign-up.
+    /// </summary>
+    public FlowLedger.ServiceDefaults.SignUpMode SignUpMode { get; set; } = FlowLedger.ServiceDefaults.SignUpMode.InviteOnly;
+
+    /// <summary>True when a login the allowlist already admitted (or that no allowlist applies to) may be given a brand-new tenant.</summary>
+    public bool AllowsNewTenants => FlowLedger.ServiceDefaults.MultiUserSettings.AllowsNewTenants(SignUpMode, HasAllowlist);
+
     public bool HasAllowlist => AllowedEmails.Length > 0 || AllowedEmailDomains.Length > 0;
 
     /// <summary>True when no allowlist is configured, or the verified email satisfies it.</summary>
