@@ -19,15 +19,8 @@ internal static class MerchantAliasEndpoints
 
         group.MapPut("/", async ([FromBody] SetAliasRequest request, MerchantAliasService service, CancellationToken ct) =>
             {
-                try
-                {
-                    var changed = await service.SetAsync(request.Pattern, request.Alias, ct);
-                    return Results.Ok(new { changed });
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["alias"] = [ex.Message] });
-                }
+                var changed = await service.SetAsync(request.Pattern, request.Alias, ct);
+                return Results.Ok(new { changed });
             })
             .WithName("SetMerchantAlias")
             .WithSummary("Create or replace an alias rule and apply it to existing and future transactions")

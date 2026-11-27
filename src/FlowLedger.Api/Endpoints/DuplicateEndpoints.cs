@@ -22,16 +22,9 @@ internal static class DuplicateEndpoints
 
         group.MapPost("/merge", async ([FromBody] PairRequest request, DuplicateService service, CancellationToken ct) =>
             {
-                try
-                {
-                    return await service.MergeAsync(request.FirstId, request.SecondId, request.KeepId, ct)
-                        ? Results.Ok(new { merged = true })
-                        : Results.NotFound();
-                }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-                {
-                    return Results.Problem(title: "Merge refused", detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
-                }
+                return await service.MergeAsync(request.FirstId, request.SecondId, request.KeepId, ct)
+                    ? Results.Ok(new { merged = true })
+                    : Results.NotFound();
             })
             .WithName("MergeDuplicate")
             .WithSummary("Merge two transactions you confirmed are the same. The removed row is kept in the merge log and cannot be re-synced.")

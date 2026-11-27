@@ -37,13 +37,12 @@ class FlowLedger.Infrastructure.Persistence.Migrations.RowVersionOnTransactionsF
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
 enum FlowLedger.Infrastructure.Sync.SyncTrigger
-interface FlowLedger.Infrastructure.DataSafety.IAuditLog
-interface FlowLedger.Infrastructure.DataSafety.IJobRunStore
+interface FlowLedger.Infrastructure.HostStores.IAuditLog
+interface FlowLedger.Infrastructure.HostStores.IJobRunStore
 sealed class FlowLedger.Infrastructure.Ai.Local.CatalogModel
 sealed class FlowLedger.Infrastructure.Ai.Local.EmbeddingSpec
 sealed class FlowLedger.Infrastructure.Ai.Local.LlmSpec
 sealed class FlowLedger.Infrastructure.Ai.Local.ModelFile
-sealed class FlowLedger.Infrastructure.DataSafety.AuditEvent
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunResult
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunStore
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunner
@@ -51,11 +50,7 @@ sealed class FlowLedger.Infrastructure.DataSafety.BackupSettings
 sealed class FlowLedger.Infrastructure.DataSafety.DataEnvironmentState
 sealed class FlowLedger.Infrastructure.DataSafety.DataRetention
 sealed class FlowLedger.Infrastructure.DataSafety.DrillTableResult
-sealed class FlowLedger.Infrastructure.DataSafety.JobRunEntry
 sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
-sealed class FlowLedger.Infrastructure.DataSafety.ProviderCallLedger
-sealed class FlowLedger.Infrastructure.DataSafety.ProviderEndpointUsage
-sealed class FlowLedger.Infrastructure.DataSafety.ProviderUsageSummary
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
 sealed class FlowLedger.Infrastructure.DataSafety.RestoreDrillResult
 sealed class FlowLedger.Infrastructure.DataSafety.RetentionResult
@@ -63,6 +58,11 @@ sealed class FlowLedger.Infrastructure.DataSafety.RetentionSettings
 sealed class FlowLedger.Infrastructure.DataSafety.SecretReencryptor
 sealed class FlowLedger.Infrastructure.Events.OutboxOptions
 sealed class FlowLedger.Infrastructure.Events.OutboxProcessor
+sealed class FlowLedger.Infrastructure.HostStores.AuditEvent
+sealed class FlowLedger.Infrastructure.HostStores.JobRunEntry
+sealed class FlowLedger.Infrastructure.HostStores.ProviderCallLedger
+sealed class FlowLedger.Infrastructure.HostStores.ProviderEndpointUsage
+sealed class FlowLedger.Infrastructure.HostStores.ProviderUsageSummary
 sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext
 sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContextFactory
 sealed class FlowLedger.Infrastructure.Persistence.NoOpDomainEventDispatcher

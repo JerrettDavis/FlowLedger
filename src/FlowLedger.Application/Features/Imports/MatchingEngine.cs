@@ -196,11 +196,11 @@ public sealed class MatchingEngine
     {
         // Load the owning RecurringFlow aggregate to call MatchActual on the owned entity
         var flow = await _occurrenceRepo.GetOwningFlowAsync(occView.PlannedOccurrenceId, ct)
-                   ?? throw new InvalidOperationException(
+                   ?? throw new ImportFailedException(
                        $"Owning RecurringFlow not found for occurrence {occView.PlannedOccurrenceId.Value}.");
 
         var occurrence = flow.Occurrences.FirstOrDefault(o => o.PlannedOccurrenceId == occView.PlannedOccurrenceId)
-                         ?? throw new InvalidOperationException(
+                         ?? throw new ImportFailedException(
                              $"PlannedFlowOccurrence {occView.PlannedOccurrenceId.Value} not found in RecurringFlow {flow.Id}.");
 
         occurrence.MatchActual(

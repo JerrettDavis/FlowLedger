@@ -25,6 +25,38 @@ internal sealed class ProviderExceptionHandler(IProblemDetailsService problems) 
             });
         }
 
+        switch (exception)
+        {
+            case FlowLedger.Application.Abstractions.NotFoundException:
+                return await WriteAsync(httpContext, exception, new ProblemDetails
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Title = "Not Found",
+                    Detail = exception.Message,
+                });
+            case FlowLedger.Application.Abstractions.RequestValidationException invalid:
+                return await WriteAsync(httpContext, exception, new HttpValidationProblemDetails(
+                    new Dictionary<string, string[]> { [invalid.Field] = [invalid.Message] })
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "One or more validation errors occurred.",
+                });
+            case FlowLedger.Application.Abstractions.ConflictException conflict:
+                return await WriteAsync(httpContext, exception, new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = conflict.Title,
+                    Detail = conflict.Message,
+                });
+            case FlowLedger.Application.Abstractions.UnprocessableRequestException unprocessable:
+                return await WriteAsync(httpContext, exception, new ProblemDetails
+                {
+                    Status = StatusCodes.Status422UnprocessableEntity,
+                    Title = unprocessable.Title,
+                    Detail = unprocessable.Message,
+                });
+        }
+
         if (exception is FlowLedger.Domain.Exceptions.DomainException domain)
         {
             // Invariant violations are client errors: 409 when the entity is in the wrong state, otherwise 400 (#90).

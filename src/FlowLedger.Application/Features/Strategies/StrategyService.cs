@@ -4,6 +4,7 @@ using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Investments;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Strategies;
 
@@ -115,7 +116,7 @@ public sealed class StrategyService(
             }
 
             var key = $"{date.Year:0000}-{date.Month:00}";
-            if (t.Direction == "Credit")
+            if (t.Direction == nameof(TransactionDirection.Credit))
             {
                 income[key] = income.GetValueOrDefault(key) + t.Amount;
             }

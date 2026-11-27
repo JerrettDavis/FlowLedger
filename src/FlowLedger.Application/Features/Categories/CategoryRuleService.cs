@@ -47,18 +47,18 @@ public sealed class CategoryRuleService(
         var path = (categoryPath ?? string.Empty).Trim().Trim('/');
         if (key.Length == 0 || path.Length == 0)
         {
-            throw new ArgumentException("Both the text to match and a category are required.");
+            throw new RequestValidationException("rule", "Both the text to match and a category are required.");
         }
 
         if (key.Length > MaxLength || path.Length > MaxLength)
         {
-            throw new ArgumentException($"Pattern and category must be {MaxLength} characters or fewer.");
+            throw new RequestValidationException("rule", $"Pattern and category must be {MaxLength} characters or fewer.");
         }
 
         var existing = await store.ListAsync(ct);
         if (existing.Count >= MaxRules && !existing.Any(r => string.Equals(r.Pattern, key, StringComparison.Ordinal)))
         {
-            throw new ArgumentException($"You can have at most {MaxRules} rules. Remove one before adding another.");
+            throw new RequestValidationException("rule", $"You can have at most {MaxRules} rules. Remove one before adding another.");
         }
 
         await store.SetAsync(key, path, ct);
@@ -76,14 +76,14 @@ public sealed class CategoryRuleService(
     {
         if (note?.Trim() is { Length: > MaxNoteLength })
         {
-            throw new ArgumentException($"Notes are limited to {MaxNoteLength} characters.");
+            throw new RequestValidationException("note", $"Notes are limited to {MaxNoteLength} characters.");
         }
 
         var target = await transactions.FindTrackedAsync(transactionId, ct)
-            ?? throw new KeyNotFoundException("Transaction not found.");
+            ?? throw new NotFoundException("Transaction not found.");
         guard?.Expect(target, expectedVersion);
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
-            ?? throw new KeyNotFoundException("Category not found.");
+            ?? throw new NotFoundException("Category not found.");
         var id = category.CategoryId;
 
         var changed = target.CategoryId == id && target.CategorySource == CategorySource.Manual ? 0 : 1;

@@ -1,3 +1,4 @@
+using FlowLedger.Domain.Aggregates;
 namespace FlowLedger.Application.Features.Transactions;
 
 /// <summary>
@@ -16,7 +17,7 @@ public static class TransferDetector
 
     private static readonly HashSet<string> LiabilityTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "CreditCard", "Loan", "Mortgage", "ManualLiability",
+        nameof(AccountType.CreditCard), nameof(AccountType.Loan), nameof(AccountType.Mortgage), nameof(AccountType.ManualLiability),
     };
 
     public static HashSet<Guid> Detect(
@@ -82,7 +83,7 @@ public static class TransferDetector
         var aLiab = types.TryGetValue(a.AccountId, out var ta) && LiabilityTypes.Contains(ta);
         var bLiab = types.TryGetValue(b.AccountId, out var tb) && LiabilityTypes.Contains(tb);
         return aLiab != bLiab
-            && a.Direction == "Debit"
+            && a.Direction == nameof(TransactionDirection.Debit)
             && string.Equals(Name(a), Name(b), StringComparison.OrdinalIgnoreCase);
     }
 

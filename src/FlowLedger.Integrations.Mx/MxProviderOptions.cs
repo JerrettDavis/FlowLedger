@@ -2,7 +2,7 @@ namespace FlowLedger.Integrations.Mx;
 
 /// <summary>
 /// MX-specific tunables (NOT credentials — those live in
-/// <see cref="FlowLedger.Integrations.Abstractions.FinancialProviderOptions"/> under the
+/// <see cref="MxCredentialsOptions"/> under the
 /// <c>Mx</c> section, reused as-is). Bind from the <c>Mx:Provider</c> configuration section.
 /// </summary>
 public sealed class MxProviderOptions

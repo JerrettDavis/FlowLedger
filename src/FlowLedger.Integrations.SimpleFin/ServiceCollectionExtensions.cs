@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
                 "SimpleFin:HistoryDays must be 1-90, and OverlapDays / BackfillDays must not be negative.")
             .ValidateOnStart();
 
-        services.AddHttpClient<SimpleFinFinancialDataProvider>((sp, http) =>
+        services.AddConnectorHttpClient<SimpleFinFinancialDataProvider>((sp, http) =>
         {
             var opts = sp.GetRequiredService<IOptions<SimpleFinOptions>>().Value;
             if (string.IsNullOrWhiteSpace(opts.AccessUrl))
@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
             http.BaseAddress = new Uri(clean.ToString().TrimEnd('/') + "/");
             http.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(userInfo)));
-        }).AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+        });
 
         services.AddKeyedScoped<IFinancialDataProvider>("SimpleFIN", (sp, _) => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
         if (registerAsDefault)

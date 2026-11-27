@@ -1,8 +1,9 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>One finished background job run, as persisted.</summary>
 public sealed record JobRunEntry(string Job, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, bool Success, string? Error, int Attempt);

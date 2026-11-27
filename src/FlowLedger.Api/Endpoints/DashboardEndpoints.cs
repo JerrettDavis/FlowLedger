@@ -18,15 +18,8 @@ internal static class DashboardEndpoints
         group.MapPost("/suspicious/{transactionId:guid}/dismiss",
                 async (Guid transactionId, DismissSuspiciousRequest? request, DismissSuspiciousHandler handler, CancellationToken ct) =>
                 {
-                    try
-                    {
-                        await handler.HandleAsync(transactionId, request?.Note, ct);
-                        return Results.NoContent();
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
-                    }
+                    await handler.HandleAsync(transactionId, request?.Note, ct);
+                    return Results.NoContent();
                 })
             .WithName("DismissSuspiciousTransaction")
             .WithSummary("Dismiss a flagged transaction from Suspicious Activity, with an optional note")

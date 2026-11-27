@@ -1,3 +1,7 @@
+class FlowLedger.Application.Abstractions.ConflictException
+class FlowLedger.Application.Abstractions.NotFoundException
+class FlowLedger.Application.Abstractions.RequestValidationException
+class FlowLedger.Application.Abstractions.UnprocessableRequestException
 enum FlowLedger.Application.Abstractions.EmbedKind
 enum FlowLedger.Application.Abstractions.TransactionSortKey
 enum FlowLedger.Application.Features.BillSheet.SheetPaymentSource
@@ -41,6 +45,7 @@ interface FlowLedger.Application.Abstractions.ITenantDataVersion
 interface FlowLedger.Application.Abstractions.ITextEmbedder
 interface FlowLedger.Application.Abstractions.ITransactionRepository
 interface FlowLedger.Application.Abstractions.IWebhookReplayStore
+interface FlowLedger.Application.Abstractions.IWebhookTelemetry
 interface FlowLedger.Application.Abstractions.IWebhookTenantResolver
 interface FlowLedger.Application.Features.Budgets.IBudgetStore
 interface FlowLedger.Application.Features.Categories.ICategorizationStore
@@ -147,6 +152,7 @@ sealed class FlowLedger.Application.Features.Duplicates.DuplicateOptions
 sealed class FlowLedger.Application.Features.Duplicates.DuplicateScanResult
 sealed class FlowLedger.Application.Features.Duplicates.DuplicateService
 sealed class FlowLedger.Application.Features.Duplicates.MergeLogEntry
+sealed class FlowLedger.Application.Features.Duplicates.MergeRefusedException
 sealed class FlowLedger.Application.Features.Forecasting.AccountForecastSeries
 sealed class FlowLedger.Application.Features.Forecasting.AccountLowWaterMark
 sealed class FlowLedger.Application.Features.Forecasting.AggregateForecastPoint
@@ -177,18 +183,21 @@ sealed class FlowLedger.Application.Features.HomeAssistant.HomeAssistantSettings
 sealed class FlowLedger.Application.Features.Imports.AutoImportResult
 sealed class FlowLedger.Application.Features.Imports.CsvColumnMapping
 sealed class FlowLedger.Application.Features.Imports.ImportCoordinator
+sealed class FlowLedger.Application.Features.Imports.ImportFailedException
 sealed class FlowLedger.Application.Features.Imports.ImportFormatInfo
 sealed class FlowLedger.Application.Features.Imports.ImportHints
 sealed class FlowLedger.Application.Features.Imports.ImportTransactionsCommand
 sealed class FlowLedger.Application.Features.Imports.ImportTransactionsHandler
 sealed class FlowLedger.Application.Features.Imports.ListMatchSuggestionsHandler
 sealed class FlowLedger.Application.Features.Imports.MatchCandidate
+sealed class FlowLedger.Application.Features.Imports.MatchFailedException
 sealed class FlowLedger.Application.Features.Imports.MatchResultDto
 sealed class FlowLedger.Application.Features.Imports.MatchSuggestionDto
 sealed class FlowLedger.Application.Features.Imports.MatchTransactionCommand
 sealed class FlowLedger.Application.Features.Imports.MatchTransactionHandler
 sealed class FlowLedger.Application.Features.Imports.MatchingEngine
 sealed class FlowLedger.Application.Features.Imports.NormalizedImport
+sealed class FlowLedger.Application.Features.Imports.UnmatchFailedException
 sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionCommand
 sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionHandler
 sealed class FlowLedger.Application.Features.Insights.BreakdownGroup

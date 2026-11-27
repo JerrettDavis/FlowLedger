@@ -195,7 +195,7 @@ public sealed class RecurringSuggestionService(
     // Fixed bills are safe to add unasked. Income is added too even when the amount varies: forecasting bills without the
     // paychecks that cover them produces false overdraft alarms, so a regular, high-confidence paycheck must be modelled.
     private static bool WouldAutoAdd(DetectedFlow d) =>
-        d.Confidence >= AutoAddConfidence && (d.AmountModel == "Fixed" || d.Direction == "Credit");
+        d.Confidence >= AutoAddConfidence && (d.AmountModel == "Fixed" || d.Direction == nameof(TransactionDirection.Credit));
 
     /// <summary>Loan/mortgage/investment accounts hold balances, not bills; card accounts only produce charges, not "income".</summary>
     private static bool Eligible(AccountType type, TransactionDirection direction) => type switch
@@ -210,7 +210,7 @@ public sealed class RecurringSuggestionService(
     {
         // A periodic extra (monthly bonus) is covered only by another extra flow, and never makes its base flow look covered.
         var merchant = RecurringDetector.Key(d.Name.Replace(RecurringFlowDetector.ExtraSuffix, string.Empty, StringComparison.Ordinal));
-        var direction = d.Direction == "Credit" ? TransactionDirection.Credit : TransactionDirection.Debit;
+        var direction = d.Direction == nameof(TransactionDirection.Credit) ? TransactionDirection.Credit : TransactionDirection.Debit;
         // Same account, direction, cadence and (near) amount is the same bill even when it was named differently
         // (the old flow carries the raw bank text, the new detection carries the alias).
         if (!d.IsPeriodicExtra && existing.Any(f => f.AccountId.Value == d.AccountId

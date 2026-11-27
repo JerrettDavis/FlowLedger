@@ -42,7 +42,7 @@ internal sealed class EfBudgetStore(FlowLedgerDbContext db, ITenantContext tenan
 
             if (await db.Budgets.CountAsync(ct) >= MaxBudgets)
             {
-                throw new InvalidOperationException($"You can have at most {MaxBudgets} budgets. Remove one before adding another.");
+                throw new RequestValidationException("budget", $"You can have at most {MaxBudgets} budgets. Remove one before adding another.");
             }
 
             existing = BudgetRecord.Create(tenantId, category, monthlyLimit);

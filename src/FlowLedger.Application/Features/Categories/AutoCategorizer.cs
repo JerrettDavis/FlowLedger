@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Categories;
 
@@ -25,9 +26,9 @@ internal static class AutoCategorizer
         R(TransferCategory, @"transfer|payment,? thank you|autopay|credit card payment|credit crd|card online payment|\bepay\b|online payment|monthly payment|additional principal"),
         // Brokerage activity is not income or spending: reinvestments and trades just move money within the portfolio.
         R("Investments/Trades", @"dividend reinvest|reinvest|^\s*(buy|sell)\b|\bsell\s*-|\bbuy\s*-"),
-        R("Income/Interest", @"interest|dividend", "Credit"),
-        R("Income/Paycheck", @"payroll|salary|direct dep|paycheck|employer", "Credit"),
-        R("Income/Deposits", @"chk deposit|mobile deposit|deposit", "Credit"),
+        R("Income/Interest", @"interest|dividend", nameof(TransactionDirection.Credit)),
+        R("Income/Paycheck", @"payroll|salary|direct dep|paycheck|employer", nameof(TransactionDirection.Credit)),
+        R("Income/Deposits", @"chk deposit|mobile deposit|deposit", nameof(TransactionDirection.Credit)),
         R("Fees/Bank Fees", @"atm usage fee|atm fee|service charge|overdraft|maintenance fee|\bfee\b"),
         R("Housing/Mortgage", @"mortgage|home loan"),
         R("Housing/Rent", @"\brent\b|landlord|property mgmt|\bhoa\b"),
