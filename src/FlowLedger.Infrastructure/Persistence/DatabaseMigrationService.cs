@@ -48,7 +48,7 @@ internal sealed partial class DatabaseMigrationService : IHostedService
             // One migrator at a time: the snapshot-then-migrate sequence is not safe to interleave, and a second
             // starter must see the finished schema rather than race it. The lock is session-scoped, so a crashed
             // starter releases it automatically.
-            var conn = db.Database.GetConnectionString()
+            var conn = DatabaseDataSource.Resolve(_config, db.Database)
                 ?? throw new InvalidOperationException("No connection string available for migrations.");
             var waitSeconds = int.TryParse(_config["Database:MigrationLockTimeoutSeconds"], out var w) && w > 0 ? w : 300;
             await using var migrationLock = await PostgresAdvisoryLock.AcquireAsync(conn, LockName, TimeSpan.FromSeconds(waitSeconds), cancellationToken);
@@ -91,7 +91,7 @@ internal sealed partial class DatabaseMigrationService : IHostedService
             return; // nothing to migrate, or brand-new database
         }
 
-        var conn = db.Database.GetConnectionString()
+        var conn = DatabaseDataSource.Resolve(_config, db.Database)
             ?? throw new InvalidOperationException("No connection string available for the pre-migration snapshot.");
         var root = _config["Backup:Directory"] ?? DatabaseSnapshotService.DefaultBackupRoot();
 

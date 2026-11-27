@@ -80,7 +80,11 @@ internal sealed partial class CategorizingSyncService(
 
         try
         {
-            var c = await Retry("Auto-categorization", () => categorizer.RunAsync(ct), ct);
+            // Only the rows this sync brought in are categorized (scoped like the steps above); rows left uncategorized earlier wait for the
+            // user's Categorize action instead of re-reading the history after every sync (#163).
+            var c = hasNew
+                ? await Retry("Auto-categorization", () => categorizer.RunForAsync(scope, allowLlm: false, ct), ct)
+                : new CategorizationResult(0, 0, 0, 0, 0);
             if (c.Categorized > 0)
             {
                 LogAutoCategorizedTransactionsLearnedKeyword(logger, c.Categorized, c.ByLearnedMerchant, c.ByKeyword, c.Transfers);

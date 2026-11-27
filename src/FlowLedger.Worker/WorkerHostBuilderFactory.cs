@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Quartz;
 
 namespace FlowLedger.Worker;
@@ -110,6 +112,8 @@ internal static class WorkerHostBuilderFactory
         // two worker processes (rolling deploy, accidental second replica) from running the same job at once.
         builder.Services.AddSingleton<JobRunHistory>();
         builder.Services.AddSingleton<JobExclusion>();
+        builder.Services.AddSingleton(JobFireGateOptions.From(builder.Configuration));
+        builder.Services.AddSingleton<JobFireGate>();
         builder.Services.AddSingleton<JobRunRecorder>();
         builder.Services.AddSingleton(JobRetryOptions.From(builder.Configuration));
         builder.Services.AddSingleton<JobRetryScheduler>();
@@ -121,7 +125,16 @@ internal static class WorkerHostBuilderFactory
             q.AddTriggerListener<JobExclusionTriggerListener>();
         });
 
+        // Trace the run itself (JobTrace), Quartz's own firing/execute spans, and the Npgsql command spans that EF Core's queries produce.
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing
+                .AddSource(JobTrace.SourceName)
+                .AddSource(Quartz.Diagnostics.QuartzInstrumentation.ActivitySourceName))
+            .WithMetrics(metrics => metrics.AddMeter(Quartz.Diagnostics.QuartzInstrumentation.MeterName));
+
         builder.Services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        // After the scheduler has started: run once for a cron fire time missed while no worker was up, then keep the persisted marks (#187).
+        builder.Services.AddHostedService<JobCatchUpService>();
         builder.Services.AddHostedService<WorkerHeartbeat>();
 
         // Transactional outbox dispatcher (#92): delivers committed domain events to handlers with retry and dead-lettering.

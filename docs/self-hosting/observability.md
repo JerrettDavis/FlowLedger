@@ -8,8 +8,7 @@ characters) is kept; anything else is replaced by the request's trace id. The id
 web and API log lines of a request. The W3C `traceparent` header also propagates between web and API through the
 standard HTTP instrumentation, so traces join up in your OTLP backend.
 
-Not done yet: the worker does not start a trace per job run, so worker log lines do not share an id with the request
-that triggered them (a Quartz job listener cannot set the ambient activity for the job body; it needs a job wrapper).
+Background jobs: every worker job run is its own root trace (`job <name>`, span source `FlowLedger.Worker`, with a `tenant work` child span per tenant). The run's correlation id is the trace id: it is the span tag `correlation.id`, W3C baggage (so internal HTTP calls forward it as `X-Correlation-Id`) and the `CorrelationId` log scope of every log line in the run. Quartz's own firing spans and meter are exported as well.
 
 ## Metrics
 
@@ -30,6 +29,8 @@ Meter `FlowLedger`, exported when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 
 The `Npgsql` meter (connection pool and command metrics) and the `Npgsql` trace source are exported too.
 
+EF Core has no stable built-in ActivitySource; its queries are traced through the `Npgsql` command spans (one per SQL command, parented to the request or job run). No third-party EF instrumentation package is used.
+
 ## Job history and retries
 
 Every scheduled job run is also written to the `job_runs` table (`job, started_utc, finished_utc, success, error, attempt`;
@@ -40,8 +41,35 @@ A failed backup, asset-valuation or Home Assistant run is retried with exponenti
 The sync job is not retried here on purpose (every retry is a billable provider call; it applies its own per-connection
 back-off). A retry is a one-off trigger carrying `retryAttempt`; the per-job advisory lock still prevents overlap.
 
-Still not done (#187): a persistent Quartz job store (needs the QRTZ_ tables, so a missed fire time is still lost if the worker
-is down at that moment) and exactly-once-per-fire-time across replicas.
+### Missed fire times and replicas (#187)
+
+The scheduler keeps its triggers in memory (Quartz RAMJobStore), and a persistent store (AdoJobStore with the QRTZ_ tables and
+cluster check-ins) was deliberately not adopted: every trigger here is a static cron entry rebuilt from configuration on each start,
+there is no job or trigger state worth persisting, and a clustered store adds schema, clock-skew and recovery settings to a
+single-container compose deployment. Two small guarantees are built on one table instead, `job_fire_marks` (`job`, `last_fire_utc`,
+`updated_utc`; created by an ordinary EF migration, so the `migrate` service applies it):
+
+- **Once per fire time across replicas.** After taking the per-job advisory lock, a firing claims its cron slot with one conditional
+  upsert (`last_fire_utc` only ever moves forward). A second replica that fires the same slot, even seconds after the first
+  finished (when the lock is free again), is vetoed. A misfired firing is mapped back to the slot it was due for. Retries of a
+  slot do not claim again.
+- **The claim is a lease, confirmed when the run ends.** The row records `owner`, `claimed_utc` and `completed_utc`; the listener
+  confirms the claim in `TriggerComplete`. A run whose process died never confirms, so once its lease
+  (`Worker:FireGate:LeaseSeconds`, default 600) runs out the slot is reclaimable and the catch-up check re-fires it once. The
+  advisory lock still prevents any overlap with a run that is alive.
+- **Catch-up after downtime, and for abandoned claims.** At startup and then every `Worker:CatchUp:IntervalMinutes` (default 5),
+  each cron job whose latest due slot is newer than its mark, or whose claim for that slot is unconfirmed past its lease, is run
+  ONCE (never a burst), through the same claim. The very first start on a database only records the current slot.
+  `Worker:CatchUp:Enabled=false` turns this off.
+- **If the marks table is unreachable** the claim is retried (`Worker:FireGate:Attempts`, default 3, `RetryDelayMs` 250) and the
+  firing is then SKIPPED (fail closed): every job here has external side effects (provider calls, off-site backup copy, Home
+  Assistant push), and the catch-up check re-fires the slot once the database is back. Set `Worker:FireGate:OnStoreFailure=Run`
+  (or `Worker:FireGate:Jobs:<JobName>:OnStoreFailure=Run`) to prefer a possible duplicate run over a skipped one. Every decision is
+  counted on `flowledger.job.firegate{job,outcome}` (`claimed`, `duplicate`, `store_failed_skipped`, `store_failed_ran`,
+  `complete_failed`); alert on the `store_failed_*` outcomes.
+
+A run that fails (throws) still confirms its slot: failures are surfaced by the job history and the retry settings above, not by
+re-claiming the slot.
 
 ## JSON logs
 
@@ -55,7 +83,8 @@ Sensitive actions append a row to `audit_events` (created on first use, included
 `occurred_utc, tenant_id, actor, action, target, remote_ip, trace_id, status_code`. `trace_id` is the same W3C trace id that
 appears in the logs, so a row can be joined to the log lines of that request. Audited actions: `connector.link`,
 `connector.unlink`, `connector.connect`, `connector.mx_connect`, `connector.quiltt_session`, `data.export`, `data.import`,
-`data.backup_now`, `home_assistant.save`, `integration.create|update|delete|rotate_secret`, `user.link_code|link|unlink`.
+`data.backup_now`, `home_assistant.save`, `integration.create|update|delete|rotate_secret`, `user.link_code|link|unlink`,
+`secrets.reencrypt` (key rotation), `archive.seal`, `tenant.offboard`, `account.deactivate`, `asset.deactivate`, `recurring.deactivate`, `category.delete`, `category.clear_auto`, `transaction.merge_duplicate`, `budget.delete`, `goal.delete`.
 Failed and denied attempts are recorded as well (`status_code`). The table is append-only by construction (the application has
 no update or delete path), not by a database trigger; restrict the database role if you need it enforced. A failed audit write
 is logged and does not change the response.
@@ -98,5 +127,5 @@ Prometheus, so it commonly becomes `exported_job`); adjust the selectors to matc
 
 - Failed API-key authentication attempts are not written to `audit_events` (an anonymous caller could otherwise fill the table);
   they are visible in the request logs only.
-- Destructive edits of ordinary data (delete a transaction, ...) are not audited, only the actions listed above.
-- EF and Quartz instrumentation, a trace per worker job, dashboards.
+- Not every destructive edit is audited: deleting a single transaction, saved report, sheet row or rule is not (the actions listed above are).
+- Dashboards (the metrics and spans are exported; no dashboard is shipped).

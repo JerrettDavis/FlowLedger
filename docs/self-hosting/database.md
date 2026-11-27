@@ -43,7 +43,11 @@ Notes:
 
 ## Connection pool sizing
 
-Npgsql pools connections per process (default 100 per connection string). Each of the API and Worker has its own pool, so the
+Every EF context in a process (requests, background stores, the worker) draws from ONE shared `NpgsqlDataSource` with a bounded pool
+(#180). Defaults: `Database__MaxPoolSize=40`, `Database__ConnectionTimeoutSeconds=15` (a saturated pool queues, then fails),
+`Database__CommandTimeoutSeconds=60`, and `Application Name` set to the host assembly (`FlowLedger.Api` / `FlowLedger.Worker`), so
+`pg_stat_activity` shows who holds each session. Anything you put in the connection string (`Maximum Pool Size=`, `Timeout=`,
+`Command Timeout=`, `Application Name=`) overrides these. Each of the API and Worker has its own pool, so the
 database must allow roughly `Maximum Pool Size` x (number of API + Worker processes) plus headroom for migrations and admin
 tools. The Worker visits tenants serially by default; `Worker__MaxParallelTenants` (1-16) syncs several tenants at once and each
 concurrent tenant holds its own connection, so keep that value small relative to the pool and to the server's `max_connections`.

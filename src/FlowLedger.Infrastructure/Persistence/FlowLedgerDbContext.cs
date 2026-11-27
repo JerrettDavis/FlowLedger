@@ -71,6 +71,7 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<BackupRunRecord> BackupRuns => Set<BackupRunRecord>();
     internal DbSet<AuditEventRecord> AuditEvents => Set<AuditEventRecord>();
     internal DbSet<JobRunRecord> JobRuns => Set<JobRunRecord>();
+    internal DbSet<JobFireMarkRecord> JobFireMarks => Set<JobFireMarkRecord>();
     internal DbSet<WebhookReplayRecord> WebhookReplays => Set<WebhookReplayRecord>();
     internal DbSet<TenantRegistryRecord> Tenants => Set<TenantRegistryRecord>();
     internal DbSet<AppUserRecord> AppUsers => Set<AppUserRecord>();
@@ -138,6 +139,7 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new BackupRunRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AuditEventRecordConfiguration());
         modelBuilder.ApplyConfiguration(new JobRunRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new JobFireMarkRecordConfiguration());
         modelBuilder.ApplyConfiguration(new WebhookReplayRecordConfiguration());
         modelBuilder.ApplyConfiguration(new TenantRegistryRecordConfiguration());
         modelBuilder.ApplyConfiguration(new AppUserRecordConfiguration());

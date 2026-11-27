@@ -89,15 +89,22 @@ public static partial class DependencyInjection
         // ── Database ────────────────────────────────────────────────────────────
         // The Aspire Postgres resource is named "flowledger" in AppHost.cs.
         // Aspire injects the connection string under the key "ConnectionStrings:flowledger".
-        services.AddDbContext<FlowLedgerDbContext>((serviceProvider, options) =>
+        // One bounded, named NpgsqlDataSource per host: the request contexts, the host-wide stores and the singletons all draw from the same
+        // pool (Database:MaxPoolSize, timeouts, Application Name), so connection use no longer scales with the number of stores (#180).
+        services.AddSingleton(_ =>
         {
             var connectionString = configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException(
                     "Required connection string 'flowledger' was not found. " +
                     "Ensure the Aspire Postgres resource is configured and the " +
                     "connection string is injected via Aspire service defaults.");
+            return DatabaseDataSource.Create(connectionString, DatabaseConnectionOptions.From(configuration));
+        });
 
-            options.UseNpgsql(connectionString, npgsql =>
+        services.AddSingleton(sp => new HostDb(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
+        services.AddDbContext<FlowLedgerDbContext>((serviceProvider, options) =>
+        {
+            options.UseNpgsql(serviceProvider.GetRequiredService<Npgsql.NpgsqlDataSource>(), npgsql =>
             {
                 npgsql.MigrationsAssembly(typeof(FlowLedgerDbContext).Assembly.GetName().Name);
                 npgsql.EnableRetryOnFailure(maxRetryCount: 5);
@@ -136,6 +143,9 @@ public static partial class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddHttpClient<FlowLedger.Application.Features.Strategies.IMarketRateProvider, FlowLedger.Infrastructure.Strategies.FredMarketRateProvider>(c => c.DefaultRequestHeaders.UserAgent.ParseAdd("FlowLedger-RateFetcher/1.0"));
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        // SQL GROUP BY aggregation for the dashboard (#160); the handler falls back to the query engine when this is not registered.
+        services.AddScoped<FlowLedger.Application.Features.Query.ITransactionAggregateStore, EfTransactionAggregateStore>();
+        services.AddScoped<FlowLedger.Application.Features.Query.TransactionAggregates>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
         services.AddScoped<IRecurringFlowRepository, RecurringFlowRepository>();

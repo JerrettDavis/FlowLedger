@@ -16,17 +16,15 @@ public static partial class DependencyInjection
         configuration.GetConnectionString(ConnectionName)
         ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.");
 
-    private static HostDb HostDbFrom(IConfiguration configuration) => new(HostConnectionString(configuration));
-
     /// <summary>Host-wide stores (not tenant-filtered): users, tenants, erasure, webhook replay, provider call ledger, audit log, job history.</summary>
     private static void AddHostWideStores(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(_ =>
-            new EfUserDirectory(HostDbFrom(configuration), TenancySettings.Legacy(configuration)));
-        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
-            new EfWebhookReplayStore(HostDbFrom(configuration)));
-        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
-            new EfTenantRegistry(HostDbFrom(configuration)));
+        services.AddSingleton<FlowLedger.Application.Features.Users.IUserDirectory>(sp =>
+            new EfUserDirectory(sp.GetRequiredService<HostDb>(), TenancySettings.Legacy(configuration)));
+        services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(sp =>
+            new EfWebhookReplayStore(sp.GetRequiredService<HostDb>()));
+        services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(sp =>
+            new EfTenantRegistry(sp.GetRequiredService<HostDb>()));
         services.AddScoped<FlowLedger.Application.Features.Users.ITenantErasure>(sp =>
             new EfTenantErasure(
                 sp.GetRequiredService<FlowLedgerDbContext>(),
@@ -34,12 +32,14 @@ public static partial class DependencyInjection
                 sp.GetServices<FlowLedger.Application.Features.Users.ITenantFileEraser>()));
 
         // Provider call ledger (append-only; feeds budgets + the usage page).
-        services.AddSingleton<ProviderCallLedger>(_ => new ProviderCallLedger(HostConnectionString(configuration)));
+        services.AddSingleton<ProviderCallLedger>(sp => new ProviderCallLedger(sp.GetRequiredService<HostDb>()));
         services.AddSingleton<FlowLedger.Integrations.Abstractions.IProviderCallLedger>(sp => sp.GetRequiredService<ProviderCallLedger>());
         // Audit log of sensitive actions (append-only, host-wide EF table).
-        services.AddSingleton<IAuditLog>(_ => new EfAuditLog(HostDbFrom(configuration)));
+        services.AddSingleton<IAuditLog>(sp => new EfAuditLog(sp.GetRequiredService<HostDb>()));
         // Durable background job run history (host-wide EF table; worker writes, API reads).
-        services.AddSingleton<IJobRunStore>(_ => new EfJobRunStore(HostDbFrom(configuration)));
+        services.AddSingleton<IJobRunStore>(sp => new EfJobRunStore(sp.GetRequiredService<HostDb>()));
+        // Fire-time claims so a missed or duplicated cron slot is detected across replicas and restarts (#187).
+        services.AddSingleton<IJobFireMarks>(sp => new EfJobFireMarks(sp.GetRequiredService<HostDb>(), sp.GetService<TimeProvider>()));
     }
 
     /// <summary>Per-tenant stores (EF: tenant filter + guard).</summary>

@@ -52,7 +52,9 @@ internal sealed partial class PostgresVersionGuardService(IServiceProvider sp, I
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = sp.CreateAsyncScope();
-        var cs = scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>().Database.GetConnectionString()
+        var cs = FlowLedger.Infrastructure.Persistence.DatabaseDataSource.Resolve(
+                scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
+                scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>().Database)
             ?? throw new InvalidOperationException("No connection string available for the PostgreSQL version check.");
 
         var versionNum = await PostgresVersionGuard.ReadServerVersionNumAsync(cs, cancellationToken);
