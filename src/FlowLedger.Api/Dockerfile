@@ -49,7 +49,7 @@ RUN dotnet publish src/FlowLedger.Api/FlowLedger.Api.csproj \
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # noble-chiseled-extra adds only ICU + tzdata: there is NO shell, curl or wget. Docker healthchecks
 # therefore use scripts/healthprobe (a static Go binary built below and copied in).
-FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS healthprobe
+FROM golang:1.27-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS healthprobe
 WORKDIR /src
 COPY scripts/healthprobe/main.go .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /healthprobe main.go
