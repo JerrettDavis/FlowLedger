@@ -72,6 +72,49 @@ public sealed class SourceRuleTests
         Assert.DoesNotContain("Quartz", csproj);
     }
 
+    [Theory]
+    [InlineData("FlowLedger.Domain")]
+    [InlineData("FlowLedger.Application")]
+    public void Domain_and_Application_do_not_use_HttpClient(string project)
+    {
+        // HTTP transport (including the SOAP/WSDL client) lives in Infrastructure behind a port.
+        var http = new Regex(@"System\.Net\.Http|HttpClient", RegexOptions.None);
+        var offenders = SourceFiles(project)
+            .Where(f => http.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"HTTP types used in {project}: {string.Join(", ", offenders)}");
+    }
+
+    /// <summary>Async methods that deliberately take no token, with the reason. Adding to this list needs a reason.</summary>
+    private static readonly HashSet<string> CancellationTokenExceptions = new(StringComparer.Ordinal)
+    {
+        // The caller's token travels inside the factory delegate; the cache itself never awaits on its own behalf.
+        "TenantResultCache.GetOrAddAsync",
+    };
+
+    [Fact]
+    public void Application_async_methods_take_a_CancellationToken()
+    {
+        var application = typeof(FlowLedger.Application.DependencyInjection).Assembly;
+        var offenders = application.GetExportedTypes()
+            .Where(t => t is { IsClass: true } && !t.IsAbstract || t.IsInterface)
+            .SelectMany(t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance
+                                          | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+                .Where(m => !m.IsSpecialName
+                            && (m.ReturnType == typeof(Task) || m.ReturnType == typeof(ValueTask)
+                                || (m.ReturnType.IsGenericType && (m.ReturnType.GetGenericTypeDefinition() == typeof(Task<>)
+                                                                  || m.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))))
+                            && m.GetParameters().All(p => p.ParameterType != typeof(CancellationToken)))
+                .Select(m => $"{t.Name}.{m.Name}"))
+            .Where(m => !CancellationTokenExceptions.Contains(m))
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Public async Application methods without a CancellationToken parameter: {string.Join(", ", offenders)}");
+    }
+
     // ── 3. Time comes from a TimeProvider, not the wall clock (ratchet) ──────
 
     /// <summary>Files that still read the wall clock directly. Empty since #127: Domain and Application take time from a TimeProvider.</summary>

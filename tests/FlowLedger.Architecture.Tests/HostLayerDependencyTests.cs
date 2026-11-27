@@ -68,4 +68,55 @@ public sealed class HostLayerDependencyTests
 
         Assert.True(stale.Count == 0, $"These endpoints no longer use Infrastructure; remove them from the allowlist: {string.Join(", ", stale)}");
     }
+
+    /// <summary>
+    /// Non-endpoint Api types that use Infrastructure. Program and MigrateCommand are the composition root; the other two are
+    /// known debt (the audit sink and the on-demand sync job should sit behind Application ports).
+    /// </summary>
+    private static readonly HashSet<string> ApiHostInfrastructureAllowlist = new(StringComparer.Ordinal)
+    {
+        "Program",
+        "FlowLedger.Api.MigrateCommand",
+        "FlowLedger.Api.Middleware.AuditMiddleware",
+        "FlowLedger.Api.Jobs.OnDemandSyncJob",
+    };
+
+    /// <summary>Api types that name a concrete connector assembly: only the Quiltt endpoint (session minting) is not composition.</summary>
+    private static readonly HashSet<string> ApiConcreteConnectorAllowlist = new(StringComparer.Ordinal)
+    {
+        "FlowLedger.Api.Endpoints.QuilttEndpoints",
+    };
+
+    private static readonly string[] ConcreteConnectors =
+    [
+        "FlowLedger.Integrations.Mx", "FlowLedger.Integrations.Quiltt", "FlowLedger.Integrations.SimpleFin", "FlowLedger.Integrations.Simulated",
+    ];
+
+    private static HashSet<string> Outer(IEnumerable<string>? names) =>
+        (names ?? []).Select(n => n.Split('+', '/')[0]).ToHashSet(StringComparer.Ordinal);
+
+    [Fact]
+    public void Api_host_code_outside_endpoints_uses_Infrastructure_only_in_the_composition_root_and_allowlist()
+    {
+        var failing = Outer(Types.InAssembly(Api).That().DoNotResideInNamespace("FlowLedger.Api.Endpoints")
+            .ShouldNot().HaveDependencyOn("FlowLedger.Infrastructure").GetResult().FailingTypeNames);
+
+        var fresh = failing.Where(n => !ApiHostInfrastructureAllowlist.Contains(n)).ToList();
+        var stale = ApiHostInfrastructureAllowlist.Where(n => !failing.Contains(n)).ToList();
+
+        Assert.True(fresh.Count == 0, $"Api host types must use Application ports, not Infrastructure. New violations: {string.Join(", ", fresh)}");
+        Assert.True(stale.Count == 0, $"These types no longer use Infrastructure; remove them from the allowlist: {string.Join(", ", stale)}");
+    }
+
+    [Fact]
+    public void Api_does_not_name_concrete_connector_assemblies_outside_the_allowlist()
+    {
+        var failing = Outer(Types.InAssembly(Api).ShouldNot().HaveDependencyOnAny(ConcreteConnectors).GetResult().FailingTypeNames);
+
+        var fresh = failing.Where(n => !ApiConcreteConnectorAllowlist.Contains(n)).ToList();
+        var stale = ApiConcreteConnectorAllowlist.Where(n => !failing.Contains(n)).ToList();
+
+        Assert.True(fresh.Count == 0, $"Api code must go through IFinancialDataProvider/IConnectorRegistry. New violations: {string.Join(", ", fresh)}");
+        Assert.True(stale.Count == 0, $"These types no longer name a connector assembly; remove them from the allowlist: {string.Join(", ", stale)}");
+    }
 }
