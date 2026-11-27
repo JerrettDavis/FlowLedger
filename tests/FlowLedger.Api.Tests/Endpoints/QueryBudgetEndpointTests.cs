@@ -40,7 +40,7 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
     {
         factory.Budget = new QueryBudget(MaxIntermediateRows: 1, MaxEvalSteps: 1_000_000, Timeout: TimeSpan.FromSeconds(10));
 
-        var response = await _client.PostAsJsonAsync("/api/query/run", new RunQueryRequest("transactions | where amount > 0"));
+        var response = await _client.PostAsJsonAsync("/api/query/run", RunQueryRequestBuilder.A().Running("transactions | where amount > 0").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
@@ -50,7 +50,7 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
     {
         factory.Budget = new QueryBudget(MaxIntermediateRows: 1_000_000, MaxEvalSteps: 1_000_000, Timeout: TimeSpan.Zero);
 
-        var response = await _client.PostAsJsonAsync("/api/query/run", new RunQueryRequest("transactions | where amount > 0"));
+        var response = await _client.PostAsJsonAsync("/api/query/run", RunQueryRequestBuilder.A().Running("transactions | where amount > 0").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.RequestTimeout);
     }
@@ -60,7 +60,7 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
     {
         factory.Budget = new QueryBudget(MaxIntermediateRows: 1_000, MaxEvalSteps: 1_000_000, Timeout: TimeSpan.FromSeconds(10));
 
-        var response = await _client.PostAsJsonAsync("/api/query/run", new RunQueryRequest("transactions | summarize n = count()"));
+        var response = await _client.PostAsJsonAsync("/api/query/run", RunQueryRequestBuilder.A().Running("transactions | summarize n = count()").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -74,11 +74,11 @@ public sealed class QueryBudgetEndpointTests(QueryBudgetApiFactory factory) : IA
         {
             held.Should().OnlyContain(l => l != null);
 
-            var blocked = await _client.PostAsJsonAsync("/api/query/ask", new AskQueryRequest("how much did I spend?"));
+            var blocked = await _client.PostAsJsonAsync("/api/query/ask", AskQueryRequestBuilder.A().Asking("how much did I spend?").Build());
             blocked.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
 
             var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
-            var ok = await other.PostAsJsonAsync("/api/query/ask", new AskQueryRequest("   "));
+            var ok = await other.PostAsJsonAsync("/api/query/ask", AskQueryRequestBuilder.A().Asking("   ").Build());
             ok.StatusCode.Should().Be(HttpStatusCode.OK);
         }
         finally

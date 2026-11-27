@@ -72,8 +72,7 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Recurring_flow_types_round_trip()
     {
-        AssertRoundTrips(new RecurringFlowDto(Id1, Id2, "Rent", 1500m, "USD", "Outflow", "Fixed", "Monthly", 1, null, null, null,
-            D, null, null, "Landlord", true, At, 1500m));
+        AssertRoundTrips(RecurringFlowDtoBuilder.A().WithId(Id1).OnAccount(Id2).Named("Rent").WithAmount(1500m).WithCounterparty("Landlord").Build());
         AssertRoundTrips(CreateRecurringFlowRequestBuilder.A().OnAccount(Id2).Named("Pay").WithAmount(2000m).WithDirection("Inflow")
             .Every("TwiceMonthly", dayOfMonth: 1, secondDayOfMonth: 15).From(D, D.AddYears(1)).InCategory(Id1).WithCounterparty(null).Build());
         AssertRoundTrips(UpdateRecurringFlowRequestBuilder.A().WithAmount(9.99m).WithModel("Variable").Build());
