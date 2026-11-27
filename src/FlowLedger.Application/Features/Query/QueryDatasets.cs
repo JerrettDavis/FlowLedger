@@ -91,7 +91,7 @@ public sealed class QueryDatasetProvider(
     ICategoryRepository categories,
     IAssetRepository assets,
     IBalanceHistoryReader balanceHistory,
-    TimeProvider? clock = null)
+    TimeProvider clock)
 {
     private const int MaxTransactions = TransactionQuota.ProcessingCap;
 
@@ -141,7 +141,7 @@ public sealed class QueryDatasetProvider(
         }
 
         var accountMap = accountEntities.ToDictionary(a => a.Id);
-        var today = AssetClock.Today(clock);
+        var today = clock.UtcToday();
         var assetEntities = await assets.ListAsync(ct);
         var valuationRows = assetEntities
             .SelectMany(a => a.Valuations.Select(v => new object?[]

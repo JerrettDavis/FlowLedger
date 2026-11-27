@@ -12,7 +12,7 @@ public sealed class AssetTests
     private static readonly DateOnly Jan1 = new(2024, 1, 1);
 
     private static Asset NewAsset(decimal value = 1000m, AssetCategory cat = AssetCategory.Electronics)
-        => Asset.Create(Tenant, "Laptop", cat, new Money(value, "USD"), Jan1);
+        => Asset.Create(Tenant, "Laptop", cat, new Money(value, "USD"), Jan1, FlowLedger.TestSupport.TestClock.Provider);
 
     [Fact]
     public void Create_records_initial_valuation()
@@ -24,8 +24,8 @@ public sealed class AssetTests
     [Fact]
     public void Create_rejects_blank_name_and_negative_value()
     {
-        var blank = () => Asset.Create(Tenant, " ", AssetCategory.Other, new Money(1m, "USD"), Jan1);
-        var neg = () => Asset.Create(Tenant, "x", AssetCategory.Other, new Money(-1m, "USD"), Jan1);
+        var blank = () => Asset.Create(Tenant, " ", AssetCategory.Other, new Money(1m, "USD"), Jan1, FlowLedger.TestSupport.TestClock.Provider);
+        var neg = () => Asset.Create(Tenant, "x", AssetCategory.Other, new Money(-1m, "USD"), Jan1, FlowLedger.TestSupport.TestClock.Provider);
         blank.Should().Throw<EmptyStringException>();
         neg.Should().Throw<InvalidAssetException>();
     }
@@ -34,9 +34,9 @@ public sealed class AssetTests
     public void RecordValuation_averages_distinct_sources_within_window()
     {
         var a = NewAsset(200m); // Manual @ Jan1
-        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(3), "feedA", blendWindowDays: 7);
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(3), "feedA", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
         a.CurrentValue.Amount.Should().Be(250m);
-        a.RecordValuation(new Money(400m, "USD"), Jan1.AddDays(7), "feedB", blendWindowDays: 7);
+        a.RecordValuation(new Money(400m, "USD"), Jan1.AddDays(7), "feedB", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
         a.CurrentValue.Amount.Should().Be(300m); // (200 + 300 + 400) / 3
         a.ValuedOn.Should().Be(Jan1.AddDays(7));
     }
@@ -45,10 +45,10 @@ public sealed class AssetTests
     public void RecordValuation_blend_uses_latest_per_source_and_ignores_values_outside_window()
     {
         var a = NewAsset(200m);
-        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(2), "feedA", blendWindowDays: 7);
-        a.RecordValuation(new Money(500m, "USD"), Jan1.AddDays(4), "feedA", blendWindowDays: 7); // replaces 300
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(2), "feedA", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
+        a.RecordValuation(new Money(500m, "USD"), Jan1.AddDays(4), "feedA", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7); // replaces 300
         a.CurrentValue.Amount.Should().Be(350m); // (200 + 500) / 2
-        a.RecordValuation(new Money(900m, "USD"), Jan1.AddDays(20), "feedB", blendWindowDays: 7);
+        a.RecordValuation(new Money(900m, "USD"), Jan1.AddDays(20), "feedB", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
         a.CurrentValue.Amount.Should().Be(900m); // earlier values are > 7 days old
     }
 
@@ -56,8 +56,8 @@ public sealed class AssetTests
     public void GetSpread_reports_low_high_median_average_per_source()
     {
         var a = NewAsset(200m);
-        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA", blendWindowDays: 7);
-        a.RecordValuation(new Money(1000m, "USD"), Jan1.AddDays(2), "feedB", blendWindowDays: 7);
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
+        a.RecordValuation(new Money(1000m, "USD"), Jan1.AddDays(2), "feedB", FlowLedger.TestSupport.TestClock.Provider, blendWindowDays: 7);
         var s = a.GetSpread(7)!;
         (s.Low, s.High, s.Median, s.SourceCount).Should().Be((200m, 1000m, 300m, 3));
         s.Average.Should().Be(500m);
@@ -68,7 +68,7 @@ public sealed class AssetTests
     public void RecordValuation_without_window_keeps_latest_wins()
     {
         var a = NewAsset(200m);
-        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA");
+        a.RecordValuation(new Money(300m, "USD"), Jan1.AddDays(1), "feedA", FlowLedger.TestSupport.TestClock.Provider);
         a.CurrentValue.Amount.Should().Be(300m);
     }
 
@@ -76,11 +76,11 @@ public sealed class AssetTests
     public void RecordValuation_newer_updates_current_and_older_only_history()
     {
         var a = NewAsset();
-        a.RecordValuation(new Money(800m, "USD"), Jan1.AddMonths(6), "Manual");
+        a.RecordValuation(new Money(800m, "USD"), Jan1.AddMonths(6), "Manual", FlowLedger.TestSupport.TestClock.Provider);
         a.CurrentValue.Amount.Should().Be(800m);
         a.ValuedOn.Should().Be(Jan1.AddMonths(6));
 
-        a.RecordValuation(new Money(1200m, "USD"), Jan1.AddMonths(-3), "Manual");
+        a.RecordValuation(new Money(1200m, "USD"), Jan1.AddMonths(-3), "Manual", FlowLedger.TestSupport.TestClock.Provider);
         a.CurrentValue.Amount.Should().Be(800m);
         a.Valuations.Should().HaveCount(3);
     }
@@ -89,7 +89,7 @@ public sealed class AssetTests
     public void RecordValuation_rejects_currency_mismatch()
     {
         var a = NewAsset();
-        var act = () => a.RecordValuation(new Money(5m, "EUR"), Jan1, "Manual");
+        var act = () => a.RecordValuation(new Money(5m, "EUR"), Jan1, "Manual", FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<CurrencyMismatchException>();
     }
 
@@ -123,8 +123,8 @@ public sealed class AssetTests
     public void LinkAccount_rejects_other_tenants_account_and_allows_unlink()
     {
         var a = NewAsset();
-        var mine = Account.Create(Tenant, "Mortgage", AccountType.Mortgage, Money.Zero("USD"));
-        var theirs = Account.Create(TenantId.New(), "Other", AccountType.Mortgage, Money.Zero("USD"));
+        var mine = Account.Create(Tenant, "Mortgage", AccountType.Mortgage, Money.Zero("USD"), FlowLedger.TestSupport.TestClock.Provider);
+        var theirs = Account.Create(TenantId.New(), "Other", AccountType.Mortgage, Money.Zero("USD"), FlowLedger.TestSupport.TestClock.Provider);
 
         a.LinkAccount(mine);
         a.LinkedAccountId.Should().Be(mine.Id);
@@ -197,7 +197,7 @@ public sealed class AssetTests
     {
         var a = NewAsset();
         a.SetValuationModel(ValuationMethod.DecliningBalance, 0.5m, null, null);
-        a.RecordValuation(new Money(400m, "USD"), Jan1.AddYears(1), "Manual");
+        a.RecordValuation(new Money(400m, "USD"), Jan1.AddYears(1), "Manual", FlowLedger.TestSupport.TestClock.Provider);
         AssetValuationEstimator.Estimate(a, Jan1.AddYears(2)).Amount.Should().BeApproximately(200m, 2m);
     }
 }

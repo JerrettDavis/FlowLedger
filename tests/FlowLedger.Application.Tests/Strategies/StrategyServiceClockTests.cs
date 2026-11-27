@@ -31,13 +31,13 @@ public sealed class StrategyServiceClockTests
     {
         var accounts = new FakeAccountRepository();
         var txs = new FakeTransactionRepository();
-        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(5000m, Usd));
+        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(5000m, Usd), FlowLedger.TestSupport.TestClock.Provider);
         await accounts.AddAsync(account);
         await txs.AddAsync(Transaction.RecordActual(Tenant, account.AccountId, new Money(900m, Usd), TransactionDirection.Debit,
-            "Rent", new DateOnly(2026, 11, 15), new DateOnly(2026, 11, 15), TransactionSource.CsvImport));
+            "Rent", new DateOnly(2026, 11, 15), new DateOnly(2026, 11, 15), TransactionSource.CsvImport, FlowLedger.TestSupport.TestClock.Provider));
 
         var service = new StrategyService(
-            txs, accounts, new FakeCategoryRepository(), new StaticMarketRateProvider(), new NoRates(), new FakeTenantContext(),
+            txs, accounts, new FakeCategoryRepository(), new StaticMarketRateProvider(FlowLedger.TestSupport.TestClock.Provider), new NoRates(), new FakeTenantContext(),
             llm: null, time: new FixedTime(now));
         return await service.GetReportAsync();
     }

@@ -30,7 +30,7 @@ public sealed class AccountPersistenceTests : IAsyncLifetime
         var tenantId = TenantId.From(tenantCtx.TenantId);
         var usd = Currency.Usd;
         var account = Account.Create(tenantId, "Checking Account", AccountType.Checking,
-            new Money(1_500.00m, usd), institution: "First Bank");
+            new Money(1_500.00m, usd), FlowLedger.TestSupport.TestClock.Provider, institution: "First Bank");
 
         // Act — persist
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
@@ -60,7 +60,7 @@ public sealed class AccountPersistenceTests : IAsyncLifetime
         var tenantId = TenantId.From(tenantCtx.TenantId);
         var amount = new Money(0.1m + 0.2m, Currency.Usd);
 
-        var account = Account.Create(tenantId, "Precision Test", AccountType.Cash, amount);
+        var account = Account.Create(tenantId, "Precision Test", AccountType.Cash, amount, FlowLedger.TestSupport.TestClock.Provider);
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
         {
@@ -85,8 +85,8 @@ public sealed class AccountPersistenceTests : IAsyncLifetime
         var tidA = TenantId.From(tenantA.TenantId);
         var tidB = TenantId.From(tenantB.TenantId);
 
-        var accountA = Account.Create(tidA, "Tenant A Account", AccountType.Checking, new Money(100m, Currency.Usd));
-        var accountB = Account.Create(tidB, "Tenant B Account", AccountType.Savings, new Money(200m, Currency.Usd));
+        var accountA = Account.Create(tidA, "Tenant A Account", AccountType.Checking, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
+        var accountB = Account.Create(tidB, "Tenant B Account", AccountType.Savings, new Money(200m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
 
         // Save tenant A account using tenant A context
         await using (var ctx = _fixture.CreateDbContext(tenantA))
@@ -128,10 +128,10 @@ public sealed class AccountPersistenceTests : IAsyncLifetime
         var tenantId = TenantId.From(tenantCtx.TenantId);
 
         // Without credit limit
-        var noLimit = Account.Create(tenantId, "No Limit", AccountType.Checking, new Money(500m, Currency.Usd));
+        var noLimit = Account.Create(tenantId, "No Limit", AccountType.Checking, new Money(500m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         // With credit limit
         var withLimit = Account.Create(tenantId, "CC", AccountType.CreditCard,
-            new Money(-200m, Currency.Usd), creditLimit: new Money(5_000m, Currency.Usd));
+            new Money(-200m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider, creditLimit: new Money(5_000m, Currency.Usd));
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
         {

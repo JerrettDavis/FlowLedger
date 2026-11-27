@@ -80,7 +80,7 @@ public sealed class IntegrationServiceTests
     {
         var store = new FakeStore();
         var transport = new FakeTransport();
-        return (new IntegrationService(store, transport, new Network(local), new FakeTenantContext()), store, transport);
+        return (new IntegrationService(store, transport, new Network(local), new FakeTenantContext(), FlowLedger.TestSupport.TestClock.Provider), store, transport);
     }
 
     private static IntegrationSaveRequest Rest(string url = "https://api.example.com/v1", IntegrationAuth auth = IntegrationAuth.None, string? credential = null, string? user = null)

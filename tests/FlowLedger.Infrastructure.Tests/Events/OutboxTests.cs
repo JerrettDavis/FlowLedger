@@ -80,14 +80,14 @@ public sealed class OutboxTests : IAsyncLifetime
     private async Task RaiseAsync(TestTenantContext tenant)
     {
         await using var ctx = _fixture.CreateProductionStyleContext(tenant);
-        var account = Account.Create(TenantId.From(tenant.TenantId), "Checking", AccountType.Checking, new Money(0m, Currency.Usd));
+        var account = Account.Create(TenantId.From(tenant.TenantId), "Checking", AccountType.Checking, new Money(0m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         ctx.Accounts.Add(account);
         Stage(ctx, tenant);
         await ctx.SaveChangesAsync();
     }
 
     private static void Stage(FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext ctx, TestTenantContext tenant) =>
-        new EfOutbox(ctx, tenant).Enqueue(new SyncCompleted(TenantId.From(tenant.TenantId), 1, 2, 0));
+        new EfOutbox(ctx, tenant).Enqueue(new SyncCompleted(TenantId.From(tenant.TenantId), 1, 2, 0) { OccurredAt = FlowLedger.TestSupport.TestClock.Instant });
 
     private async Task<(int Attempts, bool Processed, bool Dead, string? Error)[]> RowsAsync()
     {
@@ -120,11 +120,11 @@ public sealed class OutboxTests : IAsyncLifetime
     {
         var tenant = TestTenantContext.New();
         await using var ctx = _fixture.CreateProductionStyleContext(tenant);
-        var account = Account.Create(TenantId.From(tenant.TenantId), "Dup", AccountType.Checking, new Money(0m, Currency.Usd));
+        var account = Account.Create(TenantId.From(tenant.TenantId), "Dup", AccountType.Checking, new Money(0m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         ctx.Accounts.Add(account);
         Stage(ctx, tenant);
         // Cross-tenant mutation is rejected before commit: nothing may be recorded.
-        ctx.Accounts.Add(Account.Create(TenantId.From(Guid.NewGuid()), "Other", AccountType.Checking, new Money(0m, Currency.Usd)));
+        ctx.Accounts.Add(Account.Create(TenantId.From(Guid.NewGuid()), "Other", AccountType.Checking, new Money(0m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider));
         var act = () => ctx.SaveChangesAsync();
         await act.Should().ThrowAsync<InvalidOperationException>();
 

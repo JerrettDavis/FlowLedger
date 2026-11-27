@@ -52,7 +52,7 @@ public sealed class CategorizationLocalAiTests
     private async Task SetUpAsync()
     {
         var tenantId = TenantId.From(_tenant.TenantId);
-        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd));
+        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         await _accounts.AddAsync(_checking);
         _coffee = Category.Create(tenantId, new CategoryPath("Food/Coffee"), "Coffee");
         _fuel = Category.Create(tenantId, new CategoryPath("Transport/Fuel"), "Fuel");
@@ -70,7 +70,7 @@ public sealed class CategorizationLocalAiTests
     {
         var tx = Transaction.RecordActual(
             TenantId.From(_tenant.TenantId), _checking.AccountId, new Money(12m, Currency.Usd), TransactionDirection.Debit, desc,
-            new DateOnly(2026, 11, Math.Min(day, 28)), new DateOnly(2026, 11, Math.Min(day, 28)), TransactionSource.Manual);
+            new DateOnly(2026, 11, Math.Min(day, 28)), new DateOnly(2026, 11, Math.Min(day, 28)), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         if (cat is not null)
         {
             tx.Categorize(cat.CategoryId);

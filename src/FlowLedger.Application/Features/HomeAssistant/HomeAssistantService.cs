@@ -26,9 +26,9 @@ public sealed class HomeAssistantService(
     GetMonthlySpendByCategoryHandler spend,
     GetForecastHandler forecast,
     ITenantContext tenant,
-    TimeProvider? clock = null)
+    TimeProvider clock)
 {
-    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+    private readonly TimeProvider _clock = clock;
 
     public const int HorizonDays = 14;
     public const int ForecastRiskDays = 7;

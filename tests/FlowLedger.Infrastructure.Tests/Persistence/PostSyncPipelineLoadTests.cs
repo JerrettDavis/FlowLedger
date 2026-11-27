@@ -48,7 +48,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
         {
             seed.Transactions.Add(Transaction.RecordActual(
                 tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
-                $"COFFEE SHOP {i}", new DateOnly(2026, 1, 1).AddDays(i % 300), new DateOnly(2026, 1, 1).AddDays(i % 300), TransactionSource.Manual));
+                $"COFFEE SHOP {i}", new DateOnly(2026, 1, 1).AddDays(i % 300), new DateOnly(2026, 1, 1).AddDays(i % 300), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider));
         }
 
         await seed.SaveChangesAsync();
@@ -149,7 +149,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
             {
                 var tx = Transaction.RecordActual(
                     tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
-                    $"COFFEE SHOP {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual);
+                    $"COFFEE SHOP {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
                 tx.Categorize(category.CategoryId, null, CategorySource.Manual);
                 seed.Transactions.Add(tx);
             }
@@ -205,7 +205,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
             {
                 seed.Transactions.Add(Transaction.RecordActual(
                     tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
-                    $"UNKNOWN VENDOR {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual));
+                    $"UNKNOWN VENDOR {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider));
             }
 
             await seed.SaveChangesAsync();
@@ -240,7 +240,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
                 var day = new DateOnly(2026, 1, 1).AddDays(i % 200);
                 var tx = Transaction.RecordActual(
                     tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
-                    i % 2 == 0 ? "BLUE BOTTLE" : $"UNKNOWN VENDOR {i}", day, day, TransactionSource.Manual);
+                    i % 2 == 0 ? "BLUE BOTTLE" : $"UNKNOWN VENDOR {i}", day, day, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
                 if (i % 2 == 0)
                 {
                     tx.Categorize(coffee.CategoryId, null, CategorySource.Manual);
@@ -253,7 +253,7 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
             {
                 var tx = Transaction.RecordActual(
                     tenantId, account, new Money(77m + i, Currency.Usd), TransactionDirection.Debit,
-                    "BLUE BOTTLE", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), TransactionSource.Manual);
+                    "BLUE BOTTLE", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
                 seed.Transactions.Add(tx);
                 newIds.Add(tx.Id);
             }

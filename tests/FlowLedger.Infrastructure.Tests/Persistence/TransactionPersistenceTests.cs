@@ -36,7 +36,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
             "Grocery Store",
             effectiveDate: date,
             postedDate: date,
-            source: TransactionSource.Manual);
+            source: TransactionSource.Manual, time: FlowLedger.TestSupport.TestClock.Provider);
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
         {
@@ -71,7 +71,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
 
         var tx1 = Transaction.RecordActual(tenantId, accountId,
             new Money(99.99m, Currency.Usd), TransactionDirection.Debit,
-            "MERCHANT ABC", date, date, TransactionSource.CsvImport, fingerprint);
+            "MERCHANT ABC", date, date, TransactionSource.CsvImport, FlowLedger.TestSupport.TestClock.Provider, fingerprint);
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
         {
@@ -83,7 +83,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         // same tenant should fail with a DB unique constraint violation.
         var tx2 = Transaction.RecordActual(tenantId, accountId,
             new Money(99.99m, Currency.Usd), TransactionDirection.Debit,
-            "MERCHANT ABC (dup)", date, date, TransactionSource.CsvImport, fingerprint);
+            "MERCHANT ABC (dup)", date, date, TransactionSource.CsvImport, FlowLedger.TestSupport.TestClock.Provider, fingerprint);
 
         await using (var ctx2 = _fixture.CreateDbContext(tenantCtx))
         {
@@ -108,10 +108,10 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         var fingerprint = TransactionFingerprint.Create(accountId, date, 50m, "CROSS TENANT STORE");
 
         var txA = Transaction.RecordActual(tidA, accountId, new Money(50m, Currency.Usd),
-            TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, fingerprint);
+            TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider, fingerprint);
 
         var txB = Transaction.RecordActual(tidB, accountIdB, new Money(50m, Currency.Usd),
-            TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, fingerprint);
+            TransactionDirection.Debit, "CROSS TENANT STORE", date, date, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider, fingerprint);
 
         await using (var ctx = _fixture.CreateDbContext(tenantA))
         {
@@ -138,10 +138,10 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
         var accountIdB = await _fixture.SeedAccountAsync(tenantB);
 
         var txA = Transaction.RecordActual(tidA, accountId, new Money(10m, Currency.Usd),
-            TransactionDirection.Debit, "TxA", new DateOnly(2025, 1, 1), null, TransactionSource.Manual);
+            TransactionDirection.Debit, "TxA", new DateOnly(2025, 1, 1), null, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
         var txB = Transaction.RecordActual(tidB, accountIdB, new Money(20m, Currency.Usd),
-            TransactionDirection.Debit, "TxB", new DateOnly(2025, 1, 2), null, TransactionSource.Manual);
+            TransactionDirection.Debit, "TxB", new DateOnly(2025, 1, 2), null, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
         await using (var ctx = _fixture.CreateDbContext(tenantA))
         {
@@ -183,7 +183,7 @@ public sealed class TransactionPersistenceTests : IAsyncLifetime
 
         var tx = Transaction.RecordActual(tenantId, accountId,
             new Money(100m, Currency.Usd), TransactionDirection.Debit,
-            "Split Transaction", date, date, TransactionSource.Manual);
+            "Split Transaction", date, date, TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
         tx.SetSplits([
             new TransactionSplit(new Money(60m, Currency.Usd), catId, "groceries"),

@@ -147,7 +147,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     {
         var tenant = TestTenantContext.New();
         var sut = Build(tenant.TenantId, tenant, Connector("SimpleFIN", ["legacy-1"]));
-        var legacy = Account.Create(TenantId.From(tenant.TenantId), "Old", AccountType.Checking, new Money(5m, new Currency("USD")), null, "legacy-1");
+        var legacy = Account.Create(TenantId.From(tenant.TenantId), "Old", AccountType.Checking, new Money(5m, new Currency("USD")), FlowLedger.TestSupport.TestClock.Provider, null, "legacy-1");
         sut.Db.Accounts.Add(legacy);
         await sut.Db.SaveChangesAsync();
 
@@ -162,7 +162,7 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     {
         var tenant = TestTenantContext.New();
         var sut = Build(tenant.TenantId, tenant, Connector("SimpleFIN", ["pin-1"]));
-        var acct = Account.Create(TenantId.From(tenant.TenantId), "Mine", AccountType.Checking, new Money(5m, new Currency("USD")), null, "pin-1");
+        var acct = Account.Create(TenantId.From(tenant.TenantId), "Mine", AccountType.Checking, new Money(5m, new Currency("USD")), FlowLedger.TestSupport.TestClock.Provider, null, "pin-1");
         sut.Db.Accounts.Add(acct);
         await sut.Db.SaveChangesAsync();
         await sut.Links.PinManualAsync(acct.Id);

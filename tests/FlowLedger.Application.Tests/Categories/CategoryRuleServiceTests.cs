@@ -29,7 +29,7 @@ public sealed class CategoryRuleServiceTests
 
     private Transaction Tx(string description) => Transaction.RecordActual(
         TenantId.From(_tenant.TenantId), AccountId.New(), new Money(20m, Currency.Usd), TransactionDirection.Debit, description,
-        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual);
+        new DateOnly(2026, 11, 5), new DateOnly(2026, 11, 5), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
 
     private CategoryRuleService Service(RuleStore rules, TxStore txs) => new(rules, txs, _categories, _tenant);
 

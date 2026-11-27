@@ -24,10 +24,10 @@ public sealed class ImportHandlerTests
         var tenant = new FakeTenantContext();
         var matcher = new MatchingEngine(occRepo);
 
-        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(1000m, Usd));
+        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(1000m, Usd), FlowLedger.TestSupport.TestClock.Provider);
         acctRepo.AddAsync(account).GetAwaiter().GetResult();
 
-        var handler = new ImportTransactionsHandler(txRepo, acctRepo, occRepo, tenant, matcher);
+        var handler = new ImportTransactionsHandler(txRepo, acctRepo, occRepo, tenant, matcher, FlowLedger.TestSupport.TestClock.Provider);
         return (handler, txRepo, acctRepo, occRepo, account);
     }
 

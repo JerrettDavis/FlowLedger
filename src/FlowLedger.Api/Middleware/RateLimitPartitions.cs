@@ -45,17 +45,19 @@ public static class RateLimitPartitions
         var services = http.RequestServices;
         var max = services?.GetService<IConfiguration>()?.GetValue("RateLimiting:MaxTenantPartitions", DefaultMaxTenantPartitions)
                   ?? DefaultMaxTenantPartitions;
-        return KeyFor(http, services?.GetService<IOptions<ApiOptions>>()?.Value.TenantSigningKey, max);
+        return KeyFor(http, services?.GetService<IOptions<ApiOptions>>()?.Value.TenantSigningKey, max, Registry, services?.GetService<TimeProvider>());
     }
 
-    public static string KeyFor(HttpContext http, string? signingKey) => KeyFor(http, signingKey, DefaultMaxTenantPartitions);
+    public static string KeyFor(HttpContext http, string? signingKey, TimeProvider? clock = null) =>
+        KeyFor(http, signingKey, DefaultMaxTenantPartitions, Registry, clock);
 
     public static string KeyFor(HttpContext http, string? signingKey, int maxTenantPartitions) =>
-        KeyFor(http, signingKey, maxTenantPartitions, Registry);
+        KeyFor(http, signingKey, maxTenantPartitions, Registry, null);
 
     /// <summary>Exposed for tests so the cap can be exercised without sharing process-wide state.</summary>
-    internal static string KeyFor(HttpContext http, string? signingKey, int maxTenantPartitions, TenantPartitionRegistry registry)
+    internal static string KeyFor(HttpContext http, string? signingKey, int maxTenantPartitions, TenantPartitionRegistry registry, TimeProvider? clock = null)
     {
+        var now = (clock ?? TimeProvider.System).GetUtcNow();
         if (http.User.Identity?.IsAuthenticated == true
             && http.User.Identity.AuthenticationType == ApiKeyAuthenticationHandler.SchemeName)
         {
@@ -68,7 +70,7 @@ public static class RateLimitPartitions
             // Unverifiable tenant (signing key set but signature missing/invalid): the request will be rejected downstream, and
             // must not create a partition of its own.
             if (!string.IsNullOrEmpty(signingKey)
-                && !TenantAssertion.Verify(signingKey, id, http.Request.Headers["X-Tenant-Sig"].ToString(), DateTimeOffset.UtcNow))
+                && !TenantAssertion.Verify(signingKey, id, http.Request.Headers["X-Tenant-Sig"].ToString(), now))
             {
                 return IpKey(http);
             }
@@ -84,7 +86,7 @@ public static class RateLimitPartitions
             // (a leaked key, or a very large deployment, must not grow limiter state without bound): beyond the cap new tenants share
             // a fixed set of overflow buckets until idle partitions age out.
             var key = "tenant:" + id.ToString("N");
-            return registry.TryAdmit(key, maxTenantPartitions, DateTimeOffset.UtcNow)
+            return registry.TryAdmit(key, maxTenantPartitions, now)
                 ? key
                 : "tenant:o" + (BitConverter.ToUInt32(id.ToByteArray(), 0) % OverflowBuckets);
         }

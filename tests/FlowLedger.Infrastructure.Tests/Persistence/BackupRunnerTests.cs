@@ -20,8 +20,8 @@ public sealed class BackupRunnerTests : IAsyncLifetime
         await _fixture.ResetAsync();
         var tenantCtx = TestTenantContext.New();
         await using var ctx = _fixture.CreateDbContext(tenantCtx);
-        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Checking", AccountType.Checking, new Money(5m, Currency.Usd)));
-        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Savings, \"main\"", AccountType.Savings, new Money(7m, Currency.Usd)));
+        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Checking", AccountType.Checking, new Money(5m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider));
+        ctx.Accounts.Add(Account.Create(TenantId.From(tenantCtx.TenantId), "Savings, \"main\"", AccountType.Savings, new Money(7m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider));
         await ctx.SaveChangesAsync();
     }
 

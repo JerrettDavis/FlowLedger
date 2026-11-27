@@ -16,7 +16,7 @@ public sealed class PlannedFlowOccurrenceTests
         RecurringFlow.Create(
             TenantId, AccountId, "Electric",
             new Money(180m, "USD"), TransactionDirection.Debit,
-            RecurrencePattern.Monthly(10), Jan1, Dec31);
+            RecurrencePattern.Monthly(10), Jan1, FlowLedger.TestSupport.TestClock.Provider, Dec31);
 
     // ── MatchActual ───────────────────────────────────────────────────────────
 

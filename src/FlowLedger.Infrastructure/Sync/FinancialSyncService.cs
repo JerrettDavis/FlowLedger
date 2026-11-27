@@ -38,7 +38,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
     private readonly IProviderAccountCatalog? _catalog;
     private readonly bool _autoCreateAccounts;
     private readonly IProviderConnectionStore? _health;
-    private readonly TimeProvider? _clock;
+    private readonly TimeProvider _clock;
     private readonly SyncChangeSet _changed = new();   // rows this sync inserted or settled (#163)
 
     /// <summary>Per-tenant stored-transaction ceiling the provider path enforces; tests lower it.</summary>
@@ -61,7 +61,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
         IProviderConnectionStore? health = null,
         TimeProvider? clock = null)
     {
-        _clock = clock;
+        _clock = clock ?? TimeProvider.System; // the composition root registers the clock; direct constructions (tests) default to the system one
         _health = health;
         _links = links;
         _catalog = catalog;
@@ -131,7 +131,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
         // Persist immediately: if the process dies after this point the member is never re-created.
         var record = ProviderConnectionRecord.Create(
             _tenant.TenantId, _provider.ProviderName, memberRef.ProviderId,
-            memberRef.InstitutionName, memberRef.Status.ToString(), DateTimeOffset.UtcNow);
+            memberRef.InstitutionName, memberRef.Status.ToString(), _clock.GetUtcNow());
         await _db.ProviderConnections.AddAsync(record, ct);
         await _db.SaveChangesAsync(ct);
         return record;
@@ -153,7 +153,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
         }
         catch (ProviderException ex)
         {
-            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(ProviderIssue.FromException(ex), DateTimeOffset.UtcNow), CancellationToken.None);
+            await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(ProviderIssue.FromException(ex), _clock.GetUtcNow()), CancellationToken.None);
             throw; // never swallow: callers (UI, jobs) still see the original failure
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -161,7 +161,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
             // An unexpected failure (a database constraint, a bug) must still leave a trail: record it as Internal so the
             // retry policy bounds the attempts (MaxBoundedFailures) instead of repeating it forever with no UI issue.
             await RecordHealthSafelyAsync(ProviderIssueMapping.ToInfo(
-                ProviderIssue.Of(ProviderIssueKind.Internal, $"Unexpected {ex.GetType().Name} during sync."), DateTimeOffset.UtcNow), CancellationToken.None);
+                ProviderIssue.Of(ProviderIssueKind.Internal, $"Unexpected {ex.GetType().Name} during sync."), _clock.GetUtcNow()), CancellationToken.None);
             throw;
         }
 
@@ -194,7 +194,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
             var health = await _provider.GetConnectionHealthAsync(member, ct);
             return health.IsHealthy || health.Issue is null
                 ? null
-                : ProviderIssueMapping.ToInfo(health.Issue, DateTimeOffset.UtcNow, informational: true); // reads succeeded, so never a gate/give-up input
+                : ProviderIssueMapping.ToInfo(health.Issue, _clock.GetUtcNow(), informational: true); // reads succeeded, so never a gate/give-up input
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -243,7 +243,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
             var resolved = await resolver.TryResolveMemberProviderIdAsync(memberRef.MemberProviderId, ct);
             if (resolved is not null && resolved != memberRef.MemberProviderId)
             {
-                memberRef.ResolveMember(resolved, DateTimeOffset.UtcNow);
+                memberRef.ResolveMember(resolved, _clock.GetUtcNow());
                 await _db.SaveChangesAsync(ct);
             }
         }
@@ -256,7 +256,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
         {
             try
             {
-                var seen = DateTimeOffset.UtcNow;
+                var seen = _clock.GetUtcNow();
                 await _catalog.UpsertAsync(providerAccounts
                     .Select(pa => new DiscoveredProviderAccount(
                         _provider.ProviderName, pa.ProviderId, pa.Name, pa.AccountType, pa.Balance.Amount, pa.CurrencyCode, seen))
@@ -299,7 +299,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
                 domainAccount.TypeLockedByUser && Account.IsLiabilityType(domainAccount.AccountType)
                     ? ToOwed(pa.Balance.Amount)
                     : pa.Balance.Amount,
-                pa.CurrencyCode, DateTimeOffset.UtcNow), ct);
+                pa.CurrencyCode, _clock.GetUtcNow()), ct);
 
             // Step 4: sync transactions for this account
             var (added, skipped) = await SyncTransactionsAsync(domainAccount, pa.ProviderId, tenantId, ct);

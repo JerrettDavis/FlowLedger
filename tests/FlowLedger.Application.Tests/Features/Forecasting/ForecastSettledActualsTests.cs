@@ -86,12 +86,12 @@ public sealed class ForecastSettledActualsTests
     {
         var accounts = new FakeAccountRepository();
         var txs = new FakeTransactionRepository();
-        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(1000m, Usd));
+        var account = Account.Create(Tenant, "Checking", AccountType.Checking, new Money(1000m, Usd), FlowLedger.TestSupport.TestClock.Provider);
         await accounts.AddAsync(account);
         foreach (var offset in new[] { 0, -5, -20 })
         {
             await txs.AddAsync(Transaction.RecordActual(Tenant, account.AccountId, new Money(60m, Usd),
-                TransactionDirection.Debit, $"Charge {offset}", Today.AddDays(offset), Today.AddDays(offset), TransactionSource.CsvImport));
+                TransactionDirection.Debit, $"Charge {offset}", Today.AddDays(offset), Today.AddDays(offset), TransactionSource.CsvImport, FlowLedger.TestSupport.TestClock.Provider));
         }
 
         var handler = new GetForecastHandler(accounts, new FakeRecurringFlowRepository(), txs, new ForecastEngine(), new FakeTenantContext());

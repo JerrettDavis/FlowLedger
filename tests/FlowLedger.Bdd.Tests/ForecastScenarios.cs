@@ -45,7 +45,7 @@ public partial class ForecastScenarios : TinyBddXunitBase
         async Task<AccountId> CreateAccount(TestTenantContext _)
         {
             var accounts = scope.Resolve<IAccountRepository>();
-            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(1_000m, "USD"));
+            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(1_000m, "USD"), TestClock.Provider);
             await accounts.AddAsync(account);
             await accounts.SaveChangesAsync();
             return account.AccountId;
@@ -59,14 +59,14 @@ public partial class ForecastScenarios : TinyBddXunitBase
                 tenantId, accountId, "Payroll", new Money(2_000m, "USD"),
                 TransactionDirection.Credit,
                 RecurrencePattern.EveryNWeeks(2, today.DayOfWeek),
-                startDate: today);
+                startDate: today, time: TestClock.Provider);
             await flows.AddAsync(payroll);
 
             var rent = RecurringFlow.Create(
                 tenantId, accountId, "Rent", new Money(1_500m, "USD"),
                 TransactionDirection.Debit,
                 RecurrencePattern.Monthly(1),
-                startDate: today);
+                startDate: today, time: TestClock.Provider);
             await flows.AddAsync(rent);
 
             await flows.SaveChangesAsync();
@@ -145,7 +145,7 @@ public partial class ForecastScenarios : TinyBddXunitBase
         async Task<AccountId> CreateAccount(TestTenantContext _)
         {
             var accounts = scope.Resolve<IAccountRepository>();
-            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(500m, "USD"));
+            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(500m, "USD"), TestClock.Provider);
             await accounts.AddAsync(account);
             await accounts.SaveChangesAsync();
             return account.AccountId;
@@ -158,7 +158,7 @@ public partial class ForecastScenarios : TinyBddXunitBase
                 tenantId, accountId, "Big Loan Payment", new Money(3_000m, "USD"),
                 TransactionDirection.Debit,
                 RecurrencePattern.Monthly(today.AddDays(5).Day),
-                startDate: today);
+                startDate: today, time: TestClock.Provider);
             await flows.AddAsync(bigDebit);
             await flows.SaveChangesAsync();
             return accountId;

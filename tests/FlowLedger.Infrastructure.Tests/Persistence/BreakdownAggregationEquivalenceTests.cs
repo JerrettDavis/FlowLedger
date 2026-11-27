@@ -56,7 +56,7 @@ public sealed class BreakdownAggregationEquivalenceTests : IAsyncLifetime
 
         Account Make(string name, AccountType type, Action<Account>? tweak = null)
         {
-            var a = Account.Create(tenantId, name, type, Usd(1000m));
+            var a = Account.Create(tenantId, name, type, Usd(1000m), TestClock.Provider);
             tweak?.Invoke(a);
             db.Accounts.Add(a);
             return a;
@@ -91,7 +91,7 @@ public sealed class BreakdownAggregationEquivalenceTests : IAsyncLifetime
         {
             var effective = Ago(daysAgo);
             var posted = pending ? (DateOnly?)null : Ago(postedDaysAgo ?? daysAgo);
-            var tx = Transaction.RecordActual(tenantId, account.AccountId, Usd(amount), dir, description, effective, posted, TransactionSource.Manual);
+            var tx = Transaction.RecordActual(tenantId, account.AccountId, Usd(amount), dir, description, effective, posted, TransactionSource.Manual, TestClock.Provider);
             if (category is not null)
             {
                 tx.Categorize(category.CategoryId, merchant, CategorySource.Manual);
@@ -140,7 +140,7 @@ public sealed class BreakdownAggregationEquivalenceTests : IAsyncLifetime
 
         Add(hidden, 999.11m, TransactionDirection.Debit, "HIDDEN SPEND", 10, groceries, "Hiddenmart");
         Add(closed, 888.12m, TransactionDirection.Debit, "CLOSED SPEND", 10, groceries, "Closedmart");
-        db.Transactions.Add(Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(777m), TransactionDirection.Debit, "PLANNED RENT", Ago(2)));
+        db.Transactions.Add(Transaction.CreatePlanned(tenantId, chk.AccountId, Usd(777m), TransactionDirection.Debit, "PLANNED RENT", Ago(2), TestClock.Provider));
 
         // Splits: parts in different categories of one top-level group (one transaction counts once there), a non-spending part, an uncategorized part.
         var split1 = Add(card, 100.13m, TransactionDirection.Debit, "BIG BOX", 7, groceries, "Big Box", tags: ["trip"]);

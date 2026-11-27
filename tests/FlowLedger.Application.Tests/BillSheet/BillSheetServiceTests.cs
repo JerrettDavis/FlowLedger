@@ -9,7 +9,7 @@ namespace FlowLedger.Application.Tests.BillSheet;
 
 public sealed class BillSheetServiceTests
 {
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    private static readonly DateOnly Today = FlowLedger.TestSupport.TestClock.Today;
     private static readonly DateOnly ThisMonth = new(Today.Year, Today.Month, 1);
 
     private const string Csv =
@@ -35,7 +35,7 @@ public sealed class BillSheetServiceTests
     {
         var store = new InMemoryStore();
         var txns = new FakeTransactionRepository();
-        return (new BillSheetService(store, txns), store, txns);
+        return (new BillSheetService(store, txns, FlowLedger.TestSupport.TestClock.Provider), store, txns);
     }
 
     [Fact]
@@ -45,19 +45,19 @@ public sealed class BillSheetServiceTests
         var txns = new FakeTransactionRepository();
         var accounts = new FakeAccountRepository();
         var tenant = TenantId.New();
-        var brokerage = Account.Create(tenant, "Brokerage", AccountType.Investment, new Money(1000m, "USD"));
-        var checking = Account.Create(tenant, "Checking", AccountType.Checking, new Money(1000m, "USD"));
+        var brokerage = Account.Create(tenant, "Brokerage", AccountType.Investment, new Money(1000m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
+        var checking = Account.Create(tenant, "Checking", AccountType.Checking, new Money(1000m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
         await accounts.AddAsync(brokerage);
         await accounts.AddAsync(checking);
-        var svc = new BillSheetService(store, txns, accounts);
+        var svc = new BillSheetService(store, txns, FlowLedger.TestSupport.TestClock.Provider, accounts);
 
         for (var i = 0; i < 4; i++)
         {
             var d = ThisMonth.AddMonths(-i).AddDays(9);
             await txns.AddAsync(Transaction.RecordActual(tenant, brokerage.AccountId, new Money(500m, "USD"),
-                TransactionDirection.Debit, "ACME BROKERAGE CONTRIBUTION", d, d, TransactionSource.MxAggregation));
+                TransactionDirection.Debit, "ACME BROKERAGE CONTRIBUTION", d, d, TransactionSource.MxAggregation, FlowLedger.TestSupport.TestClock.Provider));
             await txns.AddAsync(Transaction.RecordActual(tenant, checking.AccountId, new Money(39.99m, "USD"),
-                TransactionDirection.Debit, "Peak Fitness Club", d, d, TransactionSource.MxAggregation));
+                TransactionDirection.Debit, "Peak Fitness Club", d, d, TransactionSource.MxAggregation, FlowLedger.TestSupport.TestClock.Provider));
         }
 
         await svc.RefreshAsync();
@@ -321,7 +321,7 @@ public sealed class BillSheetServiceTests
     {
         var tx = Transaction.RecordActual(
             TenantId.New(), AccountId.New(), new Money(amount, "USD"), TransactionDirection.Debit, desc, date, date,
-            TransactionSource.MxAggregation);
+            TransactionSource.MxAggregation, FlowLedger.TestSupport.TestClock.Provider);
         await repo.AddAsync(tx);
     }
 

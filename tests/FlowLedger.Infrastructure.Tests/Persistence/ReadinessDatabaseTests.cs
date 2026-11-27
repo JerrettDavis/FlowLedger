@@ -68,15 +68,15 @@ public sealed class ReadinessDatabaseTests(IntegrationTestFixture fixture) : IAs
     [DockerFact]
     public async Task Backup_check_degrades_when_none_or_stale_and_recovers_after_a_fresh_run()
     {
-        var check = new BackupFreshnessCheck(Config(), TimeProvider.System);
+        var check = new BackupFreshnessCheck(Config(), FlowLedger.TestSupport.TestClock.Provider);
         (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Degraded, "no backup has ever run");
 
         var store = new BackupRunStore(fixture.ConnectionString);
-        var old = DateTimeOffset.UtcNow.AddDays(-3);
+        var old = FlowLedger.TestSupport.TestClock.Instant.AddDays(-3);
         await store.AddAsync(new BackupRunResult(true, old, old, "x", 1, null, null, true, null));
         (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Degraded, "last success is 3 days old");
 
-        var now = DateTimeOffset.UtcNow;
+        var now = FlowLedger.TestSupport.TestClock.Instant;
         await store.AddAsync(new BackupRunResult(true, now, now, "y", 1, null, null, true, null));
         (await check.CheckHealthAsync(new HealthCheckContext())).Status.Should().Be(HealthStatus.Healthy);
     }

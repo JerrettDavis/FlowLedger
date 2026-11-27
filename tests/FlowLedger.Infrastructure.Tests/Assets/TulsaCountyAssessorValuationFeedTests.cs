@@ -40,7 +40,7 @@ public sealed class TulsaCountyAssessorValuationFeedTests
 
     private static Asset Home(Dictionary<string, string> attrs)
     {
-        var a = Asset.Create(TenantId.New(), "Home", AssetCategory.RealEstate, new Money(200000m, "USD"), new DateOnly(2020, 1, 1));
+        var a = Asset.Create(TenantId.New(), "Home", AssetCategory.RealEstate, new Money(200000m, "USD"), new DateOnly(2020, 1, 1), FlowLedger.TestSupport.TestClock.Provider);
         a.UpdateDetails("Home", AssetCategory.RealEstate, null, null, "SERIAL-DO-NOT-SEND", null, null, null, attrs);
         return a;
     }

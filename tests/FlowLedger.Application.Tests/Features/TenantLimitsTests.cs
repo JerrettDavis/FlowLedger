@@ -62,7 +62,7 @@ public sealed class TenantLimitsTests
     public async Task Creating_an_account_beyond_the_limit_is_refused_even_when_older_ones_are_deactivated()
     {
         var repo = new FakeAccountRepository();
-        var handler = new CreateAccountHandler(repo, new FakeTenantContext());
+        var handler = new CreateAccountHandler(repo, new FakeTenantContext(), FlowLedger.TestSupport.TestClock.Provider);
         for (var i = 0; i < TenantLimits.MaxAccounts; i++)
         {
             var created = await handler.HandleAsync(new CreateAccountRequest("A" + i, "Checking", 0m, "USD", null, null));

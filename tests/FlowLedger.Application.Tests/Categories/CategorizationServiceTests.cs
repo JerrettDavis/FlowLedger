@@ -32,8 +32,8 @@ public sealed class CategorizationServiceTests
     private async Task<CategorizationService> SetUpAsync()
     {
         var tenantId = TenantId.From(_tenant.TenantId);
-        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd));
-        _savings = Account.Create(tenantId, "Savings", AccountType.Savings, new Money(100m, Currency.Usd));
+        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
+        _savings = Account.Create(tenantId, "Savings", AccountType.Savings, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         await _accounts.AddAsync(_checking);
         await _accounts.AddAsync(_savings);
         return new CategorizationService(new Store(_txs), _categories, _accounts, _tenant);
@@ -43,7 +43,7 @@ public sealed class CategorizationServiceTests
     {
         var tx = Transaction.RecordActual(
             TenantId.From(_tenant.TenantId), account.AccountId, new Money(amount, Currency.Usd), dir, desc,
-            new DateOnly(2026, 11, day), new DateOnly(2026, 11, day), TransactionSource.Manual);
+            new DateOnly(2026, 11, day), new DateOnly(2026, 11, day), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         _txs.Add(tx);
         return tx;
     }
@@ -185,7 +185,7 @@ public sealed class CategorizationServiceTests
     private async Task<(CategorizationService svc, Domain.ValueObjects.CategoryId dining, Domain.ValueObjects.CategoryId pay)> SetUpTrainedAsync(CategorizationOptions? options = null)
     {
         var tenantId = TenantId.From(_tenant.TenantId);
-        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd));
+        _checking = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(100m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         await _accounts.AddAsync(_checking);
         var dining = Category.Create(tenantId, new CategoryPath("Food/Dining"), "Dining");
         var pay = Category.Create(tenantId, new CategoryPath("Income/Paycheck"), "Paycheck");

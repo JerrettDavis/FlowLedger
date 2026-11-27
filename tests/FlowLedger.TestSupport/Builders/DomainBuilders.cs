@@ -31,8 +31,8 @@ public sealed class AccountBuilder
     public AccountBuilder CreatedAt(TimeProvider time) { _time = time; return this; }
 
     public Account Build() => Account.Create(
-        _tenant, _name, _type, new Money(_balance, _currency),
-        _creditLimit is { } limit ? new Money(limit, _currency) : null, _institution, _time);
+        _tenant, _name, _type, new Money(_balance, _currency), _time,
+        _creditLimit is { } limit ? new Money(limit, _currency) : null, _institution);
 
     public static implicit operator Account(AccountBuilder builder) => builder.Build();
 }
@@ -74,7 +74,7 @@ public sealed class TransactionBuilder
 
     public Transaction Build() => Transaction.RecordActual(
         _tenant, _account, new Money(_amount, _currency), _direction, _description, _effective,
-        _posted ? _effective : null, _source, _fingerprint, _time);
+        _posted ? _effective : null, _source, _time, _fingerprint);
 
     public static implicit operator Transaction(TransactionBuilder builder) => builder.Build();
 }
@@ -117,8 +117,8 @@ public sealed class RecurringFlowBuilder
     public RecurringFlowBuilder CreatedAt(TimeProvider time) { _time = time; return this; }
 
     public RecurringFlow Build() => RecurringFlow.Create(
-        _tenant, _account, _name, new Money(_amount, _currency), _direction, _pattern, _start, _end,
-        _amountModel, null, _counterparty, _time);
+        _tenant, _account, _name, new Money(_amount, _currency), _direction, _pattern, _start, _time, _end,
+        _amountModel, null, _counterparty);
 
     public static implicit operator RecurringFlow(RecurringFlowBuilder builder) => builder.Build();
 }

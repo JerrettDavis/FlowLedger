@@ -15,9 +15,9 @@ public sealed record PastWhatIfRequest(
 /// <summary>Loads the user's ledger, reduces it to <see cref="StrategyInputs"/>, and runs the engine and simulators.</summary>
 public sealed class StrategyService(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories, IMarketRateProvider rateProvider,
-    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, ILocalLlm? llm = null, TimeProvider? time = null)
+    IAccountRateStore rateStore, FlowLedger.SharedKernel.ITenantContext tenant, TimeProvider time, ILocalLlm? llm = null)
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly TimeProvider _time = time;
 
     private const int MaxTransactions = TransactionQuota.ProcessingCap;
     private const int TransferPadDays = 14;

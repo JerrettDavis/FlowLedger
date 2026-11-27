@@ -20,9 +20,9 @@ public sealed partial class IntegrationService(
     IIntegrationTransport transport,
     IHomeAssistantNetworkPolicy network,
     ITenantContext tenant,
-    TimeProvider? clock = null)
+    TimeProvider clock)
 {
-    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+    private readonly TimeProvider _clock = clock;
 
     public const int MaxIntegrationsPerTenant = 25;
     public const int MaxHeaders = 10;

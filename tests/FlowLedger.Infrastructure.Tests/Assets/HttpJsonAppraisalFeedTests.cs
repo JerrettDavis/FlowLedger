@@ -13,7 +13,7 @@ public sealed class HttpJsonAppraisalFeedTests
 {
     private static Asset Vehicle()
     {
-        var a = Asset.Create(TenantId.New(), "Truck", AssetCategory.Vehicle, new Money(20000m, "USD"), new DateOnly(2024, 1, 1));
+        var a = Asset.Create(TenantId.New(), "Truck", AssetCategory.Vehicle, new Money(20000m, "USD"), new DateOnly(2024, 1, 1), FlowLedger.TestSupport.TestClock.Provider);
         a.UpdateDetails("Truck", AssetCategory.Vehicle, "Ford", "F-150 XL", "SERIAL-DO-NOT-SEND", null,
             new DateOnly(2021, 5, 1), null, new Dictionary<string, string> { ["VIN"] = "1FT123" });
         return a;

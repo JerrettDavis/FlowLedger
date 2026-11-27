@@ -26,7 +26,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task CreateTransaction_ValidRequest_StoresAndReturnsDto()
     {
-        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         var dto = await handler.HandleAsync(ValidRequest());
 
         dto.Amount.Should().Be(150m);
@@ -40,7 +40,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task CreateTransaction_CreditDirection_Stored()
     {
-        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         var request = ValidRequest() with { Direction = "Credit" };
         var dto = await handler.HandleAsync(request);
         dto.Direction.Should().Be("Credit");
@@ -49,7 +49,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task CreateTransaction_MerchantWithoutCategory_LeavesTransactionUncategorized()
     {
-        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         var dto = await handler.HandleAsync(ValidRequest() with { MerchantName = "Corner Cafe" });
 
         dto.MerchantName.Should().Be("Corner Cafe");
@@ -60,7 +60,7 @@ public sealed class TransactionHandlersTests
     public async Task CreateTransaction_AtTheTenantQuota_IsRejected()
     {
         _repo.ReportedCount = TransactionQuota.MaxPerTenant;
-        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var handler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
 
         var act = () => handler.HandleAsync(ValidRequest());
 
@@ -73,7 +73,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task GetTransaction_ExistingId_ReturnsDto()
     {
-        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         var created = await createHandler.HandleAsync(ValidRequest());
 
         var getHandler = new GetTransactionHandler(_repo);
@@ -96,7 +96,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task ListTransactions_ReturnsAll()
     {
-        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         await createHandler.HandleAsync(ValidRequest());
         await createHandler.HandleAsync(ValidRequest());
 
@@ -112,7 +112,7 @@ public sealed class TransactionHandlersTests
         var acctA = Guid.NewGuid();
         var acctB = Guid.NewGuid();
 
-        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         await createHandler.HandleAsync(ValidRequest(acctA));
         await createHandler.HandleAsync(ValidRequest(acctA));
         await createHandler.HandleAsync(ValidRequest(acctB));
@@ -127,7 +127,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task ListTransactions_Search_FiltersByDescriptionCaseInsensitivelyBeforePaging()
     {
-        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Shop" });
         await createHandler.HandleAsync(ValidRequest() with { Description = "Rent" });
 
@@ -140,7 +140,7 @@ public sealed class TransactionHandlersTests
     [Fact]
     public async Task CountAsync_ignores_paging_and_respects_filters()
     {
-        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator());
+        var createHandler = new CreateTransactionHandler(_repo, _tenant, new FakeReferenceValidator(), FlowLedger.TestSupport.TestClock.Provider);
         await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Shop" });
         await createHandler.HandleAsync(ValidRequest() with { Description = "Coffee Beans" });
         await createHandler.HandleAsync(ValidRequest() with { Description = "Rent" });

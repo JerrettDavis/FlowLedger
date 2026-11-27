@@ -84,9 +84,9 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
                 var date = new DateOnly(2025, 6, 1);
                 txCtx.Transactions.Add(Transaction.RecordActual(
                     TenantId.From(t.TenantId), accountId, new Money(5m, Currency.Usd), TransactionDirection.Debit, "Shop",
-                    effectiveDate: date, postedDate: date, source: TransactionSource.Manual));
+                    effectiveDate: date, postedDate: date, source: TransactionSource.Manual, time: FlowLedger.TestSupport.TestClock.Provider));
                 new FlowLedger.Infrastructure.Events.EfOutbox(txCtx, t).Enqueue(
-                    new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0));
+                    new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0) { OccurredAt = FlowLedger.TestSupport.TestClock.Instant });
                 await txCtx.SaveChangesAsync();
             }
 

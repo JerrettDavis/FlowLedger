@@ -59,7 +59,7 @@ internal sealed partial class FinancialSyncService
         var existingNameSet = new HashSet<string>(existingNames, StringComparer.Ordinal);
 
         int added = 0;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
 
         foreach (var seed in seeds)
         {

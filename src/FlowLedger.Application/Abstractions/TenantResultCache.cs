@@ -73,13 +73,13 @@ public sealed class TenantDataVersion(int maxTenants = TenantDataVersion.Default
 /// invalidates its entries. Entries also expire after <see cref="Ttl"/> (writes that bypass SaveChanges, other replicas) and the
 /// whole cache holds at most <c>maxEntries</c> items, evicting the oldest.
 /// </summary>
-public sealed class TenantResultCache(ITenantDataVersion versions, TimeProvider? time = null, int maxEntries = TenantResultCache.DefaultMaxEntries, TimeSpan? ttl = null)
+public sealed class TenantResultCache(ITenantDataVersion versions, TimeProvider time, int maxEntries = TenantResultCache.DefaultMaxEntries, TimeSpan? ttl = null)
 {
     public const int DefaultMaxEntries = 200;
 
     private readonly object _gate = new();
     private readonly Dictionary<(Guid Tenant, string Key, long Version), (object Value, DateTimeOffset Expires, long Order)> _items = [];
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly TimeProvider _time = time;
     private long _order;
 
     public TimeSpan Ttl { get; } = ttl ?? TimeSpan.FromSeconds(60);

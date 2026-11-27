@@ -90,9 +90,9 @@ public sealed class CreateTransactionHandler
     private readonly ITransactionRepository _repo;
     private readonly ITenantContext _tenant;
     private readonly IReferenceValidator _references;
-    private readonly TimeProvider? _clock;
+    private readonly TimeProvider _clock;
 
-    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider? clock = null)
+    public CreateTransactionHandler(ITransactionRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider clock)
     {
         _repo = repo;
         _tenant = tenant;

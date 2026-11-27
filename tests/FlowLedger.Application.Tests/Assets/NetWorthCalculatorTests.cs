@@ -15,7 +15,7 @@ public sealed class NetWorthCalculatorTests
 
     private static Asset House(decimal value, Account? link = null)
     {
-        var a = Asset.Create(Tenant, "House", AssetCategory.RealEstate, new Money(value, "USD"), Today);
+        var a = Asset.Create(Tenant, "House", AssetCategory.RealEstate, new Money(value, "USD"), Today, FlowLedger.TestSupport.TestClock.Provider);
         a.LinkAccount(link);
         return a;
     }
@@ -72,7 +72,7 @@ public sealed class NetWorthCalculatorTests
     {
         var gone = House(500m);
         gone.Deactivate();
-        var dep = Asset.Create(Tenant, "Phone", AssetCategory.Electronics, new Money(1000m, "USD"), Today.AddYears(-1));
+        var dep = Asset.Create(Tenant, "Phone", AssetCategory.Electronics, new Money(1000m, "USD"), Today.AddYears(-1), FlowLedger.TestSupport.TestClock.Provider);
         dep.SetValuationModel(ValuationMethod.DecliningBalance, 0.5m, null, null);
 
         var r = NetWorthCalculator.Compute([], [gone, dep], Today);

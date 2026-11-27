@@ -19,17 +19,6 @@ public abstract class AggregateRoot : IAggregateRoot
 
     protected void RaiseEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
 
-    /// <summary>Raises the event stamped with the caller-supplied time (from a <see cref="TimeProvider"/>), not the wall clock.</summary>
-    protected void RaiseEvent(IDomainEvent domainEvent, DateTimeOffset occurredAt)
-    {
-        if (domainEvent is Events.DomainEventBase stamped)
-        {
-            stamped.StampOccurredAt(occurredAt);
-        }
-
-        _domainEvents.Add(domainEvent);
-    }
-
-    /// <summary>The instant to stamp on a change: from the supplied provider, or the system clock when the caller passes none.</summary>
-    protected static DateTimeOffset Now(TimeProvider? time) => (time ?? TimeProvider.System).GetUtcNow();
+    /// <summary>The instant to stamp on a change, always from the caller-supplied provider (the domain never reads the wall clock).</summary>
+    protected static DateTimeOffset Now(TimeProvider time) => time.GetUtcNow();
 }

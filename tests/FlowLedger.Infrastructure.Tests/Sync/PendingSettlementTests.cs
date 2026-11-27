@@ -4,6 +4,7 @@ using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
+using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -28,7 +29,7 @@ public sealed class PendingSettlementTests : IAsyncLifetime
     {
         await using var db = _fixture.CreateDbContext(tenant);
         var svc = new FinancialSyncService(new ScriptedProvider(txs), db, tenant,
-            new EfSyncCursorStore(db, tenant), NullLogger<FinancialSyncService>.Instance);
+            new EfSyncCursorStore(db, tenant), NullLogger<FinancialSyncService>.Instance, clock: TestClock.Provider);
         var r = await svc.SyncAsync();
         await using var v = _fixture.CreateDbContext(tenant);
         return (r.TransactionsAdded, await v.Transactions.CountAsync());
@@ -83,11 +84,11 @@ public sealed class PendingSettlementTests : IAsyncLifetime
     public async Task Pending_row_the_provider_stopped_returning_is_excluded_after_the_ttl()
     {
         var tenant = TestTenantContext.New();
-        var old = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-20);
+        var old = TestClock.Today.AddDays(-20);
         await RunAsync(tenant, TxAmount("HOLD", true, old, 100m, "FUEL PREAUTH"));
 
         // The hold vanished: later syncs return something unrelated.
-        await RunAsync(tenant, TxAmount("OTHER", false, DateOnly.FromDateTime(DateTime.UtcNow), 5m, "UNRELATED"));
+        await RunAsync(tenant, TxAmount("OTHER", false, TestClock.Today, 5m, "UNRELATED"));
 
         await using var v = _fixture.CreateDbContext(tenant);
         var hold = await v.Transactions.SingleAsync(t => t.Description == "FUEL PREAUTH");
@@ -98,9 +99,9 @@ public sealed class PendingSettlementTests : IAsyncLifetime
     public async Task Recent_pending_row_is_left_alone()
     {
         var tenant = TestTenantContext.New();
-        var recent = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2);
+        var recent = TestClock.Today.AddDays(-2);
         await RunAsync(tenant, TxAmount("HOLD2", true, recent, 100m, "HOTEL HOLD"));
-        await RunAsync(tenant, TxAmount("OTHER2", false, DateOnly.FromDateTime(DateTime.UtcNow), 5m, "UNRELATED"));
+        await RunAsync(tenant, TxAmount("OTHER2", false, TestClock.Today, 5m, "UNRELATED"));
 
         await using var v = _fixture.CreateDbContext(tenant);
         (await v.Transactions.SingleAsync(t => t.Description == "HOTEL HOLD")).Status.Should().Be(TransactionStatus.Pending);

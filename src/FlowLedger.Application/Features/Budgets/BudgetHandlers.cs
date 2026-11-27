@@ -22,7 +22,7 @@ public sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetReque
 }
 
 /// <summary>Budgets with this month's actual spending (transfers excluded), rolled up from child categories.</summary>
-public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider? clock = null)
+public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock)
 {
     public async Task<BudgetOverview> HandleAsync(CancellationToken ct = default) => await HandleAsync(null, ct);
 
@@ -39,6 +39,6 @@ public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCate
             return new BudgetStatus(b.Category, b.MonthlyLimit, spent, b.MonthlyLimit - spent, pct, spent > b.MonthlyLimit, b.Version);
         }).ToList();
 
-        return new BudgetOverview((month ?? DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)).ToString("yyyy-MM", CultureInfo.InvariantCulture), rows, spentByCategory);
+        return new BudgetOverview((month ?? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)).ToString("yyyy-MM", CultureInfo.InvariantCulture), rows, spentByCategory);
     }
 }

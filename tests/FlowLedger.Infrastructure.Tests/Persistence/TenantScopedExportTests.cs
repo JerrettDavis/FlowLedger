@@ -34,7 +34,7 @@ public sealed class TenantScopedExportTests(IntegrationTestFixture fixture) : IA
         var date = new DateOnly(2025, 6, 1);
         ctx.Transactions.Add(Transaction.RecordActual(
             TenantId.From(tenant.TenantId), accountId, new Money(5m, Currency.Usd), TransactionDirection.Debit, merchant,
-            effectiveDate: date, postedDate: date, source: TransactionSource.Manual));
+            effectiveDate: date, postedDate: date, source: TransactionSource.Manual, time: FlowLedger.TestSupport.TestClock.Provider));
         await ctx.SaveChangesAsync();
     }
 

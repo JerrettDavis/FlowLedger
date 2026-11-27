@@ -21,7 +21,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Amazon", Today, Today, TransactionSource.CsvImport);
+            "Amazon", Today, Today, TransactionSource.CsvImport, TestClock.Provider);
 
         tx.Status.Should().Be(TransactionStatus.Posted);
     }
@@ -31,7 +31,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Uber", Today, null, TransactionSource.MxAggregation);
+            "Uber", Today, null, TransactionSource.MxAggregation, TestClock.Provider);
 
         tx.Status.Should().Be(TransactionStatus.Pending);
     }
@@ -41,7 +41,7 @@ public sealed class TransactionTests
     {
         var act = () => Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "  ", Today, Today, TransactionSource.Manual);
+            "  ", Today, Today, TransactionSource.Manual, TestClock.Provider);
         act.Should().Throw<EmptyStringException>();
     }
 
@@ -50,7 +50,7 @@ public sealed class TransactionTests
     {
         var act = () => Transaction.RecordActual(
             TenantId, AccountId, Money.Zero("USD"), TransactionDirection.Debit,
-            "Desc", Today, Today, TransactionSource.Manual);
+            "Desc", Today, Today, TransactionSource.Manual, TestClock.Provider);
         act.Should().Throw<NegativeOrZeroAmountException>();
     }
 
@@ -61,7 +61,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.CreatePlanned(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Rent", Today);
+            "Rent", Today, TestClock.Provider);
 
         tx.Status.Should().Be(TransactionStatus.Planned);
     }
@@ -73,7 +73,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Electric bill", Today, Today, TransactionSource.CsvImport);
+            "Electric bill", Today, Today, TransactionSource.CsvImport, TestClock.Provider);
 
         var occurrenceId = PlannedOccurrenceId.New();
         tx.Match(occurrenceId, ConfidenceScore.High);
@@ -86,7 +86,7 @@ public sealed class TransactionTests
     public void Match_on_Planned_transaction_throws_invalid_transition()
     {
         var tx = Transaction.CreatePlanned(
-            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Rent", Today);
+            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Rent", Today, TestClock.Provider);
 
         var act = () => tx.Match(PlannedOccurrenceId.New(), ConfidenceScore.High);
         act.Should().Throw<InvalidStatusTransitionException>();
@@ -99,7 +99,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Rent", Today, Today, TransactionSource.CsvImport);
+            "Rent", Today, Today, TransactionSource.CsvImport, TestClock.Provider);
         tx.Match(PlannedOccurrenceId.New(), ConfidenceScore.High);
 
         tx.Reconcile();
@@ -109,7 +109,7 @@ public sealed class TransactionTests
     [Fact]
     public void Reconcile_from_Planned_throws()
     {
-        var tx = Transaction.CreatePlanned(TenantId, AccountId, Fifty, TransactionDirection.Debit, "Rent", Today);
+        var tx = Transaction.CreatePlanned(TenantId, AccountId, Fifty, TransactionDirection.Debit, "Rent", Today, TestClock.Provider);
         var act = () => tx.Reconcile();
         act.Should().Throw<InvalidStatusTransitionException>();
     }
@@ -119,7 +119,7 @@ public sealed class TransactionTests
     [Fact]
     public void Skip_on_Planned_sets_Skipped()
     {
-        var tx = Transaction.CreatePlanned(TenantId, AccountId, Fifty, TransactionDirection.Debit, "Bonus", Today);
+        var tx = Transaction.CreatePlanned(TenantId, AccountId, Fifty, TransactionDirection.Debit, "Bonus", Today, TestClock.Provider);
         tx.Skip();
         tx.Status.Should().Be(TransactionStatus.Skipped);
     }
@@ -128,7 +128,7 @@ public sealed class TransactionTests
     public void Skip_on_Posted_throws()
     {
         var tx = Transaction.RecordActual(
-            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Paid", Today, Today, TransactionSource.Manual);
+            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Paid", Today, Today, TransactionSource.Manual, TestClock.Provider);
         var act = () => tx.Skip();
         act.Should().Throw<InvalidStatusTransitionException>();
     }
@@ -139,7 +139,7 @@ public sealed class TransactionTests
     public void Categorize_sets_category()
     {
         var tx = Transaction.RecordActual(
-            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Grocery", Today, Today, TransactionSource.Manual);
+            TenantId, AccountId, Fifty, TransactionDirection.Debit, "Grocery", Today, Today, TransactionSource.Manual, TestClock.Provider);
 
         var catId = CategoryId.New();
         tx.Categorize(catId, "Whole Foods");
@@ -155,7 +155,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, new Money(100m, "USD"), TransactionDirection.Debit,
-            "Department store", Today, Today, TransactionSource.Manual);
+            "Department store", Today, Today, TransactionSource.Manual, TestClock.Provider);
 
         var splits = new[]
         {
@@ -172,7 +172,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, new Money(100m, "USD"), TransactionDirection.Debit,
-            "Store", Today, Today, TransactionSource.Manual);
+            "Store", Today, Today, TransactionSource.Manual, TestClock.Provider);
 
         var splits = new[]
         {
@@ -191,7 +191,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Pending charge", Today, null, TransactionSource.MxAggregation);
+            "Pending charge", Today, null, TransactionSource.MxAggregation, TestClock.Provider);
 
         tx.MarkPosted(Today);
 
@@ -204,7 +204,7 @@ public sealed class TransactionTests
     {
         var tx = Transaction.RecordActual(
             TenantId, AccountId, Fifty, TransactionDirection.Debit,
-            "Already posted", Today, Today, TransactionSource.Manual);
+            "Already posted", Today, Today, TransactionSource.Manual, TestClock.Provider);
 
         var act = () => tx.MarkPosted(Today);
         act.Should().Throw<InvalidStatusTransitionException>();

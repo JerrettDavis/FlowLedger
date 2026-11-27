@@ -48,7 +48,7 @@ public sealed class InjectedClockHandlerTests
         var txRepo = new FakeTransactionRepository();
         var accounts = new FakeAccountRepository();
         var occurrences = new FakePlannedOccurrenceRepository();
-        var account = Account.Create(TenantId.From(FakeTenantContext.DefaultTenantId), "Checking", AccountType.Checking, new Money(100m, "USD"));
+        var account = Account.Create(TenantId.From(FakeTenantContext.DefaultTenantId), "Checking", AccountType.Checking, new Money(100m, "USD"), TestClock.Provider);
         await accounts.AddAsync(account);
         var handler = new ImportTransactionsHandler(txRepo, accounts, occurrences, new FakeTenantContext(), new MatchingEngine(occurrences), Clock);
 

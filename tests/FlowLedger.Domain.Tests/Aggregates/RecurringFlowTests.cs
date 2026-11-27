@@ -33,7 +33,7 @@ public sealed class RecurringFlowTests
     {
         var act = () => RecurringFlow.Create(
             TenantId, AccountId, "  ", Rent, TransactionDirection.Debit,
-            RecurrencePattern.Monthly(1), Jan1);
+            RecurrencePattern.Monthly(1), Jan1, FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<EmptyStringException>();
     }
 
@@ -42,7 +42,7 @@ public sealed class RecurringFlowTests
     {
         var act = () => RecurringFlow.Create(
             TenantId, AccountId, "Payroll", Money.Zero("USD"),
-            TransactionDirection.Credit, RecurrencePattern.Monthly(15), Jan1);
+            TransactionDirection.Credit, RecurrencePattern.Monthly(15), Jan1, FlowLedger.TestSupport.TestClock.Provider);
         act.Should().Throw<NegativeOrZeroAmountException>();
     }
 

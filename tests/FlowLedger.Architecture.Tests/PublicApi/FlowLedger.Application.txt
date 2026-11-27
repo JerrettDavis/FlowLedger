@@ -59,6 +59,7 @@ interface FlowLedger.Application.Features.Goals.IGoalStore
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantNetworkPolicy
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore
+interface FlowLedger.Application.Features.Insights.IBreakdownStore
 interface FlowLedger.Application.Features.Integrations.IIntegrationStore
 interface FlowLedger.Application.Features.Integrations.IIntegrationTransport
 interface FlowLedger.Application.Features.Query.IQueryTranslator
@@ -203,9 +204,13 @@ sealed class FlowLedger.Application.Features.Imports.NormalizedImport
 sealed class FlowLedger.Application.Features.Imports.UnmatchFailedException
 sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionCommand
 sealed class FlowLedger.Application.Features.Imports.UnmatchTransactionHandler
+sealed class FlowLedger.Application.Features.Insights.BreakdownCategoryScope
 sealed class FlowLedger.Application.Features.Insights.BreakdownGroup
 sealed class FlowLedger.Application.Features.Insights.BreakdownQuery
 sealed class FlowLedger.Application.Features.Insights.BreakdownResult
+sealed class FlowLedger.Application.Features.Insights.BreakdownRowFilter
+sealed class FlowLedger.Application.Features.Insights.BreakdownSqlGroup
+sealed class FlowLedger.Application.Features.Insights.BreakdownSqlTotals
 sealed class FlowLedger.Application.Features.Insights.BreakdownTransaction
 sealed class FlowLedger.Application.Features.Insights.GetSpendingBreakdownHandler
 sealed class FlowLedger.Application.Features.Insights.TrendPoint

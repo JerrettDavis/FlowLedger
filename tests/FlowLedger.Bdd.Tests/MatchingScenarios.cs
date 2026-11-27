@@ -49,7 +49,7 @@ public partial class MatchingScenarios : TinyBddXunitBase
         async Task<TestTenantContext> CreateAccount(TestTenantContext t)
         {
             var accounts = scope.Resolve<IAccountRepository>();
-            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(2_000m, "USD"));
+            var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(2_000m, "USD"), FlowLedger.TestSupport.TestClock.Provider);
             await accounts.AddAsync(account);
             await accounts.SaveChangesAsync();
             accountId = account.AccountId;
@@ -64,7 +64,7 @@ public partial class MatchingScenarios : TinyBddXunitBase
                 TransactionDirection.Debit,
                 RecurrencePattern.Monthly(10),
                 startDate: new DateOnly(2026, 6, 1),
-                endDate: new DateOnly(2026, 12, 31));
+                endDate: new DateOnly(2026, 12, 31), time: FlowLedger.TestSupport.TestClock.Provider);
 
             var occurrence = flow.GenerateOccurrence(plannedDate);
             occurrenceId = occurrence.PlannedOccurrenceId;
@@ -80,7 +80,7 @@ public partial class MatchingScenarios : TinyBddXunitBase
                 tenantId, accountId, new Money(184.25m, "USD"),
                 TransactionDirection.Debit, "Utility payment",
                 effectiveDate: actualDate, postedDate: actualDate,
-                source: TransactionSource.CsvImport);
+                source: TransactionSource.CsvImport, time: FlowLedger.TestSupport.TestClock.Provider);
             await txRepo.AddAsync(actual);
             await txRepo.SaveChangesAsync();
             return occurrenceId;

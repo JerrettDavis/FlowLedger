@@ -36,6 +36,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
             TransactionDirection.Debit,
             RecurrencePattern.Monthly(1),
             startDate,
+            FlowLedger.TestSupport.TestClock.Provider,
             amountModel: AmountModel.Fixed);
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
@@ -72,7 +73,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
             new Money(3_500m, Currency.Usd),
             TransactionDirection.Credit,
             RecurrencePattern.Monthly(15),
-            start);
+            start, FlowLedger.TestSupport.TestClock.Provider);
 
         var occ1 = flow.GenerateOccurrence(new DateOnly(2025, 1, 15));
         var occ2 = flow.GenerateOccurrence(new DateOnly(2025, 2, 15));
@@ -113,7 +114,7 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
             tenantId, accountId, "Biweekly",
             new Money(100m, Currency.Usd), TransactionDirection.Debit,
             RecurrencePattern.EveryNWeeks(2, DayOfWeek.Friday),
-            new DateOnly(2025, 1, 3));
+            new DateOnly(2025, 1, 3), FlowLedger.TestSupport.TestClock.Provider);
 
         await using (var ctx = _fixture.CreateDbContext(tenantCtx))
         {
@@ -142,11 +143,11 @@ public sealed class RecurringFlowPersistenceTests : IAsyncLifetime
 
         var flowA = RecurringFlow.Create(tidA, accountId, "Flow A",
             new Money(100m, Currency.Usd), TransactionDirection.Debit,
-            RecurrencePattern.Monthly(1), new DateOnly(2025, 1, 1));
+            RecurrencePattern.Monthly(1), new DateOnly(2025, 1, 1), FlowLedger.TestSupport.TestClock.Provider);
 
         var flowB = RecurringFlow.Create(tidB, accountIdB, "Flow B",
             new Money(200m, Currency.Usd), TransactionDirection.Credit,
-            RecurrencePattern.Monthly(15), new DateOnly(2025, 1, 1));
+            RecurrencePattern.Monthly(15), new DateOnly(2025, 1, 1), FlowLedger.TestSupport.TestClock.Provider);
 
         await using (var ctx = _fixture.CreateDbContext(tenantA))
         {

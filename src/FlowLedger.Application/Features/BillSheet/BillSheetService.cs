@@ -12,11 +12,11 @@ namespace FlowLedger.Application.Features.BillSheet;
 public sealed class BillSheetService(
     IBillSheetStore store,
     ITransactionRepository transactions,
+    TimeProvider clock,
     IAccountRepository? accounts = null,
-    ICategoryRepository? categories = null,
-    TimeProvider? clock = null) : ISheetAutoMarker
+    ICategoryRepository? categories = null) : ISheetAutoMarker
 {
-    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+    private readonly TimeProvider _clock = clock;
 
     public const int DefaultMonthCount = 6;
     public const string DetectedSection = "Detected";

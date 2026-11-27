@@ -74,8 +74,8 @@ public sealed class Asset : AggregateRoot
         AssetCategory category,
         Money currentValue,
         DateOnly valuedOn,
-        string source = AssetValuationSources.Manual,
-        TimeProvider? time = null)
+        TimeProvider time,
+        string source = AssetValuationSources.Manual)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -162,7 +162,7 @@ public sealed class Asset : AggregateRoot
     /// When greater than zero, competing valuations (different sources) dated within this many days of the
     /// newest valuation are averaged into <see cref="CurrentValue"/> instead of the latest one winning.
     /// </param>
-    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, string? note = null, int blendWindowDays = 0, TimeProvider? time = null)
+    public AssetValuation RecordValuation(Money value, DateOnly asOf, string source, TimeProvider time, string? note = null, int blendWindowDays = 0)
     {
         if (value.Currency != CurrentValue.Currency)
         {

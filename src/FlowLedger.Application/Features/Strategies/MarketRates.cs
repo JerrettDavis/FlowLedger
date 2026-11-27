@@ -37,8 +37,8 @@ public interface IMarketRateProvider
 }
 
 /// <summary>Always returns the static defaults (tests, offline installs).</summary>
-internal sealed class StaticMarketRateProvider(MarketRates? rates = null, TimeProvider? clock = null) : IMarketRateProvider
+internal sealed class StaticMarketRateProvider(TimeProvider clock, MarketRates? rates = null) : IMarketRateProvider
 {
     public Task<MarketRates> GetAsync(CancellationToken ct = default) =>
-        Task.FromResult(rates ?? MarketRates.Defaults(DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)));
+        Task.FromResult(rates ?? MarketRates.Defaults(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)));
 }

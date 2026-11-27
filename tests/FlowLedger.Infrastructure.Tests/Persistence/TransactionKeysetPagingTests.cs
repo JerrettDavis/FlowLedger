@@ -39,6 +39,14 @@ public sealed class TransactionKeysetPagingTests : IAsyncLifetime
         public override DateTimeOffset GetUtcNow() => TestClock.Instant;
     }
 
+    /// <summary>Each call is a millisecond later, so rows created with it get distinct created-at values.</summary>
+    private sealed class TickingTime : TimeProvider
+    {
+        private long _ticks;
+
+        public override DateTimeOffset GetUtcNow() => TestClock.Instant.AddMilliseconds(Interlocked.Increment(ref _ticks));
+    }
+
     private async Task<TestTenantContext> SeedAsync(int count)
     {
         var tenant = TestTenantContext.New();
@@ -46,11 +54,12 @@ public sealed class TransactionKeysetPagingTests : IAsyncLifetime
         var other = await _fixture.SeedAccountAsync(tenant, "Other");
         await using var db = _fixture.CreateDbContext(tenant);
         var tenantId = TenantId.From(tenant.TenantId);
+        var ticking = new TickingTime();
         for (var i = 0; i < count; i++)
         {
             // A handful of dates, and (for the first half) one shared created-at: the id is the last tie-break and must page correctly.
             var date = new DateOnly(2026, 1, 1).AddDays(i % 9);
-            var time = i < count / 2 ? new FixedTime() : null;
+            TimeProvider time = i < count / 2 ? new FixedTime() : ticking;
             db.Transactions.Add(Transaction.RecordActual(
                 tenantId, i % 5 == 0 ? other : account, new Money(1m + i, Currency.Usd), TransactionDirection.Debit,
                 i % 4 == 0 ? $"Coffee {i}" : $"Rent {i}", date, date, TransactionSource.Manual, time: time));

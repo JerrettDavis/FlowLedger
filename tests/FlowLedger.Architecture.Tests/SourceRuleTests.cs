@@ -137,6 +137,23 @@ public sealed class SourceRuleTests
             $"New direct wall-clock use (inject TimeProvider instead): {string.Join(", ", fresh)}");
     }
 
+    /// <summary>
+    /// Domain and Application never fall back to the system clock either: a missing <c>TimeProvider</c> is a wiring error, not a reason to
+    /// read wall-clock time (#127). Time is a required argument of every factory, handler and service that stamps or compares it.
+    /// </summary>
+    private static readonly Regex SystemClockFallback = new(@"TimeProvider\.System\b", RegexOptions.Compiled);
+
+    [Fact]
+    public void Domain_and_Application_do_not_fall_back_to_TimeProvider_System()
+    {
+        var users = new[] { "FlowLedger.Domain", "FlowLedger.Application" }
+            .SelectMany(SourceFiles)
+            .Where(f => SystemClockFallback.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .ToList();
+        Assert.True(users.Count == 0, $"Take the TimeProvider as a required parameter instead of defaulting to TimeProvider.System: {string.Join(", ", users)}");
+    }
+
     [Fact]
     public void Wall_clock_allowlist_has_no_stale_entries()
     {

@@ -32,8 +32,8 @@ public sealed class DatabaseSnapshotTests : IAsyncLifetime
         await using var ctx = _fixture.CreateDbContext(tenantCtx);
         // Names with commas, quotes and newlines exercise CSV quoting in the record counter.
         ctx.Accounts.Add(Account.Create(tenantId, "Checking, \"main\"\nline2", AccountType.Checking,
-            new Money(10m, Currency.Usd), institution: "Bank"));
-        ctx.Accounts.Add(Account.Create(tenantId, "Savings", AccountType.Savings, new Money(20m, Currency.Usd)));
+            new Money(10m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider, institution: "Bank"));
+        ctx.Accounts.Add(Account.Create(tenantId, "Savings", AccountType.Savings, new Money(20m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider));
         await ctx.SaveChangesAsync();
     }
 

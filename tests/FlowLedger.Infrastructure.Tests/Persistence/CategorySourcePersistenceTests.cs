@@ -22,14 +22,14 @@ public sealed class CategorySourcePersistenceTests : IAsyncLifetime
     {
         var tenantCtx = TestTenantContext.New();
         var tenantId = TenantId.From(tenantCtx.TenantId);
-        var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(10m, Currency.Usd));
+        var account = Account.Create(tenantId, "Checking", AccountType.Checking, new Money(10m, Currency.Usd), FlowLedger.TestSupport.TestClock.Provider);
         var category = Category.Create(tenantId, new CategoryPath("Food/Groceries"), "Groceries");
         var auto = Transaction.RecordActual(tenantId, account.AccountId, new Money(5m, Currency.Usd), TransactionDirection.Debit,
-            "Bluejay", new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), TransactionSource.Manual);
+            "Bluejay", new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         var manual = Transaction.RecordActual(tenantId, account.AccountId, new Money(6m, Currency.Usd), TransactionDirection.Debit,
-            "Other", new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 2), TransactionSource.Manual);
+            "Other", new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 2), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         var plain = Transaction.RecordActual(tenantId, account.AccountId, new Money(7m, Currency.Usd), TransactionDirection.Debit,
-            "Plain", new DateOnly(2026, 11, 3), new DateOnly(2026, 11, 3), TransactionSource.Manual);
+            "Plain", new DateOnly(2026, 11, 3), new DateOnly(2026, 11, 3), TransactionSource.Manual, FlowLedger.TestSupport.TestClock.Provider);
         auto.Categorize(category.CategoryId, null, CategorySource.Auto);
         manual.Categorize(category.CategoryId);
 

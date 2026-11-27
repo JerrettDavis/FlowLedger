@@ -55,9 +55,9 @@ public sealed class CreateRecurringFlowHandler
     private readonly IRecurringFlowRepository _repo;
     private readonly ITenantContext _tenant;
     private readonly IReferenceValidator _references;
-    private readonly TimeProvider? _clock;
+    private readonly TimeProvider _clock;
 
-    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider? clock = null)
+    public CreateRecurringFlowHandler(IRecurringFlowRepository repo, ITenantContext tenant, IReferenceValidator references, TimeProvider clock)
     {
         _repo = repo;
         _tenant = tenant;
@@ -87,12 +87,12 @@ public sealed class CreateRecurringFlowHandler
             direction,
             pattern,
             request.StartDate,
+            _clock,
             // The API contract is inclusive (the flow's last day); the domain window is half-open [start, end).
             request.EndDate?.AddDays(1),
             amountModel,
             categoryId,
-            request.Counterparty,
-            _clock);
+            request.Counterparty);
 
         await _repo.AddAsync(flow, ct);
         await _repo.SaveChangesAsync(ct);

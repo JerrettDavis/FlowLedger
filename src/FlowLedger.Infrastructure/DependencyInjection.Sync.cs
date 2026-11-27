@@ -109,6 +109,6 @@ public static partial class DependencyInjection
             !bool.TryParse(cfg["RecurringFlows:AutoAdd"], out var autoAdd) || autoAdd,
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RecurringFlowSyncService>>());
 
-        return new OutboxPublishingSyncService(recurring, sp.GetRequiredService<IOutbox>(), sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>());
+        return new OutboxPublishingSyncService(recurring, sp.GetRequiredService<IOutbox>(), sp.GetRequiredService<FlowLedger.SharedKernel.ITenantContext>(), sp.GetRequiredService<TimeProvider>());
     }
 }
