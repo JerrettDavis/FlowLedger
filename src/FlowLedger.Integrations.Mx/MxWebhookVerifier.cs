@@ -50,13 +50,7 @@ internal sealed class MxWebhookVerifier
                 "MX webhook signature header is missing or empty.");
         }
 
-        var expectedBytes = Encoding.UTF8.GetBytes(ComputeSignature(rawBody));
-        var presentedBytes = Encoding.UTF8.GetBytes(signatureHeader);
-
-        // Guard equal length so FixedTimeEquals runs on matched-length spans (true constant time
-        // on the happy path; length mismatch is itself a non-secret observable and can fast-fail).
-        if (expectedBytes.Length != presentedBytes.Length
-            || !CryptographicOperations.FixedTimeEquals(expectedBytes, presentedBytes))
+        if (!HmacWebhookSignature.Matches(ComputeSignature(rawBody), signatureHeader))
         {
             throw new InvalidWebhookSignatureException(
                 "MX webhook signature verification failed.");
@@ -64,9 +58,5 @@ internal sealed class MxWebhookVerifier
     }
 
     /// <summary>Computes the lowercase-hex HMAC-SHA256 signature for a payload.</summary>
-    public string ComputeSignature(ReadOnlySpan<byte> rawBody)
-    {
-        var hash = HMACSHA256.HashData(_secretBytes, rawBody);
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
+    public string ComputeSignature(ReadOnlySpan<byte> rawBody) => HmacWebhookSignature.ComputeHex(_secretBytes, rawBody);
 }

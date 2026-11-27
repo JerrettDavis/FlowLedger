@@ -28,8 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<QuilttSessionCache>();
 
         // The session POST can create a profile, so unsafe methods (all Quiltt calls are POSTs) are never auto-retried.
-        services.AddHttpClient<QuilttApiClient>()
-            .AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+        services.AddConnectorHttpClient<QuilttApiClient>();
 
         services.AddScoped(sp =>
         {
