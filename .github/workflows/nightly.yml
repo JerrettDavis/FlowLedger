@@ -3,6 +3,7 @@ name: Nightly
 # Scheduled verification that does not belong in the PR gate:
 #  - repeat the unit/integration suite 3x, and the Infrastructure project (the most timing- and Docker-sensitive) 10x, to surface flakes
 #  - run the wall-clock Perf tests excluded from the PR gate (trend via TRX artifacts)
+#  - model-check the INV-09 TLA+ spec with TLC (tla2tools.jar pinned by version and sha256)
 # Failures open (or comment on) a tracking issue. Mutation testing and live-sandbox runs are not
 # wired up yet (they need Stryker tooling and provider credentials respectively).
 
@@ -112,9 +113,32 @@ jobs:
           path: artifacts/perf/**/*.trx
           if-no-files-found: warn
 
+  tlc-inv09:
+    name: INV-09 TLA+ model check (TLC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Pinned TLA+ release and the sha256 of its tla2tools.jar (verified before it is run).
+      TLA_VERSION: v1.7.4
+      TLA_TOOLS_SHA256: 936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Java is preinstalled on ubuntu-latest runners (TLC needs 11+).
+      - name: Download tla2tools.jar (sha256 verified)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tla"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/tla/tla2tools.jar"             "https://github.com/tlaplus/tlaplus/releases/download/${TLA_VERSION}/tla2tools.jar"
+          echo "${TLA_TOOLS_SHA256}  $RUNNER_TEMP/tla/tla2tools.jar" | sha256sum --check -
+      - name: Run TLC on SyncLock (fails on any invariant or property violation)
+        working-directory: docs/architecture/inv-09-sync-lock
+        run: |
+          java -cp "$RUNNER_TEMP/tla/tla2tools.jar" tlc2.TLC -config SyncLock.cfg -workers auto -metadir "$RUNNER_TEMP/tlc-states" SyncLock.tla | tee "$RUNNER_TEMP/tlc.log"
+          grep -q "Model checking completed. No error has been found." "$RUNNER_TEMP/tlc.log"
+
   report-failure:
     name: Open issue on failure
-    needs: [repeat-suite, repeat-infrastructure, perf]
+    needs: [repeat-suite, repeat-infrastructure, perf, tlc-inv09]
     if: failure()
     runs-on: ubuntu-latest
     permissions:

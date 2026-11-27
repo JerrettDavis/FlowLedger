@@ -39,8 +39,9 @@ Or open `SyncLock.tla` in the TLA+ Toolbox / VS Code TLA+ extension and run the 
 
 ## Status and limits
 
-- The model has not been run through TLC yet (no TLC runner was available when it was written) and is not part of CI; run it once with
-  the command above before relying on it. The deterministic counterpart that does run in CI is
+- CI model-checks this spec: the `tlc-inv09` job in `.github/workflows/nightly.yml` (nightly and on manual `workflow_dispatch`) downloads
+  `tla2tools.jar` from the pinned TLA+ release (`v1.7.4`, sha256 verified before use), runs TLC with `SyncLock.cfg`, and fails on any invariant or property
+  violation. To bump TLA+, change `TLA_VERSION` and `TLA_TOOLS_SHA256` together. The deterministic counterpart that runs in the PR gate is
   `SyncExclusionModelTests.cs` and `GuardedSyncServiceTests.cs` (tagged `INV-09`).
 - Not modelled: the minimum-interval throttle (it only adds more `Fail` paths), several connections per tenant (the guard is per tenant
   today), and database failover.
