@@ -16,6 +16,8 @@ public sealed class ProviderCallLedger : IProviderCallLedger
 
     public ProviderCallLedger(string connectionString) => _host = new HostDb(connectionString);
 
+    internal ProviderCallLedger(HostDb host) => _host = host;
+
     public async Task RecordAsync(ProviderCallRecord call, CancellationToken ct = default)
     {
         // Metric first: it must count even when the ledger write below fails.
