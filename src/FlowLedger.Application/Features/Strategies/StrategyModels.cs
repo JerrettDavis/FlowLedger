@@ -20,13 +20,13 @@ public sealed record Suggestion(
     IReadOnlyList<string> Assumptions,
     string? Simulator = null);
 
-public sealed record AccountSnapshot(
+internal sealed record AccountSnapshot(
     Guid Id, string Name, string Type, decimal Balance, bool IsInvestment, bool IsLiability,
     decimal? Rate = null, int? RemainingMonths = null);
 
-public sealed record MonthFlow(string Month, decimal Income, decimal Spend);
+internal sealed record MonthFlow(string Month, decimal Income, decimal Spend);
 
-public sealed record StrategyInputs(
+internal sealed record StrategyInputs(
     IReadOnlyList<AccountSnapshot> Accounts,
     IReadOnlyList<MonthFlow> Months,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, decimal>> CategoryByMonth,

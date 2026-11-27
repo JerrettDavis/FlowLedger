@@ -1,5 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.RecurringFlows;
+using FlowLedger.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace FlowLedger.Infrastructure.Sync;
@@ -9,8 +10,9 @@ namespace FlowLedger.Infrastructure.Sync;
 /// lists stay current without the user doing anything. Everything less certain waits as a suggestion. A failure here never
 /// fails the sync.
 /// </summary>
-public sealed class RecurringFlowSyncService(
+internal sealed class RecurringFlowSyncService(
     IFinancialSyncService inner,
+    FlowLedgerDbContext db,
     RecurringSuggestionService suggestions,
     bool autoAdd,
     ILogger<RecurringFlowSyncService> logger) : IFinancialSyncService
@@ -27,7 +29,7 @@ public sealed class RecurringFlowSyncService(
 
         try
         {
-            var added = await suggestions.AutoAddAsync(ct);
+            var added = await ConcurrencyRetry.RunAsync(db, () => suggestions.AutoAddAsync(ct), logger, "Recurring-flow detection", ct);
             if (added.Added > 0)
             {
                 logger.LogInformation("Auto-added {Count} recurring flow(s): {Names}", added.Added, string.Join(", ", added.Names));

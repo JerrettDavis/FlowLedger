@@ -381,6 +381,7 @@ public sealed class FinancialSyncServiceTests : IAsyncLifetime
     {
         public string ProviderName => "Simulated";
         public ProviderCapabilities Capabilities => ProviderCapabilities.Accounts;
+        public ConnectorTraits Traits => ConnectorTraits.PerTenantAccess | ConnectorTraits.ProvisionsLocally | ConnectorTraits.SeedsDemoData;
         public Task<ProviderMemberRef> BeginConnectionAsync(TenantId t, CancellationToken ct = default)
             => Task.FromResult(new ProviderMemberRef("m", "Bank", ConnectionStatus.Connected));
         public Task<ConnectionStatus> GetConnectionStatusAsync(string m, CancellationToken ct = default)

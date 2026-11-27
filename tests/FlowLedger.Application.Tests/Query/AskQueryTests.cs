@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Query;
 using FlowLedger.Application.Tests.Fakes;
@@ -153,7 +154,7 @@ public sealed class AskQueryTests
         var t = new ScriptedTranslator("transactions | count");
         await Handler(t).HandleAsync("count");
 
-        t.LastSystem.Should().Contain("Dataset `transactions`").And.Contain("direction").And.Contain(DateTime.UtcNow.Year.ToString());
+        t.LastSystem.Should().Contain("Dataset `transactions`").And.Contain("direction").And.Contain(DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture));
     }
 
     [Fact]

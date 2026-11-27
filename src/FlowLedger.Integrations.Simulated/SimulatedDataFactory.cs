@@ -561,13 +561,13 @@ public static class SimulatedDataFactory
     /// Primary Checking account (used only so callers can correlate which domain account
     /// to attach these flows to — the factory does not resolve domain AccountIds).
     /// </summary>
-    public static IReadOnlyList<SimulatedRecurringFlowSeed> GetRecurringFlowSeeds(
+    public static IReadOnlyList<RecurringFlowSeed> GetRecurringFlowSeeds(
         string checkingProviderAccountId,
         string creditProviderAccountId)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        return new List<SimulatedRecurringFlowSeed>
+        return new List<RecurringFlowSeed>
         {
             // ── Income ────────────────────────────────────────────────────────
             new(

@@ -65,6 +65,21 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     // ── List ──────────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task Get_list_reports_the_total_matching_count_independent_of_paging()
+    {
+        var account = await CreateAccount();
+        await CreateTransaction(account.Id);
+        await CreateTransaction(account.Id);
+        await CreateTransaction(account.Id);
+
+        var response = await _client.GetAsync($"/api/transactions?accountId={account.Id}&take=2");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<List<TransactionDto>>()).Should().HaveCount(2);
+        response.Headers.GetValues("X-Total-Count").Single().Should().Be("3");
+    }
+
+    [Fact]
     public async Task Get_list_returns_200_and_includes_created_transaction()
     {
         var account = await CreateAccount();

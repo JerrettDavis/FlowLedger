@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -52,7 +53,7 @@ public sealed class QuilttProviderTests
         """;
 
     private static Stub HappyPath() => new((req, body) =>
-        req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+        req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal) ? Json("""{"token":"tok","userId":"p_1"}""")
         : body.Contains("FlowLedgerAccounts") ? Json(AccountsJson)
         : Json(TransactionsJson));
 
@@ -137,7 +138,7 @@ public sealed class QuilttProviderTests
         var calls = 0;
         var stub = new Stub((req, body) =>
         {
-            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal)) { return Json("""{"token":"tok","userId":"p_1"}"""); }
             if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
             calls++;
             return Json(body.Contains("\"after\":null")
@@ -162,9 +163,9 @@ public sealed class QuilttProviderTests
               {"id":"acc_2","name":"Mystery","kind":"DEPOSITORY","state":"OPEN","balance":{"current":10},"connection":{"id":"c","status":"SYNCED"}}
             ]}}
             """;
-        var day = FlowLedger.TestSupport.TestClock.Today.AddDays(-2).ToString("yyyy-MM-dd");
+        var day = FlowLedger.TestSupport.TestClock.Today.AddDays(-2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var stub = new Stub((req, body) =>
-            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal) ? Json("""{"token":"tok","userId":"p_1"}""")
             : body.Contains("FlowLedgerAccounts") ? Json(accounts)
             : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day + "\",\"description\":\"X\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}},"
                 + "{\"id\":\"t2\",\"date\":\"" + day + "\",\"description\":\"Y\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_2\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
@@ -185,15 +186,15 @@ public sealed class QuilttProviderTests
     {
         var day = FlowLedger.TestSupport.TestClock.Today.AddDays(-4);
         var stub = new Stub((req, body) =>
-            req.RequestUri!.Host.StartsWith("auth") ? Json("""{"token":"tok","userId":"p_1"}""")
+            req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal) ? Json("""{"token":"tok","userId":"p_1"}""")
             : body.Contains("FlowLedgerAccounts") ? Json(AccountsJson)
-            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day.ToString("yyyy-MM-dd") + "\",\"description\":\"HOLD\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"PENDING\",\"account\":{\"id\":\"acc_1\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
+            : Json("{\"data\":{\"transactions\":{\"nodes\":[{\"id\":\"t1\",\"date\":\"" + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\",\"description\":\"HOLD\",\"amount\":-5,\"entryType\":\"DEBIT\",\"status\":\"PENDING\",\"account\":{\"id\":\"acc_1\"}}],\"pageInfo\":{\"hasNextPage\":false}}}}"));
         var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", InitialHistoryDays = 36_500 });
         await p.GetAccountsAsync("p_1");
 
         var page = await p.GetTransactionsAsync("acc_1", SyncCursor.Initial);
 
-        page.NextCursor.Value.Should().Be(day.AddDays(-1).ToString("yyyy-MM-dd"));
+        page.NextCursor.Value.Should().Be(day.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -204,12 +205,12 @@ public sealed class QuilttProviderTests
         var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
         var stub = new Stub((req, body) =>
         {
-            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal)) { return Json("""{"token":"tok","userId":"p_1"}"""); }
             if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
             var from = DateOnly.Parse(System.Text.RegularExpressions.Regex.Match(body, "\"from\":\"([0-9-]+)\"").Groups[1].Value);
             var remaining = rows.Where(r => r.Date >= from).ToList();
             var nodes = string.Join(",", remaining.Take(2).Select(r =>
-                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd") + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}}"));
+                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"acc_1\"}}"));
             return Json("{\"data\":{\"transactions\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + (remaining.Count > 2 ? "true" : "false") + ",\"endCursor\":\"c\"}}}}");
         });
         var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", MaxPages = 1, PageSize = 2, OverlapDays = 3, InitialHistoryDays = 36_500 });
@@ -242,12 +243,12 @@ public sealed class QuilttProviderTests
         var rows = Enumerable.Range(0, 5).Select(i => (Id: $"t{i}", Date: d0.AddDays(i))).ToList();
         var stub = new Stub((req, body) =>
         {
-            if (req.RequestUri!.Host.StartsWith("auth")) { return Json("""{"token":"tok","userId":"p_1"}"""); }
+            if (req.RequestUri!.Host.StartsWith("auth", StringComparison.Ordinal)) { return Json("""{"token":"tok","userId":"p_1"}"""); }
             if (body.Contains("FlowLedgerAccounts")) { return Json(AccountsJson); }
             var from = DateOnly.Parse(System.Text.RegularExpressions.Regex.Match(body, "\"from\":\"([0-9-]+)\"").Groups[1].Value);
             var remaining = rows.Where(r => r.Date >= from).ToList();
             var nodes = string.Join(",", remaining.Take(2).Select(r =>
-                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd") + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"" + (r.Id == "t1" ? "acc_2" : "acc_1") + "\"}}"));
+                "{\"id\":\"" + r.Id + "\",\"date\":\"" + r.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\",\"description\":\"X\",\"amount\":-1,\"entryType\":\"DEBIT\",\"status\":\"POSTED\",\"account\":{\"id\":\"" + (r.Id == "t1" ? "acc_2" : "acc_1") + "\"}}"));
             return Json("{\"data\":{\"transactions\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + (remaining.Count > 2 ? "true" : "false") + ",\"endCursor\":\"c\"}}}}");
         });
         var p = Make(stub, opts: new QuilttOptions { ApiKeySecret = "key", ConnectorId = "con_1", MaxPages = 1, PageSize = 2, OverlapDays = 3, InitialHistoryDays = 36_500 });

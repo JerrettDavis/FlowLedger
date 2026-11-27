@@ -5,7 +5,7 @@ namespace FlowLedger.Application.Features.BillSheet;
 /// date floats); a weekly or every-N-weeks row has one date per interval that falls in the month, so a fortnightly $55
 /// mow shows up two or three times in a month; a twice-monthly row has two. Each date is one "slot" of the month's cell.
 /// </summary>
-public static class BillSchedule
+internal static class BillSchedule
 {
     /// <summary>The expected payment dates in <paramref name="month"/>; a floating monthly row yields a single null date.</summary>
     public static IReadOnlyList<DateOnly?> Slots(SheetBillData bill, DateOnly month)

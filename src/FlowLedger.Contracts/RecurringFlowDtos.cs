@@ -20,7 +20,8 @@ public sealed record RecurringFlowDto(
     string? Counterparty,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    decimal MonthlyAmount = 0m);
+    decimal MonthlyAmount = 0m,
+    uint Version = 0);
 
 /// <summary>Request DTO for creating a recurring flow.</summary>
 public sealed record CreateRecurringFlowRequest(

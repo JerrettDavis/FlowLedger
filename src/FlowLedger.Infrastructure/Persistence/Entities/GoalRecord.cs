@@ -11,5 +11,8 @@ internal sealed class GoalRecord
     public DateOnly? TargetDate { get; private set; }
     public DateTimeOffset UpdatedUtc { get; private set; }
 
+    /// <summary>Optimistic-concurrency token: Postgres <c>xmin</c> (#157).</summary>
+    public uint RowVersion { get; private set; }
+
     private GoalRecord() { }
 }

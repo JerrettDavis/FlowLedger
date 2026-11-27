@@ -1,7 +1,7 @@
-namespace FlowLedger.Integrations.Simulated;
+namespace FlowLedger.Integrations.Abstractions;
 
 /// <summary>
-/// Lightweight seed descriptor for a recurring flow produced by the simulated provider.
+/// Lightweight seed descriptor for a recurring flow produced by a demo-data connector (see <see cref="IRecurringFlowSeedSource"/>).
 /// All values are primitive so this type has no dependency on the domain layer.
 /// The Infrastructure sync service maps these into <c>RecurringFlow</c> aggregates.
 /// </summary>
@@ -15,7 +15,7 @@ namespace FlowLedger.Integrations.Simulated;
 /// <param name="IntervalWeeks">Interval in weeks for EveryNWeeks patterns; null otherwise.</param>
 /// <param name="AnchorDayOfWeek">Day-of-week name for Weekly/EveryNWeeks patterns; null otherwise.</param>
 /// <param name="Counterparty">Optional merchant/payee name.</param>
-public sealed record SimulatedRecurringFlowSeed(
+public sealed record RecurringFlowSeed(
     string ProviderAccountId,
     string Name,
     decimal Amount,
@@ -26,3 +26,10 @@ public sealed record SimulatedRecurringFlowSeed(
     int? IntervalWeeks,
     string? AnchorDayOfWeek,
     string? Counterparty);
+
+/// <summary>Implemented by a demo-data connector that can seed recurring flows alongside its accounts.</summary>
+public interface IRecurringFlowSeedSource
+{
+    /// <summary>Seeds keyed to the given provider account ids (checking for income/bills, credit for card payments).</summary>
+    IReadOnlyList<RecurringFlowSeed> GetRecurringFlowSeeds(string checkingProviderAccountId, string creditProviderAccountId);
+}

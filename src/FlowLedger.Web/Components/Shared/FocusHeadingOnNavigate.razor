@@ -1,0 +1,29 @@
+@namespace FlowLedger.Web.Components.Shared
+@inject IJSRuntime Js
+@* Moves focus to the page h1 after in-app navigation (like the built-in FocusOnNavigate), but NOT on the first load:
+   a fresh page must leave the skip link as the first Tab stop (WCAG 2.4.1), so focus stays at the document start. *@
+
+@code {
+    [Parameter, EditorRequired] public RouteData? RouteData { get; set; }
+
+    private RouteData? _lastRouteData;
+    private bool _initialised;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_initialised)
+        {
+            _initialised = true;
+            _lastRouteData = RouteData;
+            return;
+        }
+
+        if (ReferenceEquals(_lastRouteData, RouteData))
+        {
+            return;
+        }
+
+        _lastRouteData = RouteData;
+        await Js.InvokeVoidAsync("flowledgerFocusHeading");
+    }
+}

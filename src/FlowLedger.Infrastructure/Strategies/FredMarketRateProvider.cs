@@ -9,7 +9,7 @@ namespace FlowLedger.Infrastructure.Strategies;
 /// averages, Treasury yields (used to estimate deposit/CD yields), and Federal Reserve consumer loan/credit card rates.
 /// Results are cached; any failure falls back per-field to labelled assumptions, never to an exception.
 /// </summary>
-public sealed class FredMarketRateProvider(HttpClient http, ILogger<FredMarketRateProvider> logger) : IMarketRateProvider
+internal sealed class FredMarketRateProvider(HttpClient http, ILogger<FredMarketRateProvider> logger) : IMarketRateProvider
 {
     public const string BaseUrl = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=";
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(6);

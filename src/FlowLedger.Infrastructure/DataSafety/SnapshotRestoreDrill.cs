@@ -17,7 +17,7 @@ public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool Sc
 /// The live database is never touched and the scratch name must never equal it.
 /// This same path is the disaster-recovery restore (use <c>keep: true</c> and promote the scratch database).
 /// </summary>
-public static class SnapshotRestoreDrill
+internal static class SnapshotRestoreDrill
 {
     private static readonly System.Text.RegularExpressions.Regex SafeIdentifier = new("^[A-Za-z_][A-Za-z0-9_]{0,62}$");
 

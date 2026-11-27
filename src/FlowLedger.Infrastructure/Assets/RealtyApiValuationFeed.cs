@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace FlowLedger.Infrastructure.Assets;
 
 /// <summary>Configuration for the RealtyAPI.io (Redfin) home-value feed. Bind from <c>RealtyApi</c>.</summary>
-public sealed class RealtyApiOptions
+internal sealed class RealtyApiOptions
 {
     public const string SectionName = "RealtyApi";
 
@@ -24,7 +24,7 @@ public sealed class RealtyApiOptions
 /// property (the response embeds <c>details.avm.__root.avmInfo.predictedValue</c>). Only the address leaves
 /// the system, never the serial number.
 /// </summary>
-public sealed class RealtyApiValuationFeed(
+internal sealed class RealtyApiValuationFeed(
     IHttpClientFactory httpFactory,
     IOptions<RealtyApiOptions> options,
     ILogger<RealtyApiValuationFeed> logger) : IAssetValuationFeed

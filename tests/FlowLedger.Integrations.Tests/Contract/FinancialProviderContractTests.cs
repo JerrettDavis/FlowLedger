@@ -263,7 +263,7 @@ public abstract class FinancialProviderContractTests
         var member = await provider.BeginConnectionAsync(GetTestTenantId());
         var status = await provider.GetConnectionStatusAsync(member.ProviderId);
 
-        Enum.IsDefined(typeof(ConnectionStatus), status).Should().BeTrue();
+        Enum.IsDefined(status).Should().BeTrue();
     }
 
     [Fact]

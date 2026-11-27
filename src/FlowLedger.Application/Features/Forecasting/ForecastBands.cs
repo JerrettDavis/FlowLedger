@@ -16,7 +16,7 @@ public sealed record ForecastBandPoint(DateOnly Date, decimal Expected, decimal 
 /// weekly totals) and widens it into an expected line with an 80% range that grows with the square root of time
 /// (independent weeks). No I/O, no randomness: same inputs, same bands.
 /// </summary>
-public static class ForecastBands
+internal static class ForecastBands
 {
     public const int MinWeeks = 8;
     public const int HistoryWeeks = 26;

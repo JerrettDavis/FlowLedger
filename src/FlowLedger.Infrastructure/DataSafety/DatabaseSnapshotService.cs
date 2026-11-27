@@ -6,10 +6,10 @@ using Npgsql;
 namespace FlowLedger.Infrastructure.DataSafety;
 
 /// <summary>One table inside a snapshot.</summary>
-public sealed record SnapshotTable(string Table, long Rows, string Sha256, long Bytes);
+internal sealed record SnapshotTable(string Table, long Rows, string Sha256, long Bytes);
 
 /// <summary>Manifest written next to the CSV files of a snapshot.</summary>
-public sealed record SnapshotManifest(
+internal sealed record SnapshotManifest(
     int Version,
     DateTimeOffset CreatedUtc,
     string Database,
@@ -18,7 +18,7 @@ public sealed record SnapshotManifest(
     IReadOnlyList<SnapshotTable> Tables,
     Guid? TenantId = null);
 
-public sealed record SnapshotVerification(bool Ok, IReadOnlyList<string> Problems);
+internal sealed record SnapshotVerification(bool Ok, IReadOnlyList<string> Problems);
 
 /// <summary>
 /// Tool-free, schema-independent logical snapshot of every public table: each table is streamed
@@ -27,7 +27,7 @@ public sealed record SnapshotVerification(bool Ok, IReadOnlyList<string> Problem
 /// and is used before migrations, by the scheduled backup job and by restore drills.
 /// Nothing in here ever deletes or overwrites existing snapshots.
 /// </summary>
-public sealed class DatabaseSnapshotService
+internal sealed class DatabaseSnapshotService
 {
     public const string ManifestFileName = "manifest.json";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };

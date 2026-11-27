@@ -4,7 +4,7 @@ using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.RecurringFlows;
 
 /// <summary>One real, posted transaction considered for recurrence detection.</summary>
-public sealed record FlowTxn(Guid AccountId, DateOnly Date, decimal Amount, bool IsCredit, string Text, bool Discretionary = false);
+internal sealed record FlowTxn(Guid AccountId, DateOnly Date, decimal Amount, bool IsCredit, string Text, bool Discretionary = false);
 
 /// <summary>A recurring pattern found in the transactions, ready to become a <c>RecurringFlow</c>.</summary>
 public sealed record DetectedFlow(
@@ -31,7 +31,7 @@ public sealed record DetectedFlow(
 /// merchants (fuel, groceries, cafes) never qualify because their gaps are short and irregular; patterns that stopped
 /// (a cancelled subscription) are dropped. Confidence blends gap regularity, amount stability and how much history there is.
 /// </summary>
-public static class RecurringFlowDetector
+internal static class RecurringFlowDetector
 {
     private const double MinConfidence = 0.6;
 

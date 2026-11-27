@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FlowLedger.Infrastructure.Sync;
 
 /// <summary>Read-only "when did we last sync" lookup (no provider call), shared by the API status endpoint.</summary>
-public static class SyncStatusReader
+internal static class SyncStatusReader
 {
     public static async Task<DateTimeOffset?> LastSyncedAtAsync(
         FlowLedgerDbContext db, FlowLedger.SharedKernel.ITenantContext tenantContext, string providerName, CancellationToken ct)

@@ -10,6 +10,7 @@ WORKDIR /src
 # Central build / package management files
 COPY global.json                  global.json
 COPY Directory.Build.props        Directory.Build.props
+COPY .editorconfig                .editorconfig
 COPY Directory.Packages.props     Directory.Packages.props
 
 # Project files needed to restore the API's dependency tree

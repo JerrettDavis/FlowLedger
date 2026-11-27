@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using FlowLedger.Infrastructure.Persistence.Entities;
@@ -37,7 +38,7 @@ public sealed class QuilttSyncEndToEndTests : IAsyncLifetime
     private static string Transactions()
     {
         var d = DateTime.UtcNow.Date;
-        string Day(int ago) => d.AddDays(-ago).ToString("yyyy-MM-dd");
+        string Day(int ago) => d.AddDays(-ago).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return """
             {"data":{"transactions":{"nodes":[
               {"id":"t1","date":"@D10@","description":"COFFEE SHOP","amount":-4.5,"currencyCode":"USD","status":"POSTED","entryType":"DEBIT","account":{"id":"acct_chk"}},

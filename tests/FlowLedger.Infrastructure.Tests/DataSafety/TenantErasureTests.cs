@@ -81,7 +81,7 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         var b = TestTenantContext.New();
         var dir = Directory();
 
-        // Seed both tenants: aggregates (and their outbox rows), HA settings, an ad-hoc login and a link code.
+        // Seed both tenants: aggregates (and an outbox row), HA settings, an ad-hoc login and a link code.
         foreach (var t in new[] { a, b })
         {
             var accountId = await fixture.SeedAccountAsync(t, "acct");
@@ -91,6 +91,8 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
                 txCtx.Transactions.Add(Transaction.RecordActual(
                     TenantId.From(t.TenantId), accountId, new Money(5m, Currency.Usd), TransactionDirection.Debit, "Shop",
                     effectiveDate: date, postedDate: date, source: TransactionSource.Manual));
+                new FlowLedger.Infrastructure.Events.EfOutbox(txCtx, t).Enqueue(
+                    new FlowLedger.Domain.Events.SyncCompleted(TenantId.From(t.TenantId), 1, 1, 0));
                 await txCtx.SaveChangesAsync();
             }
 

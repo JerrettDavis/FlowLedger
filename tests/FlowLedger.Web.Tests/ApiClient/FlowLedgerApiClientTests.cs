@@ -57,12 +57,60 @@ public sealed class FlowLedgerApiClientTests
         sent.Should().Be("\"42\"");
     }
 
-    private sealed class CapturingHandler(Action<HttpRequestMessage> capture) : HttpMessageHandler
+    // ── Transactions and recurring flows: optimistic concurrency (#157) ───────
+
+    [Fact]
+    public async Task SetTransactionNoteAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
+
+        var act = () => client.SetTransactionNoteAsync(Guid.NewGuid(), "hello", expectedVersion: 7);
+
+        var thrown = (await act.Should().ThrowAsync<ApiClientException>()).Which;
+        thrown.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        FlowLedger.Web.Shared.SnackbarExtensions.ProblemText(thrown).Should().Contain("This transaction was changed elsewhere").And.Contain("Reload");
+    }
+
+    [Fact]
+    public async Task TransactionAndRecurringFlowWrites_SendTheVersionAsIfMatch_AndReportTheNewEtag()
+    {
+        var sent = new List<string?>();
+        var handler = new CapturingHandler(r => sent.Add(r.Headers.TryGetValues("If-Match", out var v) ? v.Single() : null), HttpStatusCode.NoContent, etag: "\"99\"");
+        var client = new FlowLedgerApiClient(
+            new HttpClient(handler) { BaseAddress = new Uri("http://localhost") },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
+        uint? newVersion = null;
+
+        await client.SetTransactionNoteAsync(Guid.NewGuid(), "n", expectedVersion: 5, newVersion: v => newVersion = v);
+        await client.SetTransactionSplitsAsync(Guid.NewGuid(), [], expectedVersion: 6);
+        await client.DeleteRecurringFlowAsync(Guid.NewGuid(), expectedVersion: 8);
+
+        sent.Should().Equal("\"5\"", "\"6\"", "\"8\"");
+        newVersion.Should().Be(99u, "the next write chains from the ETag the last one returned");
+    }
+
+    [Fact]
+    public async Task UpdateRecurringFlowAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
+
+        var act = () => client.UpdateRecurringFlowAsync(Guid.NewGuid(), new UpdateRecurringFlowRequest(10m, "Fixed"), expectedVersion: 3);
+
+        (await act.Should().ThrowAsync<ApiClientException>()).Which.Message.Should().Contain("recurring flow was changed elsewhere");
+    }
+
+    private sealed class CapturingHandler(Action<HttpRequestMessage> capture, HttpStatusCode status = HttpStatusCode.NotFound, string? etag = null) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             capture(request);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            var response = new HttpResponseMessage(status);
+            if (etag is not null)
+            {
+                response.Headers.TryAddWithoutValidation("ETag", etag);
+            }
+
+            return Task.FromResult(response);
         }
     }
 

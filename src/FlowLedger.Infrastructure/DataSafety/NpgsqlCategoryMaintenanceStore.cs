@@ -8,7 +8,7 @@ namespace FlowLedger.Infrastructure.DataSafety;
 /// Applies a category move/merge plan in ONE database transaction: category rows, every reference to a merged category
 /// (transactions, splits, recurring flows) and the path-keyed side tables (rules, budgets). No new tables, so no migration.
 /// </summary>
-public sealed class NpgsqlCategoryMaintenanceStore(string connectionString, ITenantContext tenant) : ICategoryMaintenanceStore
+internal sealed class NpgsqlCategoryMaintenanceStore(string connectionString, ITenantContext tenant) : ICategoryMaintenanceStore
 {
     public async Task<int> ApplyAsync(CategoryRestructurePlan plan, CancellationToken ct = default)
     {

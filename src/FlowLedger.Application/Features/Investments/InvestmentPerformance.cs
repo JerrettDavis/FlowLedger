@@ -5,7 +5,7 @@ using FlowLedger.Application.Features.Transactions;
 namespace FlowLedger.Application.Features.Investments;
 
 /// <summary>Net cash moved into (+) or out of (-) an investment account on a date, as seen by that account.</summary>
-public sealed record CashFlowPoint(DateOnly Date, decimal Amount);
+internal sealed record CashFlowPoint(DateOnly Date, decimal Amount);
 
 public sealed record PeriodPerformance(string Period, int Days, decimal StartBalance, decimal NetContributions, decimal Gain, double? GainPercent);
 
@@ -15,7 +15,7 @@ public sealed record AccountPerformance(Guid AccountId, string Name, decimal Bal
 /// Investment growth separated from deposits. Gain = end balance - start balance - net contributions, so moving money in
 /// is not mistaken for performance. Pure (no I/O): balances and contributions are passed in.
 /// </summary>
-public static class InvestmentPerformanceCalculator
+internal static class InvestmentPerformanceCalculator
 {
     public static readonly IReadOnlyList<(string Label, int Days)> Periods = [("30 days", 30), ("90 days", 90), ("1 year", 365)];
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
@@ -49,6 +50,12 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         | ProviderCapabilities.WebhookVerification
         | ProviderCapabilities.WebhookParsing
         | ProviderCapabilities.ConnectionHealth;
+
+    /// <summary>One Quiltt profile per tenant, linked by the user inside the app; balances use the holdings sign.</summary>
+    public const ConnectorTraits DeclaredTraits =
+        ConnectorTraits.PerTenantAccess | ConnectorTraits.UserInitiatedLinking | ConnectorTraits.ReportsHoldingsSign;
+
+    public ConnectorTraits Traits => DeclaredTraits;
 
     /// <summary>The public Connector id the browser opens (not a secret).</summary>
     public string? ConnectorId => _options.ConnectorId;
@@ -223,14 +230,14 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         if (cutAt is { } cut)
         {
             _logger.LogInformation("Quiltt read was cut at {Max} pages; continuing from {Date}.", _options.MaxPages, cut);
-            return new TransactionPage(items, new SyncCursor(ContinuationPrefix + cut.ToString("yyyy-MM-dd")), HasMore: true) { SkippedCount = skipped };
+            return new TransactionPage(items, new SyncCursor(ContinuationPrefix + cut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), HasMore: true) { SkippedCount = skipped };
         }
 
         var settled = items.Where(t => !t.IsPending).Select(t => t.PostedDate).DefaultIfEmpty().Max();
         // Only pending rows so far: everything older than the earliest has been seen, so do not re-read the whole window every sync.
         // A truly empty account keeps its initial cursor so history that arrives later is not skipped.
-        var next = settled != default ? new SyncCursor(settled.ToString("yyyy-MM-dd"))
-            : cursor.IsInitial && items.Count > 0 ? new SyncCursor(items.Min(t => t.PostedDate).AddDays(-1).ToString("yyyy-MM-dd"))
+        var next = settled != default ? new SyncCursor(settled.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+            : cursor.IsInitial && items.Count > 0 ? new SyncCursor(items.Min(t => t.PostedDate).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
             : cursor;
         _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
         return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };

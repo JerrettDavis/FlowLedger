@@ -152,7 +152,6 @@ public sealed class SourceRuleTests
     /// <summary>Files that still hold a bare connector literal (OpenAPI tag text or a private const). Shrink only.</summary>
     private static readonly HashSet<string> ConnectorLiteralAllowlist =
     [
-        "src/FlowLedger.Api/Endpoints/DataEndpoints.cs",
         "src/FlowLedger.Infrastructure/DependencyInjection.cs", // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/ConnectorEndpoints.cs",     // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/MxEndpoints.cs",
@@ -171,6 +170,60 @@ public sealed class SourceRuleTests
             .ToList();
 
         Assert.True(offenders.Count == 0, $"Use ConnectorIds instead of bare names in: {string.Join(", ", offenders)}");
+    }
+
+    /// <summary>Sync and Application code asks a connector what it does (<c>ConnectorTraits</c>); it never names a connector (#89).</summary>
+    [Fact]
+    public void Sync_and_Application_branch_on_connector_traits_not_connector_identity()
+    {
+        var connectorProject = new Regex(@"FlowLedger\.Integrations\.(Simulated|Mx|Quiltt|SimpleFin)\b");
+        var connectorId = new Regex(@"ConnectorIds\.|""(Simulated|SimpleFIN|MX|Quiltt)""");
+        var offenders = SourceFiles("FlowLedger.Infrastructure").Where(f => Rel(f).Contains("/Sync/"))
+            .Concat(SourceFiles("FlowLedger.Application"))
+            .Where(f =>
+            {
+                var text = File.ReadAllText(f);
+                return connectorProject.IsMatch(text) || connectorId.IsMatch(text);
+            })
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, $"Declare a ConnectorTraits flag instead of naming a connector in: {string.Join(", ", offenders)}");
+    }
+
+    // ── 6b. No new oversized source files (#103) ─────────────────────────────
+
+    private const int MaxSourceLines = 500;
+
+    /// <summary>Files over the limit today, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list.</summary>
+    private static readonly Dictionary<string, int> OversizedCeilings = new()
+    {
+        ["src/FlowLedger.Infrastructure/Sync/FinancialSyncService.cs"] = 923,
+        ["src/FlowLedger.Application/Features/Imports/ImportNormalizer.cs"] = 747,
+        ["src/FlowLedger.Application/Features/Query/QueryEngine.cs"] = 710,
+        ["src/FlowLedger.Integrations.Simulated/SimulatedDataFactory.cs"] = 687,
+        ["src/FlowLedger.Integrations.Mx/MxFinancialDataProvider.cs"] = 647,
+        ["src/FlowLedger.Application/Features/Query/QueryParser.cs"] = 611,
+        ["src/FlowLedger.Application/Features/RecurringFlows/RecurringFlowDetector.cs"] = 538,
+        ["src/FlowLedger.Application/Features/Forecasting/ForecastEngine.cs"] = 522,
+        ["src/FlowLedger.Domain/Aggregates/Transaction.cs"] = 503,
+    };
+
+    [Fact]
+    public void Source_files_stay_under_the_size_limit_or_hold_a_shrinking_ceiling()
+    {
+        var sizes = Directory.EnumerateDirectories(Path.Combine(Root, "src"))
+            .SelectMany(d => SourceFiles(Path.GetFileName(d)))
+            .ToDictionary(Rel, f => File.ReadLines(f).Count());
+
+        var tooBig = sizes.Where(kv => kv.Value > MaxSourceLines
+                && (!OversizedCeilings.TryGetValue(kv.Key, out var ceiling) || kv.Value > ceiling))
+            .Select(kv => $"{kv.Key} ({kv.Value})").ToList();
+        var stale = OversizedCeilings.Where(kv => !sizes.TryGetValue(kv.Key, out var n) || n <= MaxSourceLines)
+            .Select(kv => kv.Key).ToList();
+
+        Assert.True(stale.Count == 0, $"Remove files that now fit from the ceiling list: {string.Join(", ", stale)}");
+        Assert.True(tooBig.Count == 0, $"Split files over {MaxSourceLines} lines (or do not grow a listed one): {string.Join(", ", tooBig)}");
     }
 
     // ── 7. One constant-time string comparison (#100) ────────────────────────

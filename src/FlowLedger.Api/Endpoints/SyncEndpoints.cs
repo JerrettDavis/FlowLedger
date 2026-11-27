@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Integrations.Abstractions;
@@ -62,27 +63,23 @@ internal static class SyncEndpoints
                     }
                 }
 
-                var anyReal = connectors.Enabled.Any(c => c.Id != ConnectorIds.Simulated);
+                var anyReal = connectors.Enabled.Any(c => !c.Traits.HasFlag(ConnectorTraits.SeedsDemoData));
                 var minutes = int.TryParse(cfg["Sync:MinIntervalMinutes"], out var m) ? m : (anyReal ? 30 : 0);
                 return Results.Ok(new { lastSyncedAt = last, minIntervalMinutes = minutes, provider = primary.ProviderName });
             })
             .WithName("GetSyncStatus")
             .WithSummary("When the last successful sync finished and the enforced minimum interval");
 
-        group.MapPost("/sync", async (IFinancialSyncService syncService, FlowLedger.Application.Features.Integrations.IntegrationService integrations, HttpContext httpContext, CancellationToken ct) =>
+        group.MapPost("/sync", async (IFinancialSyncService syncService, HttpContext httpContext, CancellationToken ct) =>
         {
             try
             {
                 var result = await syncService.SyncAsync(ct);
-                await integrations.DispatchAsync(
-                    FlowLedger.Application.Features.Integrations.IntegrationEvents.SyncCompleted,
-                    new { accounts = result.AccountsUpserted, transactionsAdded = result.TransactionsAdded },
-                    ct);
                 return Results.Ok(result);
             }
             catch (SyncThrottledException ex)
             {
-                httpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(ex.RetryAfter.TotalSeconds)).ToString();
+                httpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(ex.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
                 return Results.Problem(title: "Synced recently", detail: ex.Message, statusCode: StatusCodes.Status429TooManyRequests);
             }
             catch (SyncAlreadyRunningException ex)

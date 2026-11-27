@@ -117,7 +117,7 @@ public sealed class CreateRecurringFlowHandler
                 RecurrencePattern.Monthly(request.DayOfMonth ?? 1),
             RecurrenceFrequency.LastBusinessDay =>
                 RecurrencePattern.LastBusinessDay(),
-            _ => throw new ArgumentOutOfRangeException(nameof(request.RecurrenceFrequency), freq, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(request), freq, "Unsupported recurrence frequency.")
         };
     }
 }
@@ -126,17 +126,23 @@ public sealed class CreateRecurringFlowHandler
 public sealed class UpdateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
+    private readonly IRowVersionGuard? _guard;
 
-    public UpdateRecurringFlowHandler(IRecurringFlowRepository repo)
-        => _repo = repo;
+    public UpdateRecurringFlowHandler(IRecurringFlowRepository repo, IRowVersionGuard? guard = null)
+    {
+        _repo = repo;
+        _guard = guard;
+    }
 
-    public async Task<RecurringFlowDto?> HandleAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default)
+    public async Task<RecurringFlowDto?> HandleAsync(Guid id, UpdateRecurringFlowRequest request, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var flow = await _repo.GetByIdAsync(RecurringFlowId.From(id), ct);
         if (flow is null)
         {
             return null;
         }
+
+        _guard?.Expect(flow, expectedVersion);
 
         var amountModel = Enum.Parse<AmountModel>(request.AmountModel, ignoreCase: true);
         var newAmount = new Money(request.Amount, flow.Amount.Currency);
@@ -151,17 +157,23 @@ public sealed class UpdateRecurringFlowHandler
 public sealed class DeactivateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
+    private readonly IRowVersionGuard? _guard;
 
-    public DeactivateRecurringFlowHandler(IRecurringFlowRepository repo)
-        => _repo = repo;
+    public DeactivateRecurringFlowHandler(IRecurringFlowRepository repo, IRowVersionGuard? guard = null)
+    {
+        _repo = repo;
+        _guard = guard;
+    }
 
-    public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var flow = await _repo.GetByIdAsync(RecurringFlowId.From(id), ct);
         if (flow is null)
         {
             return false;
         }
+
+        _guard?.Expect(flow, expectedVersion);
 
         flow.Deactivate();
         await _repo.SaveChangesAsync(ct);
@@ -194,5 +206,6 @@ internal static class RecurringFlowMapper
         f.Counterparty,
         f.IsActive,
         f.CreatedAt,
-        MoneyRounding.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2));
+        MoneyRounding.Round(f.Amount.Amount * f.Pattern.OccurrencesPerMonth, 2),
+        f.RowVersion);
 }

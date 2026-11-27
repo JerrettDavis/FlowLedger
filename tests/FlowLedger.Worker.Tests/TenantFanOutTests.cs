@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.SharedKernel;
 using FlowLedger.Worker;
@@ -61,7 +62,7 @@ public sealed class TenantFanOutTests
     private static ServiceProvider ParallelProvider(int maxParallel, params Guid[] tenants)
     {
         var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = maxParallel.ToString() }).Build();
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:MaxParallelTenants"] = maxParallel.ToString(CultureInfo.InvariantCulture) }).Build();
         var services = new ServiceCollection();
         services.AddSingleton<IUserDirectory>(new FakeDirectory(tenants));
         services.AddSingleton<IConfiguration>(cfg);

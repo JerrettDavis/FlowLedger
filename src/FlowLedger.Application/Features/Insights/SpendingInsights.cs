@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
@@ -37,7 +38,7 @@ public sealed record BreakdownResult(
 /// Pure spending/income breakdown (Mint-style). Transfers between own accounts are excluded, splits contribute one row per
 /// part, and categories are hierarchical ("Food/Groceries") so a slice can be drilled into its children.
 /// </summary>
-public static class SpendingInsightsAnalyzer
+internal static class SpendingInsightsAnalyzer
 {
     public const string Uncategorized = "Uncategorized";
     public const string NoTag = "Untagged";
@@ -217,9 +218,9 @@ public static class SpendingInsightsAnalyzer
 
     public static string BucketKey(DateOnly d, string bucket) => bucket switch
     {
-        "day" => d.ToString("yyyy-MM-dd"),
-        "week" => d.AddDays(-(((int)d.DayOfWeek + 6) % 7)).ToString("yyyy-MM-dd"), // Monday
-        _ => d.ToString("yyyy-MM"),
+        "day" => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        "week" => d.AddDays(-(((int)d.DayOfWeek + 6) % 7)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), // Monday
+        _ => d.ToString("yyyy-MM", CultureInfo.InvariantCulture),
     };
 
     private static List<TrendPoint> FillBuckets(List<TrendPoint> trend, BreakdownQuery q)

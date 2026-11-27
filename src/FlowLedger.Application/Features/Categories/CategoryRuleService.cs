@@ -21,7 +21,8 @@ public sealed class CategoryRuleService(
     ICategoryRuleStore store,
     ICategorizationStore transactions,
     ICategoryRepository categories,
-    ITenantContext tenant)
+    ITenantContext tenant,
+    IRowVersionGuard? guard = null)
 {
     private const int Max = TransactionQuota.ProcessingCap;
     public const int MaxLength = 200;
@@ -71,7 +72,7 @@ public sealed class CategoryRuleService(
     /// re-labels EVERY transaction of the same merchant (including ones categorized by hand earlier) and saves a rule so
     /// future syncs of that merchant land in the same category. Returns how many transactions changed.
     /// </summary>
-    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null)
+    public async Task<int> RecategorizeAsync(Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null, uint? expectedVersion = null)
     {
         if (note?.Trim() is { Length: > MaxNoteLength })
         {
@@ -80,6 +81,7 @@ public sealed class CategoryRuleService(
 
         var target = await transactions.FindTrackedAsync(transactionId, ct)
             ?? throw new KeyNotFoundException("Transaction not found.");
+        guard?.Expect(target, expectedVersion);
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
             ?? throw new KeyNotFoundException("Category not found.");
         var id = category.CategoryId;

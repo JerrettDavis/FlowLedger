@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
@@ -223,7 +224,7 @@ public static class AuthSetup
     }
 
     private static string SafeLocal(string? url) =>
-        !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\") && !url.Any(char.IsControl) ? url : "/";
+        !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal) && !url.StartsWith("/\\", StringComparison.Ordinal) && !url.Any(char.IsControl) ? url : "/";
 
     private sealed record ResolveResponse(Guid UserId, Guid TenantId, bool IsHousehold = false);
 }

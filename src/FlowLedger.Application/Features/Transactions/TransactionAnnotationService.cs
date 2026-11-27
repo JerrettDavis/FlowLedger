@@ -10,11 +10,11 @@ namespace FlowLedger.Application.Features.Transactions;
 public sealed record SplitInput(decimal Amount, Guid? CategoryId, string? Notes);
 
 /// <summary>User annotations on a transaction: a free-text note and category splits (e.g. a $100 Target run = $70 Groceries + $30 Household).</summary>
-public sealed class TransactionAnnotationService(ICategorizationStore store, ICategoryRepository categories)
+public sealed class TransactionAnnotationService(ICategorizationStore store, ICategoryRepository categories, IRowVersionGuard? guard = null)
 {
     public const int MaxNoteLength = 1000;
 
-    public async Task SetNoteAsync(Guid transactionId, string? note, CancellationToken ct = default)
+    public async Task SetNoteAsync(Guid transactionId, string? note, CancellationToken ct = default, uint? expectedVersion = null)
     {
         if (note is { Length: > MaxNoteLength })
         {
@@ -22,12 +22,13 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
         }
 
         var tx = await FindAsync(transactionId, ct);
+        guard?.Expect(tx, expectedVersion);
         tx.SetNote(note);
         await store.SaveAsync(ct);
     }
 
     /// <summary>Replaces the splits. An empty list removes them. Splits must be positive and sum to the transaction amount.</summary>
-    public async Task SetSplitsAsync(Guid transactionId, IReadOnlyList<SplitInput> splits, CancellationToken ct = default)
+    public async Task SetSplitsAsync(Guid transactionId, IReadOnlyList<SplitInput> splits, CancellationToken ct = default, uint? expectedVersion = null)
     {
         if (splits.Count == 1)
         {
@@ -40,6 +41,7 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
         }
 
         var tx = await FindAsync(transactionId, ct);
+        guard?.Expect(tx, expectedVersion);
         if (splits.Count == 0)
         {
             tx.ClearSplits();

@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.RecurringFlows;
 /// processor prefixes (PayPal, Square, Toast), phone/reference numbers and trailing state codes are stripped. What is left
 /// may still carry a city; the detector handles that by merging a key into any longer key that starts with it.
 /// </summary>
-public static class MerchantNormalizer
+internal static class MerchantNormalizer
 {
     private static readonly HashSet<string> ProcessorPrefixes = new(StringComparer.Ordinal)
     {

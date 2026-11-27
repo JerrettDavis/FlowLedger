@@ -1,9 +1,9 @@
 using FlowLedger.Domain.ValueObjects;
 namespace FlowLedger.Application.Features.Strategies;
 
-public sealed record GoalDebt(string Name, decimal Balance, decimal RatePercent, int RemainingMonths);
+internal sealed record GoalDebt(string Name, decimal Balance, decimal RatePercent, int RemainingMonths);
 
-public sealed record GoalContext(decimal AvgMonthlyIncome, decimal AvgMonthlySpend, IReadOnlyList<GoalDebt> Debts);
+internal sealed record GoalContext(decimal AvgMonthlyIncome, decimal AvgMonthlySpend, IReadOnlyList<GoalDebt> Debts);
 
 public sealed record GoalRequest(
     decimal Target, decimal Saved, decimal Monthly, decimal Apy, int DeadlineMonths,
@@ -19,7 +19,7 @@ public sealed record GoalPlan(
     IReadOnlyList<GoalLever> Levers, IReadOnlyList<string> Callouts);
 
 /// <summary>"How do I get to $X?" Simulates the current path, a slider-driven scenario, and each lever on its own.</summary>
-public static class GoalPlanner
+internal static class GoalPlanner
 {
     public const int MaxMonths = Simulators.MaxMonths;
 

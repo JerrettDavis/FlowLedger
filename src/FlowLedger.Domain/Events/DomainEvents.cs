@@ -1,4 +1,3 @@
-using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.SharedKernel;
 
@@ -17,73 +16,20 @@ public abstract record DomainEventBase : IDomainEvent
     internal void StampOccurredAt(DateTimeOffset at) => _occurredAt = at;
 }
 
-// ── Account events ───────────────────────────────────────────────────────────
+// ── Post-import / post-sync events ───────────────────────────────────────────
+// Every event here MUST have at least one IDomainEventHandler consumer (enforced by OutboxEventConsumerTests); an event nobody
+// handles is dead weight in the outbox, so add the consumer in the same change that introduces the event.
 
-/// <summary>Raised when an account is created (connected/registered) in the system.</summary>
-public sealed record AccountConnected(
-    AccountId AccountId,
-    TenantId TenantId,
-    AccountType AccountType) : DomainEventBase;
-
-/// <summary>Raised whenever an account's current balance changes.</summary>
-public sealed record AccountBalanceUpdated(
-    AccountId AccountId,
-    TenantId TenantId,
-    Money PreviousBalance,
-    Money NewBalance) : DomainEventBase;
-
-// ── Transaction events ───────────────────────────────────────────────────────
-
-/// <summary>Raised when an actual transaction is recorded (imported or manual).</summary>
-public sealed record TransactionImported(
-    TransactionId TransactionId,
+/// <summary>Raised (through the transactional outbox) when an import committed new transactions; drives the post-import side effects.</summary>
+public sealed record TransactionsImported(
     TenantId TenantId,
     AccountId AccountId,
-    Money Amount,
-    TransactionDirection Direction,
-    TransactionSource Source) : DomainEventBase;
+    Guid ImportBatchId,
+    int ImportedCount) : DomainEventBase;
 
-/// <summary>Raised when a transaction is assigned a category.</summary>
-public sealed record TransactionCategorized(
-    TransactionId TransactionId,
+/// <summary>Raised (through the transactional outbox) when a financial sync finished; drives the post-sync side effects.</summary>
+public sealed record SyncCompleted(
     TenantId TenantId,
-    CategoryId CategoryId) : DomainEventBase;
-
-/// <summary>Raised when an actual transaction is matched to a planned flow occurrence.</summary>
-public sealed record TransactionMatchedToPlan(
-    TransactionId TransactionId,
-    TenantId TenantId,
-    PlannedOccurrenceId PlannedOccurrenceId,
-    ConfidenceScore Confidence) : DomainEventBase;
-
-// ── Recurring flow events ────────────────────────────────────────────────────
-
-/// <summary>Raised when a new recurring flow is registered.</summary>
-public sealed record RecurringFlowCreated(
-    RecurringFlowId RecurringFlowId,
-    TenantId TenantId,
-    AccountId AccountId,
-    TransactionDirection Direction) : DomainEventBase;
-
-/// <summary>Raised when a planned occurrence is generated for a recurring flow.</summary>
-public sealed record PlannedOccurrenceGenerated(
-    PlannedOccurrenceId PlannedOccurrenceId,
-    RecurringFlowId RecurringFlowId,
-    TenantId TenantId,
-    DateOnly PlannedDate,
-    Money PlannedAmount) : DomainEventBase;
-
-// ── Asset events ─────────────────────────────────────────────────────────────
-
-/// <summary>Raised when a physical asset is added to the tenant's holdings.</summary>
-public sealed record AssetAdded(
-    AssetId AssetId,
-    TenantId TenantId,
-    AssetCategory Category) : DomainEventBase;
-
-/// <summary>Raised whenever an asset's current value changes through a new valuation.</summary>
-public sealed record AssetRevalued(
-    AssetId AssetId,
-    TenantId TenantId,
-    Money PreviousValue,
-    Money NewValue) : DomainEventBase;
+    int AccountsUpserted,
+    int TransactionsAdded,
+    int TransactionsSkipped) : DomainEventBase;

@@ -217,6 +217,13 @@ internal sealed class RecurringFlowConfiguration : IEntityTypeConfiguration<Recu
                 .HasDatabaseName("ix_planned_occurrences_date");
         });
 
+        // Optimistic concurrency (#157): Postgres' own xmin system column, so no schema change is needed.
+        builder.Property(f => f.RowVersion)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         // Indexes
         builder.HasIndex("TenantId").HasDatabaseName("ix_recurring_flows_tenant_id");
         builder.HasIndex("TenantId", "AccountId")

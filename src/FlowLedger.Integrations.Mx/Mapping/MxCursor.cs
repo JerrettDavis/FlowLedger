@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlowLedger.Integrations.Abstractions;
@@ -33,7 +34,7 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage, string? F
     /// cursor would skip any transaction posted after the pass — the date window is the watermark.
     /// </summary>
     public static MxCursor Watermark(int recordsPerPage, DateOnly fromDate) =>
-        new(1, NormalizeRecordsPerPage(recordsPerPage), fromDate.ToString("yyyy-MM-dd"));
+        new(1, NormalizeRecordsPerPage(recordsPerPage), fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
     /// <summary>
     /// Decodes a <see cref="SyncCursor"/> into an <see cref="MxCursor"/>.

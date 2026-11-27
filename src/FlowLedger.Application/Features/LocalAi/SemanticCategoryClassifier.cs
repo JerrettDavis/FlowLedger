@@ -4,7 +4,7 @@ using FlowLedger.Application.Features.Categories;
 namespace FlowLedger.Application.Features.LocalAi;
 
 /// <summary>One labelled descriptor (already normalised) used as a nearest-neighbour example.</summary>
-public sealed record LabeledText(string Text, string Label, double Weight = 1.0);
+internal sealed record LabeledText(string Text, string Label, double Weight = 1.0);
 
 /// <summary>
 /// Embedding k-nearest-neighbour category classifier ("SetFit-lite": a frozen sentence embedder + a non-parametric head).
@@ -12,7 +12,7 @@ public sealed record LabeledText(string Text, string Label, double Weight = 1.0)
 /// learns a correction the moment it is made. One vote per distinct merchant (weight capped), so a merchant seen 200 times
 /// cannot drown the long tail. Pure apart from the embedder call.
 /// </summary>
-public sealed class SemanticCategoryClassifier
+internal sealed class SemanticCategoryClassifier
 {
     public const int MinExamples = 10;
     public const double MaxMerchantWeight = 3;
@@ -105,7 +105,7 @@ public sealed class SemanticCategoryClassifier
 }
 
 /// <summary>Combines the lexical naive-Bayes prediction with the semantic one into a single confidence.</summary>
-public static class PredictionEnsemble
+internal static class PredictionEnsemble
 {
     /// <summary>
     /// Agreement is strong evidence (independent-ish signals: noisy-OR); disagreement keeps one at a discount

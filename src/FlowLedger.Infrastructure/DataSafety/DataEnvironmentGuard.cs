@@ -134,7 +134,7 @@ public static class DataEnvironmentGuard
 }
 
 /// <summary>Runs the guard at startup (register AFTER the migration service so the schema exists).</summary>
-public sealed class DataEnvironmentGuardService : IHostedService
+internal sealed class DataEnvironmentGuardService : IHostedService
 {
     private readonly IServiceProvider _sp;
     private readonly IConfiguration _config;

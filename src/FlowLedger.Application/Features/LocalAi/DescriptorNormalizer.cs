@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.LocalAi;
 /// Cleans a raw bank descriptor before it is embedded or compared: "SQ *BLUE BOTTLE COFFEE #1042 OAKLAND CA" and
 /// "BLUE BOTTLE COFFEE 77" must land close together. Pure; never used to change stored data, only to compute similarity.
 /// </summary>
-public static partial class DescriptorNormalizer
+internal static partial class DescriptorNormalizer
 {
     [GeneratedRegex(@"^\s*(?:(?:sq|tst|pp|paypal|gglpay|google pay|apple pay|amzn mktp|pos|debit|credit|purchase|recurring|checkcard|check card|visa|ach|web|pmt|payment to)\s*[\*\-:#]+\s*|(?:pos|debit|purchase|recurring|checkcard|check card)\s+)+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Prefixes();
