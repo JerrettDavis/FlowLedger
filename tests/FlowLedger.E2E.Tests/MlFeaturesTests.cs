@@ -165,7 +165,8 @@ public class MlFeaturesTests : E2ETestBase
         await NavigateAsync("/");
         await WaitForLoadAsync();
         await Page!.GetByText("Needs a Look").First.WaitForAsync(new() { Timeout = 30000 });
-        var flagged = Page.GetByText("Price increase", new() { Exact = false });
+        // "Price increase" is also the bare title of the alert in the alerts panel; the "Needs a Look" row is the one that carries the amounts.
+        var flagged = Page.GetByText("Price increase", new() { Exact = false }).Filter(new() { HasText = "$17.99" });
         await flagged.First.WaitForAsync(new() { Timeout = 20000 });
         (await flagged.First.InnerTextAsync()).Should().Contain("$17.99").And.Contain("$15.49");
         AssertNoPageErrors();

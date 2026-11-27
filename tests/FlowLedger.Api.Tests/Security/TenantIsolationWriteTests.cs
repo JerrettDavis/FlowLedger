@@ -110,6 +110,9 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         ["POST /api/home-assistant/test"] = CaseWithBody(c => Json(c.B, HttpMethod.Post, "/api/home-assistant/test"), "Save a webhook URL first", HttpStatusCode.BadGateway),
 
         // ── Payloads that name A's rows: B must be refused or find nothing. ──
+        // B names A's transaction and A's category: the category is invisible to B, so the whole request is refused, and A's row is untouched.
+        ["POST /api/transactions/bulk-category"] = Case(c => Json(c.B, HttpMethod.Post, "/api/transactions/bulk-category",
+            new { transactionIds = new[] { c.Seed.Transaction }, categoryId = c.Seed.Category }), HttpStatusCode.NotFound),
         ["POST /api/transactions"] = Case(c => Json(c.B, HttpMethod.Post, "/api/transactions",
             CreateTransactionRequestBuilder.A().OnAccount(c.Seed.Account).WithAmount(1m).WithDirection("Debit").Described("B INTRUDER").On(new DateOnly(2026, 1, 16)).Build()), HttpStatusCode.NotFound),
         ["POST /api/recurring-flows"] = Case(c => Json(c.B, HttpMethod.Post, "/api/recurring-flows",
