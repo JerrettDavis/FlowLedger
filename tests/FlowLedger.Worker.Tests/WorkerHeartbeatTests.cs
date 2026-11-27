@@ -63,9 +63,11 @@ public sealed class WorkerHeartbeatTests
         try
         {
             await host.StartAsync();
-            await Eventually.WaitAsync(() => File.Exists(path), "the heartbeat file is written", TimeSpan.FromSeconds(15));
-
-            WorkerHeartbeat.IsHealthy(path, WorkerHeartbeat.MaxAge, FlowLedger.TestSupport.TestClock.Instant).Should().BeTrue();
+            // File.WriteAllText creates and truncates before it writes, so the file can exist but still be empty for a moment: wait for the
+            // stamp to be readable (healthy), not just for the file to appear.
+            await Eventually.WaitAsync(
+                () => WorkerHeartbeat.IsHealthy(path, WorkerHeartbeat.MaxAge, FlowLedger.TestSupport.TestClock.Instant),
+                "the heartbeat is written and healthy", TimeSpan.FromSeconds(15));
         }
         finally
         {

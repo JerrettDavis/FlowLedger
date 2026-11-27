@@ -280,5 +280,9 @@ public sealed record ImportFormatDto(string Id, string Name);
 
 public sealed record AutoImportResultDto(string FormatId, string FormatName, List<string> Warnings, ImportSummaryDto Summary);
 
+/// <summary>Category, status and amount filters for the transactions grid; they are applied on the server before paging (#72).</summary>
+public sealed record TransactionColumnFilter(
+    Guid? CategoryId = null, bool UncategorizedOnly = false, string? Status = null, decimal? MinAmount = null, decimal? MaxAmount = null);
+
 /// <summary>One page of transactions and the total matching the filters, for server-side paging.</summary>
 public sealed record TransactionPage(List<FlowLedger.Contracts.TransactionDto> Items, int? Total);

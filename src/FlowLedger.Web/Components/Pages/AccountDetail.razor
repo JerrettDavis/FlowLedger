@@ -1,0 +1,154 @@
+@page "/accounts/{Id:guid}"
+@inject FlowLedger.Web.ApiClient.FlowLedgerApiClient ApiClient
+@inject ILogger<AccountDetail> Logger
+
+<PageTitle>@(_account?.Name ?? "Account") — FlowLedger</PageTitle>
+
+<PageHeader Title="@(_account?.Name ?? "Account")">
+    <DateRangeSelector Label="Change over" Preset="@_rangePreset" From="@(_rangeFrom ?? default)" To="@_rangeTo" Changed="OnRangeChanged" />
+    <MudButton Variant="Variant.Outlined" Href="accounts" StartIcon="@Icons.Material.Filled.ArrowBack" aria-label="Back to accounts">Accounts</MudButton>
+</PageHeader>
+
+@if (_loading)
+{
+    <CardSkeleton Height="40px" Count="3" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" aria-live="assertive">@_error</MudAlert>
+}
+else if (_account is null)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.AccountBalance" Title="Account not found" Description="It may have been removed.">
+        <Action><MudButton Variant="Variant.Text" Color="Color.Primary" Href="accounts">Back to accounts</MudButton></Action>
+    </EmptyState>
+}
+else
+{
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid var(--mud-palette-divider);" data-testid="account-summary">
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Balance</MudText>
+                <MudText Typo="Typo.h5" Class="@(_account.BalanceAmount < 0 ? "fl-num fl-neg" : "fl-num")">@Format.Money(_account.BalanceAmount, _account.BalanceCurrency)</MudText>
+                @if (_change is { } ch && ch.End != ch.Start)
+                {
+                    <MudText Typo="Typo.caption" Class="@(ch.End - ch.Start >= 0 ? "fl-num fl-pos" : "fl-num fl-neg")" data-testid="account-change">
+                        @Format.SignedWithPercent(ch.End - ch.Start, ch.Start) over @_rangePreset
+                    </MudText>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Account</MudText>
+                <MudText Typo="Typo.body1">@_account.AccountType@(string.IsNullOrWhiteSpace(_account.Institution) ? "" : $" · {_account.Institution}")</MudText>
+                @if (!_account.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">Disabled</MudChip>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">Freshness</MudText>
+                <MudText Typo="Typo.body1" data-testid="account-last-synced">@LastSyncedText</MudText>
+                @if (IsStale)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" data-testid="account-stale">Balance may be out of date</MudChip>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudText Typo="Typo.h6" Class="mb-2">Recent transactions</MudText>
+    @if (_recent.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">No transactions on this account yet.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true" Hover="true" aria-label="Recent transactions on this account">
+            <thead>
+                <tr><th>Date</th><th>Merchant</th><th class="text-right">Amount</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _recent)
+                {
+                    <tr>
+                        <td>@Format.DayMonth(t.EffectiveDate)</td>
+                        <td>@(string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName)</td>
+                        <td class="text-right fl-num">@Format.Signed(t.Amount, t.Direction == "Credit")</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"transactions?account={_account.Id}")" Class="mt-2">All transactions for this account</MudButton>
+    }
+}
+
+@code {
+    private static readonly TimeSpan StaleAfter = TimeSpan.FromDays(3);
+
+    [Parameter] public Guid Id { get; set; }
+
+    private FlowLedger.Contracts.AccountDto? _account;
+    private List<FlowLedger.Contracts.TransactionDto> _recent = [];
+    private FlowLedger.Web.ApiClient.SyncStatusDto? _status;
+    private (decimal Start, decimal End)? _change;
+    private bool _loading = true;
+    private string? _error;
+    private string _rangePreset = "Last 30 days";
+    private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 30 days").From;
+    private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 30 days").To;
+
+    private DateTimeOffset? LastRefreshed => _account?.LastBalanceConfirmedAt ?? _status?.LastSyncedAt;
+
+    private string LastSyncedText => LastRefreshed is { } at ? FlowLedger.Web.Shared.SyncAge.Describe(at, DateTimeOffset.UtcNow) : "Never synced";
+
+    private bool IsStale => _account is { IsActive: true } && (LastRefreshed is not { } at || DateTimeOffset.UtcNow - at > StaleAfter);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var accounts = await ApiClient.GetAccountsAsync();
+            _account = accounts.FirstOrDefault(a => a.Id == Id);
+            if (_account is not null)
+            {
+                _recent = (await ApiClient.GetTransactionPageAsync(accountId: Id, take: 25, includeHidden: true)).Items;
+                try { _status = await ApiClient.GetSyncStatusAsync(); }
+                catch (Exception ex) { Logger.LogWarning(ex, "Failed to load sync status"); }
+                await LoadChangeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load account details");
+            _error = SnackbarExtensions.ProblemText(ex, "Couldn't load this account. Please try again.");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadChangeAsync()
+    {
+        try
+        {
+            var changes = await ApiClient.GetSeriesChangesAsync("balance_history", "account", "balance", _rangeFrom, _rangeTo);
+            _change = _account is not null && changes.TryGetValue(_account.Name, out var c) ? c : null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load balance change");
+            _change = null;
+        }
+    }
+
+    private async Task OnRangeChanged(DateRangeSelector.DateRange r)
+    {
+        _rangePreset = r.Preset;
+        _rangeFrom = r.From;
+        _rangeTo = r.To;
+        await LoadChangeAsync();
+    }
+}

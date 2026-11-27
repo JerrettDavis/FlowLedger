@@ -92,6 +92,7 @@ sealed class FlowLedger.Application.Abstractions.SyncThrottledException
 sealed class FlowLedger.Application.Abstractions.TenantDataVersion
 sealed class FlowLedger.Application.Abstractions.TenantQuotaExceededException
 sealed class FlowLedger.Application.Abstractions.TenantResultCache
+sealed class FlowLedger.Application.Abstractions.TransactionFilter
 sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeHandler
 sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.CreateAccountHandler
@@ -102,6 +103,7 @@ sealed class FlowLedger.Application.Features.Accounts.ListAccountsHandler
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountHandler
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountSettingsHandler
+sealed class FlowLedger.Application.Features.Alerts.ActivityAlert
 sealed class FlowLedger.Application.Features.Alerts.Alert
 sealed class FlowLedger.Application.Features.Alerts.GetAlertsHandler
 sealed class FlowLedger.Application.Features.Assets.AssetOperationException
@@ -319,8 +321,11 @@ sealed class FlowLedger.Application.Features.Users.TenantErasureRefusedException
 sealed class FlowLedger.Application.Features.Users.TenantErasureResult
 sealed class FlowLedger.Application.Features.Users.TenantInfo
 static class FlowLedger.Application.Abstractions.AccountConnectorLinks
+static class FlowLedger.Application.Abstractions.SyncCallEstimate
 static class FlowLedger.Application.Abstractions.TenantLimits
 static class FlowLedger.Application.DependencyInjection
+static class FlowLedger.Application.Features.Alerts.ActivityAlertKinds
+static class FlowLedger.Application.Features.Alerts.BudgetRollover
 static class FlowLedger.Application.Features.Assets.AssetCategoryTemplates
 static class FlowLedger.Application.Features.Budgets.BudgetLimits
 static class FlowLedger.Application.Features.Budgets.MonthlySpend

@@ -42,6 +42,18 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
+    /// <summary>Sets one category on every selected transaction (bulk edit). Returns how many rows changed.</summary>
+    public async Task<int> SetCategoryBulkAsync(IReadOnlyCollection<Guid> transactionIds, Guid categoryId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync("set categories", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/transactions/bulk-category", new { transactionIds, categoryId }, JsonOptions, ct);
+            await ThrowIfFailedAsync(response, "set categories", ct);
+            var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(JsonOptions, ct);
+            return body.TryGetProperty("changed", out var c) ? c.GetInt32() : 0;
+        });
+    }
+
     /// <summary>Recategorizes one transaction, or (applyToAll) every transaction of the same merchant plus future syncs. Returns how many changed.</summary>
     public async Task<int> RecategorizeAsync(
         Guid transactionId, Guid categoryId, bool applyToAll, CancellationToken ct = default, string? note = null, uint? expectedVersion = null, Action<uint>? newVersion = null)

@@ -3,6 +3,28 @@ using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Abstractions;
 
+/// <summary>
+/// Optional column filters for a transaction list (#72), applied by the store before paging and counting.
+/// Amount bounds are on the unsigned amount (a 25.00 debit and a 25.00 credit both count as 25).
+/// </summary>
+public sealed record TransactionFilter(
+    Guid? CategoryId = null,
+    bool UncategorizedOnly = false,
+    Domain.Aggregates.TransactionStatus? Status = null,
+    decimal? MinAmount = null,
+    decimal? MaxAmount = null)
+{
+    public bool IsEmpty => CategoryId is null && !UncategorizedOnly && Status is null && MinAmount is null && MaxAmount is null;
+
+    /// <summary>In-memory form of the same predicate, for stores and fakes that do not translate to SQL.</summary>
+    public bool Matches(Domain.Aggregates.Transaction t)
+        => (CategoryId is null || t.CategoryId?.Value == CategoryId)
+        && (!UncategorizedOnly || t.CategoryId is null)
+        && (Status is null || t.Status == Status)
+        && (MinAmount is null || t.Amount.Amount >= MinAmount)
+        && (MaxAmount is null || t.Amount.Amount <= MaxAmount);
+}
+
 /// <summary>Column a transaction list can be ordered by on the server (#209). Date is the default and the tie-break for the others.</summary>
 public enum TransactionSortKey
 {
@@ -41,7 +63,8 @@ public interface ITransactionRepository
         bool everydayOnly = false,
         string? search = null,
         TransactionSortKey sort = TransactionSortKey.Date,
-        bool descending = true);
+        bool descending = true,
+        TransactionFilter? filter = null);
 
     /// <summary>
     /// How many transactions match the same filters as <see cref="ListAsync"/> (ignoring paging), so a grid can show
@@ -53,8 +76,9 @@ public interface ITransactionRepository
         DateOnly? to = null,
         CancellationToken ct = default,
         bool everydayOnly = false,
-        string? search = null)
-        => (await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search)).Count;
+        string? search = null,
+        TransactionFilter? filter = null)
+        => (await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search, filter: filter)).Count;
 
     /// <summary>
     /// A position in the date-ordered list: the row after which the next page starts. Keyset paging reads the next page from here with an
@@ -69,9 +93,9 @@ public interface ITransactionRepository
     /// </summary>
     async Task<IReadOnlyList<Transaction>> ListAfterAsync(
         TransactionKeyset? after, AccountId? accountId, DateOnly? from, DateOnly? to, int take, bool descending, bool everydayOnly, string? search,
-        CancellationToken ct = default)
+        CancellationToken ct = default, TransactionFilter? filter = null)
     {
-        var all = await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search, TransactionSortKey.Date, descending);
+        var all = await ListAsync(accountId, from, to, 0, int.MaxValue, ct, everydayOnly, search, TransactionSortKey.Date, descending, filter);
         var start = after is null ? 0 : all.ToList().FindIndex(t => t.Id == after.Id) + 1;
         return all.Skip(start).Take(take).ToList();
     }

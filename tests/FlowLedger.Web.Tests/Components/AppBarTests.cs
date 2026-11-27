@@ -19,11 +19,17 @@ public sealed class AppBarTests : BunitContext, IAsyncLifetime
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("null", Encoding.UTF8, "application/json") });
     }
 
-    private IRenderedComponent<AppBar> RenderBar(string environment = "production")
+    private sealed class StatusHandler(string json) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+    }
+
+    private IRenderedComponent<AppBar> RenderBar(string environment = "production", HttpMessageHandler? handler = null)
     {
         Services.AddMudServices();
         Services.AddSingleton(new FlowLedgerApiClient(
-            new HttpClient(new OkHandler()) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
+            new HttpClient(handler ?? new OkHandler()) { BaseAddress = new Uri("http://localhost") }, NullLogger<FlowLedgerApiClient>.Instance));
         Services.AddScoped<ThemeService>();
         Services.AddScoped<SyncCoordinator>();
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -40,6 +46,32 @@ public sealed class AppBarTests : BunitContext, IAsyncLifetime
 
         cut.Find("span.fl-appbar-inline button[aria-label='Toggle share mode']").Should().NotBeNull();
         cut.Find("span.fl-appbar-overflow button[aria-label='More actions']").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Production_header_shows_when_the_last_sync_happened()
+    {
+        var at = DateTimeOffset.UtcNow.AddMinutes(-12).ToString("O");
+        var cut = RenderBar(handler: new StatusHandler("{\"lastSyncedAt\":\"" + at + "\",\"minIntervalMinutes\":30,\"provider\":\"Mx\"}"));
+
+        cut.WaitForAssertion(() => cut.Find("[data-testid='last-synced']").TextContent.Should().Contain("Synced 12 min ago"));
+    }
+
+    [Fact]
+    public void Header_has_no_last_synced_text_before_the_first_sync()
+    {
+        RenderBar().FindAll("[data-testid='last-synced']").Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(10, "Synced just now")]
+    [InlineData(300, "Synced 5 min ago")]
+    [InlineData(7200, "Synced 2 h ago")]
+    [InlineData(172800, "Synced 2 d ago")]
+    public void Sync_age_is_described_in_plain_language(int secondsAgo, string expected)
+    {
+        var now = DateTimeOffset.UtcNow;
+        FlowLedger.Web.Shared.SyncAge.Describe(now.AddSeconds(-secondsAgo), now).Should().Be(expected);
     }
 
     [Fact]

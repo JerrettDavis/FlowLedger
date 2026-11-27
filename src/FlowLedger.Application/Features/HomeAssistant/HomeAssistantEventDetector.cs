@@ -25,7 +25,8 @@ internal static class HomeAssistantEventDetector
         IReadOnlyList<HaRecentTransaction> recent,
         IReadOnlyList<HaBudgetBreach> budgets,
         decimal? projectedLowBalance,
-        HomeAssistantSettings settings)
+        HomeAssistantSettings settings,
+        IReadOnlyList<Alerts.ActivityAlert>? activity = null)
     {
         var events = new List<HaEvent>();
         var lead = Math.Clamp(settings.LeadDays, 0, 30);
@@ -98,6 +99,16 @@ internal static class HomeAssistantEventDetector
                     : $"A budget is {(b.Over ? "over" : "nearly used up")} this month.",
                 $"{HaEventKinds.BudgetAlert}:{MerchantKey.From(b.Category)}:{state}:{today:yyyy-MM}",
                 settings.IncludeNames ? b.Category : null, today));
+        }
+
+        // Transaction-driven alerts (#70): the wire kind equals the alert kind; names and amounts follow the household's sharing choices.
+        foreach (var a in activity ?? [])
+        {
+            events.Add(new HaEvent(a.Kind, a.Severity, a.Title,
+                settings.IncludeNames && a.Subject is not null ? $"{a.Title}: {a.Subject}." : $"{a.Title} on one of your accounts.",
+                a.DedupeKey, settings.IncludeNames ? a.Subject : null, a.Date, null,
+                settings.ShareAmounts && a.Kind != Alerts.ActivityAlertKinds.LowBalance ? a.Amount : null,
+                settings.ShareAmounts && a.Kind == Alerts.ActivityAlertKinds.LowBalance ? a.Amount : null));
         }
 
         var allowed = settings.Kinds.ToHashSet(StringComparer.Ordinal);

@@ -4,6 +4,7 @@ enum FlowLedger.Infrastructure.Sync.SyncTrigger
 interface FlowLedger.Infrastructure.DataSafety.IJobFireMarks
 interface FlowLedger.Infrastructure.HostStores.IAuditLog
 interface FlowLedger.Infrastructure.HostStores.IJobRunStore
+sealed class FlowLedger.Infrastructure.DataSafety.BackupFailureNotifier
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunResult
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunStore
 sealed class FlowLedger.Infrastructure.DataSafety.BackupRunner

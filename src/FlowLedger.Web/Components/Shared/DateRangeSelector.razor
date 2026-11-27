@@ -23,6 +23,9 @@
     public static readonly string[] DefaultPresets =
         ["This month", "Last month", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", Custom];
 
+    /// <summary>Compact chart-style presets (#71): 1M, 6M, 1Y and All, plus a custom window.</summary>
+    public static readonly string[] ChartPresets = ["1M", "6M", "1Y", "All", Custom];
+
     /// <summary>Presets for pages that look forward (due dates, target dates).</summary>
     public static readonly string[] ForwardPresets =
         ["All time", "Next 30 days", "Next 3 months", "Next 6 months", "Next 12 months", "This year", Custom];
@@ -63,7 +66,10 @@
             "Last 6 months" => (firstOfMonth.AddMonths(-5), today),
             "Year to date" => (new DateOnly(today.Year, 1, 1), today),
             "Last 12 months" => (firstOfMonth.AddMonths(-11), today),
-            "All time" => (null, today),
+            "All time" or "All" => (null, today),
+            "1M" => (today.AddMonths(-1), today),
+            "6M" => (today.AddMonths(-6), today),
+            "1Y" => (today.AddYears(-1), today),
             "Next 30 days" => (today, today.AddDays(30)),
             "Next 3 months" => (today, today.AddMonths(3)),
             "Next 6 months" => (today, today.AddMonths(6)),

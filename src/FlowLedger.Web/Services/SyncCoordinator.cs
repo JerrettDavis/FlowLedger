@@ -29,6 +29,27 @@ public sealed partial class SyncCoordinator(
     /// <summary>True while a sync or connect is running (the buttons disable themselves).</summary>
     public bool Syncing { get; private set; }
 
+    /// <summary>When the server last completed a sync for this household (null = never or not yet known); shown in the app bar.</summary>
+    public DateTimeOffset? LastSyncedAt { get; private set; }
+
+    /// <summary>Reads the last-sync time from the server; a failure leaves the previous value in place.</summary>
+    public async Task RefreshLastSyncedAsync()
+    {
+        try
+        {
+            var status = await api.GetSyncStatusAsync();
+            if (status?.LastSyncedAt is { } at)
+            {
+                LastSyncedAt = at;
+                Changed?.Invoke();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogLastSyncedRefreshFailed(ex);
+        }
+    }
+
     /// <summary>Text for the polite live region: what just happened ("Syncing", "Sync complete: 3 new transactions").</summary>
     public string Announcement { get; private set; } = "";
 
@@ -62,6 +83,7 @@ public sealed partial class SyncCoordinator(
         {
             await api.ConnectAsync();
             var result = await api.SyncAsync();
+            LastSyncedAt = DateTimeOffset.UtcNow;
             var msg = result is not null
                 ? $"Sync complete — {result.AccountsUpserted} accounts, {result.TransactionsAdded} transactions added, {result.TransactionsSkipped} skipped, {result.RecurringFlowsAdded} recurring flows added"
                 : "Sync complete";
@@ -197,6 +219,7 @@ public sealed partial class SyncCoordinator(
                 return;
             }
 
+            LastSyncedAt = status.LastSyncedAt ?? LastSyncedAt;
             var wait = (status.LastSyncedAt is { } last ? last + AutoSyncInterval : DateTimeOffset.MinValue) - DateTimeOffset.UtcNow;
             if (wait > TimeSpan.Zero || status.Provider == "Simulated")
             {
@@ -218,6 +241,7 @@ public sealed partial class SyncCoordinator(
         try
         {
             var result = await api.SyncAsync();
+            LastSyncedAt = DateTimeOffset.UtcNow;
             if (auto)
             {
                 if (result is { TransactionsAdded: > 0 })
@@ -263,6 +287,9 @@ public sealed partial class SyncCoordinator(
         Announcement = announcement;
         Changed?.Invoke();
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Could not read the last sync time")]
+    private partial void LogLastSyncedRefreshFailed(Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Connect & Sync failed")]
     private partial void LogConnectAndSyncFailed(Exception exception);

@@ -31,9 +31,10 @@ public sealed partial class FlowLedgerApiClient
         bool includeHidden = false,
         string? search = null,
         string? sort = null,
-        bool descending = true)
+        bool descending = true,
+        TransactionColumnFilter? filter = null)
     {
-        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search, sort, descending);
+        var url = TransactionsUrl(accountId, from, to, skip, take, includeHidden, search, sort, descending, filter);
         return await ExecuteAsync("load transactions", async () =>
         {
             var response = await _http.GetAsync(url, ct);
@@ -55,9 +56,37 @@ public sealed partial class FlowLedgerApiClient
 
     private static string TransactionsUrl(
         Guid? accountId, DateOnly? from, DateOnly? to, int skip, int take, bool includeHidden, string? search,
-        string? sort = null, bool descending = true)
+        string? sort = null, bool descending = true, TransactionColumnFilter? filter = null)
     {
         var qs = new List<string>();
+        if (filter is not null)
+        {
+            if (filter.CategoryId is { } category)
+            {
+                qs.Add($"categoryId={category}");
+            }
+
+            if (filter.UncategorizedOnly)
+            {
+                qs.Add("uncategorized=true");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Status))
+            {
+                qs.Add($"status={Uri.EscapeDataString(filter.Status)}");
+            }
+
+            if (filter.MinAmount is { } min)
+            {
+                qs.Add($"minAmount={min.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            }
+
+            if (filter.MaxAmount is { } max)
+            {
+                qs.Add($"maxAmount={max.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(sort))
         {
             qs.Add($"sort={Uri.EscapeDataString(sort)}");

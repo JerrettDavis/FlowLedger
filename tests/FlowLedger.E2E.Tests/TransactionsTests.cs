@@ -82,6 +82,21 @@ public class TransactionsTests : E2ETestBase
         AssertNoPageErrors();
     }
 
+    [E2EFact(DisplayName = "Transactions: category, status and amount filters are present (#72)")]
+    public async Task Transactions_ColumnFiltersArePresent()
+    {
+        await NavigateAsync("/transactions");
+        await WaitForLoadAsync();
+        await AssertNoErrorAlertVisible();
+
+        foreach (var label in new[] { "Filter by category", "Filter by status", "Minimum amount", "Maximum amount" })
+        {
+            (await Page!.GetByLabel(label).CountAsync()).Should().BeGreaterThan(0, $"the {label} control must exist");
+        }
+
+        AssertNoPageErrors();
+    }
+
     [E2EFact(DisplayName = "Transactions: nav link is present")]
     public async Task Transactions_NavLinkIsPresent()
     {

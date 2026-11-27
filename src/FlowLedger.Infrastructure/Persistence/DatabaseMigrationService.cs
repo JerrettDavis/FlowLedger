@@ -1,5 +1,7 @@
 using FlowLedger.Infrastructure.DataSafety;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -61,6 +63,7 @@ internal sealed partial class DatabaseMigrationService : IHostedService
             }
 
             LogPendingMigrationSToApply(_logger, pending.Count, pending[^1]);
+            await RefuseUnconfirmedDestructiveAsync(db, pending, cancellationToken);
             await SnapshotBeforeMigratingAsync(db, cancellationToken);
             await db.Database.MigrateAsync(cancellationToken);
             LogEFCoreMigrationsAppliedSuccessfully(_logger);
@@ -69,6 +72,35 @@ internal sealed partial class DatabaseMigrationService : IHostedService
         {
             LogFailedToApplyEFCore(_logger, ex);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Destructive-migration guard: on a database that already has applied migrations, refuses to continue when a pending
+    /// migration drops tables/columns, narrows a column or deletes data, unless the operator confirmed it
+    /// (<c>Database:AllowDestructiveMigrations=true</c> or <c>Database:ConfirmedDestructiveMigrations=&lt;id&gt;</c>).
+    /// </summary>
+    private async Task RefuseUnconfirmedDestructiveAsync(FlowLedgerDbContext db, IReadOnlyList<string> pending, CancellationToken ct)
+    {
+        if ((await db.Database.GetAppliedMigrationsAsync(ct)).Any() is false)
+        {
+            return; // brand-new database: nothing to destroy
+        }
+
+        var assembly = db.GetService<IMigrationsAssembly>();
+        var destructive = DestructiveMigrationGuard.Scan(assembly, db.Database.ProviderName ?? string.Empty, pending);
+        foreach (var (id, findings) in destructive)
+        {
+            if (DestructiveMigrationGuard.IsAllowed(_config, id))
+            {
+                LogDestructiveMigrationConfirmed(_logger, id);
+                continue;
+            }
+
+            LogDestructiveMigrationRefused(_logger, id, string.Join("; ", findings));
+            throw new InvalidOperationException(
+                $"Migration '{id}' is destructive ({string.Join("; ", findings)}). Take a backup and set "
+                + $"{DestructiveMigrationGuard.AllowKey}=true (or {DestructiveMigrationGuard.ConfirmedKey}={id}) to apply it.");
         }
     }
 
@@ -118,6 +150,12 @@ internal sealed partial class DatabaseMigrationService : IHostedService
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{Count} pending migration(s) ({First}...); taking a verified snapshot first.")]
     private static partial void LogPendingMigrationSTakingA(ILogger logger, int count, string first);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Destructive migration {Migration} confirmed by configuration.")]
+    private static partial void LogDestructiveMigrationConfirmed(ILogger logger, string migration);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Refusing destructive migration {Migration}: {Findings}")]
+    private static partial void LogDestructiveMigrationRefused(ILogger logger, string migration, string findings);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Pre-migration snapshot OK -> {Dir} ({Tables} tables, {Rows} rows).")]
     private static partial void LogPreMigrationSnapshotOKTables(ILogger logger, string? dir, int tables, long rows);

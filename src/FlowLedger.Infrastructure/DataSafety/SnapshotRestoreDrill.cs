@@ -7,9 +7,15 @@ using Npgsql;
 
 namespace FlowLedger.Infrastructure.DataSafety;
 
-public sealed record DrillTableResult(string Table, long ExpectedRows, long RestoredRows, bool Ok);
+/// <param name="LiveRows">Row count of the same table in the live database at drill time (null when not compared). Informational: live may legitimately differ from a snapshot taken earlier.</param>
+public sealed record DrillTableResult(string Table, long ExpectedRows, long RestoredRows, bool Ok, long? LiveRows = null)
+{
+    /// <summary>True when the live table has fewer rows than were restored, i.e. rows existed in the snapshot that the live database no longer has.</summary>
+    public bool LiveBehindRestore => LiveRows is { } l && l < RestoredRows;
+}
 
-public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool ScratchKept, IReadOnlyList<DrillTableResult> Tables, IReadOnlyList<string> Problems);
+/// <param name="RawObjectsVerified">Raw provider-payload objects whose content hash matched their key (0 when the archive was not checked).</param>
+public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool ScratchKept, IReadOnlyList<DrillTableResult> Tables, IReadOnlyList<string> Problems, int RawObjectsVerified = 0);
 
 /// <summary>
 /// Proves a snapshot can actually be restored: it creates a scratch database, applies EF migrations up to the
@@ -28,7 +34,8 @@ internal static class SnapshotRestoreDrill
         string snapshotDir,
         string scratchDatabase = "flowledger_drill",
         bool keep = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? rawArchiveDir = null)
     {
         var problems = new List<string>();
         var live = new NpgsqlConnectionStringBuilder(liveConnectionString);
@@ -64,6 +71,7 @@ internal static class SnapshotRestoreDrill
             await MigrateForRestoreAsync(scratch.ConnectionString, manifest, ct);
 
             results.AddRange(await LoadTablesAsync(scratch.ConnectionString, snapshotDir, manifest, problems, ct));
+            results = await AddLiveCountsAsync(liveConnectionString, results, ct);
         }
         catch (Exception ex)
         {
@@ -80,7 +88,37 @@ internal static class SnapshotRestoreDrill
             }
         }
 
-        return new RestoreDrillResult(problems.Count == 0, scratchDatabase, keep, results, problems);
+        var rawVerified = 0;
+        if (!string.IsNullOrWhiteSpace(rawArchiveDir))
+        {
+            var raw = RawArchiveIntegrity.Verify(rawArchiveDir);
+            rawVerified = raw.Verified;
+            problems.AddRange(raw.Problems);
+        }
+
+        return new RestoreDrillResult(problems.Count == 0, scratchDatabase, keep, results, problems, rawVerified);
+    }
+
+    /// <summary>Adds the live row count of each drilled table. A failure to read live counts never fails the drill.</summary>
+    private static async Task<List<DrillTableResult>> AddLiveCountsAsync(string liveConnectionString, List<DrillTableResult> results, CancellationToken ct)
+    {
+        try
+        {
+            await using var conn = new NpgsqlConnection(liveConnectionString);
+            await conn.OpenAsync(ct);
+            var withLive = new List<DrillTableResult>(results.Count);
+            foreach (var r in results)
+            {
+                await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM \"{r.Table}\"", conn);
+                withLive.Add(r with { LiveRows = (long)(await cmd.ExecuteScalarAsync(ct))! });
+            }
+
+            return withLive;
+        }
+        catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException)
+        {
+            return results;
+        }
     }
 
     /// <summary>COPYs every manifest table (except migration history/settings) from CSV into the target and checks row counts.</summary>

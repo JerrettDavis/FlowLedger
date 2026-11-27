@@ -29,6 +29,19 @@ public sealed class NetWorthCalculatorTests
     }
 
     [Fact]
+    public void Breakdown_splits_account_assets_liabilities_and_physical_assets_and_adds_up_to_net_worth()
+    {
+        var r = NetWorthCalculator.Compute(
+            [Acct(AccountType.Checking, 1000m), Acct(AccountType.Investment, 4000m), Acct(AccountType.CreditCard, 300m), Acct(AccountType.Mortgage, 2000m)],
+            [House(900m)], Today);
+
+        r.AccountAssets.Should().Be(5000m, "checking + investment");
+        r.AccountLiabilities.Should().Be(2300m, "card + mortgage");
+        r.PhysicalAssets.Should().Be(900m);
+        r.NetWorth.Should().Be(r.AccountAssets - r.AccountLiabilities + r.PhysicalAssets);
+    }
+
+    [Fact]
     public void Overpaid_card_increases_net_worth()
     {
         var r = NetWorthCalculator.Compute([Acct(AccountType.Checking, 1000m), Acct(AccountType.CreditCard, -200m)], [], Today);
