@@ -13,6 +13,7 @@ internal static class HostWideEntities
         ["backup_runs"] = "host backup history",
         ["audit_events"] = "append-only audit trail (#193); tenant_id is informational (null for host-level actions) and tenant erasure removes a tenant's rows by that column like any other",
         ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
+        ["job_fire_marks"] = "last claimed cron fire time per background job (#187): once-per-fire-time across worker replicas, catch-up after downtime",
         ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
         ["tenants"] = "the tenant registry itself (#169), keyed by id; erasure keeps its row as the audit record",
         ["app_users"] = "the login directory: resolves a login to its tenant, so it spans tenants by design",

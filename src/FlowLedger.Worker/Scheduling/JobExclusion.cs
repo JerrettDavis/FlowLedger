@@ -10,8 +10,8 @@ namespace FlowLedger.Worker.Scheduling;
 /// <summary>
 /// Cross-process exclusion per job. <c>[DisallowConcurrentExecution]</c> only guards one scheduler; during a rolling
 /// deploy or with an accidental second worker, two processes would run the same job. This holds a Postgres advisory
-/// lock (<c>flowledger:job:&lt;name&gt;</c>) for the length of a run. It prevents OVERLAP, not a second run
-/// that starts after the first finished (that needs a persisted last-fire marker).
+/// lock (<c>flowledger:job:&lt;name&gt;</c>) for the length of a run. The lock prevents OVERLAP; <see cref="JobFireGate"/> (the
+/// persisted last-fire mark) additionally stops a second run of the same fire time that starts after the first finished.
 /// </summary>
 internal sealed partial class JobExclusion(IConfiguration configuration, ILogger<JobExclusion> logger)
 {
@@ -64,7 +64,7 @@ internal sealed partial class JobExclusion(IConfiguration configuration, ILogger
 }
 
 /// <summary>Quartz adapter: takes the lock in <c>VetoJobExecution</c> and releases it in <c>TriggerComplete</c>.</summary>
-internal sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITriggerListener
+internal sealed class JobExclusionTriggerListener(JobExclusion exclusion, JobFireGate? gate = null) : ITriggerListener
 {
     public string Name => nameof(JobExclusionTriggerListener);
 
@@ -74,6 +74,14 @@ internal sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITri
     public async ValueTask<bool> VetoJobExecution(ITrigger trigger, IJobExecutionContext context, CancellationToken cancellationToken = default)
     {
         var proceed = await exclusion.TryEnterAsync(context.JobDetail.Key.Name, context.FireInstanceId, cancellationToken);
+
+        // Holding the lock, claim this fire time: a replica that fires the same slot after the first one finished is vetoed here (#187).
+        if (proceed && gate is not null && !await gate.MayFireAsync(trigger, context, cancellationToken))
+        {
+            await exclusion.ExitAsync(context.FireInstanceId); // a vetoed firing never reaches TriggerComplete
+            proceed = false;
+        }
+
         if (!proceed)
         {
             FlowLedgerTelemetry.RecordJobVetoed(context.JobDetail.Key.Name);
