@@ -14,7 +14,7 @@ public sealed record SignUpPolicy(bool OidcEnabled, SignUpMode Mode, bool Allowl
 
     public static SignUpPolicy From(IConfiguration cfg) =>
         new(MultiUserSettings.OidcEnabled(cfg), MultiUserSettings.ResolveSignUpMode(cfg), MultiUserSettings.HasAllowlist(cfg),
-            cfg.GetValue(AllowOpenSignupBillableKey, false));
+            MultiUserSettings.Flag(cfg, AllowOpenSignupBillableKey));
 
     /// <summary>True when the API itself may let an unknown login create a tenant (the Web app's allowlist check still applies on top).</summary>
     public bool AllowsNewTenants => !OidcEnabled || MultiUserSettings.AllowsNewTenants(Mode, AllowlistConfigured);

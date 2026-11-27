@@ -138,7 +138,7 @@ builder.Services.AddOptions<ApiOptions>()
 
 // #135: the effective "signed tenant assertion required" switch (explicit Api:RequireSignedTenant, else true outside Development with OIDC on).
 builder.Services.AddOptions<ApiOptions>().PostConfigure<IConfiguration, Microsoft.Extensions.Hosting.IHostEnvironment>(
-    (o, cfg, env) => o.RequireSignedTenant = MultiUserSettings.RequireSignedTenant(cfg, env));
+    (o, cfg, env) => o.EffectiveRequireSignedTenant = MultiUserSettings.RequireSignedTenant(cfg, env));
 
 // #145: the API's own sign-up policy (closed sign-up cannot be bypassed by calling /api/users/resolve; gates billable provisioning).
 builder.Services.AddSingleton(sp => SignUpPolicy.From(sp.GetRequiredService<IConfiguration>()));

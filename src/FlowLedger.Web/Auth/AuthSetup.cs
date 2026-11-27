@@ -80,8 +80,8 @@ public static class AuthSetup
         if (oidc.Enabled)
         {
             oidc.SignUpMode = FlowLedger.ServiceDefaults.MultiUserSettings.ResolveSignUpMode(builder.Configuration);
-            oidc.SessionAbsoluteMaxDays = builder.Configuration.GetValue(FlowLedger.ServiceDefaults.MultiUserSettings.SessionAbsoluteMaxDaysKey, DefaultSessionAbsoluteMaxDays);
-            oidc.LegacyCookieName = builder.Configuration.GetValue(FlowLedger.ServiceDefaults.MultiUserSettings.SessionLegacyCookieNameKey, false);
+            oidc.SessionAbsoluteMaxDays = FlowLedger.ServiceDefaults.MultiUserSettings.Int(builder.Configuration, FlowLedger.ServiceDefaults.MultiUserSettings.SessionAbsoluteMaxDaysKey, DefaultSessionAbsoluteMaxDays);
+            oidc.LegacyCookieName = FlowLedger.ServiceDefaults.MultiUserSettings.Flag(builder.Configuration, FlowLedger.ServiceDefaults.MultiUserSettings.SessionLegacyCookieNameKey);
         }
 
         builder.Services.AddCascadingAuthenticationState();
