@@ -92,4 +92,36 @@ public class TransactionsTests : E2ETestBase
         (await link.CountAsync()).Should().BeGreaterThan(0);
         AssertNoPageErrors();
     }
+
+    [E2EFact(DisplayName = "Transactions: Description, Account and Status columns are visible on a 1366x768 laptop (#209)")]
+    public async Task Transactions_AllColumnsAreReachableAtLaptopWidth()
+    {
+        await Page!.SetViewportSizeAsync(1366, 768);
+        await NavigateAsync("/transactions");
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
+
+        foreach (var column in new[] { "Description", "Account", "Status" })
+        {
+            var header = Page.Locator("[aria-label='Transactions table'] th, [aria-label='Transactions table'] [role='columnheader']")
+                .Filter(new() { HasTextString = column });
+            (await header.First.IsVisibleAsync()).Should().BeTrue($"the {column} column must not be hidden at 1366 wide");
+        }
+
+        AssertNoPageErrors();
+    }
+
+    [E2EFact(DisplayName = "Transactions: the amount header sorts and restarts from the first page (#209)")]
+    public async Task Transactions_AmountHeaderSortsAndReloads()
+    {
+        await NavigateAsync("/transactions");
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
+
+        // The API call happens server-side (Blazor Server), so the browser can only observe the result: the header's state flips
+        // and the grid reloads. The ordering itself is asserted by TransactionSortTests and the bUnit page tests.
+        await Page!.GetByTestId("sort-amount").ClickAsync();
+        await Page.Locator("[data-testid=sort-amount][aria-label*='descending']").WaitForAsync();
+        (await WaitForGridDataAsync("[aria-label='Transactions table']")).Should().BeGreaterThan(0);
+
+        AssertNoPageErrors();
+    }
 }

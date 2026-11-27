@@ -43,7 +43,7 @@ internal static class SheetEndpoints
 
         group.MapPost("/import", ([FromBody] ImportSheetRequest r, BillSheetService s, CancellationToken ct) => Guarded(async () =>
             Results.Ok(await s.ImportCsvAsync(r, ct))))
-            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(5 * 1024 * 1024))
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ApiLimits.CsvImportBytes))
             .WithName("ImportBillSheet").WithSummary("Load rows and paid marks from a CSV export of the workbook").RequireRateLimiting("write");
 
         return app;

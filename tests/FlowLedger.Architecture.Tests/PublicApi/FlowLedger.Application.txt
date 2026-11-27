@@ -1,4 +1,5 @@
 enum FlowLedger.Application.Abstractions.EmbedKind
+enum FlowLedger.Application.Abstractions.TransactionSortKey
 enum FlowLedger.Application.Features.BillSheet.SheetPaymentSource
 enum FlowLedger.Application.Features.Forecasting.ForecastItemSource
 enum FlowLedger.Application.Features.HomeAssistant.HomeAssistantWebhookUrl+NetworkKind

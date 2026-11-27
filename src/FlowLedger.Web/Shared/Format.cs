@@ -99,6 +99,19 @@ public static class Format
         return (rounded >= 0 ? "+" : "−") + Math.Abs(rounded).ToString("0.##", CultureInfo.CurrentCulture) + "%";
     }
 
+    /// <summary>A whole count with the display culture's digit grouping ("1,234").</summary>
+    public static string Count(long value) => value.ToString("N0", CultureInfo.CurrentCulture);
+
+    /// <summary>A plain number: no decimals when it is whole, two otherwise, grouped for the display culture.</summary>
+    public static string Number(decimal value) =>
+        value == Math.Floor(value) ? value.ToString("N0", CultureInfo.CurrentCulture) : value.ToString("N2", CultureInfo.CurrentCulture);
+
+    /// <summary>A fraction as a whole-number percentage in the display culture (0.256 becomes "26%"). Pages never call "P0" themselves (#212).</summary>
+    public static string Ratio(decimal fraction) => fraction.ToString("P0", CultureInfo.CurrentCulture);
+
+    /// <inheritdoc cref="Ratio(decimal)"/>
+    public static string Ratio(double fraction) => fraction.ToString("P0", CultureInfo.CurrentCulture);
+
     /// <summary>"+$12.00 (+1.2%)" - signed amount with its percentage change when computable.</summary>
     public static string SignedWithPercent(decimal change, decimal baseline)
     {

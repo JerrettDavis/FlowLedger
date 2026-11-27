@@ -4,10 +4,15 @@
     </TitleContent>
     <DialogContent>
         <MudForm @ref="_form" aria-label="Asset form">
+            @if (_feedback.Summary is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+            }
             <MudGrid>
                 <MudItem xs="12" sm="7">
-                    <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
-                                  MaxLength="200" aria-label="Asset name" />
+                    <MudTextField @bind-Value="Name" Label="Name" Required="true" RequiredError="Name is required"
+                                  MaxLength="200" aria-label="Asset name"
+                                  Error="@_feedback.Has("name")" ErrorText="@_feedback.For("name")" />
                 </MudItem>
                 <MudItem xs="12" sm="5">
                     <MudSelect T="string" Value="_category" ValueChanged="OnCategoryChanged" Label="Category" aria-label="Asset category">
@@ -21,10 +26,12 @@
                 @if (Asset is null)
                 {
                     <MudItem xs="6" sm="4">
-                        <MudNumericField @bind-Value="_value" Label="Current value" Format="F2" Min="0m" aria-label="Current value" />
+                        <MudNumericField @bind-Value="CurrentValue" Label="Current value" Format="F2" Min="0m" aria-label="Current value"
+                                         Error="@_feedback.Has("currentValue")" ErrorText="@_feedback.For("currentValue")" />
                     </MudItem>
                     <MudItem xs="6" sm="2">
-                        <MudTextField @bind-Value="_currency" Label="Currency" MaxLength="3" aria-label="Currency code" />
+                        <MudTextField @bind-Value="Currency" Label="Currency" MaxLength="3" aria-label="Currency code"
+                                      Error="@_feedback.Has("currency")" ErrorText="@_feedback.For("currency")" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
                         <MudDatePicker @bind-Date="_valuedOn" Label="Value as of" aria-label="Value as of date" />
@@ -35,7 +42,8 @@
                     <MudDatePicker @bind-Date="_purchaseDate" Label="Purchase date (optional)" aria-label="Purchase date" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudNumericField @bind-Value="_purchasePrice" Label="Purchase price (optional)" Format="F2" Min="0m" aria-label="Purchase price" />
+                    <MudNumericField @bind-Value="_purchasePrice" Label="Purchase price (optional)" Format="F2" Min="0m" aria-label="Purchase price"
+                                     Error="@_feedback.Has("purchasePrice")" ErrorText="@_feedback.For("purchasePrice")" />
                 </MudItem>
 
                 <MudItem xs="12" sm="4"><MudTextField @bind-Value="_manufacturer" Label="Manufacturer" MaxLength="200" aria-label="Manufacturer" /></MudItem>
@@ -56,12 +64,14 @@
                 @if (_method is "DecliningBalance" or "Appreciation")
                 {
                     <MudItem xs="6" sm="4">
-                        <MudNumericField @bind-Value="_ratePercent" Label="Annual rate (%)" Min="0m" Max="100m" Format="F1" aria-label="Annual rate percent" />
+                        <MudNumericField @bind-Value="_ratePercent" Label="Annual rate (%)" Min="0m" Max="100m" Format="F1" aria-label="Annual rate percent"
+                                         Error="@_feedback.Has("annualRate")" ErrorText="@_feedback.For("annualRate")" />
                     </MudItem>
                 }
                 @if (_method == "StraightLine")
                 {
-                    <MudItem xs="6" sm="4"><MudNumericField @bind-Value="_lifeYears" Label="Useful life (years)" Min="1" aria-label="Useful life years" /></MudItem>
+                    <MudItem xs="6" sm="4"><MudNumericField @bind-Value="_lifeYears" Label="Useful life (years)" Min="1" aria-label="Useful life years"
+                                                                  Error="@_feedback.Has("usefulLifeYears")" ErrorText="@_feedback.For("usefulLifeYears")" /></MudItem>
                     <MudItem xs="6" sm="4"><MudNumericField @bind-Value="_salvage" Label="Salvage value" Format="F2" Min="0m" aria-label="Salvage value" /></MudItem>
                 }
 
@@ -104,6 +114,19 @@
     [Parameter] public FlowLedger.Contracts.AssetDto? Asset { get; set; }
     [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
     [Parameter] public List<FlowLedger.Contracts.AssetCategoryTemplateDto> Templates { get; set; } = [];
+
+    /// <summary>
+    /// When set, the dialog performs the save itself and stays open on failure, so the API's per-field validation errors appear
+    /// next to the fields they belong to instead of in a toast after the dialog is gone. It receives the create or update request.
+    /// </summary>
+    [Parameter] public Func<object, Task>? SubmitAsync { get; set; }
+
+    private readonly FormFeedback _feedback = new();
+
+    // Editing a field clears the previous server verdict, so a stale message never sits next to a corrected value.
+    private string Name { get => _name; set { _name = value; _feedback.Clear(); } }
+    private decimal? CurrentValue { get => _value; set { _value = value; _feedback.Clear(); } }
+    private string Currency { get => _currency; set { _currency = value; _feedback.Clear(); } }
 
     private sealed class Row { public string Key { get; set; } = ""; public string Value { get; set; } = ""; }
 
@@ -183,6 +206,21 @@
                 _name, _category, purchase, _purchasePrice, _manufacturer, _model, _serial, _notes,
                 _method, rate, salvage, life, _linkedAccountId, attrs);
 
-        MudDialog.Close(DialogResult.Ok(result));
+        if (SubmitAsync is null)
+        {
+            MudDialog.Close(DialogResult.Ok(result));
+            return;
+        }
+
+        _feedback.Clear();
+        try
+        {
+            await SubmitAsync(result);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) when (_feedback.TryCapture(ex))
+        {
+            // Stay open: the summary and the field messages are now rendered.
+        }
     }
 }

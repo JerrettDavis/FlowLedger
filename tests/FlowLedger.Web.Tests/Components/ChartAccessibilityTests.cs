@@ -109,4 +109,16 @@ public sealed class ChartAccessibilityTests : BunitContext
     {
         ChartSummary.ProgressText("Groceries", 82.46, "of budget used").Should().Be("Groceries: 82% of budget used");
     }
+
+    [Fact]
+    public void No_page_draws_an_svg_chart_whose_only_name_is_a_fixed_generic_label()
+    {
+        // A fixed label such as "Trend bar chart" says a chart exists but not what it shows (WCAG 1.1.1): the label must carry the data.
+        var offenders = RepoFiles.Razor()
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "<svg[^>]*role=\"img\"[^>]*aria-label=\"[A-Za-z ]+\""))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        offenders.Should().BeEmpty("chart SVGs get a generated summary (ChartSummary) or sit inside ChartFigure");
+    }
 }

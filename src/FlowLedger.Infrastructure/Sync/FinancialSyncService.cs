@@ -310,7 +310,7 @@ internal sealed partial class FinancialSyncService : IFinancialSyncService
         // Step 5: seed recurring flows from the simulated provider (idempotent — skips existing).
         var recurringFlowsAdded = await SeedRecurringFlowsAsync(providerIdToAccount, tenantId, ct);
 
-        // Flush all outstanding changes once after the full loop
+        // Flush whatever the loop left pending (account rows, links, seeded flows). Transactions and the sync cursor are already committed per page (EfSyncCursorStore.SetAsync saves), so this is not the only save.
         await _db.SaveChangesAsync(ct);
 
         // Only now is the sync a success: stamp the throttle clock (#120). A failure above leaves the previous stamp, so a partly
