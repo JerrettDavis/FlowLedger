@@ -1,4 +1,5 @@
 using System.Globalization;
+using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Features.Strategies;
@@ -24,9 +25,9 @@ internal static class StrategyEngine
         var avgSpend = recent.Count == 0 ? 0m : recent.Average(m => m.Spend);
         var avgIncome = recent.Count == 0 ? 0m : recent.Average(m => m.Income);
 
-        var cash = input.Accounts.Where(a => !a.IsLiability && !a.IsInvestment && a.Type is "Checking" or "Savings" or "Cash").ToList();
-        var checking = cash.Where(a => a.Type is "Checking" or "Cash").Sum(a => Math.Max(0, a.Balance));
-        var savings = cash.Where(a => a.Type == "Savings").Sum(a => Math.Max(0, a.Balance));
+        var cash = input.Accounts.Where(a => !a.IsLiability && !a.IsInvestment && a.Type is nameof(AccountType.Checking) or nameof(AccountType.Savings) or nameof(AccountType.Cash)).ToList();
+        var checking = cash.Where(a => a.Type is nameof(AccountType.Checking) or nameof(AccountType.Cash)).Sum(a => Math.Max(0, a.Balance));
+        var savings = cash.Where(a => a.Type == nameof(AccountType.Savings)).Sum(a => Math.Max(0, a.Balance));
         var liquid = checking + savings;
 
         double? savingsRate = avgIncome > 0 ? (double)((avgIncome - avgSpend) / avgIncome) : null;
@@ -59,8 +60,8 @@ internal static class StrategyEngine
         var r = input.Rates;
         // Keep ~1.5 months of spending in checking for bills; the rest is idle. Prefer the user's real APY per account.
         var keep = avgSpend * 1.5m;
-        var checkingAccts = cash.Where(a => a.Type is "Checking" or "Cash" && a.Balance > 0).ToList();
-        var savingsAccts = cash.Where(a => a.Type == "Savings" && a.Balance > 0).ToList();
+        var checkingAccts = cash.Where(a => a.Type is nameof(AccountType.Checking) or nameof(AccountType.Cash) && a.Balance > 0).ToList();
+        var savingsAccts = cash.Where(a => a.Type == nameof(AccountType.Savings) && a.Balance > 0).ToList();
         var checkingRate = Weighted(checkingAccts, r.TypicalCheckingApy);
         var idleChecking = Math.Max(0, checking - keep);
         var gainChecking = idleChecking * Math.Max(0, r.Hysa - checkingRate) / 100m;
@@ -242,7 +243,7 @@ internal static class StrategyEngine
     private static void AddDebt(List<Suggestion> list, StrategyInputs input, decimal liquid, decimal avgSpend)
     {
         var r = input.Rates;
-        var cards = input.Accounts.Where(a => a.Type == "CreditCard" && a.Balance >= 100).ToList();
+        var cards = input.Accounts.Where(a => a.Type == nameof(AccountType.CreditCard) && a.Balance >= 100).ToList();
         var owed = cards.Sum(a => a.Balance);
         if (owed <= 0)
         {
@@ -287,7 +288,7 @@ internal static class StrategyEngine
     private static void AddHousingAndAuto(List<Suggestion> list, StrategyInputs input)
     {
         var r = input.Rates;
-        foreach (var m in input.Accounts.Where(a => a.Type == "Mortgage" && a.Balance >= 20_000))
+        foreach (var m in input.Accounts.Where(a => a.Type == nameof(AccountType.Mortgage) && a.Balance >= 20_000))
         {
             var bal = m.Balance;
             if (m.Rate is { } rate)
@@ -334,7 +335,7 @@ internal static class StrategyEngine
             }
         }
 
-        foreach (var a in input.Accounts.Where(a => a.Type == "Loan" && a.Balance >= 3000
+        foreach (var a in input.Accounts.Where(a => a.Type == nameof(AccountType.Loan) && a.Balance >= 3000
             && (a.Name.Contains("auto", StringComparison.OrdinalIgnoreCase) || a.Name.Contains("car", StringComparison.OrdinalIgnoreCase))))
         {
             var bal = a.Balance;
