@@ -23,6 +23,10 @@
         }
         <span class="fl-sr-only">@Sync.Announcement</span>
     </span>
+    @if (Status.Environment == "production" && Sync.LastSyncedAt is { } lastSynced)
+    {
+        <MudText Typo="Typo.caption" Class="fl-hide-xs mx-2" data-testid="last-synced" title="@lastSynced.ToLocalTime().ToString("g")">@SyncAge.Describe(lastSynced, DateTimeOffset.UtcNow)</MudText>
+    }
     @if (Status.BackupAlert is not null && Status.BackupAlert != _dismissedBackupAlert && Status.Environment == "production")
     {
         <MudChip T="string" Size="Size.Small" Class="fl-hide-xs" Color="Color.Error" Variant="Variant.Filled" Href="data"
@@ -139,10 +143,11 @@
 
     private string ThemeLabel => ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Sync.Changed += OnSyncChanged;
         ThemeService.ThemeChanged += OnSyncChanged;
+        await Sync.RefreshLastSyncedAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
