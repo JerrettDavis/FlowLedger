@@ -116,12 +116,12 @@ internal static class MxEndpoints
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
             if (!abuse.AllowVerifiedDelivery(ConnectorIds.Mx))
-                {
-                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "rate_limited");
-                    return WebhookAbuse.TooManyRequests(request.HttpContext);
-                }
+            {
+                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "rate_limited");
+                return WebhookAbuse.TooManyRequests(request.HttpContext);
+            }
 
-                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
+            if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
             {
                 FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "duplicate");
                 return Results.Accepted(value: new { duplicate = true });

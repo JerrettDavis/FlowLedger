@@ -112,12 +112,12 @@ internal static class QuilttEndpoints
                 }
 
                 if (!abuse.AllowVerifiedDelivery(ConnectorIds.Quiltt))
-                    {
-                        FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "rate_limited");
-                        return WebhookAbuse.TooManyRequests(request.HttpContext);
-                    }
+                {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "rate_limited");
+                    return WebhookAbuse.TooManyRequests(request.HttpContext);
+                }
 
-                    if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
+                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
                     return Results.Accepted(value: new { duplicate = true });
