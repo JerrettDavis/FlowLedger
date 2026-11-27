@@ -11,7 +11,7 @@ namespace FlowLedger.Integrations.Mx;
 /// After each call: appends a row to the provider call ledger. A ledger WRITE failure never fails a call we
 /// already paid for; a failed budget READ does (fail closed).
 /// </summary>
-public sealed class MxCallGuardHandler : DelegatingHandler
+internal sealed class MxCallGuardHandler : DelegatingHandler
 {
     public const string ProviderName = "MX";
 

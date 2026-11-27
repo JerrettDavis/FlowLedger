@@ -5,6 +5,7 @@ enum FlowLedger.Application.Features.HomeAssistant.HomeAssistantWebhookUrl+Netwo
 enum FlowLedger.Application.Features.Insights.BreakdownGroupBy
 enum FlowLedger.Application.Features.Integrations.IntegrationAuth
 enum FlowLedger.Application.Features.Integrations.IntegrationKind
+enum FlowLedger.Application.Features.Query.QueryBudgetKind
 enum FlowLedger.Application.Features.Strategies.PickSource
 enum FlowLedger.Application.Features.Strategies.SuggestionKind
 enum FlowLedger.Application.Features.Strategies.SuggestionSeverity
@@ -35,6 +36,7 @@ interface FlowLedger.Application.Abstractions.IRowVersionGuard
 interface FlowLedger.Application.Abstractions.ISavedReportStore
 interface FlowLedger.Application.Abstractions.ISheetAutoMarker
 interface FlowLedger.Application.Abstractions.ISyncCursorStore
+interface FlowLedger.Application.Abstractions.ITenantDataVersion
 interface FlowLedger.Application.Abstractions.ITextEmbedder
 interface FlowLedger.Application.Abstractions.ITransactionRepository
 interface FlowLedger.Application.Abstractions.IWebhookReplayStore
@@ -77,6 +79,9 @@ sealed class FlowLedger.Application.Abstractions.ProviderConnectionInfo
 sealed class FlowLedger.Application.Abstractions.ReferencedEntityNotFoundException
 sealed class FlowLedger.Application.Abstractions.SyncAlreadyRunningException
 sealed class FlowLedger.Application.Abstractions.SyncThrottledException
+sealed class FlowLedger.Application.Abstractions.TenantDataVersion
+sealed class FlowLedger.Application.Abstractions.TenantQuotaExceededException
+sealed class FlowLedger.Application.Abstractions.TenantResultCache
 sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeHandler
 sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.CreateAccountHandler
@@ -217,12 +222,15 @@ sealed class FlowLedger.Application.Features.LocalAi.LocalAiOptions
 sealed class FlowLedger.Application.Features.LocalAi.LocalAiOptions+LlmOptions
 sealed class FlowLedger.Application.Features.LocalAi.LocalAiService
 sealed class FlowLedger.Application.Features.LocalAi.MerchantGroupsResult
+sealed class FlowLedger.Application.Features.Query.AskConcurrencyGate
 sealed class FlowLedger.Application.Features.Query.AskQueryHandler
 sealed class FlowLedger.Application.Features.Query.AskQueryRequest
 sealed class FlowLedger.Application.Features.Query.AskQueryResult
 sealed class FlowLedger.Application.Features.Query.GetQuerySchemaHandler
 sealed class FlowLedger.Application.Features.Query.GetReportHandler
 sealed class FlowLedger.Application.Features.Query.ListReportsHandler
+sealed class FlowLedger.Application.Features.Query.QueryBudget
+sealed class FlowLedger.Application.Features.Query.QueryBudgetExceededException
 sealed class FlowLedger.Application.Features.Query.QueryDatasetProvider
 sealed class FlowLedger.Application.Features.Query.QueryException
 sealed class FlowLedger.Application.Features.Query.QueryTable
@@ -263,12 +271,14 @@ sealed class FlowLedger.Application.Features.Strategies.TrajectoryPoint
 sealed class FlowLedger.Application.Features.Transactions.CreateTransactionHandler
 sealed class FlowLedger.Application.Features.Transactions.CreateTransactionRequestValidator
 sealed class FlowLedger.Application.Features.Transactions.EnrichmentResult
+sealed class FlowLedger.Application.Features.Transactions.GetProcessingWindowHandler
 sealed class FlowLedger.Application.Features.Transactions.GetTransactionHandler
 sealed class FlowLedger.Application.Features.Transactions.ListTransactionsHandler
 sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQuery
 sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQueryValidator
 sealed class FlowLedger.Application.Features.Transactions.MerchantAliasDto
 sealed class FlowLedger.Application.Features.Transactions.MerchantAliasService
+sealed class FlowLedger.Application.Features.Transactions.ProcessingWindowDto
 sealed class FlowLedger.Application.Features.Transactions.SplitInput
 sealed class FlowLedger.Application.Features.Transactions.TransactionAnnotationService
 sealed class FlowLedger.Application.Features.Transactions.TransactionEnrichmentService
@@ -282,6 +292,7 @@ sealed class FlowLedger.Application.Features.Users.TenantErasureRefusedException
 sealed class FlowLedger.Application.Features.Users.TenantErasureResult
 sealed class FlowLedger.Application.Features.Users.TenantInfo
 static class FlowLedger.Application.Abstractions.AccountConnectorLinks
+static class FlowLedger.Application.Abstractions.TenantLimits
 static class FlowLedger.Application.DependencyInjection
 static class FlowLedger.Application.Features.Assets.AssetCategoryTemplates
 static class FlowLedger.Application.Features.Budgets.MonthlySpend

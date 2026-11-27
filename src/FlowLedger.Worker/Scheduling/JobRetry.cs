@@ -10,7 +10,7 @@ namespace FlowLedger.Worker.Scheduling;
 /// the first (default 3; 1 disables retries). Delays grow exponentially from <c>BaseDelaySeconds</c> (default 300) up to
 /// <c>MaxDelaySeconds</c> (default 3600) and are jittered by +/-50% so replicas and jobs do not retry in lockstep.
 /// </summary>
-public sealed record JobRetryOptions(int MaxAttempts, TimeSpan BaseDelay, TimeSpan MaxDelay)
+internal sealed record JobRetryOptions(int MaxAttempts, TimeSpan BaseDelay, TimeSpan MaxDelay)
 {
     public static JobRetryOptions From(IConfiguration configuration)
     {
@@ -48,7 +48,7 @@ public sealed record JobRetryOptions(int MaxAttempts, TimeSpan BaseDelay, TimeSp
 }
 
 /// <summary>Schedules a one-off retry trigger for a failed job.</summary>
-public sealed class JobRetryScheduler(JobRetryOptions options, TimeProvider clock, ILogger<JobRetryScheduler> logger)
+internal sealed class JobRetryScheduler(JobRetryOptions options, TimeProvider clock, ILogger<JobRetryScheduler> logger)
 {
     public const string AttemptKey = "retryAttempt";
 

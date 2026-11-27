@@ -17,7 +17,7 @@ namespace FlowLedger.Worker.Jobs;
 /// <c>:FeedName</c> (default: the AssetFeeds:Http:Name feed, "appraiser").
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledAssetValuationJob(
+internal sealed class ScheduledAssetValuationJob(
     IServiceProvider services,
     IConfiguration configuration,
     ILogger<ScheduledAssetValuationJob> logger) : IJob

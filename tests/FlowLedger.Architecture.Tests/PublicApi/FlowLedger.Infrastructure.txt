@@ -64,6 +64,7 @@ sealed class FlowLedger.Infrastructure.Persistence.FlowLedgerDbContextFactory
 sealed class FlowLedger.Infrastructure.Persistence.NoOpDomainEventDispatcher
 sealed class FlowLedger.Infrastructure.Persistence.UnscopedTenantContext
 sealed class FlowLedger.Infrastructure.Storage.RawArchiveMaintenance
+sealed class FlowLedger.Infrastructure.Storage.SealResult
 sealed class FlowLedger.Infrastructure.Sync.OutboxPublishingSyncService
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptDecision
 sealed class FlowLedger.Infrastructure.Sync.SyncAttemptGate

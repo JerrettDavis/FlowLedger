@@ -6,7 +6,7 @@ namespace FlowLedger.Integrations.Quiltt;
 /// Process-wide cache of Quiltt profile sessions. A session is reused until shortly before it expires (and never longer than
 /// <see cref="MaxAge"/>, which bounds how long a token that Quiltt revoked early could be served).
 /// </summary>
-public sealed class QuilttSessionCache(TimeProvider? time = null, int maxEntries = QuilttSessionCache.DefaultMaxEntries)
+internal sealed class QuilttSessionCache(TimeProvider? time = null, int maxEntries = QuilttSessionCache.DefaultMaxEntries)
 {
     /// <summary>Upper bound on cached profiles (#179); expired entries go first, then the ones closest to expiry.</summary>
     public const int DefaultMaxEntries = 1000;

@@ -19,6 +19,37 @@ public sealed class PublicApiSurfaceTests
     public void Infrastructure_public_surface_matches_baseline() =>
         AssertBaseline(typeof(FlowLedger.Infrastructure.Persistence.FlowLedgerDbContext).Assembly);
 
+    // The remaining shippable assemblies (#121): their public surface can only grow through a reviewed baseline diff too.
+    [Fact]
+    public void Integrations_Abstractions_public_surface_matches_baseline() =>
+        AssertBaseline(typeof(FlowLedger.Integrations.Abstractions.ConnectorIds).Assembly);
+
+    [Fact]
+    public void Integrations_Mx_public_surface_matches_baseline() =>
+        AssertBaseline(typeof(FlowLedger.Integrations.Mx.MxFinancialDataProvider).Assembly);
+
+    [Fact]
+    public void Integrations_Simulated_public_surface_matches_baseline() =>
+        AssertBaseline(typeof(FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider).Assembly);
+
+    [Fact]
+    public void Integrations_Quiltt_public_surface_matches_baseline() =>
+        AssertBaseline(typeof(FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider).Assembly);
+
+    [Fact]
+    public void Integrations_SimpleFin_public_surface_matches_baseline() =>
+        AssertBaseline(AssemblyOf("FlowLedger.Integrations.SimpleFin"));
+
+    [Fact]
+    public void Web_public_surface_matches_baseline() =>
+        AssertBaseline(AssemblyOf("FlowLedger.Web"));
+
+    [Fact]
+    public void Worker_public_surface_matches_baseline() =>
+        AssertBaseline(AssemblyOf("FlowLedger.Worker"));
+
+    private static Assembly AssemblyOf(string name) => Assembly.Load(name);
+
     private static void AssertBaseline(Assembly assembly)
     {
         var name = assembly.GetName().Name!;

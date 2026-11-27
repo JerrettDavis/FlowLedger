@@ -1,0 +1,4 @@
+sealed class FlowLedger.Integrations.Quiltt.QuilttFinancialDataProvider
+sealed class FlowLedger.Integrations.Quiltt.QuilttOptions
+sealed class FlowLedger.Integrations.Quiltt.QuilttSession
+static class FlowLedger.Integrations.Quiltt.ServiceCollectionExtensions
