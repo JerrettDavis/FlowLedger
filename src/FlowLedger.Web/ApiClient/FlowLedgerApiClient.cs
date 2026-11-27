@@ -63,7 +63,7 @@ public sealed partial class FlowLedgerApiClient
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "HTTP error during {Operation}", operationDescription);
+            LogHttpError(ex, operationDescription);
             throw new ApiClientException(
                 $"Couldn't {operationDescription} (a network or server error occurred).",
                 ex.StatusCode,
@@ -71,7 +71,7 @@ public sealed partial class FlowLedgerApiClient
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "JSON deserialization error during {Operation}", operationDescription);
+            LogJsonError(ex, operationDescription);
             throw new ApiClientException(
                 $"Couldn't {operationDescription} (the server returned an unexpected response).",
                 inner: ex);
@@ -105,9 +105,7 @@ public sealed partial class FlowLedgerApiClient
                 // embedded as query parameters (e.g. ?accountId=...) that constitute
                 // PII in a financial application. The operation description is sufficient
                 // to identify the failed call without exposing account-scoped data.
-                _logger.LogError(
-                    "Non-success status {StatusCode} during {Operation}",
-                    (int)response.StatusCode, operationDescription);
+                LogNonSuccessDuring((int)response.StatusCode, operationDescription);
                 throw new ApiClientException(
                     $"Couldn't {operationDescription} (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
@@ -116,4 +114,34 @@ public sealed partial class FlowLedgerApiClient
             return await response.Content.ReadFromJsonAsync<T>(JsonOptions, ct);
         });
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "HTTP error during {Operation}")]
+    private partial void LogHttpError(Exception exception, string operation);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "JSON deserialization error during {Operation}")]
+    private partial void LogJsonError(Exception exception, string operation);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} during {Operation}")]
+    private partial void LogNonSuccessDuring(int statusCode, string operation);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} updating settings of account {Id}")]
+    private partial void LogNonSuccessUpdatingAccountSettings(int statusCode, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} updating account {Id}")]
+    private partial void LogNonSuccessUpdatingAccount(int statusCode, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} changing type of account {Id}")]
+    private partial void LogNonSuccessChangingAccountType(int statusCode, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} creating transaction")]
+    private partial void LogNonSuccessCreatingTransaction(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} creating recurring flow")]
+    private partial void LogNonSuccessCreatingRecurringFlow(int statusCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} updating recurring flow {Id}")]
+    private partial void LogNonSuccessUpdatingRecurringFlow(int statusCode, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} deleting recurring flow {Id}")]
+    private partial void LogNonSuccessDeletingRecurringFlow(int statusCode, Guid id);
 }

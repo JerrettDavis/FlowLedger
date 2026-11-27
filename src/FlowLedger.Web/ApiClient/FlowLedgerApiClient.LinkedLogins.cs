@@ -42,7 +42,7 @@ public sealed partial class FlowLedgerApiClient
             var response = await _http.PostAsJsonAsync("/api/transactions", request, JsonOptions, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} creating transaction", (int)response.StatusCode);
+                LogNonSuccessCreatingTransaction((int)response.StatusCode);
                 throw new ApiClientException(
                     $"Couldn't create transaction (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
