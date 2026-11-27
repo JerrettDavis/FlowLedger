@@ -180,7 +180,7 @@ internal static class SnapshotRestoreDrill
     /// </summary>
     internal static async Task MigrateForRestoreAsync(string connectionString, SnapshotManifest manifest, CancellationToken ct)
     {
-        await MigrateAsync(connectionString, manifest.AppliedMigrations.LastOrDefault(), ct);
+        await MigrateAsync(connectionString, manifest.AppliedMigrations is { Count: > 0 } applied ? applied[^1] : null, ct);
 
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct);
