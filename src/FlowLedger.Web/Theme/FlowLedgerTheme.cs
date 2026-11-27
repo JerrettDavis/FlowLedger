@@ -14,8 +14,8 @@ public static class FlowLedgerTheme
         {
             Primary = "#1E40AF",
             Secondary = "#475569",
-            Tertiary = "#047857",
-            Success = "#047857",
+            Tertiary = "#065F46", // 4.5:1 also on its own 14% tint (the success pill), not just on white
+            Success = "#065F46",
             Error = "#B91C1C",
             Warning = "#B45309",
             Info = "#1E40AF",

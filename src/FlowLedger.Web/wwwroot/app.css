@@ -703,4 +703,9 @@ html.fl-share .fl-user-name { display: none; }
 .fl-details dd { margin: 0; overflow-wrap: anywhere; }
 
 /* Links inside running text must not rely on colour alone (WCAG 1.4.1), and must not animate through low-contrast colours. */
-:where(p, .mud-alert-message, li) a.mud-link { text-decoration: underline; transition: none; }
+:where(p, .mud-alert-message, li) a:not(.mud-button-root, .mud-nav-link, .mud-chip) { text-decoration: underline; transition: none; }
+
+/* MudBlazor's text-variant alerts colour the message with the severity's dark shade (about 4.4:1 on the dark tint). The icon keeps the
+   severity colour; the words use the primary text colour. */
+:where(.mud-alert-text-error, .mud-alert-text-warning, .mud-alert-text-info, .mud-alert-text-success, .mud-alert-text-normal) .mud-alert-message
+{ color: var(--mud-palette-text-primary); }

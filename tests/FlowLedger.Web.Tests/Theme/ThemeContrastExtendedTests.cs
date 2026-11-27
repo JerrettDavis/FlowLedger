@@ -207,4 +207,33 @@ public sealed class ThemeContrastExtendedTests
             (byte)Math.Round(tint.B * a + bg.B * (1 - a)),
             (byte)255);
     }
+
+    /// <summary>The pos/neg pills (finance-ui.css) are the status colour over a 14% tint of itself, over the surface: axe measured 4.49:1 on the old green.</summary>
+    [Fact]
+    public void Status_pills_are_readable_on_their_own_tint_in_both_themes()
+    {
+        static MudColor Tint(MudColor status, MudColor surface, double share) => new(
+            (byte)Math.Round(status.R * share + surface.R * (1 - share)),
+            (byte)Math.Round(status.G * share + surface.G * (1 - share)),
+            (byte)Math.Round(status.B * share + surface.B * (1 - share)),
+            (byte)255);
+
+        var light = FlowLedgerTheme.Instance.PaletteLight;
+        var dark = FlowLedgerTheme.Instance.PaletteDark;
+        var cases = new (string Name, MudColor Text, MudColor Surface)[]
+        {
+            ("light success pill", light.Success, light.Surface),
+            ("light error pill", light.Error, light.Surface),
+            ("dark success pill", dark.Success, dark.Surface),
+            ("dark error pill", dark.Error, dark.Surface),
+        };
+
+        var failures = cases
+            .Select(c => (c.Name, Ratio: Ratio(c.Text, Tint(c.Text, c.Surface, 0.14))))
+            .Where(c => c.Ratio < TextRatio)
+            .Select(c => $"{c.Name} {c.Ratio:0.00}:1")
+            .ToList();
+
+        failures.Should().BeEmpty();
+    }
 }
