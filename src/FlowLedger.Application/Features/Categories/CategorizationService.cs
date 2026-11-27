@@ -46,6 +46,25 @@ public interface ICategorizationStore
     async Task<IReadOnlyList<Transaction>> LoadTrackedAutoCategorizedAsync(int max, CancellationToken ct = default)
         => await LoadTrackedAsync(max, ct);
 
+    /// <summary>
+    /// Untracked real transactions whose date (posted, else effective) is in [<paramref name="from"/>, <paramref name="to"/>], newest first, at most
+    /// <paramref name="max"/>. Stores should override with an indexed range read; the default filters the newest-first window.
+    /// </summary>
+    async Task<IReadOnlyList<Transaction>> LoadWindowAsync(DateOnly from, DateOnly to, int max, CancellationToken ct = default)
+        => (await LoadAsync(max, ct))
+            .Where(t => t.Status.IsReal() && (t.PostedDate ?? t.EffectiveDate) >= from && (t.PostedDate ?? t.EffectiveDate) <= to)
+            .ToList();
+
+    /// <summary>
+    /// Untracked real transactions the user categorized by hand (the only evidence the learned-merchant map and the models train on),
+    /// newest first, at most <paramref name="max"/>. Stores should override with a filtered, limited query.
+    /// </summary>
+    async Task<IReadOnlyList<Transaction>> LoadManualLearningAsync(int max, CancellationToken ct = default)
+        => (await LoadAsync(TransactionQuota.ProcessingCap, ct))
+            .Where(t => t.Status.IsReal() && t.CategoryId is not null && t.CategorySource == CategorySource.Manual)
+            .Take(max)
+            .ToList();
+
     /// <summary>True when some real (not Planned/Skipped) transaction has no category.</summary>
     async Task<bool> AnyUncategorizedAsync(CancellationToken ct = default)
         => (await LoadTrackedAsync(TransactionQuota.ProcessingCap, ct)).Any(t => t.CategoryId is null && t.Status.IsReal());
@@ -113,8 +132,52 @@ public sealed class CategorizationService(
             return new CategorizationResult(0, 0, 0, 0, 0, Partial: TransactionQuota.IsPartial(txs.Count));
         }
 
+        return await CategorizeAsync(allowLlm, uncategorized, real, real, TransactionQuota.IsPartial(txs.Count), ct);
+    }
+
+    /// <summary>How many of the user's most recent hand-categorized rows feed the learned-merchant map and the models on a scoped run (#163).</summary>
+    internal const int LearningWindow = 20_000;
+
+    /// <summary>
+    /// Categorizes only the rows with these ids (the ones a sync just inserted or settled, #163) instead of re-reading the whole history.
+    /// Reads: those rows by id; the rows within <see cref="TransferDetector.WindowDays"/> of them (the only possible transfer partners);
+    /// and the newest <see cref="LearningWindow"/> hand-categorized rows (the only learning inputs). A null scope is the full run.
+    /// </summary>
+    public async Task<CategorizationResult> RunForAsync(IReadOnlyCollection<Guid>? onlyIds, bool allowLlm = false, CancellationToken ct = default)
+    {
+        if (onlyIds is null)
+        {
+            return await RunAsync(allowLlm, ct);
+        }
+
+        if (onlyIds.Count == 0)
+        {
+            return new CategorizationResult(0, 0, 0, 0, 0);
+        }
+
+        var targets = (await store.LoadByIdsAsync(onlyIds, ct)).Where(t => TransactionStatusExtensions.IsReal(t.Status) && t.CategoryId is null).ToList();
+        if (targets.Count == 0)
+        {
+            return new CategorizationResult(0, 0, 0, 0, 0);
+        }
+
+        static DateOnly Day(Transaction t) => t.PostedDate ?? t.EffectiveDate;
+        var from = targets.Min(Day).AddDays(-TransferDetector.WindowDays);
+        var to = targets.Max(Day).AddDays(TransferDetector.WindowDays);
+        var nearby = await store.LoadWindowAsync(from, to, Max, ct);
+        var learning = await store.LoadManualLearningAsync(LearningWindow, ct);
+        // The targets are always part of the transfer context, whatever the window read returned.
+        var context = nearby.Concat(targets).DistinctBy(t => t.Id).ToList();
+        return await CategorizeAsync(allowLlm, targets, context, learning, TransactionQuota.IsPartial(nearby.Count), ct);
+    }
+
+    private async Task<CategorizationResult> CategorizeAsync(
+        bool allowLlm, List<Transaction> uncategorized, List<Transaction> transferContext, IReadOnlyList<Transaction> learningRows, bool partial, CancellationToken ct)
+    {
+        // Only the user's own categories are evidence; Auto/Suggested rows would teach the model its own guesses.
+        var real = learningRows.Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual).ToList();
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
-        var transferIds = TransferDetector.Detect(real.Select(TransactionMapper.ToDto).ToList(), accountTypes);
+        var transferIds = TransferDetector.Detect(transferContext.Select(TransactionMapper.ToDto).ToList(), accountTypes);
 
         // merchant -> the category the USER chose most often (auto-filled rows are not evidence of intent)
         var learned = real.Where(t => t.CategoryId is not null && t.CategorySource == CategorySource.Manual)
@@ -233,7 +296,7 @@ public sealed class CategorizationService(
 
         await categories.SaveChangesAsync(ct);
         await store.SaveChangedAsync(changedRows, ct);
-        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, TransactionQuota.IsPartial(txs.Count));
+        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, partial);
     }
 
     /// <summary>Fixed confidence shown for a language-model pick (it has no calibrated probability).</summary>

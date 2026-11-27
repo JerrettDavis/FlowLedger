@@ -25,6 +25,40 @@ public sealed class ListTransactionsHandler
         return txs.Select(TransactionMapper.ToDto).ToList().AsReadOnly();
     }
 
+    /// <summary>
+    /// Every matching row, in pages of <paramref name="pageSize"/>, at most <paramref name="maxRows"/> in total (streaming export). Pages are read
+    /// with keyset paging (an index range after the last row sent, no OFFSET) when the order is by date; other sorts page by offset.
+    /// Skip/Take on the query are ignored.
+    /// </summary>
+    public async IAsyncEnumerable<IReadOnlyList<TransactionDto>> PagesAsync(
+        ListTransactionsQuery query, int pageSize, int maxRows, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        AccountId? accountId = query.AccountId.HasValue ? AccountId.From(query.AccountId.Value) : null;
+        ITransactionRepository.TransactionKeyset? after = null;
+        var sent = 0;
+        while (sent < maxRows)
+        {
+            var take = Math.Min(pageSize, maxRows - sent);
+            var page = query.SortKey == TransactionSortKey.Date
+                ? await _repo.ListAfterAsync(after, accountId, query.From, query.To, take, query.Descending, !query.IncludeHidden, query.Search, ct)
+                : await _repo.ListAsync(accountId, query.From, query.To, sent, take, ct, everydayOnly: !query.IncludeHidden, search: query.Search, sort: query.SortKey, descending: query.Descending);
+            if (page.Count == 0)
+            {
+                yield break;
+            }
+
+            yield return page.Select(TransactionMapper.ToDto).ToList().AsReadOnly();
+            sent += page.Count;
+            if (page.Count < take)
+            {
+                yield break;
+            }
+
+            var last = page[^1];
+            after = new ITransactionRepository.TransactionKeyset(last.EffectiveDate, last.CreatedAt, last.Id);
+        }
+    }
+
     /// <summary>Total rows matching the query's filters, ignoring Skip/Take (for server-side paging).</summary>
     public Task<int> CountAsync(ListTransactionsQuery query, CancellationToken ct = default)
     {

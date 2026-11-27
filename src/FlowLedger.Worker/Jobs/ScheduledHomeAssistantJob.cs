@@ -12,7 +12,10 @@ namespace FlowLedger.Worker.Jobs;
 [DisallowConcurrentExecution]
 internal sealed partial class ScheduledHomeAssistantJob(IServiceProvider services, ILogger<ScheduledHomeAssistantJob> logger) : IJob
 {
-    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+        => FlowLedger.Worker.Scheduling.JobTrace.RunAsync(context, logger, ct => ExecuteCoreAsync(context, ct), cancellationToken);
+
+    private async ValueTask ExecuteCoreAsync(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         await TenantFanOut.ForEachTenantAsync(services, logger, async (sp, tenantId) =>
         {

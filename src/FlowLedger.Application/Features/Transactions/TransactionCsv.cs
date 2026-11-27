@@ -8,28 +8,36 @@ public static class TransactionCsv
 {
     private const string Header = "Date,Account,Description,Merchant,Direction,Amount,Currency,Status,Category,Notes,Tags";
 
+    /// <summary>The header line, with its line ending (so a streamed export can write it before the first row).</summary>
+    public const string HeaderLine = Header + "\r\n";
+
     public static string Build(IEnumerable<TransactionDto> rows, IReadOnlyDictionary<Guid, string>? categoryNames = null)
     {
-        var sb = new StringBuilder(Header).Append("\r\n");
+        var sb = new StringBuilder(HeaderLine);
         foreach (var t in rows)
         {
-            var category = t.CategoryId is { } c && categoryNames?.TryGetValue(c, out var n) == true ? n : t.CategoryId?.ToString();
-            sb.Append(string.Join(',',
-                    t.EffectiveDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    t.AccountId.ToString(),
-                    Text(t.Description),
-                    Text(t.MerchantName),
-                    Text(t.Direction),
-                    t.Amount.ToString("0.00", CultureInfo.InvariantCulture),
-                    Text(t.Currency),
-                    Text(t.Status),
-                    Text(category),
-                    Text(t.Notes),
-                    Text(t.Tags is null ? null : string.Join(' ', t.Tags))))
-                .Append("\r\n");
+            sb.Append(Row(t, categoryNames));
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>One row, with its line ending.</summary>
+    public static string Row(TransactionDto t, IReadOnlyDictionary<Guid, string>? categoryNames = null)
+    {
+        var category = t.CategoryId is { } c && categoryNames?.TryGetValue(c, out var n) == true ? n : t.CategoryId?.ToString();
+        return string.Join(',',
+            t.EffectiveDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            t.AccountId.ToString(),
+            Text(t.Description),
+            Text(t.MerchantName),
+            Text(t.Direction),
+            t.Amount.ToString("0.00", CultureInfo.InvariantCulture),
+            Text(t.Currency),
+            Text(t.Status),
+            Text(category),
+            Text(t.Notes),
+            Text(t.Tags is null ? null : string.Join(' ', t.Tags))) + "\r\n";
     }
 
     public static string Text(string? value)
