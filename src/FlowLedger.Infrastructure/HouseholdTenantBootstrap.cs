@@ -29,21 +29,36 @@ internal static partial class HouseholdTenantBootstrap
     public static bool HasExplicitId(IConfiguration cfg) =>
         ExplicitKeys.Any(k => Guid.TryParse(cfg[k], out var id) && id != Guid.Empty);
 
-    /// <summary>Resolves (and for a new OIDC install generates) the household id; null when configuration or existing data decide it.</summary>
-    public static async Task<Guid?> EnsureAsync(
+    /// <summary>
+    /// Resolves (and for a new OIDC install generates) the household id. <see cref="HouseholdTenantOutcome.ExistingDataNoId"/> is the only
+    /// outcome the caller must refuse; an unmigrated database is NOT that (it holds no data yet, the migration job simply has not run).
+    /// </summary>
+    public static async Task<HouseholdTenantResult> EnsureAsync(
         IConfiguration cfg, string connectionString, bool mayGenerate, HouseholdTenantConfigProvider? sink, ILogger logger, CancellationToken ct)
     {
         if (HasExplicitId(cfg))
         {
-            return null;
+            return new HouseholdTenantResult(HouseholdTenantOutcome.Configured, null);
         }
 
         try
         {
             await using var db = new HostDb(connectionString).Create();
             var stored = await ReadAsync(db, ct);
-            if (stored is null && mayGenerate && !await db.Accounts.AsNoTracking().AnyAsync(ct) && !await db.Tenants.AsNoTracking().AnyAsync(ct))
+            var outcome = HouseholdTenantOutcome.Stored;
+            if (stored is null)
             {
+                var hasData = await db.Accounts.AsNoTracking().AnyAsync(ct) || await db.Tenants.AsNoTracking().AnyAsync(ct);
+                if (hasData)
+                {
+                    return new HouseholdTenantResult(HouseholdTenantOutcome.ExistingDataNoId, null);
+                }
+
+                if (!mayGenerate)
+                {
+                    return new HouseholdTenantResult(HouseholdTenantOutcome.NotApplicable, null);
+                }
+
                 var candidate = Guid.NewGuid();
                 // First writer wins (API and Worker may start together); everyone then reads back the winner.
                 await db.Database.ExecuteSqlInterpolatedAsync(
@@ -52,20 +67,22 @@ internal static partial class HouseholdTenantBootstrap
                 if (stored == candidate)
                 {
                     LogGenerated(logger, candidate);
+                    outcome = HouseholdTenantOutcome.Generated;
                 }
             }
 
             if (stored is { } id)
             {
                 sink?.Publish(id);
+                return new HouseholdTenantResult(outcome, id);
             }
 
-            return stored;
+            return new HouseholdTenantResult(HouseholdTenantOutcome.NotApplicable, null);
         }
         catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UndefinedTable)
         {
-            // Unmigrated database (a host started before the migration job): nothing stored, nothing to generate yet.
-            return null;
+            // Unmigrated database (a host started before the migration job): no data, nothing stored, nothing to refuse yet.
+            return new HouseholdTenantResult(HouseholdTenantOutcome.NotMigrated, null);
         }
     }
 
@@ -78,6 +95,29 @@ internal static partial class HouseholdTenantBootstrap
     [LoggerMessage(Level = LogLevel.Information, Message = "Generated a random household tenant id {TenantId} for this new install and stored it in system_settings.")]
     private static partial void LogGenerated(ILogger logger, Guid tenantId);
 }
+
+internal enum HouseholdTenantOutcome
+{
+    /// <summary>An explicit Api:TenantId / Tenancy:LegacyTenantId / Worker:TenantId decides; nothing was read or generated.</summary>
+    Configured,
+
+    /// <summary>The id stored in system_settings was published.</summary>
+    Stored,
+
+    /// <summary>A new install: a random id was generated, stored and published.</summary>
+    Generated,
+
+    /// <summary>The database holds data but no household id (a legacy install under the well-known constant): refuse unless acknowledged.</summary>
+    ExistingDataNoId,
+
+    /// <summary>The schema is not there yet (migration job still running): not an error, try again on the next start.</summary>
+    NotMigrated,
+
+    /// <summary>Empty database but this host may not generate (not an OIDC install): the configured/default id applies.</summary>
+    NotApplicable,
+}
+
+internal readonly record struct HouseholdTenantResult(HouseholdTenantOutcome Outcome, Guid? TenantId);
 
 /// <summary>Lowest-effort bridge from the stored id to the synchronous <see cref="IConfiguration"/> readers: a provider added last whose only key is <c>Tenancy:LegacyTenantId</c>.</summary>
 internal sealed class HouseholdTenantConfigProvider : ConfigurationProvider, IConfigurationSource

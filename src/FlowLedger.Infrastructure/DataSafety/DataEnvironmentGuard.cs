@@ -167,7 +167,7 @@ internal sealed partial class DataEnvironmentGuardService : IHostedService
         var oidc = !string.IsNullOrWhiteSpace(_config["Auth:Oidc:Authority"]) && !string.IsNullOrWhiteSpace(_config["Auth:Oidc:ClientId"]);
         var household = await HouseholdTenantBootstrap.EnsureAsync(
             _config, conn, mayGenerate: oidc, _sp.GetService<HouseholdTenantConfigProvider>(), _logger, cancellationToken);
-        if (oidc && household is null && !HouseholdTenantBootstrap.HasExplicitId(_config)
+        if (oidc && household.Outcome == HouseholdTenantOutcome.ExistingDataNoId
             && _sp.GetService<IHostEnvironment>() is { } hostEnv && !hostEnv.IsDevelopment()
             && !(bool.TryParse(_config["Tenancy:AllowWellKnownLegacyTenantId"], out var allowWellKnown) && allowWellKnown))
         {

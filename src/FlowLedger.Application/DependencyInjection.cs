@@ -28,13 +28,13 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Every public concrete <c>*Handler</c> class in this assembly is a scoped use-case entry point: registered by convention so a
+    /// Every concrete, non-nested <c>*Handler</c> class in this assembly (public or internal) is a scoped use-case entry point: registered by convention so a
     /// new handler cannot be forgotten (a test also asserts every handler resolves).
     /// </summary>
     private static void AddHandlers(IServiceCollection services)
     {
-        var handlers = typeof(DependencyInjection).Assembly.GetExportedTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false }
+        var handlers = typeof(DependencyInjection).Assembly.GetTypes() // internal handlers register too: a handler made internal must not silently drop out of DI
+            .Where(t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false, IsNested: false }
                         && t.Name.EndsWith("Handler", StringComparison.Ordinal));
         foreach (var handler in handlers)
         {

@@ -10,8 +10,14 @@ namespace FlowLedger.Api.Tests.Security;
 
 /// <summary>#135: Production + OIDC requires the signed tenant assertion; a missing key fails startup instead of failing open.</summary>
 [Collection("ApiIntegration")]
-public sealed class RequireSignedTenantTests(FailClosedApiFactory factory)
+public sealed class RequireSignedTenantTests(FailClosedApiFactory factory) : IAsyncLifetime
 {
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    // The household tests write household_tenant_id and a tenants row into the shared collection database; leave it clean so test order
+    // cannot change what an OIDC host with no configured tenant id does in a later test class.
+    public Task DisposeAsync() => factory.ResetAsync();
+
     private const string SigningKey = "test-signing-key-0123456789abcdef0123456789";
     private static readonly Guid Tenant = new("5f1c2a3b-0000-4000-8000-00000000abcd");
 

@@ -12,8 +12,8 @@ What exists today:
 - One interface with metadata, connection lifecycle, accounts, transactions, webhook verification and parsing, and member resolution.
   Optional members are either default interface members (`GetConnectionHealthAsync`, `Traits`) or advertised by
   `ProviderCapabilities` flags that callers check before calling.
-- Four connectors implement it (MX, Quiltt, SimpleFIN, Simulated) and every one of them is **keyed by connector id** in DI, wrapped by
-  the same call-ledger and budget handler (`ConnectorCallGuardHandler`), listed by `IConnectorRegistry`, and driven by one
+- Four connectors implement it (MX, Quiltt, SimpleFIN, Simulated) and every one of them is **keyed by connector id** in DI and listed by
+  `IConnectorRegistry`; the three HTTP connectors (MX, Quiltt, SimpleFIN) are also wrapped by the same call-ledger and budget handler (`ConnectorCallGuardHandler`; Simulated has no HTTP client), and driven by one
   `FinancialSyncService` pipeline that treats a connector as a single unit (accounts, then transactions, then health).
 - The webhook endpoints, the on-demand sync job, the account-link store and the status endpoints all resolve a provider by id and
   then call two or three of its operations.

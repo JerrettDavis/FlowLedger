@@ -25,14 +25,28 @@ COMMENT_MARKER = "<!-- flowledger-coverage-delta -->"
 RAISE_HINT_MARGIN = 5.0
 
 
+def source_key(sources: list[str], filename: str) -> str:
+    """Repo-relative key for a source file. Coverlet writes `filename` relative to the report's own <source> root, and that root differs
+    between test projects (the repo root in one report, its `src/` folder in another), so the same file used to be counted twice under two keys
+    and the merged percentage came out far below any single report. Resolving against the root makes every report agree."""
+    for source in sources:
+        full = (source.replace("\\", "/").rstrip("/") + "/" + filename.replace("\\", "/")).replace("//", "/")
+        cut = full.find("/src/")
+        if cut >= 0:
+            return full[cut + 1:]
+    return filename.replace("\\", "/")
+
+
 def measure(files: list[str]) -> dict[str, tuple[int, int]]:
     """assembly -> (lines hit, lines total); reports are merged per file/line by max hits."""
     data: dict[str, dict[str, dict[int, int]]] = {}
     for path in files:
-        for pkg in ET.parse(path).getroot().iter("package"):
+        root = ET.parse(path).getroot()
+        sources = [s.text or "" for s in root.iter("source")]
+        for pkg in root.iter("package"):
             name = pkg.get("name", "")
             for cls in pkg.iter("class"):
-                lines = data.setdefault(name, {}).setdefault(cls.get("filename", ""), {})
+                lines = data.setdefault(name, {}).setdefault(source_key(sources, cls.get("filename", "")), {})
                 for ln in cls.iter("line"):
                     n = int(ln.get("number"))
                     lines[n] = max(lines.get(n, 0), int(ln.get("hits")))

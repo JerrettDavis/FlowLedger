@@ -68,7 +68,7 @@ public sealed class MonthlySpendTests
     [InlineData("Car", 100, -1, false)]
     public void Goal_validator_matches_legacy_rules(string name, decimal target, decimal saved, bool valid)
     {
-        var r = new SaveGoalRequestValidator().Validate(new SaveGoalRequest(null, name, target, saved, null));
+        var r = new SaveGoalRequestValidator().Validate(SaveGoalRequestBuilder.A().Named(name).Targeting(target).Saved(saved).Build());
 
         r.IsValid.Should().Be(valid);
         if (!valid)

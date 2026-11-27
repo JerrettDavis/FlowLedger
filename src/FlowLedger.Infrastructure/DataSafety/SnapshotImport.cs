@@ -94,6 +94,14 @@ public static class SnapshotImport
             // Bring the schema forward to the current model.
             await SnapshotRestoreDrill.MigrateAsync(targetConnectionString, null, ct);
 
+            // The household tenant id is the one host-wide setting that belongs to the DATA: the imported rows and login mappings live under the
+            // source's id, and a fresh OIDC target may already have generated its own on a first start. Carry the source's id over (api and worker
+            // must restart afterwards: the running processes publish the old value from memory).
+            if (manifest.Tables.Any(t => t.Table == "system_settings"))
+            {
+                await RestoreHouseholdTenantIdAsync(targetConnectionString, dir, ct);
+            }
+
             return new RestoreDrillResult(problems.Count == 0, "", false, results, problems);
         }
         finally
@@ -109,6 +117,41 @@ public static class SnapshotImport
         }
 
         static RestoreDrillResult Fail(string why) => new(false, "", false, [], [why]);
+    }
+
+    /// <summary>Upserts only the <c>household_tenant_id</c> row of the bundle's <c>system_settings.csv</c>; every other setting stays the target's own.</summary>
+    internal static async Task RestoreHouseholdTenantIdAsync(string connectionString, string snapshotDir, CancellationToken ct)
+    {
+        var file = Path.Combine(snapshotDir, "system_settings.csv");
+        if (!File.Exists(file))
+        {
+            return;
+        }
+
+        var columns = (await File.ReadLinesAsync(file, ct).FirstAsync(ct)).Split(',').Select(c => c.Trim('"')).ToList();
+        if (!columns.Contains("key") || !columns.Contains("value") || columns.Any(c => !System.Text.RegularExpressions.Regex.IsMatch(c, "^[A-Za-z_][A-Za-z0-9_]{0,62}$")))
+        {
+            return; // an unexpected shape is not worth failing a restore for; the setting stays what the target had
+        }
+
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        await using (var temp = new NpgsqlCommand("CREATE TEMP TABLE import_system_settings (LIKE system_settings)", conn))
+        {
+            await temp.ExecuteNonQueryAsync(ct);
+        }
+
+        var header = string.Join(",", columns.Select(c => "\"" + c + "\""));
+        await using (var copy = await conn.BeginTextImportAsync($"COPY import_system_settings ({header}) FROM STDIN (FORMAT csv, HEADER true)", ct))
+        using (var reader = new StreamReader(file))
+        {
+            await copy.WriteAsync(await reader.ReadToEndAsync(ct));
+        }
+
+        await using var upsert = new NpgsqlCommand(
+            "INSERT INTO system_settings (key, value) SELECT key, value FROM import_system_settings WHERE key = 'household_tenant_id' " +
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_utc = now()", conn);
+        await upsert.ExecuteNonQueryAsync(ct);
     }
 
     /// <summary>Extracts one entry, counting the bytes actually written (shared across entries via <paramref name="totalWritten"/>)
