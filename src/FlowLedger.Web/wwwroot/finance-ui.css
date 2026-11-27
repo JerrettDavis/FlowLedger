@@ -266,3 +266,28 @@ html, body { max-width: 100%; }
 .fl-account-chip__bal { font-size: 11px; color: var(--mud-palette-text-secondary); }
 
 .fl-wrap-anywhere { overflow-wrap: anywhere; }
+
+/* Transactions filters: one toggle on phones keeps the first rows on screen; tablet and desktop always show the fields. */
+.fl-filters-toggle { display: none; }
+@media (max-width: 599.98px) {
+  .fl-filters-toggle { display: inline-flex; }
+  .fl-filters--closed { display: none; }
+}
+
+/* Sheet on a phone: the pinned name column took more than half the width, so the next column (Due) sat half hidden behind it after the grid scrolled to the current month. */
+@media (max-width: 599.98px) {
+  .fl-sheet .fl-sheet-name { min-width: 120px; max-width: 140px; white-space: normal; }
+}
+
+/* Touch targets: 44px minimum for buttons, icon buttons, clickable chips, checkboxes and list links on phones and coarse pointers.
+   The numeric field's spin buttons stay small (not focusable; typing is the input path). */
+@media (pointer: coarse), (max-width: 599.98px) {
+  .mud-main-content .mud-icon-button, .mud-dialog .mud-icon-button { min-width: 44px; min-height: 44px; }
+  .mud-main-content .mud-button-root.mud-button:not(.mud-input-numeric-spin .mud-button-root), .mud-dialog .mud-button-root.mud-button:not(.mud-input-numeric-spin .mud-button-root) { min-width: 44px; min-height: 44px; }
+  .mud-main-content button.mud-chip, .mud-main-content a.mud-chip, .mud-dialog button.mud-chip { min-height: 44px; }
+  .mud-main-content .mud-checkbox, .mud-dialog .mud-checkbox { min-height: 44px; }
+  .fl-li__link { display: inline-block; padding: 12px 0; margin: -12px 0; }
+  .fl-catchip, .fl-tree-toggle, .fl-sheet-cell, .fl-sheet-link, .fl-sheet-sort { min-height: 44px; }
+  .fl-tree-toggle, .fl-sheet-sort { min-width: 44px; }
+  .fl-sheet-link, .fl-sheet-sort { display: inline-flex; align-items: center; }
+}
