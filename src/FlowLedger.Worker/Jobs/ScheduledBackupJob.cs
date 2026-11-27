@@ -6,7 +6,7 @@ namespace FlowLedger.Worker.Jobs;
 
 /// <summary>Daily verified backup: snapshot, restore drill, encrypted off-site copy. Failures are recorded and visible in the UI.</summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledBackupJob : IJob
+public sealed partial class ScheduledBackupJob : IJob
 {
     private readonly BackupRunner _runner;
     private readonly DataRetention _retention;
@@ -26,11 +26,11 @@ public sealed class ScheduledBackupJob : IJob
         var result = await _runner.RunAsync(cancellationToken, allowPrune: true);
         if (result.Ok)
         {
-            _logger.LogInformation("Backup OK: {Dir} ({Rows} rows), off-site: {Offsite}", result.SnapshotDir, result.Rows, result.OffsiteDetail);
+            LogBackupOk(result.SnapshotDir, result.Rows, result.OffsiteDetail);
         }
         else
         {
-            _logger.LogError("BACKUP FAILED: {Error}", result.Error);
+            LogBackupFailed(result.Error);
             // Surface the failure to the job listener (history + flowledger.job.runs{outcome=failure}); Quartz does not refire on this.
             throw new JobExecutionException($"Backup failed: {result.Error}");
         }
@@ -41,12 +41,12 @@ public sealed class ScheduledBackupJob : IJob
             var pruned = await _retention.PruneAsync(cancellationToken);
             if (pruned.SnapshotsBlanked > 0 || pruned.LinkCodesDeleted > 0)
             {
-                _logger.LogInformation("Retention: blanked {Snapshots} merge snapshots, deleted {Codes} link codes.", pruned.SnapshotsBlanked, pruned.LinkCodesDeleted);
+                LogRetentionPruned(pruned.SnapshotsBlanked, pruned.LinkCodesDeleted);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Data retention pass failed; it will run again with the next backup.");
+            LogRetentionFailed(ex);
         }
 
         if (_rawArchive is not null)
@@ -57,13 +57,31 @@ public sealed class ScheduledBackupJob : IJob
                 var removed = await _rawArchive.PruneConfiguredAsync(DateTimeOffset.UtcNow, cancellationToken);
                 if (removed > 0)
                 {
-                    _logger.LogInformation("Retention: removed {Files} raw provider payload files past the retention window.", removed);
+                    LogRawArchivePruned(removed);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Raw archive retention pass failed; it will run again with the next backup.");
+                LogRawArchiveRetentionFailed(ex);
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Backup OK: {Dir} ({Rows} rows), off-site: {Offsite}")]
+    private partial void LogBackupOk(string? dir, long rows, string? offsite);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "BACKUP FAILED: {Error}")]
+    private partial void LogBackupFailed(string? error);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Retention: blanked {Snapshots} merge snapshots, deleted {Codes} link codes.")]
+    private partial void LogRetentionPruned(int snapshots, int codes);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Data retention pass failed; it will run again with the next backup.")]
+    private partial void LogRetentionFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Retention: removed {Files} raw provider payload files past the retention window.")]
+    private partial void LogRawArchivePruned(int files);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Raw archive retention pass failed; it will run again with the next backup.")]
+    private partial void LogRawArchiveRetentionFailed(Exception exception);
 }

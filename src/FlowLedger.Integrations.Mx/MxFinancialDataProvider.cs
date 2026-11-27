@@ -18,7 +18,7 @@ namespace FlowLedger.Integrations.Mx;
 /// single opaque id. The member ref's <c>ProviderId</c> is <c>{userGuid}|{memberGuid}</c> and each
 /// account's <c>ProviderId</c> is <c>{userGuid}|{accountGuid}</c> (see <see cref="MxCompositeId"/>).
 /// </summary>
-public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdResolver
+public sealed partial class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdResolver
 {
     private readonly MxApiClient _client;
     private readonly MxWebhookVerifier _webhookVerifier;
@@ -311,10 +311,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         var pollInterval = TimeSpan.FromMilliseconds(Math.Max(0, _options.PollIntervalMs));
         var maxAttempts = Math.Max(1, _options.MaxPollAttempts);
 
-        _logger.LogInformation(
-            "MX member {MemberGuid} is aggregating or transient (status={Status}, isAggregating={IsAgg}). " +
-            "Polling status up to {MaxAttempts} times with {IntervalMs}ms interval.",
-            memberGuid, member.ConnectionStatus, member.IsBeingAggregated, maxAttempts, _options.PollIntervalMs);
+        LogMemberPolling(memberGuid, member.ConnectionStatus, member.IsBeingAggregated, maxAttempts, _options.PollIntervalMs);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -327,7 +324,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             switch (Classify(current))
             {
                 case MemberReadiness.Ready:
-                    _logger.LogInformation("MX member {MemberGuid} is ready after {Attempt} poll(s).", memberGuid, attempt);
+                    LogMemberReady(memberGuid, attempt);
                     // The status endpoint may omit name; keep the listed member's identity fields.
                     return current with
                     {
@@ -340,9 +337,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                     break;
             }
 
-            _logger.LogDebug(
-                "MX member {MemberGuid} poll {Attempt}/{MaxAttempts}: status={Status}, isAggregating={IsAgg}.",
-                memberGuid, attempt, maxAttempts, current.ConnectionStatus, current.IsBeingAggregated);
+            LogMemberPollAttempt(memberGuid, attempt, maxAttempts, current.ConnectionStatus, current.IsBeingAggregated);
         }
 
         // The member is healthy, just not finished aggregating. That is retryable, not a reason to ask the user to act.
@@ -463,7 +458,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
                 catch (UnknownCurrencyException ex)
                 {
                     // Never guess USD for an account whose currency the provider did not report (#124).
-                    _logger.LogWarning("Skipping MX account: {Message}", ex.Message);
+                    LogSkippingAccount(ex.Message);
                     continue;
                 }
 
@@ -480,10 +475,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
 
             if (page >= maxPages)
             {
-                _logger.LogWarning(
-                    "GetAccountsAsync: reached MaxPages limit ({MaxPages}) for member {MemberGuid}. " +
-                    "Returning {Count} accounts collected so far. Remaining pages skipped.",
-                    maxPages, memberGuid, results.Count);
+                LogAccountsMaxPages(maxPages, memberGuid, results.Count);
                 break;
             }
 
@@ -523,7 +515,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
             catch (UnknownCurrencyException ex)
             {
                 unknownCurrency++;
-                _logger.LogWarning("Skipping MX transaction: {Message}", ex.Message);
+                LogSkippingTransaction(ex.Message);
             }
         }
 
@@ -532,7 +524,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         var skipped = mapped.Count - items.Count + unknownCurrency;
         foreach (var bad in mapped.Where(t => t.PostedDate == DateOnly.MinValue))
         {
-            _logger.LogWarning("Skipping MX transaction {ProviderTransactionId}: no usable date.", bad.ProviderId);
+            LogSkippingTransactionNoDate(bad.ProviderId);
         }
 
         // Without pagination metadata a full page may be truncated: keep paging (a short page ends the pass) so the
@@ -545,9 +537,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         // truncated pass never moves the date watermark past unread history.
         if (hasMore && position.Page >= Math.Max(1, _options.MaxPages))
         {
-            _logger.LogWarning(
-                "GetTransactionsAsync: reached MaxPages limit ({MaxPages}); resuming on the next sync.",
-                _options.MaxPages);
+            LogTransactionsMaxPages(_options.MaxPages);
             return new TransactionPage(items, position.Next().Encode(), HasMore: false) { SkippedCount = skipped };
         }
 
@@ -586,7 +576,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         }
         catch (System.Text.Json.JsonException ex)
         {
-            _logger.LogError(ex, "MX webhook payload is malformed and could not be parsed.");
+            LogWebhookMalformed(ex);
             throw new FatalProviderException(
                 "MX webhook payload is malformed and could not be parsed.", inner: ex);
         }
@@ -627,7 +617,7 @@ public sealed class MxFinancialDataProvider : IFinancialDataProvider, IMemberIdR
         return false;
     }
 
-    private static void AddIfPresent(IDictionary<string, string> map, string key, string? value)
+    private static void AddIfPresent(Dictionary<string, string> map, string key, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
         {

@@ -14,7 +14,7 @@ namespace FlowLedger.Infrastructure.Sync;
 /// Failure isolation: one connector failing never stops the others. If every connector fails the first error is rethrown (so a
 /// single-connector install behaves exactly as before); if at least one succeeds the failures are logged and the partial result returned.
 /// </summary>
-internal sealed class MultiConnectorSyncService : IFinancialSyncService
+internal sealed partial class MultiConnectorSyncService : IFinancialSyncService
 {
     private readonly IServiceProvider _services;
     private readonly IConnectorRegistry _registry;
@@ -48,7 +48,8 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
     public Task<string> ConnectAsync(CancellationToken ct = default)
     {
         // Provisioning a connection is per connector; the demo/primary flow uses the first usable one.
-        var primary = Usable.FirstOrDefault() ?? throw NoUsableConnector();
+        var usable = Usable;
+        var primary = usable.Count > 0 ? usable[0] : throw NoUsableConnector();
         return For(primary).ConnectAsync(ct);
     }
 
@@ -79,7 +80,7 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Sync via connector {Connector} failed for tenant {TenantId}.", connector.Id, _tenant.TenantId);
+                LogSyncViaConnectorFailedFor(_logger, ex, connector.Id, _tenant.TenantId);
                 failures.Add(ex);
             }
         }
@@ -93,7 +94,10 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
         return new SyncResult(accounts, added, skipped, flows);
     }
 
-    private static Exception NoUsableConnector() => new NeedsUserActionProviderException(
+    private static NeedsUserActionProviderException NoUsableConnector() => new NeedsUserActionProviderException(
         "This account has no linked financial institution yet. Per-user provider linking is not available; the configured connectors belong to the household owner.",
         "Ask the household owner, or add accounts manually / via CSV import.");
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Sync via connector {Connector} failed for tenant {TenantId}.")]
+    private static partial void LogSyncViaConnectorFailedFor(ILogger logger, Exception exception, string? connector, Guid tenantId);
 }

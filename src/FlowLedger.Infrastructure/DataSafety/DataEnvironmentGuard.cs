@@ -134,7 +134,7 @@ public static class DataEnvironmentGuard
 }
 
 /// <summary>Runs the guard at startup (register AFTER the migration service so the schema exists).</summary>
-internal sealed class DataEnvironmentGuardService : IHostedService
+internal sealed partial class DataEnvironmentGuardService : IHostedService
 {
     private readonly IServiceProvider _sp;
     private readonly IConfiguration _config;
@@ -164,10 +164,13 @@ internal sealed class DataEnvironmentGuardService : IHostedService
         var adopt = bool.TryParse(_config["DataEnvironment:AdoptExistingAsProduction"], out var a) && a;
 
         _state.Current = await DataEnvironmentGuard.EnsureAsync(conn, expected, adopt, cancellationToken);
-        _logger.LogInformation("Data environment verified: {Environment}", _state.Current);
+        LogDataEnvironmentVerified(_logger, _state.Current);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Data environment verified: {Environment}")]
+    private static partial void LogDataEnvironmentVerified(ILogger logger, DataEnvironment? environment);
 }
 
 public static class DataEnvironmentExtensions

@@ -9,7 +9,7 @@ public sealed class TransactionHandlersTests
     private readonly FakeTransactionRepository _repo = new();
     private readonly FakeTenantContext _tenant = new();
 
-    private CreateTransactionRequest ValidRequest(Guid? accountId = null) => new(
+    private static CreateTransactionRequest ValidRequest(Guid? accountId = null) => new(
         accountId ?? Guid.NewGuid(),
         150m,
         "USD",

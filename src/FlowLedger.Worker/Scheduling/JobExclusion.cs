@@ -13,7 +13,7 @@ namespace FlowLedger.Worker.Scheduling;
 /// lock (<c>flowledger:job:&lt;name&gt;</c>) for the length of a run. It prevents OVERLAP, not a second run
 /// that starts after the first finished (that needs a persisted last-fire marker).
 /// </summary>
-public sealed class JobExclusion(IConfiguration configuration, ILogger<JobExclusion> logger)
+public sealed partial class JobExclusion(IConfiguration configuration, ILogger<JobExclusion> logger)
 {
     private readonly ConcurrentDictionary<string, PostgresAdvisoryLock> _held = new();
 
@@ -33,7 +33,7 @@ public sealed class JobExclusion(IConfiguration configuration, ILogger<JobExclus
             var handle = await PostgresAdvisoryLock.TryAcquireAsync(cs, LockName(job), ct);
             if (handle is null)
             {
-                logger.LogWarning("Job {Job} skipped: another process holds its lock (overlapping worker or deploy).", job);
+                LogSkippedLockHeld(job);
                 return false;
             }
 
@@ -43,7 +43,7 @@ public sealed class JobExclusion(IConfiguration configuration, ILogger<JobExclus
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             // Database trouble must not silently stop scheduled work; the jobs themselves report their own DB errors.
-            logger.LogWarning(ex, "Job {Job}: could not take the cross-process lock; running without it.", job);
+            LogLockUnavailable(ex, job);
             return true;
         }
     }
@@ -55,6 +55,12 @@ public sealed class JobExclusion(IConfiguration configuration, ILogger<JobExclus
             await handle.DisposeAsync();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Job {Job} skipped: another process holds its lock (overlapping worker or deploy).")]
+    private partial void LogSkippedLockHeld(string job);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Job {Job}: could not take the cross-process lock; running without it.")]
+    private partial void LogLockUnavailable(Exception exception, string job);
 }
 
 /// <summary>Quartz adapter: takes the lock in <c>VetoJobExecution</c> and releases it in <c>TriggerComplete</c>.</summary>
@@ -85,6 +91,6 @@ public sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITrigg
     public async ValueTask TriggerComplete(ITrigger trigger, IJobExecutionContext context, SchedulerInstruction triggerInstructionCode, CancellationToken cancellationToken = default)
         => await exclusion.ExitAsync(context.FireInstanceId);
 
-    public ValueTask TriggerRetriesExhausted(ITrigger trigger, IJobExecutionContext context, JobExecutionException jobException, CancellationToken cancellationToken = default)
+    public ValueTask TriggerRetriesExhausted(ITrigger trigger, IJobExecutionContext context, JobExecutionException exception, CancellationToken cancellationToken = default)
         => ValueTask.CompletedTask;
 }

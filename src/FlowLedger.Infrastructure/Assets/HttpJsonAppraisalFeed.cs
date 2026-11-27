@@ -39,7 +39,7 @@ internal sealed class HttpJsonAppraisalFeedOptions
 /// Pulls a value for an asset from any HTTP JSON endpoint described by configuration. Only descriptive
 /// fields ever leave the system — never the serial number.
 /// </summary>
-internal sealed class HttpJsonAppraisalFeed(
+internal sealed partial class HttpJsonAppraisalFeed(
     IHttpClientFactory httpFactory,
     IOptions<HttpJsonAppraisalFeedOptions> options,
     ILogger<HttpJsonAppraisalFeed> logger) : IAssetValuationFeed
@@ -58,7 +58,7 @@ internal sealed class HttpJsonAppraisalFeed(
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttps && !uri.IsLoopback))
         {
-            logger.LogWarning("Asset feed {Feed} skipped: URL template must resolve to an https URL.", Name);
+            LogAssetFeedSkippedURLTemplate(logger, Name);
             return null;
         }
 
@@ -73,7 +73,7 @@ internal sealed class HttpJsonAppraisalFeed(
             using var response = await httpFactory.CreateClient(HttpClientName).SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Asset feed {Feed} returned HTTP {Status}", Name, (int)response.StatusCode);
+                LogAssetFeedReturnedHTTP(logger, Name, (int)response.StatusCode);
                 return null;
             }
 
@@ -85,7 +85,7 @@ internal sealed class HttpJsonAppraisalFeed(
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             // A flaky or non-JSON endpoint means "no value", not a server error.
-            logger.LogWarning(ex, "Asset feed {Feed} failed", Name);
+            LogAssetFeedFailed(logger, ex, Name);
             return null;
         }
     }
@@ -133,4 +133,13 @@ internal sealed class HttpJsonAppraisalFeed(
             _ => null,
         };
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Asset feed {Feed} skipped: URL template must resolve to an https URL.")]
+    private static partial void LogAssetFeedSkippedURLTemplate(ILogger logger, string? feed);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Asset feed {Feed} returned HTTP {Status}")]
+    private static partial void LogAssetFeedReturnedHTTP(ILogger logger, string? feed, int status);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Asset feed {Feed} failed")]
+    private static partial void LogAssetFeedFailed(ILogger logger, Exception exception, string? feed);
 }

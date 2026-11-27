@@ -14,7 +14,7 @@ namespace FlowLedger.Integrations.Quiltt;
 /// accounts and transactions over GraphQL. A scoped instance caches one session, one accounts read and one transactions read,
 /// so a whole sync costs a handful of requests regardless of account count.
 /// </summary>
-public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
+public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
 {
     public const string Name = "Quiltt";
 
@@ -109,7 +109,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             }
             catch (UnknownCurrencyException ex)
             {
-                _logger.LogWarning("Skipping Quiltt account: {Message}", ex.Message); // never guess USD (#124)
+                LogSkippingAccount(ex.Message); // never guess USD (#124)
             }
         }
 
@@ -192,7 +192,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             }
             else
             {
-                _logger.LogWarning("Quiltt returned {Max} pages inside one day; continuing is not possible, so this pass ends here.", _options.MaxPages);
+                LogPagesInsideOneDay(_options.MaxPages);
             }
         }
 
@@ -205,7 +205,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         var skipped = forAccount.Count - ingestible.Count;
         foreach (var bad in forAccount.Except(ingestible))
         {
-            _logger.LogWarning("Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.", bad.Id);
+            LogSkippingTransactionNoDate(bad.Id);
         }
 
         var mappedItems = new List<ProviderTransaction>();
@@ -218,7 +218,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
             catch (UnknownCurrencyException ex)
             {
                 skipped++;
-                _logger.LogWarning("Skipping Quiltt transaction: {Message}", ex.Message);
+                LogSkippingTransaction(ex.Message);
             }
         }
 
@@ -229,7 +229,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
         if (cutAt is { } cut)
         {
-            _logger.LogInformation("Quiltt read was cut at {Max} pages; continuing from {Date}.", _options.MaxPages, cut);
+            LogReadCut(_options.MaxPages, cut);
             return new TransactionPage(items, new SyncCursor(ContinuationPrefix + cut.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), HasMore: true) { SkippedCount = skipped };
         }
 
@@ -239,7 +239,7 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
         var next = settled != default ? new SyncCursor(settled.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
             : cursor.IsInitial && items.Count > 0 ? new SyncCursor(items.Min(t => t.PostedDate).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
             : cursor;
-        _logger.LogDebug("Quiltt returned {Count} transaction(s) for one account.", items.Count);
+        LogTransactionCount(items.Count);
         return new TransactionPage(items, next, HasMore: false) { SkippedCount = skipped };
     }
 
@@ -342,4 +342,23 @@ public sealed class QuilttFinancialDataProvider : IFinancialDataProvider
 
     private static string? Str(JsonElement? e, string name) =>
         e is { ValueKind: JsonValueKind.Object } o && o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping Quiltt account: {Message}")]
+    private partial void LogSkippingAccount(string message);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message =
+        "Quiltt returned {Max} pages inside one day; continuing is not possible, so this pass ends here.")]
+    private partial void LogPagesInsideOneDay(int max);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping Quiltt transaction {ProviderTransactionId}: projected or no usable date.")]
+    private partial void LogSkippingTransactionNoDate(string? providerTransactionId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping Quiltt transaction: {Message}")]
+    private partial void LogSkippingTransaction(string message);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Quiltt read was cut at {Max} pages; continuing from {Date}.")]
+    private partial void LogReadCut(int max, DateOnly date);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Quiltt returned {Count} transaction(s) for one account.")]
+    private partial void LogTransactionCount(int count);
 }

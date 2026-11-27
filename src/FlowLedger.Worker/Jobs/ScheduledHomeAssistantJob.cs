@@ -10,7 +10,7 @@ namespace FlowLedger.Worker.Jobs;
 /// Households that have not turned sharing on are a cheap no-op. A failing tenant never blocks the others.
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class ScheduledHomeAssistantJob(IServiceProvider services, ILogger<ScheduledHomeAssistantJob> logger) : IJob
+public sealed partial class ScheduledHomeAssistantJob(IServiceProvider services, ILogger<ScheduledHomeAssistantJob> logger) : IJob
 {
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
@@ -20,9 +20,11 @@ public sealed class ScheduledHomeAssistantJob(IServiceProvider services, ILogger
                 .RunAsync(cancellationToken);
             if (result.Sent > 0 || result.Failed > 0)
             {
-                logger.LogInformation("Home Assistant: tenant {TenantId} sent {Sent}, failed {Failed}, already sent {Already}.",
-                    tenantId, result.Sent, result.Failed, result.AlreadySent);
+                LogRunResult(tenantId, result.Sent, result.Failed, result.AlreadySent);
             }
         }, cancellationToken);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Home Assistant: tenant {TenantId} sent {Sent}, failed {Failed}, already sent {Already}.")]
+    private partial void LogRunResult(Guid tenantId, int sent, int failed, int already);
 }

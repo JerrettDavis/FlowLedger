@@ -15,7 +15,7 @@ namespace FlowLedger.ServiceDefaults;
 /// <c>ForwardedHeaders:Enabled=true</c> plus <c>ForwardedHeaders:KnownProxies</c> (IPs) and/or <c>ForwardedHeaders:KnownNetworks</c>
 /// (CIDRs), as arrays or comma-separated lists. <c>X-Forwarded-Host</c> is honoured only when <c>AllowedHosts</c> is restricted.
 /// </summary>
-public static class ForwardedHeadersSetup
+public static partial class ForwardedHeadersSetup
 {
     public const string Section = "ForwardedHeaders";
 
@@ -146,14 +146,15 @@ public static class ForwardedHeadersSetup
         return true;
     }
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "SECURITY: AllowedHosts is '*' outside Development, so the Host header is not restricted. Set AllowedHosts to your public host name(s) (e.g. AllowedHosts=flowledger.example.com;localhost).")]
+    private static partial void LogAllowedHostsWildcard(ILogger logger);
+
     /// <summary>Adds the middleware when enabled, and warns outside Development when the Host header is not restricted.</summary>
     public static void UseFlowLedgerForwardedHeaders(this WebApplication app, bool enabled)
     {
         if (!app.Environment.IsDevelopment() && AllowsAnyHost(app.Configuration))
         {
-            app.Logger.LogWarning(
-                "SECURITY: AllowedHosts is '*' outside Development, so the Host header is not restricted. " +
-                "Set AllowedHosts to your public host name(s) (e.g. AllowedHosts=flowledger.example.com;localhost).");
+            LogAllowedHostsWildcard(app.Logger);
         }
 
         app.UseFlowLedgerPeerCapture();

@@ -135,7 +135,7 @@ public sealed class SimulatedDeterminismTests
     }
 
     private static async Task<List<ProviderTransaction>> DrainAllTransactionsAsync(
-        IFinancialDataProvider provider,
+        SimulatedFinancialDataProvider provider,
         string accountId)
     {
         var all = new List<ProviderTransaction>();

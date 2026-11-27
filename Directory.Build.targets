@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    Microsoft.Extensions.Telemetry.Abstractions (pulled in transitively by ServiceDefaults) ships a second
+    [LoggerMessage] generator, Microsoft.Gen.Logging. Running both emits duplicate partial-method bodies
+    (CS0757). Keep the in-box Microsoft.Extensions.Logging.Generators one only.
+  -->
+  <Target Name="RemoveDuplicateLoggingGenerator" DependsOnTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <_InBoxLoggingGenerator Include="@(Analyzer)" Condition="'%(Filename)' == 'Microsoft.Extensions.Logging.Generators'" />
+    </ItemGroup>
+    <ItemGroup Condition="'@(_InBoxLoggingGenerator)' != ''">
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'Microsoft.Gen.Logging' Or '%(Filename)' == 'Microsoft.Gen.Logging.Parsing'" />
+    </ItemGroup>
+  </Target>
+</Project>

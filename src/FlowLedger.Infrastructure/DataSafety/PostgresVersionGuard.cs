@@ -47,7 +47,7 @@ internal static class PostgresVersionGuard
 }
 
 /// <summary>Runs <see cref="PostgresVersionGuard"/> at host start, before the migration service.</summary>
-internal sealed class PostgresVersionGuardService(IServiceProvider sp, ILogger<PostgresVersionGuardService> logger) : IHostedService
+internal sealed partial class PostgresVersionGuardService(IServiceProvider sp, ILogger<PostgresVersionGuardService> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -59,11 +59,14 @@ internal sealed class PostgresVersionGuardService(IServiceProvider sp, ILogger<P
         var warning = PostgresVersionGuard.Evaluate(versionNum);
         if (warning is not null)
         {
-            logger.LogWarning("{Warning}", warning);
+            LogEvent(logger, warning);
         }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Warning}")]
+    private static partial void LogEvent(ILogger logger, string? warning);
 }
 
 public static class PostgresVersionGuardExtensions

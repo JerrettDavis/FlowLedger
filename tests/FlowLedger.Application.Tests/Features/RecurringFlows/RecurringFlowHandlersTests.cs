@@ -9,7 +9,7 @@ public sealed class RecurringFlowHandlersTests
     private readonly FakeRecurringFlowRepository _repo = new();
     private readonly FakeTenantContext _tenant = new();
 
-    private CreateRecurringFlowRequest MonthlyRentRequest(Guid? accountId = null) => new(
+    private static CreateRecurringFlowRequest MonthlyRentRequest(Guid? accountId = null) => new(
         accountId ?? Guid.NewGuid(),
         "Rent",
         1500m,

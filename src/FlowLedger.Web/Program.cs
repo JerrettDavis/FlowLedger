@@ -94,7 +94,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 if (!oidc.Enabled)
 {
-    app.Logger.LogWarning("Auth:Oidc is not configured: running in single-household mode WITHOUT sign-in. Configure Auth:Oidc before exposing this app.");
+    StartupLog.OidcNotConfigured(app.Logger);
 }
 else
 {

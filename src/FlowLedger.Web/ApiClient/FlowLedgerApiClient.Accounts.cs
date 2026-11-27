@@ -37,7 +37,7 @@ public sealed partial class FlowLedgerApiClient
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} updating settings of account {Id}", (int)response.StatusCode, id);
+                LogNonSuccessUpdatingAccountSettings((int)response.StatusCode, id);
                 throw new ApiClientException(
                     $"Couldn't update account settings (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
@@ -76,7 +76,7 @@ public sealed partial class FlowLedgerApiClient
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} updating account {Id}", (int)response.StatusCode, id);
+                LogNonSuccessUpdatingAccount((int)response.StatusCode, id);
                 throw new ApiClientException(
                     $"Couldn't update account (server returned {(int)response.StatusCode}).",
                     response.StatusCode);
@@ -101,7 +101,7 @@ public sealed partial class FlowLedgerApiClient
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} changing type of account {Id}", (int)response.StatusCode, id);
+                LogNonSuccessChangingAccountType((int)response.StatusCode, id);
                 var detail = response.StatusCode == HttpStatusCode.BadRequest
                     ? await ReadProblemDetailAsync(response, ct)
                     : null;

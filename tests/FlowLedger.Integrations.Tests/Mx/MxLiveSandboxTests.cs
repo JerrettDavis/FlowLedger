@@ -23,7 +23,7 @@ namespace FlowLedger.Integrations.Tests.Mx;
 [Trait("Category", "LiveMx")]
 public sealed class MxLiveSandboxTests
 {
-    private static IServiceProvider BuildProviderFromEnvironment()
+    private static ServiceProvider BuildProviderFromEnvironment()
     {
         var config = new ConfigurationBuilder()
             .AddEnvironmentVariables()
@@ -39,7 +39,7 @@ public sealed class MxLiveSandboxTests
     [LiveFact("Mx__ApiKey")]
     public async Task Live_round_trip_connect_accounts_transactions()
     {
-        using var sp = (ServiceProvider)BuildProviderFromEnvironment();
+        using var sp = BuildProviderFromEnvironment();
         using var scope = sp.CreateScope();
         var provider = scope.ServiceProvider.GetRequiredService<IFinancialDataProvider>();
 

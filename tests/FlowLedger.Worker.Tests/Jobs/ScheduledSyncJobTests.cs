@@ -37,7 +37,7 @@ public sealed class ScheduledSyncJobTests
             options);
     }
 
-    private static IJobExecutionContext FakeContext() =>
+    private static FakeJobExecutionContext FakeContext() =>
         new FakeJobExecutionContext();
 
     // ── Tests ─────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ public sealed class ScheduledSyncJobTests
         public string FireInstanceId => "test-fire";
         public object? Result { get; set; }
         public TimeSpan JobRunTime => TimeSpan.Zero;
-        public void Put(object key, object? objectValue) { }
-        public object? Get(object key) => null;
+        public static void Put(object key, object? objectValue) { }
+        public static object? Get(object key) => null;
     }
 }

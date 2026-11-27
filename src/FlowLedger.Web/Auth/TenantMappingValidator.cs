@@ -14,7 +14,7 @@ namespace FlowLedger.Web.Auth;
 /// on a definite mismatch. API outages never sign users out: the check is simply retried on the next request.
 /// This runs on HTTP requests (page loads, circuit start); an already-open Blazor circuit is covered by <see cref="TenantRevalidatingAuthenticationStateProvider"/> (#159).
 /// </summary>
-public static class TenantMappingValidator
+public static partial class TenantMappingValidator
 {
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
 
@@ -81,8 +81,11 @@ public static class TenantMappingValidator
                 ctx.ShouldRenew = true;
                 break;
             case Outcome.Reject:
-                services.GetService<ILoggerFactory>()?.CreateLogger(typeof(TenantMappingValidator))
-                    .LogInformation("Signing out a session whose login no longer maps to its tenant.");
+                if (services.GetService<ILoggerFactory>()?.CreateLogger(typeof(TenantMappingValidator)) is { } logger)
+                {
+                    LogSigningOut(logger);
+                }
+
                 ctx.RejectPrincipal();
                 await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 break;
@@ -108,8 +111,11 @@ public static class TenantMappingValidator
         {
             if (resp.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
-                services.GetService<ILoggerFactory>()?.CreateLogger(typeof(TenantMappingValidator))
-                    .LogError("The API rejected the session re-validation call ({Status}); check Api:Key and Api:TenantSigningKey match on API and Web. Sessions are NOT being re-validated.", (int)resp.StatusCode);
+                if (services.GetService<ILoggerFactory>()?.CreateLogger(typeof(TenantMappingValidator)) is { } logger)
+                {
+                    LogRevalidationRejected(logger, (int)resp.StatusCode);
+                }
+
             }
 
             return null; // 401/5xx etc: not a definite answer about the mapping
@@ -118,4 +124,11 @@ public static class TenantMappingValidator
         var rows = await resp.Content.ReadFromJsonAsync<List<IdentityRow>>(cancellationToken: ct);
         return rows?.Select(r => r.UserId).ToHashSet();
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Signing out a session whose login no longer maps to its tenant.")]
+    private static partial void LogSigningOut(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message =
+        "The API rejected the session re-validation call ({Status}); check Api:Key and Api:TenantSigningKey match on API and Web. Sessions are NOT being re-validated.")]
+    private static partial void LogRevalidationRejected(ILogger logger, int status);
 }
