@@ -108,11 +108,11 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task SaveGoalAsync(Guid? id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, uint? expectedVersion = null, CancellationToken ct = default)
+    public async Task SaveGoalAsync(Guid? id, string name, decimal targetAmount, decimal savedAmount, DateOnly? targetDate, uint? expectedVersion = null, Guid? linkedAccountId = null, CancellationToken ct = default)
     {
         await ExecuteAsync("save goal", async () =>
         {
-            var response = await SendVersionedAsync(HttpMethod.Put, "/api/goals", new { id, name, targetAmount, savedAmount, targetDate }, expectedVersion, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, "/api/goals", new { id, name, targetAmount, savedAmount, targetDate, linkedAccountId }, expectedVersion, ct);
             ThrowIfChangedElsewhere(response, "goal");
             await ThrowIfFailedAsync(response, "save goal", ct);
 

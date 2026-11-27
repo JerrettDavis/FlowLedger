@@ -127,6 +127,106 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
                 && a.GetProperty("severity").GetString() == "warning");
     }
 
+    // ── Account-tied goals (#70) ──────────────────────────────────────────────
+
+    private async Task<Guid> CreateAccountAsync(string name, decimal startingBalance)
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/accounts", FlowLedger.TestSupport.Builders.CreateAccountRequestBuilder.A().Named(name).OfType("Savings").StartingAt(startingBalance).Build());
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    }
+
+    private async Task<decimal> BalanceOfAsync(Guid accountId)
+    {
+        using var accounts = JsonDocument.Parse(await _client.GetStringAsync("/api/accounts"));
+        return accounts.RootElement.EnumerateArray().Single(a => a.GetProperty("id").GetGuid() == accountId).GetProperty("balanceAmount").GetDecimal();
+    }
+
+    [Fact]
+    public async Task A_goal_linked_to_an_account_is_measured_on_that_accounts_balance()
+    {
+        var account = await CreateAccountAsync("Rainy Day", 250m);
+        (await _client.PutAsJsonAsync("/api/goals", new { name = "Fund", targetAmount = 1000m, savedAmount = 10m, linkedAccountId = account })).EnsureSuccessStatusCode();
+        (await _client.PutAsJsonAsync("/api/goals", new { name = "Manual", targetAmount = 1000m, savedAmount = 100m })).EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/goals"));
+        var goals = doc.RootElement.EnumerateArray().ToList();
+        var linked = goals.Single(g => g.GetProperty("name").GetString() == "Fund");
+        var balance = await BalanceOfAsync(account);
+        linked.GetProperty("linkedAccountId").GetGuid().Should().Be(account);
+        linked.GetProperty("linkedAccountName").GetString().Should().Be("Rainy Day");
+        linked.GetProperty("currentAmount").GetDecimal().Should().Be(balance);
+        linked.GetProperty("savedAmount").GetDecimal().Should().Be(10m, "the hand-entered amount is kept, but progress follows the account");
+        linked.GetProperty("remaining").GetDecimal().Should().Be(1000m - balance);
+        linked.GetProperty("percentComplete").GetDouble().Should().BeApproximately((double)(balance / 10m), 0.01);
+
+        var manual = goals.Single(g => g.GetProperty("name").GetString() == "Manual");
+        manual.GetProperty("currentAmount").GetDecimal().Should().Be(100m);
+        manual.GetProperty("linkedAccountId").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task A_goal_cannot_be_linked_to_an_account_that_does_not_exist()
+    {
+        var response = await _client.PutAsJsonAsync("/api/goals",
+            new { name = "Ghost", targetAmount = 1000m, savedAmount = 0m, linkedAccountId = Guid.NewGuid() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        doc.RootElement.GetProperty("errors").GetProperty("linkedAccountId")[0].GetString().Should().Contain("linked account was not found");
+    }
+
+    [Fact]
+    public async Task A_goal_can_be_unlinked_again_and_goes_back_to_its_saved_amount()
+    {
+        var account = await CreateAccountAsync("Temp Link", 400m);
+        var saved = await _client.PutAsJsonAsync("/api/goals", new { name = "Flip", targetAmount = 1000m, savedAmount = 50m, linkedAccountId = account });
+        var id = (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        (await _client.PutAsJsonAsync("/api/goals", new { id, name = "Flip", targetAmount = 1000m, savedAmount = 50m })).EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/goals"));
+        var goal = doc.RootElement.EnumerateArray().Single(g => g.GetProperty("name").GetString() == "Flip");
+        goal.GetProperty("linkedAccountId").ValueKind.Should().Be(JsonValueKind.Null);
+        goal.GetProperty("currentAmount").GetDecimal().Should().Be(50m);
+    }
+
+    [Fact]
+    public async Task Alerts_expose_goal_slipping_for_a_linked_account_trend_and_a_low_balance_naming_the_goal()
+    {
+        var account = await CreateAccountAsync("Goal Savings", 0m);
+
+        async Task AddCreditAsync(decimal amount, int daysAgo)
+        {
+            var date = factory.ServerToday.AddDays(-daysAgo);
+            (await _client.PostAsJsonAsync("/api/transactions",
+                new FlowLedger.Contracts.CreateTransactionRequest(account, amount, "USD", "Credit", "Deposit " + daysAgo, date, null, null, null, null))).EnsureSuccessStatusCode();
+        }
+
+        // 90 days of history: the account gained a little each month, so its own trend is small and far from the goal.
+        await AddCreditAsync(20m, 85);
+        await AddCreditAsync(20m, 55);
+        await AddCreditAsync(20m, 25);
+        (await _client.PutAsJsonAsync("/api/goals", new
+        {
+            name = "Boat Fund",
+            targetAmount = 50_000m,
+            savedAmount = 0m,
+            targetDate = factory.ServerToday.AddMonths(6).ToString("yyyy-MM-dd"),
+            linkedAccountId = account,
+        })).EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await _client.GetStringAsync("/api/alerts"));
+        var alerts = doc.RootElement.EnumerateArray().ToList();
+
+        var slip = alerts.Single(a => a.TryGetProperty("kind", out var k) && k.GetString() == "goal_slipping");
+        slip.GetProperty("title").GetString().Should().Be("Goal behind schedule");
+        slip.GetProperty("detail").GetString().Should().Contain("Boat Fund").And.Contain("Goal Savings's 90-day trend");
+        var low = alerts.Single(a => a.TryGetProperty("kind", out var k) && k.GetString() == "low_balance");
+        low.GetProperty("detail").GetString().Should().Contain("Goal Savings").And.Contain("goal \"Boat Fund\"");
+    }
+
     // ── Optimistic concurrency (#157) ─────────────────────────────────────────
 
     private Task<HttpResponseMessage> Send(HttpMethod method, string url, object? body, string? ifMatch)

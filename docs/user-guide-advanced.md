@@ -252,11 +252,36 @@ month.
 2. With a target date, the goal shows **monthly needed** to reach the target by then.
 3. Update progress by clicking the pencil icon, changing **Saved so far** and saving.
 4. Remove with the bin icon.
+5. Optionally pick **Track with account**. The goal then follows that account's balance (see
+   below) instead of the amount you type.
+
+**Account-tied goals**
+
+A goal can be tied to one account (for example the savings account that holds the emergency
+fund). Then:
+
+- **Progress** is that account's balance, not the typed "Saved so far" (which is greyed out
+  while an account is picked and kept if you untie the goal later).
+- **Pace** is that account's own 90-day balance trend: how much its balance changed over the
+  last 90 days, per month. It is rebuilt from the account's own transactions (transfers
+  included), so it needs about two months of history; a newly added account has no trend yet.
+- A "Goal behind schedule" [alert](#alerts) fires when the balance, growing at that trend, would
+  not reach the target by the target date (a flat or falling account never does).
+- If the account falls under $100 a "Low balance" alert names the goals that depend on it, even
+  when it is not a checking, savings or cash account.
+
+**Goals with no account** keep the older model: goals are tracked by hand, so there is no
+saving history per goal. The pace is the household's **monthly surplus** (money in minus money
+out over the last 3 months, transfers excluded) shared equally by every unfinished goal that
+does not have an account trend. A linked goal whose account has too little history falls back
+to this model, but still measures progress on the account's balance. With under about two
+months of transactions in the household no pace is claimed and no slip alert is raised.
 
 **Gotchas**
 
-- The saved amount is something you type. Goals are **not** linked to an account, so they do
-  not update from synced balances. Keep it current by hand.
+- Without an account the saved amount is something you type, and it does not update from synced
+  balances.
+- If a linked account is deactivated the goal quietly goes back to its typed amount.
 - A goal past its target date and not yet complete raises a warning [alert](#alerts).
 - A goal needs a target above zero to save.
 
@@ -272,6 +297,8 @@ so there is nothing to dismiss; they disappear when the condition clears.
 | "<Category> is over budget" | Error (red) | Spent this month exceeds the limit |
 | "<Category> budget is N% used" | Warning | 80% or more of the limit is used |
 | "Goal <name> is past its target date" | Warning | Target date passed and goal not complete |
+| "Goal behind schedule" | Warning | The goal's projected finish (see [Goals](#goals)) is after its target date |
+| "Low balance" | Warning | A checking, savings or cash account, or the account behind an unfinished goal, is under $100 |
 
 Errors are listed first. The header also shows a red backup warning chip (linking to Data &
 Backups) in production when the last backup is stale or no off-site copy is configured.
