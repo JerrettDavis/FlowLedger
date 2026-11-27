@@ -14,6 +14,9 @@ public static class Format
     public static string Money(decimal v) =>
         v.ToString("C", CultureInfo.CurrentCulture);
 
+    /// <summary>Numeric input format with the current culture's currency decimals, so a stored 1240.3000 reads 1240.30.</summary>
+    public static string MoneyInputFormat => "F" + CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalDigits.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>
     /// The display currency's symbol (the current culture follows the display settings), for the start adornment of a money input so
     /// the field says which currency it takes.
