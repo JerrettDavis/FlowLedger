@@ -40,6 +40,9 @@ public sealed class TenantErasureRefusedException(string message) : InvalidOpera
 /// </summary>
 public interface ITenantErasure
 {
+    /// <summary>Why this tenant may not be erased (empty id, the household tenant), or null when <see cref="EraseAsync"/> would proceed. Lets callers refuse before any side effect.</summary>
+    string? RefusalFor(Guid tenantId);
+
     Task<TenantErasureResult> EraseAsync(Guid tenantId, CancellationToken ct = default);
 }
 

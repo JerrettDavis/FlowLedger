@@ -29,6 +29,19 @@ public sealed partial class FlowLedgerApiClient
         await ExecuteAsync("unlink login", async () =>
             (await _http.DeleteAsync($"/api/users/identities/{userId}", ct)).IsSuccessStatusCode);
 
+    public sealed record DeleteMyDataResult(int TotalRows, int FilesDeleted);
+
+    /// <summary>
+    /// Owner self-service erasure (#189): permanently deletes the signed-in tenant's data. <paramref name="confirmation"/> must be the typed
+    /// phrase "DELETE MY DATA". Returns null when the server refused (wrong phrase, or the household tenant).
+    /// </summary>
+    public async Task<DeleteMyDataResult?> DeleteMyDataAsync(string confirmation, CancellationToken ct = default) =>
+        await ExecuteAsync("delete my data", async () =>
+        {
+            var response = await _http.PostAsJsonAsync("/api/account/delete-my-data", new { confirmation }, JsonOptions, ct);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<DeleteMyDataResult>(JsonOptions, ct) : null;
+        });
+
     public async Task<TransactionDto?> CreateTransactionAsync(CreateTransactionRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync("create transaction", async () =>

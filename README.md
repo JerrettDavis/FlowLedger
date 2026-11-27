@@ -182,7 +182,7 @@ Full step-by-step walkthrough: [docs/architecture/mx-integration.md — Swapping
 
 - [Threat model](docs/security/threat-model.md) and [SECURITY.md](./SECURITY.md)
 - [Data inventory, retention and subprocessors](docs/privacy/data-inventory-and-retention.md)
-- Runbooks: [incident response](docs/runbooks/incident-response.md), [key rotation](docs/runbooks/key-rotation.md), [restore](docs/runbooks/restore.md), [provider outage](docs/runbooks/provider-outage.md)
+- Runbooks: [incident response](docs/runbooks/incident-response.md), [key rotation](docs/runbooks/key-rotation.md), [restore](docs/runbooks/restore.md), [tenant deletion](docs/runbooks/tenant-deletion.md), [provider outage](docs/runbooks/provider-outage.md)
 - [Changelog](CHANGELOG.md)
 
 ## Contributing

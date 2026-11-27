@@ -173,6 +173,8 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         "POST /api/users/link",
         "POST /api/users/link-code",
         "DELETE /api/users/identities/{userId:guid}",
+        // Erases the caller's own tenant, so it cannot share the fixed tenants B/A: see SelfServiceErasureTests.
+        "POST /api/account/delete-my-data",
         // Need an enabled connector, a stubbed Quiltt API and a fake model: see TenantIsolationConnectorProbeTests (own host).
         "GET /api/integrations/connectors/{connectorId}/available-accounts",
         "POST /api/integrations/quiltt/session",

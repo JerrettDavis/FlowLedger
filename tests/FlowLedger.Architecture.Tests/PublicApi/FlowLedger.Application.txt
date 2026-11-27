@@ -16,6 +16,7 @@ enum FlowLedger.Application.Features.Strategies.PickSource
 enum FlowLedger.Application.Features.Strategies.SuggestionKind
 enum FlowLedger.Application.Features.Strategies.SuggestionSeverity
 enum FlowLedger.Application.Features.Users.LinkOutcome
+enum FlowLedger.Application.Features.Users.ProviderRevocationStatus
 enum FlowLedger.Application.Features.Users.TenantStatus
 interface FlowLedger.Application.Abstractions.IAccountConnectorLinkStore
 interface FlowLedger.Application.Abstractions.IAccountRepository
@@ -73,6 +74,7 @@ interface FlowLedger.Application.Features.Strategies.IMarketRateProvider
 interface FlowLedger.Application.Features.Transactions.IMerchantAliasStore
 interface FlowLedger.Application.Features.Users.ITenantErasure
 interface FlowLedger.Application.Features.Users.ITenantFileEraser
+interface FlowLedger.Application.Features.Users.ITenantProviderRevocation
 interface FlowLedger.Application.Features.Users.ITenantRegistry
 interface FlowLedger.Application.Features.Users.IUserDirectory
 sealed class FlowLedger.Application.Abstractions.AccountConnectorLink
@@ -320,10 +322,13 @@ sealed class FlowLedger.Application.Features.Transactions.SplitInput
 sealed class FlowLedger.Application.Features.Transactions.TransactionAnnotationService
 sealed class FlowLedger.Application.Features.Transactions.TransactionEnrichmentService
 sealed class FlowLedger.Application.Features.Transactions.TransactionQuotaExceededException
+sealed class FlowLedger.Application.Features.Users.DeleteMyDataHandler
+sealed class FlowLedger.Application.Features.Users.DeleteMyDataOutcome
 sealed class FlowLedger.Application.Features.Users.ExternalIdentity
 sealed class FlowLedger.Application.Features.Users.LegacyTenantClaim
 sealed class FlowLedger.Application.Features.Users.LinkCode
 sealed class FlowLedger.Application.Features.Users.LinkedIdentity
+sealed class FlowLedger.Application.Features.Users.ProviderRevocationResult
 sealed class FlowLedger.Application.Features.Users.ResolvedUser
 sealed class FlowLedger.Application.Features.Users.SignUpClosedException
 sealed class FlowLedger.Application.Features.Users.TenantErasureRefusedException

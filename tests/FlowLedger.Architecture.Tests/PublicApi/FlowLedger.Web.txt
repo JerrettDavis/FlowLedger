@@ -130,6 +130,7 @@ sealed class FlowLedger.Web.ApiClient.EvalPointDto
 sealed class FlowLedger.Web.ApiClient.EvaluationDto
 sealed class FlowLedger.Web.ApiClient.FireDto
 sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient
+sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient+DeleteMyDataResult
 sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient+LinkCodeDto
 sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient+LinkedLoginDto
 sealed class FlowLedger.Web.ApiClient.ForecastBandPointDto

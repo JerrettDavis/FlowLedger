@@ -16,6 +16,12 @@ internal static partial class ApiLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Tenant {TenantId} offboarding refused")]
     internal static partial void TenantOffboardingRefused(ILogger logger, Guid tenantId);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tenant {TenantId} erased its own data (self-service): {Rows} rows across {Tables} tables, {Files} files erased")]
+    internal static partial void TenantSelfErased(ILogger logger, Guid tenantId, int rows, int tables, int files);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tenant {TenantId} self-service deletion refused")]
+    internal static partial void TenantSelfErasureRefused(ILogger logger, Guid tenantId);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Secrets re-encrypted: {Resealed} resealed, {Current} already current, {Unreadable} unreadable")]
     internal static partial void SecretsReencrypted(ILogger logger, int resealed, int current, int unreadable);
 
