@@ -61,6 +61,37 @@ public sealed class SyncEndpointTests(FlowLedgerApiFactory factory) : IAsyncLife
         accounts.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    // ── Estimate ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Estimate_counts_only_accounts_linked_to_the_active_connector_and_skips_manual_ones()
+    {
+        await _client.PostAsync("/api/connect", null);
+        await _client.PostAsync("/api/sync", null);
+
+        var before = await GetEstimateAsync();
+        before.ActiveAccounts.Should().BeGreaterThan(1);
+        before.EstimatedProviderCalls.Should().Be(1 + before.ActiveAccounts);
+
+        using var links = System.Text.Json.JsonDocument.Parse(await _client.GetStringAsync("/api/accounts/connectors"));
+        var target = links.RootElement.EnumerateArray().First().GetProperty("accountId").GetGuid();
+        (await _client.PutAsJsonAsync($"/api/accounts/{target}/connector", new { connectorId = "manual" })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var after = await GetEstimateAsync();
+        after.ActiveAccounts.Should().Be(before.ActiveAccounts - 1, "a manual account is never fetched");
+        after.EstimatedProviderCalls.Should().Be(1 + after.ActiveAccounts);
+    }
+
+    [Fact]
+    public async Task Estimate_is_zero_accounts_for_a_tenant_with_no_links()
+    {
+        var other = factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var estimate = await other.GetFromJsonAsync<EstimateDto>("/api/sync/estimate");
+        estimate!.ActiveAccounts.Should().Be(0);
+    }
+
+    private async Task<EstimateDto> GetEstimateAsync() => (await _client.GetFromJsonAsync<EstimateDto>("/api/sync/estimate"))!;
+
     // ── Unauthenticated ───────────────────────────────────────────────────────
 
     [Fact]
@@ -73,6 +104,8 @@ public sealed class SyncEndpointTests(FlowLedgerApiFactory factory) : IAsyncLife
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
+
+    private sealed record EstimateDto(int ActiveAccounts, int EstimatedProviderCalls);
 
     private sealed record ConnectResult(string MemberId, string Provider);
 

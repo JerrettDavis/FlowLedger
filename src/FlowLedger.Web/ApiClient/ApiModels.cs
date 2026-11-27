@@ -98,7 +98,14 @@ public sealed record ConnectResult(string MemberId, string Provider);
 /// </summary>
 public sealed record BackupRunDto(
     bool Ok, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, string? SnapshotDir, long Rows,
-    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error);
+    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error, RestoreDrillDto? Drill = null);
+
+/// <summary>One table in a restore drill: rows in the backup, rows after restoring it, and rows in the live database at drill time.</summary>
+public sealed record DrillTableDto(string Table, long ExpectedRows, long RestoredRows, long? LiveRows, bool Ok);
+
+/// <summary>What the last restore drill found (kept with the backup run).</summary>
+public sealed record RestoreDrillDto(
+    List<DrillTableDto> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, List<string> Problems);
 
 public sealed record BackupStatusDto(
     bool Healthy, bool Stale, bool OffsiteConfigured, DateTimeOffset? LastSuccessUtc,
@@ -116,7 +123,16 @@ public sealed record AskQueryAnswer(string Question, string? Query, string? Erro
 
 public sealed record CategorizationResultDto(int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
 
-public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0);
+public sealed record SubscriptionDto(
+    string Name, string Cadence, string Status, decimal Amount, decimal MonthlyCost, DateOnly FirstCharged, DateOnly LastCharged,
+    DateOnly NextExpected, int Charges, string? PriceChange, decimal? PreviousAmount, DateOnly? PriceChangedOn);
+
+public sealed record SubscriptionOverviewDto(List<SubscriptionDto> Subscriptions, decimal MonthlyTotal, decimal YearlyTotal);
+
+/// <summary>One row's category before a change, as the server reports it so an Undo can put it back.</summary>
+public sealed record CategoryRestoreDto(Guid TransactionId, Guid? CategoryId, bool Manual, double? Confidence);
+
+public sealed record BudgetStatusDto(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0, bool Rollover = false, decimal Carried = 0m);
 
 public sealed record BudgetsDto(string Month, List<BudgetStatusDto> Budgets, Dictionary<string, decimal> SpendByCategory);
 

@@ -183,6 +183,7 @@ public sealed class SimpleFinProviderTests
         h.LastUri!.Query.Should().Contain("start-date=").And.Contain("pending=1");
         page.Items.Should().HaveCount(2);
         page.Items[0].Amount.Amount.Should().Be(-45.10m);
+        page.Items.Should().OnlyContain(t => t.ProviderCategory == null, "SimpleFIN sends no category, so the categorizer gets no provider hint");
         page.HasMore.Should().BeFalse();
         page.NextCursor.IsInitial.Should().BeFalse();
     }

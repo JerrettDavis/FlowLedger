@@ -107,6 +107,7 @@ public sealed class QuilttProviderTests
         page.Items[0].Amount.Amount.Should().Be(-4.5m);
         page.Items[0].RawDescription.Should().Be("COFFEE");
         page.Items[1].IsPending.Should().BeTrue();
+        page.Items.Should().OnlyContain(t => t.ProviderCategory == null, "Quiltt sends no category, so the categorizer gets no provider hint");
         page.NextCursor.Value.Should().Be("2026-11-01");
 
         // The second account reuses the same read: one auth + one accounts + one transactions request in total.

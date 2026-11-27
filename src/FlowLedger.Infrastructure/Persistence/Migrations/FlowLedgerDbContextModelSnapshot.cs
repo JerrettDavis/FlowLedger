@@ -707,6 +707,10 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("DrillDetail")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("drill_detail");
+
                     b.Property<bool?>("DrillOk")
                         .HasColumnType("boolean")
                         .HasColumnName("drill_ok");
@@ -758,10 +762,28 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("category");
 
+                    b.Property<decimal>("CarriedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("carried_amount");
+
+                    b.Property<string>("CarriedForMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("carried_for_month");
+
                     b.Property<decimal>("MonthlyLimit")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("monthly_limit");
+
+                    b.Property<bool>("Rollover")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("rollover");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

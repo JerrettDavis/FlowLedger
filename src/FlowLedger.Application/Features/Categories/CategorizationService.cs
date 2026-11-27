@@ -413,6 +413,13 @@ public sealed partial class CategorizationService(
     /// (they become Auto, so a later correction can still replace them); categories the user chose by hand are left alone.
     /// </summary>
     public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
+        => (await SetCategoryWithUndoAsync(transactionId, categoryId, applyToMerchant, ct, expectedVersion)).Changed;
+
+    /// <summary>
+    /// <see cref="SetCategoryAsync"/> that also reports each changed row's previous category, so the caller can offer Undo
+    /// (<see cref="RestoreCategoriesAsync"/>).
+    /// </summary>
+    public async Task<CategoryChangeResult> SetCategoryWithUndoAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var target = await store.FindTrackedAsync(transactionId, ct)
             ?? throw new NotFoundException("Transaction not found.");
@@ -421,25 +428,20 @@ public sealed partial class CategorizationService(
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
             ?? throw new NotFoundException("Category not found.");
         var id = category.CategoryId;
+        var restore = new List<CategoryRestore> { Snapshot(target) };
         target.Categorize(id);
-        var changed = 1;
 
         if (applyToMerchant)
         {
-            var key = AutoCategorizer.MerchantKey(target.MerchantName, target.Description);
-            var candidates = await store.LoadTrackedUncategorizedOrAutoAsync(Max, ct);
-            foreach (var t in candidates.Where(t => t.Id != target.Id
-                         && (t.CategoryId is null || t.CategorySource == CategorySource.Auto)
-                         && t.Status.IsReal()
-                         && AutoCategorizer.MerchantKey(t.MerchantName, t.Description) == key))
+            foreach (var t in await MerchantCandidatesAsync(target, ct))
             {
+                restore.Add(Snapshot(t));
                 t.Categorize(id, null, CategorySource.Auto);
-                changed++;
             }
         }
 
         await store.SaveAsync(ct);
-        return changed;
+        return new CategoryChangeResult(restore.Count, restore);
     }
 
     /// <summary>

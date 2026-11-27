@@ -56,6 +56,7 @@ interface FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore
 interface FlowLedger.Application.Features.Duplicates.IDuplicateStore
 interface FlowLedger.Application.Features.Forecasting.IForecastEngine
 interface FlowLedger.Application.Features.Goals.IGoalStore
+interface FlowLedger.Application.Features.HomeAssistant.IAlertEventSource
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantNetworkPolicy
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantSender
 interface FlowLedger.Application.Features.HomeAssistant.IHomeAssistantStore
@@ -105,6 +106,8 @@ sealed class FlowLedger.Application.Features.Accounts.UpdateAccountRequestValida
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountSettingsHandler
 sealed class FlowLedger.Application.Features.Alerts.ActivityAlert
 sealed class FlowLedger.Application.Features.Alerts.Alert
+sealed class FlowLedger.Application.Features.Alerts.AlertDeliveryResult
+sealed class FlowLedger.Application.Features.Alerts.AlertDeliveryService
 sealed class FlowLedger.Application.Features.Alerts.GetAlertsHandler
 sealed class FlowLedger.Application.Features.Assets.AssetOperationException
 sealed class FlowLedger.Application.Features.Assets.AssetValuationSettings
@@ -126,6 +129,8 @@ sealed class FlowLedger.Application.Features.BillSheet.SheetPaymentData
 sealed class FlowLedger.Application.Features.Budgets.BudgetOverview
 sealed class FlowLedger.Application.Features.Budgets.BudgetRow
 sealed class FlowLedger.Application.Features.Budgets.BudgetStatus
+sealed class FlowLedger.Application.Features.Budgets.EffectiveBudget
+sealed class FlowLedger.Application.Features.Budgets.EffectiveBudgetService
 sealed class FlowLedger.Application.Features.Budgets.GetMonthlySpendByCategoryHandler
 sealed class FlowLedger.Application.Features.Budgets.ListBudgetsHandler
 sealed class FlowLedger.Application.Features.Budgets.SetBudgetHandler
@@ -134,8 +139,10 @@ sealed class FlowLedger.Application.Features.Budgets.SetBudgetRequestValidator
 sealed class FlowLedger.Application.Features.Categories.CategorizationOptions
 sealed class FlowLedger.Application.Features.Categories.CategorizationResult
 sealed class FlowLedger.Application.Features.Categories.CategorizationService
+sealed class FlowLedger.Application.Features.Categories.CategoryChangeResult
 sealed class FlowLedger.Application.Features.Categories.CategoryMerge
 sealed class FlowLedger.Application.Features.Categories.CategoryMove
+sealed class FlowLedger.Application.Features.Categories.CategoryRestore
 sealed class FlowLedger.Application.Features.Categories.CategoryRestructurePlan
 sealed class FlowLedger.Application.Features.Categories.CategoryRestructureResult
 sealed class FlowLedger.Application.Features.Categories.CategoryRestructureService
@@ -296,6 +303,9 @@ sealed class FlowLedger.Application.Features.Strategies.StrategyReport
 sealed class FlowLedger.Application.Features.Strategies.StrategyService
 sealed class FlowLedger.Application.Features.Strategies.Suggestion
 sealed class FlowLedger.Application.Features.Strategies.TrajectoryPoint
+sealed class FlowLedger.Application.Features.Subscriptions.DetectedSubscription
+sealed class FlowLedger.Application.Features.Subscriptions.ListSubscriptionsHandler
+sealed class FlowLedger.Application.Features.Subscriptions.SubscriptionOverview
 sealed class FlowLedger.Application.Features.Transactions.CreateTransactionHandler
 sealed class FlowLedger.Application.Features.Transactions.CreateTransactionRequestValidator
 sealed class FlowLedger.Application.Features.Transactions.EnrichmentResult

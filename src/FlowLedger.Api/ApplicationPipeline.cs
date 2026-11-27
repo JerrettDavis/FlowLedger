@@ -90,6 +90,7 @@ internal static class ApplicationPipeline
         app.MapGoalEndpoints();
         app.MapDebtEndpoints();
         app.MapAlertEndpoints();
+        app.MapSubscriptionEndpoints();
         app.MapHomeAssistantEndpoints();
         app.MapIntegrationEndpoints();
         app.MapCategoryRuleEndpoints();

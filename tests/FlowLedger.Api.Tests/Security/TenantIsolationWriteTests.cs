@@ -120,6 +120,14 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
             return await Json(c.B, HttpMethod.Post, "/api/transactions/bulk-category",
                 new { transactionIds = new[] { c.Seed.Transaction, c.Seed.Transaction2 }, categoryId });
         }, "\"changed\":0", HttpStatusCode.OK),
+        ["POST /api/transactions/restore-categories"] = CaseWithBody(async c =>
+        {
+            using var category = await c.B.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath("b-restore").Named("B Restore").Build());
+            category.EnsureSuccessStatusCode();
+            var categoryId = (await category.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            return await Json(c.B, HttpMethod.Post, "/api/transactions/restore-categories",
+                new { appliedCategoryId = categoryId, items = new[] { new { transactionId = c.Seed.Transaction, categoryId = (Guid?)null, manual = true, confidence = (double?)null } } });
+        }, "\"restored\":0", HttpStatusCode.OK),
         ["POST /api/recurring-flows"] = Case(c => Json(c.B, HttpMethod.Post, "/api/recurring-flows",
             new CreateRecurringFlowRequest(c.Seed.Account, "B INTRUDER", 1m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null, new DateOnly(2026, 1, 1), null, null, "B")), HttpStatusCode.NotFound),
         ["POST /api/imports"] = Case(c => Json(c.B, HttpMethod.Post, "/api/imports",

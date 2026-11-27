@@ -58,6 +58,43 @@ public sealed class BackupRunnerTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task The_drill_result_is_stored_with_the_run_including_live_counts_and_the_raw_archive_check()
+    {
+        var objects = Path.Combine(_root, "objects");
+        var raw = Path.Combine(objects, "raw", "2026", "11");
+        Directory.CreateDirectory(raw);
+        var body = "{\"hello\":\"world\"}";
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(body)))[..16];
+        await File.WriteAllTextAsync(Path.Combine(raw, $"mx-accounts-{hash}.json"), body);
+        var settings = new BackupSettings(_root, objects, null, null, "restic", 30, true);
+
+        var result = await new BackupRunner(_fixture.ConnectionString, settings, new BackupRunStore(_fixture.ConnectionString), NullLogger.Instance).RunAsync();
+
+        result.Ok.Should().BeTrue(result.Error);
+        var stored = (await new BackupRunStore(_fixture.ConnectionString).RecentAsync(1)).Single().Drill;
+        stored.Should().NotBeNull();
+        stored!.RawArchiveChecked.Should().BeTrue();
+        stored.RawObjectsVerified.Should().Be(1);
+        stored.Problems.Should().BeEmpty();
+        var accounts = stored.Tables.Single(t => t.Table == "accounts");
+        accounts.ExpectedRows.Should().Be(2);
+        accounts.RestoredRows.Should().Be(2);
+        accounts.LiveRows.Should().Be(2, "the live database still holds both accounts");
+        accounts.Ok.Should().BeTrue();
+    }
+
+    [DockerFact]
+    public async Task A_run_without_a_raw_archive_records_that_it_was_not_checked()
+    {
+        await Runner().RunAsync();
+
+        var drill = (await new BackupRunStore(_fixture.ConnectionString).RecentAsync(1)).Single().Drill;
+        drill.Should().NotBeNull();
+        drill!.RawArchiveChecked.Should().BeFalse();
+        drill.RawObjectsVerified.Should().Be(0);
+    }
+
+    [DockerFact]
     public async Task Failing_offsite_marks_the_run_failed_and_is_recorded()
     {
         var result = await Runner(resticRepo: "/nonexistent/repo", restic: "definitely-not-restic-xyz").RunAsync();

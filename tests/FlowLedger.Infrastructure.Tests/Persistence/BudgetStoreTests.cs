@@ -88,6 +88,39 @@ public sealed class BudgetStoreTests : IAsyncLifetime
     }
 
     [DockerFact]
+    public async Task Rollover_and_the_carried_amount_are_stored_and_reset_when_the_limit_or_the_flag_changes()
+    {
+        var a = TestTenantContext.New();
+        await using var db = _fixture.CreateProductionStyleContext(a);
+        var store = new EfBudgetStore(db, a);
+
+        await store.SetAsync(a.TenantId, "Food", 100m, rollover: true);
+        var carriedVersion = await store.SetCarriedAsync(a.TenantId, "Food", 60m, "2026-11");
+        var row = (await store.ListAsync(a.TenantId)).Single();
+        row.Rollover.Should().BeTrue();
+        row.CarriedAmount.Should().Be(60m);
+        row.CarriedForMonth.Should().Be("2026-11");
+        row.Version.Should().Be(carriedVersion);
+
+        await store.SetAsync(a.TenantId, "Food", 100m); // same limit, rollover untouched: the carry stays
+        (await store.ListAsync(a.TenantId)).Single().CarriedAmount.Should().Be(60m);
+
+        await store.SetAsync(a.TenantId, "Food", 120m); // the carry was worked out against the old limit
+        row = (await store.ListAsync(a.TenantId)).Single();
+        row.Rollover.Should().BeTrue();
+        row.CarriedForMonth.Should().BeNull();
+        row.CarriedAmount.Should().Be(0m);
+
+        await store.SetCarriedAsync(a.TenantId, "Food", 20m, "2026-11");
+        await store.SetAsync(a.TenantId, "Food", 120m, rollover: false);
+        row = (await store.ListAsync(a.TenantId)).Single();
+        row.Rollover.Should().BeFalse();
+        row.CarriedAmount.Should().Be(0m);
+
+        (await store.SetCarriedAsync(a.TenantId, "Missing", 5m, "2026-11")).Should().Be(0u);
+    }
+
+    [DockerFact]
     public async Task A_stale_budget_write_or_delete_is_rejected_and_a_current_one_applies()
     {
         var a = TestTenantContext.New();

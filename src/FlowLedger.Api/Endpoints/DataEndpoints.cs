@@ -225,5 +225,13 @@ internal static class DataEndpoints
         r.OffsiteDetail,
         r.DrillOk,
         r.Error,
+        Drill = r.Drill is null ? null : new
+        {
+            Tables = r.Drill.Tables.Select(t => new { t.Table, t.ExpectedRows, t.RestoredRows, t.LiveRows, t.Ok }).ToList(),
+            r.Drill.RawArchiveChecked,
+            r.Drill.RawObjectsVerified,
+            r.Drill.RawObjectsSealed,
+            r.Drill.Problems,
+        },
     };
 }

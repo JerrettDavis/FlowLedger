@@ -15,7 +15,11 @@ public sealed record DrillTableResult(string Table, long ExpectedRows, long Rest
 }
 
 /// <param name="RawObjectsVerified">Raw provider-payload objects whose content hash matched their key (0 when the archive was not checked).</param>
-public sealed record RestoreDrillResult(bool Ok, string ScratchDatabase, bool ScratchKept, IReadOnlyList<DrillTableResult> Tables, IReadOnlyList<string> Problems, int RawObjectsVerified = 0);
+/// <param name="RawArchiveChecked">True when a raw archive directory was configured and hash-checked.</param>
+/// <param name="RawObjectsSealed">Encrypted raw objects, counted but not hash-checked (that needs the key ring).</param>
+public sealed record RestoreDrillResult(
+    bool Ok, string ScratchDatabase, bool ScratchKept, IReadOnlyList<DrillTableResult> Tables, IReadOnlyList<string> Problems, int RawObjectsVerified = 0,
+    bool RawArchiveChecked = false, int RawObjectsSealed = 0);
 
 /// <summary>
 /// Proves a snapshot can actually be restored: it creates a scratch database, applies EF migrations up to the
@@ -89,14 +93,18 @@ internal static class SnapshotRestoreDrill
         }
 
         var rawVerified = 0;
+        var rawSealed = 0;
+        var rawChecked = false;
         if (!string.IsNullOrWhiteSpace(rawArchiveDir))
         {
             var raw = RawArchiveIntegrity.Verify(rawArchiveDir);
             rawVerified = raw.Verified;
+            rawSealed = raw.SkippedEncrypted;
+            rawChecked = true;
             problems.AddRange(raw.Problems);
         }
 
-        return new RestoreDrillResult(problems.Count == 0, scratchDatabase, keep, results, problems, rawVerified);
+        return new RestoreDrillResult(problems.Count == 0, scratchDatabase, keep, results, problems, rawVerified, rawChecked, rawSealed);
     }
 
     /// <summary>Adds the live row count of each drilled table. A failure to read live counts never fails the drill.</summary>
