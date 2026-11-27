@@ -73,8 +73,8 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     private sealed class TestRegistry(params (ConnectorDescriptor Descriptor, IFinancialDataProvider Provider)[] connectors) : IConnectorRegistry
     {
         public IReadOnlyList<ConnectorDescriptor> Enabled { get; } = connectors.Select(c => c.Descriptor).ToList();
-        public bool IsEnabled(string id) => Enabled.Any(c => c.Id == id);
-        public IFinancialDataProvider Resolve(string id) => connectors.First(c => c.Descriptor.Id == id).Provider;
+        public bool IsEnabled(ConnectorId id) => Enabled.Any(c => c.Id == id);
+        public IFinancialDataProvider Resolve(ConnectorId id) => connectors.First(c => c.Descriptor.Id == id).Provider;
     }
 
     private static (ConnectorDescriptor, IFinancialDataProvider) Connector(string name, string[] ids, Exception? failure = null, bool shared = true)
@@ -205,12 +205,12 @@ public sealed class MultiConnectorSyncTests : IAsyncLifetime
     private sealed class ThrowAfterLink(IAccountConnectorLinkStore inner) : IAccountConnectorLinkStore
     {
         public Task<IReadOnlyList<AccountConnectorLink>> ListAsync(CancellationToken ct = default) => inner.ListAsync(ct);
-        public Task<AccountConnectorLink?> FindByProviderAccountAsync(string c, string p, CancellationToken ct = default) => inner.FindByProviderAccountAsync(c, p, ct);
+        public Task<AccountConnectorLink?> FindByProviderAccountAsync(ConnectorId c, string p, CancellationToken ct = default) => inner.FindByProviderAccountAsync(c, p, ct);
         public Task<AccountConnectorLink?> FindByAccountAsync(Guid a, CancellationToken ct = default) => inner.FindByAccountAsync(a, ct);
         public Task PinManualAsync(Guid a, CancellationToken ct = default) => inner.PinManualAsync(a, ct);
         public Task<bool> UnlinkAsync(Guid a, CancellationToken ct = default) => inner.UnlinkAsync(a, ct);
 
-        public async Task<bool> LinkAsync(Guid accountId, string connectorId, string providerAccountId, CancellationToken ct = default)
+        public async Task<bool> LinkAsync(Guid accountId, ConnectorId connectorId, string providerAccountId, CancellationToken ct = default)
         {
             await inner.LinkAsync(accountId, connectorId, providerAccountId, ct);
             throw new InvalidOperationException("injected fault after the link was created");

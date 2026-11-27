@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.Outbound;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -17,10 +17,10 @@ internal sealed class EfAccountConnectorLinkStore(FlowLedgerDbContext db, ITenan
         return rows.Select(ToLink).ToList();
     }
 
-    public async Task<AccountConnectorLink?> FindByProviderAccountAsync(string connectorId, string providerAccountId, CancellationToken ct = default)
+    public async Task<AccountConnectorLink?> FindByProviderAccountAsync(ConnectorId connector, string providerAccountId, CancellationToken ct = default)
     {
         var row = await db.AccountConnectorLinks.AsNoTracking()
-            .FirstOrDefaultAsync(l => l.ConnectorId == connectorId && l.ProviderAccountId == providerAccountId, ct);
+            .FirstOrDefaultAsync(l => l.ConnectorId == connector.Value && l.ProviderAccountId == providerAccountId, ct);
         return row is null ? null : ToLink(row);
     }
 
@@ -30,14 +30,14 @@ internal sealed class EfAccountConnectorLinkStore(FlowLedgerDbContext db, ITenan
         return row is null ? null : ToLink(row);
     }
 
-    public async Task<bool> LinkAsync(Guid accountId, string connectorId, string providerAccountId, CancellationToken ct = default)
+    public async Task<bool> LinkAsync(Guid accountId, ConnectorId connector, string providerAccountId, CancellationToken ct = default)
     {
         var tenantId = tenant.TenantId;
         try
         {
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $@"INSERT INTO account_connector_links (tenant_id, account_id, connector_id, provider_account_id)
-                   VALUES ({tenantId}, {accountId}, {connectorId}, {providerAccountId})
+                   VALUES ({tenantId}, {accountId}, {connector.Value}, {providerAccountId})
                    ON CONFLICT (tenant_id, account_id) DO UPDATE SET connector_id = EXCLUDED.connector_id,
                    provider_account_id = EXCLUDED.provider_account_id, linked_utc = now()", ct);
             return true;

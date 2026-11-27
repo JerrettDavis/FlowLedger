@@ -1,8 +1,10 @@
+using FlowLedger.SharedKernel;
+
 namespace FlowLedger.Application.Abstractions;
 
 /// <summary>An account's data source: which connector feeds it and which provider-side account it mirrors.</summary>
 /// <param name="ConnectorId">A connector id (see the connector registry) or <see cref="AccountConnectorLinks.Manual"/>.</param>
-public sealed record AccountConnectorLink(Guid AccountId, string ConnectorId, string ProviderAccountId, DateTimeOffset LinkedUtc);
+public sealed record AccountConnectorLink(Guid AccountId, ConnectorId ConnectorId, string ProviderAccountId, DateTimeOffset LinkedUtc);
 
 public static class AccountConnectorLinks
 {
@@ -18,12 +20,12 @@ public interface IAccountConnectorLinkStore
 {
     Task<IReadOnlyList<AccountConnectorLink>> ListAsync(CancellationToken ct = default);
 
-    Task<AccountConnectorLink?> FindByProviderAccountAsync(string connectorId, string providerAccountId, CancellationToken ct = default);
+    Task<AccountConnectorLink?> FindByProviderAccountAsync(ConnectorId connector, string providerAccountId, CancellationToken ct = default);
 
     Task<AccountConnectorLink?> FindByAccountAsync(Guid accountId, CancellationToken ct = default);
 
     /// <summary>Links (or re-links) the account. Returns false when that provider account is already linked to a different account.</summary>
-    Task<bool> LinkAsync(Guid accountId, string connectorId, string providerAccountId, CancellationToken ct = default);
+    Task<bool> LinkAsync(Guid accountId, ConnectorId connector, string providerAccountId, CancellationToken ct = default);
 
     /// <summary>Pins the account as manual: it stays out of every connector's sync.</summary>
     Task PinManualAsync(Guid accountId, CancellationToken ct = default);

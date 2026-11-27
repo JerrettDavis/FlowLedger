@@ -5,6 +5,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Simulated;
+using FlowLedger.SharedKernel;
 using FlowLedger.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -198,9 +199,9 @@ public sealed class ConnectionHealthRecordingTests : IAsyncLifetime
 
     private sealed class ThrowingStore : IProviderConnectionStore
     {
-        public Task<string?> GetMemberProviderIdAsync(string providerName, CancellationToken ct = default) => Task.FromResult<string?>(null);
-        public Task SaveAsync(string providerName, string memberProviderId, string institution, string status, CancellationToken ct = default) => Task.CompletedTask;
-        public Task RecordHealthAsync(string providerName, ConnectionIssueInfo? issue, CancellationToken ct = default)
+        public Task<string?> GetMemberProviderIdAsync(ConnectorId providerName, CancellationToken ct = default) => Task.FromResult<string?>(null);
+        public Task SaveAsync(ConnectorId providerName, string memberProviderId, string institution, string status, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RecordHealthAsync(ConnectorId providerName, ConnectionIssueInfo? issue, CancellationToken ct = default)
             => throw new InvalidOperationException("health store down");
     }
 
