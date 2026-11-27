@@ -16,16 +16,16 @@ public class ThirdPartyRequestTests : E2ETestBase
     [InlineData("/accounts")]
     public async Task Page_requests_stay_on_the_app_origin(string route)
     {
-        var appOrigin = new Uri(BaseUrl).GetLeftPart(UriPartial.Authority);
+        var app = new Uri(BaseUrl);
         var foreign = new System.Collections.Concurrent.ConcurrentBag<string>();
         Page!.Request += (_, request) =>
         {
             var url = request.Url;
-            // data: and blob: URIs never leave the browser; everything else must share the app's origin.
-            if (!url.StartsWith("data:", StringComparison.Ordinal)
-                && !url.StartsWith("blob:", StringComparison.Ordinal)
-                && !url.StartsWith("about:", StringComparison.Ordinal)
-                && !url.StartsWith(appOrigin, StringComparison.OrdinalIgnoreCase))
+            // data:, blob: and about: URIs never leave the browser; everything else must target the app's own host and port
+            // (the circuit's websocket included, whatever its scheme).
+            if (Uri.TryCreate(url, UriKind.Absolute, out var parsed)
+                && parsed.Scheme is not ("data" or "blob" or "about")
+                && !(string.Equals(parsed.Host, app.Host, StringComparison.OrdinalIgnoreCase) && parsed.Port == app.Port))
             {
                 foreign.Add(url);
             }
