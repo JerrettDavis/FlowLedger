@@ -91,6 +91,7 @@ internal sealed class MultiConnectorSyncService : IFinancialSyncService
             {
                 _logger.LogWarning(ex, "Sync via connector {Connector} failed for tenant {TenantId}.", connector.Id, _tenant.TenantId);
                 failures.Add(ex);
+                changedKnown = false;   // the failed connector may have saved rows before it threw: do not scope the post-sync steps to ids
             }
         }
 

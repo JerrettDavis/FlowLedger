@@ -114,6 +114,14 @@ internal sealed class InFlightSet<T> where T : notnull
         get { lock (_gate) { return _items.Count; } }
     }
 
+    public bool Contains(T key)
+    {
+        lock (_gate)
+        {
+            return _items.Contains(key);
+        }
+    }
+
     public bool TryAdd(T key)
     {
         lock (_gate)
