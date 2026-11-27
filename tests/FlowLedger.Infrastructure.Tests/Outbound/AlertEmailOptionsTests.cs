@@ -9,7 +9,13 @@ public sealed class AlertEmailOptionsTests
 {
     private static AlertEmailOptions Valid() => new()
     {
-        Enabled = true, Host = "smtp.example.com", Port = 587, Username = "u", Password = "p", From = "alerts@example.com", To = "me@example.com",
+        Enabled = true,
+        Host = "smtp.example.com",
+        Port = 587,
+        Username = "u",
+        Password = "p",
+        From = "alerts@example.com",
+        To = "me@example.com",
     };
 
     private static string[] Failures(AlertEmailOptions o) =>
