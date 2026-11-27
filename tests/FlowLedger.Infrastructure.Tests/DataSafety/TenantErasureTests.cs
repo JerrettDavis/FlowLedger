@@ -19,19 +19,11 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
     private static readonly Guid Household = new("00000000-0000-0000-0000-000000000001");
     private static readonly string Key = Convert.ToBase64String(new byte[32].Select((_, i) => (byte)(i + 3)).ToArray());
 
-    public async Task InitializeAsync()
-    {
-        await fixture.ResetAsync();
-        // The ad-hoc tables are not known to the data reset (they are created on first use): start each test without them.
-        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var drop = new NpgsqlCommand("DROP TABLE IF EXISTS tenants, app_user_link_codes, app_users", conn);
-        await drop.ExecuteNonQueryAsync();
-    }
+    public Task InitializeAsync() => fixture.ResetAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private NpgsqlUserDirectory Directory() => new(fixture.ConnectionString, new LegacyTenantClaim(Household, null));
+    private EfUserDirectory Directory() => new(new HostDb(fixture.ConnectionString), new LegacyTenantClaim(Household, null));
 
     private EfTenantErasure Eraser(IEnumerable<ITenantFileEraser>? files = null)
         => new(fixture.CreateProductionStyleContext(null), Household, files ?? []);
@@ -50,10 +42,11 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         catalog.Select(c => c.Table).Should().BeEquivalentTo(scoped);
 
         var unscoped = ctx.Model.GetEntityTypes()
-            .Where(e => !e.IsOwned() && e.BaseType is null && e.FindProperty("TenantId") is null)
+            .Where(e => !e.IsOwned() && e.BaseType is null && e.FindProperty("TenantId") is null
+                && !FlowLedger.Infrastructure.Persistence.HostWideEntities.Tables.ContainsKey(e.GetTableName() ?? string.Empty))
             .Select(e => e.ClrType.Name)
             .ToList();
-        unscoped.Should().BeEmpty("a root entity without a tenant column would survive erasure");
+        unscoped.Should().BeEmpty("a root entity without a tenant column would survive erasure unless it is listed in HostWideEntities");
 
         catalog.Select(c => c.Table).Should().Contain("outbox_messages");
         catalog.Should().OnlyContain(c => c.TenantColumn == "tenant_id");
@@ -121,7 +114,7 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         }
 
         // Audit record: the registry row survives, marked deleted; erasing again is a harmless no-op.
-        var info = await new NpgsqlTenantRegistry(fixture.ConnectionString).GetAsync(a.TenantId);
+        var info = await new EfTenantRegistry(new HostDb(fixture.ConnectionString)).GetAsync(a.TenantId);
         info!.Status.Should().Be(TenantStatus.Deleted);
         info.DeletedUtc.Should().NotBeNull();
         (await Eraser().EraseAsync(a.TenantId)).TotalRows.Should().Be(0);
@@ -151,7 +144,7 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         var dir = Directory();
         var first = await dir.ResolveAsync(new ExternalIdentity("iss", "one", null, null));
         var second = await dir.ResolveAsync(new ExternalIdentity("iss", "two", null, null));
-        var registry = new NpgsqlTenantRegistry(fixture.ConnectionString);
+        var registry = new EfTenantRegistry(new HostDb(fixture.ConnectionString));
 
         (await registry.GetAsync(first.TenantId))!.Status.Should().Be(TenantStatus.Active);
         (await registry.GetAsync(second.TenantId))!.Status.Should().Be(TenantStatus.Active);
@@ -181,7 +174,7 @@ public sealed class TenantErasureTests(IntegrationTestFixture fixture) : IAsyncL
         await dir.RedeemLinkCodeAsync(second.UserId, code.Code);
         (await dir.UnlinkAsync(first.TenantId, second.UserId)).Should().BeTrue();
 
-        var registry = new NpgsqlTenantRegistry(fixture.ConnectionString);
+        var registry = new EfTenantRegistry(new HostDb(fixture.ConnectionString));
         var active = (await registry.ListAsync(TenantStatus.Active)).Select(t => t.Id).ToList();
         var detachedTenant = (await dir.ListTenantIdsAsync()).Except([first.TenantId, Household]).Single();
         active.Should().Contain([first.TenantId, detachedTenant, Household]);

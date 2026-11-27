@@ -1,4 +1,6 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Goals;
+using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,31 +28,59 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
         var rows = await db.Goals.AsNoTracking()
             .OrderBy(g => g.TargetDate == null).ThenBy(g => g.TargetDate).ThenBy(g => g.Name)
             .ToListAsync(ct);
-        return rows.Select(r => new GoalRow(r.Id, r.Name, r.TargetAmount, r.SavedAmount, r.TargetDate)).ToList();
+        return rows.Select(r => new GoalRow(r.Id, r.Name, r.TargetAmount, r.SavedAmount, r.TargetDate, r.RowVersion)).ToList();
     }
 
-    public async Task<Guid> UpsertAsync(Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, CancellationToken ct = default)
+    public async Task<(Guid Id, uint Version)> UpsertAsync(
+        Guid tenantId, Guid? id, string name, decimal target, decimal saved, DateOnly? targetDate, uint? expectedVersion = null, CancellationToken ct = default)
     {
         Guard(tenantId);
         var goalId = id ?? Guid.NewGuid();
-        var affected = await db.Database.ExecuteSqlInterpolatedAsync(
-            $@"INSERT INTO savings_goals (tenant_id, id, name, target_amount, saved_amount, target_date)
-               SELECT {tenantId}, {goalId}, {name}, {target}, {saved}, {targetDate}
-               WHERE (SELECT count(*) FROM savings_goals WHERE tenant_id = {tenantId}) < {MaxGoals}
-                  OR EXISTS (SELECT 1 FROM savings_goals WHERE tenant_id = {tenantId} AND id = {goalId})
-               ON CONFLICT (tenant_id, id) DO UPDATE SET name = EXCLUDED.name, target_amount = EXCLUDED.target_amount,
-               saved_amount = EXCLUDED.saved_amount, target_date = EXCLUDED.target_date, updated_utc = now()", ct);
-        if (affected == 0)
+        var existing = id is null ? null : await db.Goals.SingleOrDefaultAsync(g => g.Id == goalId, ct);
+        if (existing is null)
         {
-            throw new InvalidOperationException($"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
+            if (expectedVersion is not null)
+            {
+                throw new ConcurrencyConflictException("This goal was removed elsewhere. Reload it and try again.");
+            }
+
+            if (await db.Goals.CountAsync(ct) >= MaxGoals)
+            {
+                throw new InvalidOperationException($"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
+            }
+
+            existing = GoalRecord.Create(tenantId, goalId, name, target, saved, targetDate);
+            db.Goals.Add(existing);
+        }
+        else
+        {
+            if (expectedVersion is { } version)
+            {
+                db.Entry(existing).Property(g => g.RowVersion).OriginalValue = version;
+            }
+
+            existing.Update(name, target, saved, targetDate);
         }
 
-        return goalId;
+        await VersionedSave.SaveAsync(db, "goal", ct);
+        return (goalId, existing.RowVersion);
     }
 
-    public async Task RemoveAsync(Guid tenantId, Guid id, CancellationToken ct = default)
+    public async Task RemoveAsync(Guid tenantId, Guid id, uint? expectedVersion = null, CancellationToken ct = default)
     {
         Guard(tenantId);
-        await db.Goals.Where(g => g.Id == id).ExecuteDeleteAsync(ct);
+        var existing = await db.Goals.SingleOrDefaultAsync(g => g.Id == id, ct);
+        if (existing is null)
+        {
+            return; // already gone: deleting twice is not an error
+        }
+
+        if (expectedVersion is { } version)
+        {
+            db.Entry(existing).Property(g => g.RowVersion).OriginalValue = version;
+        }
+
+        db.Goals.Remove(existing);
+        await VersionedSave.SaveAsync(db, "goal", ct);
     }
 }

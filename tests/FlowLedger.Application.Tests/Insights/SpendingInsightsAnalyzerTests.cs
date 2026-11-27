@@ -37,6 +37,16 @@ public sealed class SpendingInsightsAnalyzerTests
         new(DateOnly.Parse(from), DateOnly.Parse(to), null, income, by, parent, select, bucket);
 
     [Fact]
+    public void Each_listed_transaction_carries_its_row_version_so_the_page_can_send_if_match()
+    {
+        var versioned = Tx(60, "Debit", "2026-11-03", Groceries) with { Version = 1234 };
+
+        var res = Run([versioned], Q());
+
+        res.Transactions.Should().ContainSingle().Which.Version.Should().Be(1234u);
+    }
+
+    [Fact]
     public void Top_level_groups_roll_up_children_and_flag_drillable()
     {
         var res = Run([Tx(60, "Debit", "2026-11-03", Groceries), Tx(40, "Debit", "2026-11-04", Restaurants), Tx(100, "Debit", "2026-11-05", Utilities)], Q());

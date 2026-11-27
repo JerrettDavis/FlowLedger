@@ -6,7 +6,7 @@ namespace FlowLedger.Application.Features.Budgets;
 
 public sealed record SetBudgetRequest(string Category, decimal MonthlyLimit);
 
-public sealed record BudgetStatus(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over);
+public sealed record BudgetStatus(string Category, decimal MonthlyLimit, decimal Spent, decimal Remaining, double PercentUsed, bool Over, uint Version = 0);
 
 public sealed record BudgetOverview(string Month, IReadOnlyList<BudgetStatus> Budgets, Dictionary<string, decimal> SpendByCategory);
 
@@ -36,7 +36,7 @@ public sealed class ListBudgetsHandler(IBudgetStore store, GetMonthlySpendByCate
         {
             var spent = MonthlySpend.SpentFor(b.Category, spentByCategory);
             var pct = b.MonthlyLimit > 0 ? (double)(spent / b.MonthlyLimit * 100m) : (spent > 0 ? 100d : 0d);
-            return new BudgetStatus(b.Category, b.MonthlyLimit, spent, b.MonthlyLimit - spent, pct, spent > b.MonthlyLimit);
+            return new BudgetStatus(b.Category, b.MonthlyLimit, spent, b.MonthlyLimit - spent, pct, spent > b.MonthlyLimit, b.Version);
         }).ToList();
 
         return new BudgetOverview((month ?? DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime)).ToString("yyyy-MM", CultureInfo.InvariantCulture), rows, spentByCategory);

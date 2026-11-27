@@ -65,7 +65,7 @@ else
                                 @Format.Money(b.Spent) of @Format.Money(b.MonthlyLimit)
                                 @(b.Over ? $" — over by {Format.Money(-b.Remaining)}" : $" — {Format.Money(b.Remaining)} left")
                             </MudText>
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(b.Category))" aria-label="@($"Remove budget for {b.Category}")" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => Remove(b.Category, b.Version))" aria-label="@($"Remove budget for {b.Category}")" />
                         </div>
                     </div>
                     <MudProgressLinear Value="@Math.Min(100, b.PercentUsed)" Color="@(b.Over ? Color.Error : b.PercentUsed >= 80 ? Color.Warning : Color.Success)" Size="Size.Medium" Class="mt-1"
@@ -136,17 +136,22 @@ else
     {
         try
         {
-            await ApiClient.SetBudgetAsync(_category!, _limit);
+            var expected = _data?.Budgets.FirstOrDefault(b => b.Category == _category!.Trim())?.Version;
+            await ApiClient.SetBudgetAsync(_category!, _limit, expected);
             Snackbar.Add("Budget saved.", Severity.Success);
             await LoadAsync();
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 
-    private async Task Remove(string category)
+    private async Task Remove(string category, uint version)
     {
         if (!await DialogService.ConfirmAsync("Remove budget", $"Remove the {category} budget? Spending in that category is not affected.", "Remove"))
         {
@@ -155,12 +160,16 @@ else
 
         try
         {
-            await ApiClient.DeleteBudgetAsync(category);
+            await ApiClient.DeleteBudgetAsync(category, version);
             await LoadAsync();
         }
         catch (Exception ex)
         {
             Snackbar.AddFailure(ex);
+            if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
+            {
+                await LoadAsync(); // pick up the current versions
+            }
         }
     }
 }

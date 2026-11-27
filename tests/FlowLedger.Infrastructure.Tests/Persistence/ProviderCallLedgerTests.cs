@@ -16,7 +16,7 @@ public sealed class ProviderCallLedgerTests
     [DockerFact]
     public async Task Records_counts_and_summarises()
     {
-        var ledger = new NpgsqlProviderCallLedger(_fixture.ConnectionString);
+        var ledger = new ProviderCallLedger(_fixture.ConnectionString);
         var provider = "TEST-" + Guid.NewGuid().ToString("N");
         var now = TestClock.Instant;
 

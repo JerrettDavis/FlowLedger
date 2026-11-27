@@ -19,8 +19,15 @@ internal static class BudgetEndpoints
         .WithSummary("Budgets with this month's spending");
 
         group.MapPut("/", async (
-            [FromBody] SetBudgetRequest request, IValidator<SetBudgetRequest> validator, IBudgetStore store, ITenantContext tenant, CancellationToken ct) =>
+            [FromBody] SetBudgetRequest request, IValidator<SetBudgetRequest> validator, IBudgetStore store, ITenantContext tenant,
+            HttpRequest httpRequest, HttpResponse response, CancellationToken ct) =>
         {
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("budget");
+            }
+
             var validation = await validator.ValidateAsync(request, ct);
             if (!validation.IsValid)
             {
@@ -29,7 +36,8 @@ internal static class BudgetEndpoints
 
             try
             {
-                await store.SetAsync(tenant.TenantId, request.Category.Trim(), request.MonthlyLimit, ct);
+                var version = await store.SetAsync(tenant.TenantId, request.Category.Trim(), request.MonthlyLimit, expected, ct);
+                response.Headers.ETag = $"\"{version}\"";
                 return Results.NoContent();
             }
             catch (InvalidOperationException ex)
@@ -41,9 +49,15 @@ internal static class BudgetEndpoints
         .WithSummary("Create or update a monthly budget for a category")
         .RequireRateLimiting("write");
 
-        group.MapDelete("/", async ([FromQuery] string category, IBudgetStore store, ITenantContext tenant, CancellationToken ct) =>
+        group.MapDelete("/", async ([FromQuery] string category, IBudgetStore store, ITenantContext tenant, HttpRequest httpRequest, CancellationToken ct) =>
         {
-            await store.RemoveAsync(tenant.TenantId, category, ct);
+            var expected = RowVersioning.ExpectedVersion(httpRequest, out var malformed);
+            if (malformed)
+            {
+                return RowVersioning.Malformed("budget");
+            }
+
+            await store.RemoveAsync(tenant.TenantId, category, expected, ct);
             return Results.NoContent();
         })
         .WithName("DeleteBudget")

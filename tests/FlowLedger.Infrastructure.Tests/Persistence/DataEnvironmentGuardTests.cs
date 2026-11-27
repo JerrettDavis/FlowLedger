@@ -14,14 +14,7 @@ public sealed class DataEnvironmentGuardTests : IAsyncLifetime
 
     public DataEnvironmentGuardTests(IntegrationTestFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
-    {
-        await _fixture.ResetAsync();
-        await using var conn = new NpgsqlConnection(_fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS system_settings", conn);
-        await cmd.ExecuteNonQueryAsync();
-    }
+    public Task InitializeAsync() => _fixture.ResetAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 
