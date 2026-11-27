@@ -16,6 +16,7 @@ sealed class FlowLedger.Infrastructure.DataSafety.JobFireMark
 sealed class FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock
 sealed class FlowLedger.Infrastructure.DataSafety.ReencryptResult
 sealed class FlowLedger.Infrastructure.DataSafety.RestoreDrillResult
+sealed class FlowLedger.Infrastructure.DataSafety.RestoreDrillSummary
 sealed class FlowLedger.Infrastructure.DataSafety.RetentionResult
 sealed class FlowLedger.Infrastructure.DataSafety.RetentionSettings
 sealed class FlowLedger.Infrastructure.DataSafety.SecretReencryptor
