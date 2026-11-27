@@ -49,6 +49,7 @@ interface FlowLedger.Application.Abstractions.ITransactionRepository
 interface FlowLedger.Application.Abstractions.IWebhookReplayStore
 interface FlowLedger.Application.Abstractions.IWebhookTelemetry
 interface FlowLedger.Application.Abstractions.IWebhookTenantResolver
+interface FlowLedger.Application.Features.Alerts.IAlertEmailSender
 interface FlowLedger.Application.Features.Budgets.IBudgetStore
 interface FlowLedger.Application.Features.Categories.ICategorizationStore
 interface FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore
@@ -109,6 +110,7 @@ sealed class FlowLedger.Application.Features.Alerts.ActivityAlert
 sealed class FlowLedger.Application.Features.Alerts.Alert
 sealed class FlowLedger.Application.Features.Alerts.AlertDeliveryResult
 sealed class FlowLedger.Application.Features.Alerts.AlertDeliveryService
+sealed class FlowLedger.Application.Features.Alerts.AlertEmail
 sealed class FlowLedger.Application.Features.Alerts.GetAlertsHandler
 sealed class FlowLedger.Application.Features.Assets.AssetOperationException
 sealed class FlowLedger.Application.Features.Assets.AssetValuationSettings

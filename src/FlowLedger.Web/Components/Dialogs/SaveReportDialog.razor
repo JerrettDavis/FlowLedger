@@ -5,6 +5,10 @@
         <MudText Typo="Typo.h6" id="save-report-title">@(AsPanel ? "Add to report" : "Save view")</MudText>
     </TitleContent>
     <DialogContent>
+        @if (_feedback.Summary is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+        }
         @if (AsPanel)
         {
             <MudSelect T="string" @bind-Value="_target" Label="Report" aria-label="Target report">
@@ -17,11 +21,13 @@
         }
         @if (!AsPanel || _target == "")
         {
-            <MudTextField @bind-Value="_name" Label="@(AsPanel ? "New report name" : "View name")" Required="true" MaxLength="100"
-                          Immediate="true" aria-label="Name" />
-            <MudTextField @bind-Value="_description" Label="Description (optional)" MaxLength="500" Lines="2" aria-label="Description" />
+            <MudTextField @bind-Value="_name" @bind-Value:after="_feedback.Clear" Label="@(AsPanel ? "New report name" : "View name")" Required="true" MaxLength="100"
+                          Immediate="true" aria-label="Name" Error="@_feedback.Has("name")" ErrorText="@_feedback.For("name")" />
+            <MudTextField @bind-Value="_description" @bind-Value:after="_feedback.Clear" Label="Description (optional)" MaxLength="500" Lines="2" aria-label="Description"
+                          Error="@_feedback.Has("description")" ErrorText="@_feedback.For("description")" />
         }
-        <MudTextField @bind-Value="_panelTitle" Label="Panel title" MaxLength="100" Class="mt-2" aria-label="Panel title" />
+        <MudTextField @bind-Value="_panelTitle" @bind-Value:after="_feedback.Clear" Label="Panel title" MaxLength="100" Class="mt-2" aria-label="Panel title"
+                      Error="@_feedback.Has("panels")" ErrorText="@_feedback.For("panels")" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => MudDialog.Cancel()">Cancel</MudButton>
@@ -38,6 +44,14 @@
     [Parameter] public List<SavedReportDto> Reports { get; set; } = [];
     [Parameter] public string SuggestedName { get; set; } = "";
 
+    /// <summary>
+    /// When set, the dialog performs the save itself and stays open on failure, so the API's per-field validation errors appear next to
+    /// the fields they belong to (#211). Without it the dialog just closes with its <see cref="Outcome"/>.
+    /// </summary>
+    [Parameter] public Func<Outcome, Task>? CommitAsync { get; set; }
+
+    private readonly FormFeedback _feedback = new();
+
     private string _target = "";
     private string _name = "";
     private string? _description;
@@ -49,9 +63,25 @@
         _panelTitle = SuggestedName;
     }
 
-    private void Submit()
+    private async Task Submit()
     {
         var title = string.IsNullOrWhiteSpace(_panelTitle) ? _name : _panelTitle.Trim();
-        MudDialog.Close(DialogResult.Ok(new Outcome(_name.Trim(), _description, title, _target == "" ? null : _target)));
+        var outcome = new Outcome(_name.Trim(), _description, title, _target == "" ? null : _target);
+        if (CommitAsync is null)
+        {
+            MudDialog.Close(DialogResult.Ok(outcome));
+            return;
+        }
+
+        _feedback.Clear();
+        try
+        {
+            await CommitAsync(outcome);
+            MudDialog.Close(DialogResult.Ok(outcome));
+        }
+        catch (Exception ex) when (_feedback.TryCapture(ex))
+        {
+            // Stay open: the summary and the field messages are now rendered.
+        }
     }
 }

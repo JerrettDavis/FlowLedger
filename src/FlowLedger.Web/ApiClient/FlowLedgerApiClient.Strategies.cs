@@ -14,10 +14,7 @@ public sealed partial class FlowLedgerApiClient
         await ExecuteAsync("save the account rate", async () =>
         {
             var response = await _http.PutAsJsonAsync($"/api/strategies/account-rates/{accountId}", new { ratePercent, remainingMonths }, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ApiClientException($"Couldn't save the rate (server returned {(int)response.StatusCode}).", response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "save the rate", ct);
 
             return true;
         });
@@ -67,10 +64,7 @@ public sealed partial class FlowLedgerApiClient
         return await ExecuteAsync("plan debt payoff", async () =>
         {
             var response = await _http.PostAsJsonAsync("/api/debt/plan", new { debts, extraMonthly }, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ApiClientException($"Couldn't compute plan (server returned {(int)response.StatusCode}).", response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "compute plan", ct);
 
             return await response.Content.ReadFromJsonAsync<DebtPlanDto>(JsonOptions, ct);
         });

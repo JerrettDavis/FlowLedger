@@ -379,6 +379,8 @@
             new DialogParameters<SheetBillDialog>
             {
                 { x => x.Row, row }, { x => x.RowSection, section }, { x => x.Sections, sections },
+                // The dialog performs the save so a validation failure shows next to the field and the form stays open (#211).
+                { x => x.SaveAsync, req => ApiClient.SaveSheetBillAsync(row?.Id, req) },
             }, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         var result = await dialog.Result;
         if (result is not { Canceled: false }) return;
@@ -386,9 +388,8 @@
         {
             switch (result.Data)
             {
-                case SaveBillRequest req:
-                    await ApiClient.SaveSheetBillAsync(row?.Id, req);
-                    break;
+                case SaveBillRequest:
+                    break; // already saved by the dialog; reload below
                 case string s when s == SheetBillDialog.DeleteResult && row is not null:
                     if (!await DialogService.ConfirmAsync("Delete bill", $"Delete \"{row.Name}\" from the sheet?", "Delete"))
                     {

@@ -21,6 +21,7 @@ public sealed class HomeAssistantService(
     IHomeAssistantNetworkPolicy network,
     IAccountRepository accounts,
     IRecurringFlowRepository flows,
+    Goals.IGoalStore goals,
     ITransactionRepository transactions,
     EffectiveBudgetService budgets,
     GetMonthlySpendByCategoryHandler spend,
@@ -232,7 +233,12 @@ public sealed class HomeAssistantService(
         var balances = accountList.Select(a => new Alerts.BalanceInput(
             a.Id, a.Name, a.CurrentBalance.Amount,
             a.AccountType is AccountType.Checking or AccountType.Savings or AccountType.Cash)).ToList();
-        return Alerts.ActivityAlertRules.Build(today, dtos, transferIds, balances, new Dictionary<Guid, string>());
+        var found = Alerts.ActivityAlertRules.Build(today, dtos, transferIds, balances, new Dictionary<Guid, string>()).ToList();
+
+        // Goal slip (#70): needs the goals plus the household's recent surplus.
+        var paces = (await goals.ListAsync(tenant.TenantId, ct)).Select(g => new Alerts.GoalPace(g.Id, g.Name, g.TargetAmount, g.SavedAmount, g.TargetDate)).ToList();
+        found.AddRange(Alerts.GoalSlipRules.Build(today, paces, Alerts.GoalSlipRules.MonthlySurplus(today, dtos, transferIds)));
+        return found;
     }
 
     private const int ActivityHistoryDays = 200;

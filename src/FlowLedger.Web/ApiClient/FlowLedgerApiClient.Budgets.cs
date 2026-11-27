@@ -18,10 +18,7 @@ public sealed partial class FlowLedgerApiClient
         {
             var response = await SendVersionedAsync(HttpMethod.Put, "/api/budgets", new { category, monthlyLimit, rollover }, expectedVersion, ct);
             ThrowIfChangedElsewhere(response, "budget");
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ApiClientException($"Couldn't save budget (server returned {(int)response.StatusCode}).", response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "save budget", ct);
 
             return true;
         });

@@ -368,31 +368,39 @@
 
     private async Task OpenEditDialog(FlowLedger.Contracts.RecurringFlowDto flow)
     {
+        var updated = false;
         var dialog = await DialogService.ShowAsync<RecurringFlowFormDialog>("Edit Recurring Flow",
             new DialogParameters<RecurringFlowFormDialog>
             {
                 { x => x.Flow, flow },
-                { x => x.Accounts, _accounts }
+                { x => x.Accounts, _accounts },
+                // The dialog performs the update so a validation failure shows next to the field and the form stays open (#211).
+                { x => x.UpdateAsync, async updateReq =>
+                    {
+                        try
+                        {
+                            // If-Match: the version the user last saw; a 409 means the flow changed elsewhere (another tab or a sync).
+                            await ApiClient.UpdateRecurringFlowAsync(flow.Id, updateReq, expectedVersion: flow.Version == 0 ? null : flow.Version);
+                            updated = true;
+                        }
+                        catch (FlowLedger.Web.ApiClient.ApiClientException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+                        {
+                            Logger.LogError(ex, "Recurring flow {FlowId} changed elsewhere", flow.Id);
+                            Snackbar.AddFailure(ex, fallback: "Couldn't update flow. Please try again.");
+                            await LoadAsync(); // pick up the current versions
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError(ex, "Failed to update recurring flow {FlowId}", flow.Id);
+                            throw; // the dialog shows field errors and the summary
+                        }
+                    } },
             });
-        var result = await dialog.Result;
-        if (result is { Canceled: false, Data: FlowLedger.Contracts.UpdateRecurringFlowRequest updateReq })
+        await dialog.Result;
+        if (updated)
         {
-            try
-            {
-                // If-Match: the version the user last saw; a 409 means the flow changed elsewhere (another tab or a sync).
-                await ApiClient.UpdateRecurringFlowAsync(flow.Id, updateReq, expectedVersion: flow.Version == 0 ? null : flow.Version);
-                Snackbar.Add("Flow updated", Severity.Success);
-                await LoadAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to update recurring flow {FlowId}", flow.Id);
-                Snackbar.AddFailure(ex, fallback: "Couldn't update flow. Please try again.");
-                if (ex is FlowLedger.Web.ApiClient.ApiClientException { StatusCode: System.Net.HttpStatusCode.Conflict })
-                {
-                    await LoadAsync(); // pick up the current versions
-                }
-            }
+            Snackbar.Add("Flow updated", Severity.Success);
+            await LoadAsync();
         }
     }
 

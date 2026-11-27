@@ -55,7 +55,7 @@ public sealed class SharedContractSerializationTests
         var create = CreateAccountRequestBuilder.A().Named("Savings").OfType("Savings").StartingAt(100m).At("Bank").Build();
         var settings = new AccountSettingsRequest(false, "Holding", true);
         var rename = UpdateAccountRequestBuilder.A().Named("New").Build();
-        var retype = new ChangeAccountTypeRequest("Credit");
+        var retype = ChangeAccountTypeRequestBuilder.A().To("Credit").Build();
 
         Assert.Equal(create, JsonSerializer.Deserialize<CreateAccountRequest>(JsonSerializer.Serialize(create, WebOptions), ApiOptions));
         Assert.Equal(settings, JsonSerializer.Deserialize<AccountSettingsRequest>(JsonSerializer.Serialize(settings, WebOptions), ApiOptions));

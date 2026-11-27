@@ -195,44 +195,44 @@ public sealed class BillSheetService(
     {
         if (string.IsNullOrWhiteSpace(r.Name) || r.Name.Length > 200)
         {
-            throw new SheetOperationException("Name is required (max 200 characters).");
+            throw new SheetOperationException("Name is required (max 200 characters).", "name");
         }
 
         if (string.IsNullOrWhiteSpace(r.Section) || r.Section.Length > 100)
         {
-            throw new SheetOperationException("Section is required (max 100 characters).");
+            throw new SheetOperationException("Section is required (max 100 characters).", "section");
         }
 
         if (r.DueDay is < 1 or > 31)
         {
-            throw new SheetOperationException("Due day must be between 1 and 31, or empty for a floating date.");
+            throw new SheetOperationException("Due day must be between 1 and 31, or empty for a floating date.", "dueDay");
         }
 
         if (r.Estimated < 0 || r.Actual < 0)
         {
-            throw new SheetOperationException("Amounts cannot be negative.");
+            throw new SheetOperationException("Amounts cannot be negative.", "estimated");
         }
 
         var frequency = string.IsNullOrWhiteSpace(r.Frequency) ? BillFrequency.Monthly : r.Frequency;
         if (!BillFrequency.IsKnown(frequency))
         {
-            throw new SheetOperationException("Frequency must be Monthly, TwiceMonthly, Weekly or EveryNWeeks.");
+            throw new SheetOperationException("Frequency must be Monthly, TwiceMonthly, Weekly or EveryNWeeks.", "frequency");
         }
 
         if (frequency is BillFrequency.Weekly or BillFrequency.EveryNWeeks && r.AnchorDate is null)
         {
-            throw new SheetOperationException("Weekly and every-N-weeks rows need a date one payment falls on (the anchor date).");
+            throw new SheetOperationException("Weekly and every-N-weeks rows need a date one payment falls on (the anchor date).", "anchorDate");
         }
 
         if (frequency == BillFrequency.EveryNWeeks && r.IntervalWeeks is null or < 2 or > 52)
         {
-            throw new SheetOperationException("Interval must be between 2 and 52 weeks.");
+            throw new SheetOperationException("Interval must be between 2 and 52 weeks.", "intervalWeeks");
         }
 
         if (frequency == BillFrequency.TwiceMonthly
             && (r.DueDay is not { } first || r.SecondDueDay is not { } second || second is < 1 or > 31 || first >= second))
         {
-            throw new SheetOperationException("Twice-monthly rows need two due days, the first earlier than the second.");
+            throw new SheetOperationException("Twice-monthly rows need two due days, the first earlier than the second.", "secondDueDay");
         }
     }
 

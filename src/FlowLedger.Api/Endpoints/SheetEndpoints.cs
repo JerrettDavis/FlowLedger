@@ -54,6 +54,10 @@ internal static class SheetEndpoints
         {
             return await action();
         }
+        catch (SheetOperationException ex) when (ex.Field is { } field)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [ex.Message] });
+        }
         catch (SheetOperationException ex)
         {
             return Results.Problem(title: "Invalid sheet request", detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);

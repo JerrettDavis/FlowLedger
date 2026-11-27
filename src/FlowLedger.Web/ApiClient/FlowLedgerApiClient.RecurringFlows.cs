@@ -79,9 +79,7 @@ public sealed partial class FlowLedgerApiClient
             if (!response.IsSuccessStatusCode)
             {
                 LogNonSuccessUpdatingRecurringFlow((int)response.StatusCode, id);
-                throw new ApiClientException(
-                    $"Couldn't update recurring flow (server returned {(int)response.StatusCode}).",
-                    response.StatusCode);
+                await ThrowIfFailedAsync(response, "update recurring flow", ct);
             }
 
             return await response.Content.ReadFromJsonAsync<RecurringFlowDto>(JsonOptions, ct);

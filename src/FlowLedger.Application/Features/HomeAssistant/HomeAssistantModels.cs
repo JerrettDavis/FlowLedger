@@ -14,10 +14,11 @@ public static class HaEventKinds
     public const string PriceIncrease = "price_increase";
     public const string NewSubscription = "new_subscription";
     public const string LowBalance = "low_balance";
+    public const string GoalSlipping = "goal_slipping";
 
     public static IReadOnlyList<string> All { get; } =
         [BillDueSoon, BillPaid, PaycheckExpected, PaycheckReceived, Overdraft, LowBalanceForecast, BudgetAlert,
-         LargeCharge, PriceIncrease, NewSubscription, LowBalance];
+         LargeCharge, PriceIncrease, NewSubscription, LowBalance, GoalSlipping];
 }
 
 /// <summary>
