@@ -4,7 +4,7 @@
 <PageTitle>Subscriptions — FlowLedger</PageTitle>
 
 <PageHeader Title="Subscriptions" />
-<MudText Typo="Typo.body2" Class="mb-4 fl-muted">
+<MudText Typo="Typo.body2" Class="mb-4 fl-muted fl-wrap-anywhere">
     Charges that repeat every month or year for a steady amount, found in your transactions. A price change shows up here
     for about four months after the first charge at the new price. Variable bills such as utilities are not listed.
 </MudText>
@@ -32,12 +32,11 @@ else
         </MudAlert>
     }
 
-    <div class="d-flex gap-4 flex-wrap mb-3">
+    <div class="d-flex gap-4 flex-wrap mb-3 fl-wrap-anywhere">
         <MudText Typo="Typo.subtitle1" data-testid="subscription-monthly-total">@Format.Money(_data.MonthlyTotal) a month</MudText>
         <MudText Typo="Typo.subtitle1" Class="fl-muted">@Format.Money(_data.YearlyTotal) a year</MudText>
     </div>
 
-    <div class="fl-scroll-x">
     <MudSimpleTable Dense="true" Hover="true" aria-label="Detected subscriptions" data-testid="subscriptions-table">
         <thead>
             <tr>
@@ -81,7 +80,6 @@ else
             }
         </tbody>
     </MudSimpleTable>
-    </div>
 }
 
 @code {
