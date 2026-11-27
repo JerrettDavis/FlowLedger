@@ -41,7 +41,7 @@ public sealed record DeleteMyDataOutcome(
 /// data), then every row and file of the tenant is erased through <see cref="ITenantErasure"/>, which refuses the household tenant.
 /// The tenant id comes from the request's tenant context, never from the body, so one tenant can only ever erase itself.
 /// </summary>
-public sealed class DeleteMyDataHandler(ITenantProviderRevocation revocation, ITenantErasure erasure)
+internal sealed class DeleteMyDataHandler(ITenantProviderRevocation revocation, ITenantErasure erasure)
 {
     /// <summary>The exact text the owner must type to confirm.</summary>
     public const string ConfirmationPhrase = "DELETE MY DATA";

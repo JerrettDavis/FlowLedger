@@ -15,7 +15,7 @@ public sealed record HaRunResult(int Detected, int Sent, int AlreadySent, int Fa
 /// each event is claimed by its dedupe key first, so it is delivered once; a failed delivery releases the claim and retries
 /// next run. Sends nothing unless the household enabled sharing AND stored a webhook.
 /// </summary>
-public sealed class HomeAssistantService(
+internal sealed class HomeAssistantService(
     IHomeAssistantStore store,
     IHomeAssistantSender sender,
     IHomeAssistantNetworkPolicy network,

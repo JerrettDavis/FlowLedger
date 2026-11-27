@@ -23,7 +23,7 @@ internal sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetReq
 }
 
 /// <summary>Budgets with this month's actual spending (transfers excluded), rolled up from child categories.</summary>
-public sealed class ListBudgetsHandler(EffectiveBudgetService budgets, GetMonthlySpendByCategoryHandler spend, TimeProvider clock)
+internal sealed class ListBudgetsHandler(EffectiveBudgetService budgets, GetMonthlySpendByCategoryHandler spend, TimeProvider clock)
 {
     public async Task<BudgetOverview> HandleAsync(CancellationToken ct = default) => await HandleAsync(null, ct);
 
@@ -52,7 +52,7 @@ public static class BudgetLimits
 }
 
 /// <summary>Creates or updates one budget, refusing a new one past <see cref="BudgetLimits.MaxBudgets"/>; updating an existing one is always allowed.</summary>
-public sealed class SetBudgetHandler(IBudgetStore store, ITenantContext tenant)
+internal sealed class SetBudgetHandler(IBudgetStore store, ITenantContext tenant)
 {
     public async Task<uint> HandleAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default, bool? rollover = null)
     {

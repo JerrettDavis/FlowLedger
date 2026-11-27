@@ -39,7 +39,7 @@ public static class GoalLimits
 }
 
 /// <summary>Creates or updates one goal, refusing a new one past <see cref="GoalLimits.MaxGoals"/>; updating an existing one is always allowed.</summary>
-public sealed class SaveGoalHandler(IGoalStore store, ITenantContext tenant)
+internal sealed class SaveGoalHandler(IGoalStore store, ITenantContext tenant)
 {
     public async Task<(Guid Id, uint Version)> HandleAsync(SaveGoalRequest request, uint? expectedVersion = null, CancellationToken ct = default)
     {

@@ -38,14 +38,14 @@ internal sealed class SaveReportRequestValidator : AbstractValidator<SaveReportR
 }
 
 /// <summary>Runs an ad-hoc query against the caller's own data.</summary>
-public sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
+internal sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
 {
     public async Task<QueryResult> HandleAsync(string query, CancellationToken ct = default)
         => QueryEngine.Execute(
             query, await datasets.BuildAsync(ct), DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime), budget, ct);
 }
 
-public sealed class GetQuerySchemaHandler
+internal sealed class GetQuerySchemaHandler
 {
     private static readonly string[] Operators =
         ["where", "project", "extend", "summarize … by", "sort by", "top N by", "take N", "distinct", "count"];
@@ -54,13 +54,13 @@ public sealed class GetQuerySchemaHandler
     public QuerySchemaDto Handle() => new(QueryCatalog.Datasets, QueryCatalog.Functions, QueryCatalog.Aggregates, Operators);
 }
 
-public sealed class ListReportsHandler(ISavedReportStore store)
+internal sealed class ListReportsHandler(ISavedReportStore store)
 {
     public async Task<IReadOnlyList<SavedReportDto>> HandleAsync(CancellationToken ct = default)
         => (await store.ListAsync(ct)).Concat(PresetReports.All).ToList();
 }
 
-public sealed class GetReportHandler(ISavedReportStore store)
+internal sealed class GetReportHandler(ISavedReportStore store)
 {
     public async Task<SavedReportDto?> HandleAsync(string id, CancellationToken ct = default)
     {
@@ -73,7 +73,7 @@ public sealed class GetReportHandler(ISavedReportStore store)
     }
 }
 
-public sealed class SaveReportHandler(ISavedReportStore store)
+internal sealed class SaveReportHandler(ISavedReportStore store)
 {
     public async Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
     {
@@ -88,7 +88,7 @@ public sealed class SaveReportHandler(ISavedReportStore store)
 }
 
 /// <summary>Runs every panel of a saved or preset report; a failing panel reports its error instead of failing the report.</summary>
-public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
+internal sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
 {
     /// <summary>
     /// Narrows a panel query to a date window by inserting a date filter right after the dataset name; only datasets that

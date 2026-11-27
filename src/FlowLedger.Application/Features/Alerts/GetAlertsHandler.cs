@@ -7,7 +7,7 @@ using FlowLedger.SharedKernel;
 namespace FlowLedger.Application.Features.Alerts;
 
 /// <summary>Computed alerts: budgets at/over their limit, goals past their target date, and (when history is available) large charges, price increases, new subscriptions and low balances.</summary>
-public sealed class GetAlertsHandler(
+internal sealed class GetAlertsHandler(
     EffectiveBudgetService budgets, IGoalStore goals, GetMonthlySpendByCategoryHandler spend, ITenantContext tenant, TimeProvider clock,
     ITransactionRepository? transactions = null, IAccountRepository? accounts = null)
 {

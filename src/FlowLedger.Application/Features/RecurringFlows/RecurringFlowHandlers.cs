@@ -6,7 +6,7 @@ using FlowLedger.SharedKernel;
 namespace FlowLedger.Application.Features.RecurringFlows;
 
 /// <summary>Lists all recurring flows for the current tenant.</summary>
-public sealed class ListRecurringFlowsHandler
+internal sealed class ListRecurringFlowsHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly IAccountRepository? _accounts;
@@ -35,7 +35,7 @@ public sealed class ListRecurringFlowsHandler
 }
 
 /// <summary>Returns a single recurring flow by ID.</summary>
-public sealed class GetRecurringFlowHandler
+internal sealed class GetRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
 
@@ -50,7 +50,7 @@ public sealed class GetRecurringFlowHandler
 }
 
 /// <summary>Creates a new recurring flow.</summary>
-public sealed class CreateRecurringFlowHandler
+internal sealed class CreateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly ITenantContext _tenant;
@@ -124,7 +124,7 @@ public sealed class CreateRecurringFlowHandler
 }
 
 /// <summary>Updates a recurring flow's amount and amount model.</summary>
-public sealed class UpdateRecurringFlowHandler
+internal sealed class UpdateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly IRowVersionGuard? _guard;
@@ -155,7 +155,7 @@ public sealed class UpdateRecurringFlowHandler
 }
 
 /// <summary>Deactivates a recurring flow.</summary>
-public sealed class DeactivateRecurringFlowHandler
+internal sealed class DeactivateRecurringFlowHandler
 {
     private readonly IRecurringFlowRepository _repo;
     private readonly IRowVersionGuard? _guard;

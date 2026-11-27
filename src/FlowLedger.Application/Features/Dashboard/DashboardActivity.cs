@@ -139,7 +139,7 @@ internal static class DashboardActivityAnalyzer
 }
 
 /// <summary>Loads recent history and runs the analyzer.</summary>
-public sealed class GetDashboardActivityHandler(
+internal sealed class GetDashboardActivityHandler(
     ITransactionRepository repo, IAccountRepository accounts, ISuspiciousDismissalStore dismissals, ICategoryRepository categories,
     TimeProvider clock)
 {
@@ -166,7 +166,7 @@ public sealed class GetDashboardActivityHandler(
 }
 
 /// <summary>Marks a flagged transaction as reviewed so it stops appearing under Suspicious Activity.</summary>
-public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissals, FlowLedger.Application.Features.Categories.ICategorizationStore transactions)
+internal sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissals, FlowLedger.Application.Features.Categories.ICategorizationStore transactions)
 {
     public const int MaxNoteLength = 500;
 

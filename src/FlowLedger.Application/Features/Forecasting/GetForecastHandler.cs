@@ -15,7 +15,7 @@ namespace FlowLedger.Application.Features.Forecasting;
 /// 4. Delegates all projection logic to <see cref="IForecastEngine"/> — pure and deterministic.
 /// 5. Returns a <see cref="ForecastResult"/> with full explainability.
 /// </summary>
-public sealed class GetForecastHandler
+internal sealed class GetForecastHandler
 {
     private readonly IAccountRepository _accounts;
     private readonly IRecurringFlowRepository _flows;

@@ -6,7 +6,7 @@ using FlowLedger.SharedKernel;
 namespace FlowLedger.Application.Features.Transactions;
 
 /// <summary>Lists transactions with optional filtering.</summary>
-public sealed class ListTransactionsHandler
+internal sealed class ListTransactionsHandler
 {
     private readonly ITransactionRepository _repo;
 
@@ -70,7 +70,7 @@ public sealed class ListTransactionsHandler
 }
 
 /// <summary>Returns a single transaction by ID.</summary>
-public sealed class GetTransactionHandler
+internal sealed class GetTransactionHandler
 {
     private readonly ITransactionRepository _repo;
 
@@ -85,7 +85,7 @@ public sealed class GetTransactionHandler
 }
 
 /// <summary>Records a manually-entered transaction.</summary>
-public sealed class CreateTransactionHandler
+internal sealed class CreateTransactionHandler
 {
     private readonly ITransactionRepository _repo;
     private readonly ITenantContext _tenant;
