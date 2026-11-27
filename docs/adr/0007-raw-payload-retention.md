@@ -35,12 +35,11 @@ crypto-shredded by destroying the repository password.
 - Unverified (bad-signature) webhooks are not archived, to avoid disk-fill by anonymous callers.
 
 ## Amendment: deletion exception (2026-11-26)
-"Keep everything" is the default, not an absolute. A tenant's right to have their data deleted overrides it: when a tenant
-offboarding path exists it must remove that tenant's archive objects, and existing backups must expire on a stated schedule
-(or be crypto-shredded). **That path is not built yet**; until it is, nothing deletes archive objects and the archive layout
-(`raw/{provider}/{yyyy}/{MM}/{dd}/...`) is not per tenant, so per-tenant deletion would need a layout or encryption change.
-Decision 2 above ("nothing in the codebase deletes or overwrites archive objects") remains true of the code today. See
-[data inventory and retention](../privacy/data-inventory-and-retention.md).
+"Keep everything" is the default, not an absolute. A tenant's right to have their data deleted overrides it: tenant offboarding
+removes that tenant's archive objects (built; see the tenant-partition amendment below), and existing backups must expire on a
+stated schedule or be crypto-shredded (the operator's responsibility). Decision 2 above ("nothing in the codebase deletes or
+overwrites archive objects") therefore holds only for the default configuration with no offboarding and no opt-in retention sweep.
+See [data inventory and retention](../privacy/data-inventory-and-retention.md).
 
 ## Follow-ups
 - DONE: `MxArchiveReplayHandler` serves archived responses (by method+path+query, newest wins) through the real client/mapper; wiring it as the HttpClient handler gives a zero-cost re-ingest. Selected via `Mx:Provider:ReplayArchivePath`. Verified live: 910 sandbox transactions replayed into a fresh tenant with MX unreachable.

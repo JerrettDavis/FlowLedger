@@ -180,5 +180,4 @@ See `tests/FlowLedger.Integrations.Tests/Fixtures/README.md` (capture, redaction
 Tool pinned in `.config/dotnet-tools.json`. Run `pwsh tests/mutation/run-stryker.ps1` (Domain, about 1 minute) or
 `-Target Application` (slow, no baseline yet). **Baseline (Domain, 2026-11-26): 64.40 percent**
 (498 tested mutants: 415 killed, 82 survived, 1 timeout; 148 not covered). `thresholds.break` is 59.
-A scheduled weekly workflow that uploads the HTML report is not yet added. Suggested job:
-checkout, setup-dotnet 10, `pwsh tests/mutation/run-stryker.ps1`, upload `tests/FlowLedger.Domain.Tests/StrykerOutput/**/reports`.
+The weekly `mutation.yml` workflow (Sundays, plus manual dispatch) runs both targets and uploads the HTML reports as `stryker-Domain` and `stryker-Application` artifacts. Application has no recorded baseline yet (`thresholds.break` is 0 there), so its job only publishes the report; record the first scheduled score here and set the break threshold to that score minus 5.

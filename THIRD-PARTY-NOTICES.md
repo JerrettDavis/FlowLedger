@@ -9,6 +9,6 @@ artifacts). Those SBOMs are the authoritative, version-accurate notice list; reg
 file from them when cutting a release.
 
 Direct dependencies include .NET / ASP.NET Core / EF Core (MIT), Npgsql (PostgreSQL licence),
-Quartz.NET (Apache-2.0), MudBlazor (MIT), OpenIddict (Apache-2.0), Serilog (Apache-2.0),
+Quartz.NET (Apache-2.0), MudBlazor (MIT), Serilog (Apache-2.0),
 OpenTelemetry .NET (Apache-2.0), StackExchange.Redis (MIT) and the test stack (xUnit, FluentAssertions,
 Testcontainers, Playwright). Verify against the SBOM before relying on this summary.
