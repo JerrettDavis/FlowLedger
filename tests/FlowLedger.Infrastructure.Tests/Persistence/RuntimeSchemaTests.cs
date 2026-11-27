@@ -64,6 +64,9 @@ public sealed class NoRuntimeSchemaTests
             ["FlowLedger.Infrastructure/DataSafety/DataRetention.cs"] = "host-wide retention sweeps across tenants",
             ["FlowLedger.Infrastructure/DataSafety/SecretReencryptor.cs"] = "bulk secret re-encryption",
             ["FlowLedger.Infrastructure/Health/ReadinessChecks.cs"] = "readiness probes",
+            ["FlowLedger.Infrastructure/Persistence/DatabaseDataSource.cs"] = "builds the one shared, bounded NpgsqlDataSource (#180)",
+            ["FlowLedger.Infrastructure/Persistence/HostDb.cs"] = "hands that data source to the host-wide EF contexts",
+            ["FlowLedger.Infrastructure/DependencyInjection.cs"] = "registers the shared NpgsqlDataSource",
         };
 
         var root = InfrastructureRoot();

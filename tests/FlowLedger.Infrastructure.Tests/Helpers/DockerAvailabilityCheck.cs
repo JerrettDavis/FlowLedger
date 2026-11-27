@@ -97,3 +97,16 @@ internal sealed class DockerFactAttribute : FactAttribute
         }
     }
 }
+
+/// <summary>The theory counterpart of <see cref="DockerFactAttribute"/>: data-driven Docker-backed tests.</summary>
+internal sealed class DockerTheoryAttribute : TheoryAttribute
+{
+    public DockerTheoryAttribute()
+    {
+        var required = string.Equals(Environment.GetEnvironmentVariable("FLOWLEDGER_REQUIRE_DOCKER"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!required && !DockerAvailability.IsAvailable)
+        {
+            Skip = "Docker is not available in this environment. Test skipped.";
+        }
+    }
+}

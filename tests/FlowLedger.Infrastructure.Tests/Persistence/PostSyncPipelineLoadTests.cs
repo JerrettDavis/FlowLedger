@@ -1,5 +1,6 @@
 using System.Data.Common;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Contracts;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
@@ -171,5 +172,113 @@ public sealed class PostSyncPipelineLoadTests : IAsyncLifetime
             transactionReads[0].Should().Contain("EXISTS", "an uncategorized-row probe, not a newest-first history window");
             db.ChangeTracker.Entries<Transaction>().Should().BeEmpty();
         }
+    }
+
+    private sealed class FixedSync(SyncResult result) : FlowLedger.Application.Abstractions.IFinancialSyncService
+    {
+        public Task<string> ConnectAsync(CancellationToken ct = default) => Task.FromResult("m");
+        public Task<SyncResult> SyncAsync(CancellationToken ct = default) => Task.FromResult(result);
+    }
+
+    private static FlowLedger.Infrastructure.Sync.CategorizingSyncService BuildPipeline(
+        FlowLedgerDbContext db, TestTenantContext tenant, SyncResult result)
+    {
+        var store = new CategorizationStore(db);
+        return new FlowLedger.Infrastructure.Sync.CategorizingSyncService(
+            new FixedSync(result), db,
+            new FlowLedger.Application.Features.Categories.CategorizationService(store, new CategoryRepository(db), new AccountRepository(db), tenant),
+            new MerchantAliasService(new EfMerchantAliasStore(db, tenant), store),
+            new FlowLedger.Application.Features.Categories.CategoryRuleService(new EfCategoryRuleStore(db, tenant), store, new CategoryRepository(db), tenant),
+            new TransactionEnrichmentService(store),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedger.Infrastructure.Sync.CategorizingSyncService>.Instance);
+    }
+
+    [DockerFact]
+    public async Task A_sync_that_brought_no_new_rows_issues_no_transaction_select_even_with_lingering_uncategorized_rows()
+    {
+        var tenant = TestTenantContext.New();
+        var account = await _fixture.SeedAccountAsync(tenant);
+        var tenantId = TenantId.From(tenant.TenantId);
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            for (var i = 0; i < 200; i++)
+            {
+                seed.Transactions.Add(Transaction.RecordActual(
+                    tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
+                    $"UNKNOWN VENDOR {i}", new DateOnly(2026, 1, 1).AddDays(i % 200), new DateOnly(2026, 1, 1).AddDays(i % 200), TransactionSource.Manual));
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var (_, log, db) = await OpenLoggedAsync(tenant);
+        await using (db)
+        {
+            var pipeline = BuildPipeline(db, tenant, new SyncResult(0, 0, 0, 0, ChangedTransactionIds: []));
+            log.Sql.Clear();
+
+            await pipeline.SyncAsync();
+
+            log.Sql.Where(sql => sql.Contains("FROM transactions", StringComparison.OrdinalIgnoreCase)).Should().BeEmpty(
+                "nothing changed, so no step may read the table (the old pipeline re-read the history to retry lingering rows)");
+        }
+    }
+
+    [DockerFact]
+    public async Task A_sync_with_new_rows_reads_them_by_id_plus_a_bounded_window_and_a_bounded_learning_set_never_the_whole_table()
+    {
+        var tenant = TestTenantContext.New();
+        var account = await _fixture.SeedAccountAsync(tenant);
+        var tenantId = TenantId.From(tenant.TenantId);
+        var coffee = Category.Create(tenantId, new CategoryPath("Food/Coffee"), "Coffee");
+        var newIds = new List<Guid>();
+        await using (var seed = _fixture.CreateDbContext(tenant))
+        {
+            seed.Categories.Add(coffee);
+            for (var i = 0; i < 400; i++)
+            {
+                var day = new DateOnly(2026, 1, 1).AddDays(i % 200);
+                var tx = Transaction.RecordActual(
+                    tenantId, account, new Money(5m + i, Currency.Usd), TransactionDirection.Debit,
+                    i % 2 == 0 ? "BLUE BOTTLE" : $"UNKNOWN VENDOR {i}", day, day, TransactionSource.Manual);
+                if (i % 2 == 0)
+                {
+                    tx.Categorize(coffee.CategoryId, null, CategorySource.Manual);
+                }
+
+                seed.Transactions.Add(tx);
+            }
+
+            for (var i = 0; i < 3; i++)
+            {
+                var tx = Transaction.RecordActual(
+                    tenantId, account, new Money(77m + i, Currency.Usd), TransactionDirection.Debit,
+                    "BLUE BOTTLE", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), TransactionSource.Manual);
+                seed.Transactions.Add(tx);
+                newIds.Add(tx.Id);
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var (_, log, db) = await OpenLoggedAsync(tenant);
+        await using (db)
+        {
+            var pipeline = BuildPipeline(db, tenant, new SyncResult(0, 3, 0, 0, ChangedTransactionIds: newIds));
+            log.Sql.Clear();
+
+            await pipeline.SyncAsync();
+
+            var reads = log.Sql.Where(sql => sql.Contains("FROM transactions", StringComparison.OrdinalIgnoreCase)).ToList();
+            reads.Should().NotBeEmpty();
+            reads.Should().OnlyContain(
+                sql => sql.Contains("WHERE", StringComparison.OrdinalIgnoreCase)
+                    && (sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) || sql.Contains("ANY", StringComparison.OrdinalIgnoreCase) || sql.Contains(" IN ", StringComparison.OrdinalIgnoreCase)),
+                "every read is an id lookup or a filtered, limited window; none is a full-table scan");
+        }
+
+        await using var verify = _fixture.CreateDbContext(tenant);
+        (await verify.Transactions.CountAsync(t => newIds.Contains(t.Id) && t.CategoryId == coffee.CategoryId)).Should().Be(3, "the new rows are categorized by the learned merchant");
+        (await verify.Transactions.CountAsync(t => t.CategoryId == null && !newIds.Contains(t.Id))).Should().Be(200, "older uncategorized rows are not touched by a sync scoped to the new ones");
     }
 }

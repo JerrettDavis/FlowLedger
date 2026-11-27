@@ -122,10 +122,23 @@ internal sealed partial class FinancialSyncService
         await _db.Accounts.AddAsync(newAccount, ct);
         if (_links is not null)
         {
-            // The link row has a DB-level composite foreign key to the account (#146), so the account is committed first. A crash
-            // between the two leaves an unlinked account, which the next sync finds by Institution and links again (lazy backfill).
-            await _db.SaveChangesAsync(ct);
-            await _links.LinkAsync(newAccount.Id, _provider.ProviderName, pa.ProviderId, ct);
+            // The link row has a DB-level composite foreign key to the account (#146), so the account is written first, but in the same
+            // transaction as the link (#180): a failure anywhere before the commit leaves neither row behind. A refused link (that provider
+            // account already belongs to another account) aborts only its savepoint, so the account itself still commits unlinked, as before.
+            // The retrying execution strategy rejects an explicit transaction that it does not wrap.
+            var linkStore = _links;
+            await _db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var tx = await _db.Database.BeginTransactionAsync(ct);
+                await _db.SaveChangesAsync(ct);
+                await tx.CreateSavepointAsync("account_link", ct);
+                if (!await linkStore.LinkAsync(newAccount.Id, _provider.ProviderName, pa.ProviderId, ct))
+                {
+                    await tx.RollbackToSavepointAsync("account_link", ct);
+                }
+
+                await tx.CommitAsync(ct);
+            });
         }
 
         return newAccount;

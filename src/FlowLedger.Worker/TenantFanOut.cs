@@ -29,6 +29,7 @@ internal static partial class TenantFanOut
         {
             await using var scope = root.CreateAsyncScope();
             scope.ServiceProvider.GetService<ConfiguredTenantContext>()?.Use(tenant);
+            using var span = FlowLedger.Worker.Scheduling.JobTrace.StartTenant(tenant);
             try
             {
                 await work(scope.ServiceProvider, tenant);

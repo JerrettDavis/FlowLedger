@@ -71,8 +71,10 @@ public static partial class CorrelationId
             // providers (MX, SimpleFIN, Home Assistant...) that share the same default HttpClient pipeline.
             if (request.RequestUri is { } uri && !uri.Host.Contains('.')
                 && !request.Headers.Contains(HeaderName)
-                && accessor.HttpContext?.Items[ItemKey] is string id)
+                && (accessor.HttpContext?.Items[ItemKey] as string ?? Activity.Current?.GetBaggageItem("correlation.id")) is { } id
+                && IsAcceptable(id))
             {
+                // A background job run has no HttpContext; its root span carries the run's correlation id as baggage (#193).
                 request.Headers.TryAddWithoutValidation(HeaderName, id);
             }
 

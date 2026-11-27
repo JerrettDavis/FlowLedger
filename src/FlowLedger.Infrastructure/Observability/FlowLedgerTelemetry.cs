@@ -89,6 +89,13 @@ public static class FlowLedgerTelemetry
     public static void RecordJobRetry(string job)
         => JobRetries.Add(1, new KeyValuePair<string, object?>("job", job));
 
+    /// <summary>Fire-time gate decisions (#187), tagged <c>job</c> and <c>outcome</c> (claimed | duplicate | store_failed_skipped | store_failed_ran | complete_failed).</summary>
+    public static readonly Counter<long> JobFireGate = Meter.CreateCounter<long>(
+        "flowledger.job.firegate", "{decision}", "Once-per-fire-time gate decisions by job and outcome; store_failed_* means the marks table was unreachable.");
+
+    public static void RecordJobFireGate(string job, string outcome)
+        => JobFireGate.Add(1, new KeyValuePair<string, object?>("job", job), new KeyValuePair<string, object?>("outcome", outcome));
+
     public static void RecordJobVetoed(string job)
         => JobRuns.Add(1, new KeyValuePair<string, object?>("job", job), new KeyValuePair<string, object?>("outcome", "vetoed"));
 }
