@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Infrastructure.DataSafety;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -52,7 +53,7 @@ internal sealed partial class DatabaseMigrationService : IHostedService
             // starter releases it automatically.
             var conn = DatabaseDataSource.Resolve(_config, db.Database)
                 ?? throw new InvalidOperationException("No connection string available for migrations.");
-            var waitSeconds = int.TryParse(_config["Database:MigrationLockTimeoutSeconds"], out var w) && w > 0 ? w : 300;
+            var waitSeconds = int.TryParse(_config["Database:MigrationLockTimeoutSeconds"], CultureInfo.InvariantCulture, out var w) && w > 0 ? w : 300;
             await using var migrationLock = await PostgresAdvisoryLock.AcquireAsync(conn, LockName, TimeSpan.FromSeconds(waitSeconds), cancellationToken);
 
             var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();

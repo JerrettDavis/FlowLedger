@@ -23,7 +23,7 @@ public static partial class ImportNormalizer
 
             string? Tag(string name)
             {
-                var m = Regex.Match(body, $@"<{name}>\s*([^<\r\n]*)", RegexOptions.IgnoreCase);
+                var m = Regex.Match(body, $@"<{name}>\s*([^<\r\n]*)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
                 return m.Success ? Unescape(m.Groups[1].Value.Trim()) : null;
             }
 
@@ -51,7 +51,7 @@ public static partial class ImportNormalizer
         return Finish("ofx", rows, [], skipped);
     }
 
-    [GeneratedRegex(@"<STMTTRN>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<STMTTRN>", RegexOptions.IgnoreCase, 1000)]
     private static partial Regex StmtTrnRegex();
 
     private static string Unescape(string s) =>

@@ -38,9 +38,15 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Query_result_cells_arrive_in_Web_as_JsonElement_and_keep_their_values()
     {
-        var result = new QueryResult(
-            [new QueryColumn("d", "date"), new QueryColumn("amount", "number"), new QueryColumn("who", "string")],
-            [["2026-03-04", 12.5m, "Cafe"], ["2026-03-05", 0m, null]], Truncated: true, ElapsedMs: 7);
+        var result = QueryResultBuilder.A()
+                                 .WithColumns([QueryColumnBuilder.A().WithName("d").WithType("date").Build(), QueryColumnBuilder.A().WithName("amount").Build(), QueryColumnBuilder.A()
+                                                                                                .WithName("who")
+                                                                                                .WithType("string")
+                                                                                                .Build()])
+                                 .WithRows([["2026-03-04", 12.5m, "Cafe"], ["2026-03-05", 0m, null]])
+                                 .WithTruncated(true)
+                                 .WithElapsedMs(7)
+                                 .Build();
 
         var back = JsonSerializer.Deserialize<QueryResult>(JsonSerializer.Serialize(result, ApiOptions), WebOptions)!;
 
@@ -56,17 +62,23 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Report_types_round_trip()
     {
-        var viz = new VizSpec("line", "month", ["income"], "kind", true);
-        var panel = new ReportPanel("Trend", "transactions | take 5", viz);
-        var result = new QueryResult([new QueryColumn("n", "number")], [[1], [2]], false, 3);
+        var viz = VizSpecBuilder.A().WithKind("line").WithX("month").WithY(["income"]).WithSeriesBy("kind").WithStacked(true).Build();
+        var panel = ReportPanelBuilder.A().WithTitle("Trend").WithQuery("transactions | take 5").WithViz(viz).Build();
+        var result = QueryResultBuilder.A().WithColumns([QueryColumnBuilder.A().Build()]).WithRows([[1], [2]]).WithElapsedMs(3).Build();
 
         AssertRoundTrips(viz);
         AssertRoundTrips(SavedReportDtoBuilder.A().WithPanels(panel).Build());
         AssertRoundTrips(SaveReportRequestBuilder.A().Named("Monthly").WithPanels(panel).Build());
-        AssertRoundTrips(new RunReportResultDto("r1", "Monthly", null, "Report",
-            [new PanelResultDto("Trend", "q", viz, result, null), new PanelResultDto("Bad", "q", viz, null, "boom")]));
-        AssertRoundTrips(new QuerySchemaDto(
-            [new DatasetInfo("transactions", "all", [new DatasetColumnInfo("date", "date", "when")])], ["sum"], ["count"], ["=="]));
+        AssertRoundTrips(RunReportResultDtoBuilder.A()
+                                     .WithPanels([PanelResultDtoBuilder.A().WithViz(viz).WithResult(result).Build(), PanelResultDtoBuilder.A()
+                                                                                  .WithTitle("Bad")
+                                                                                  .WithViz(viz)
+                                                                                  .WithError("boom")
+                                                                                  .Build()])
+                                     .Build());
+        AssertRoundTrips(QuerySchemaDtoBuilder.A()
+                                     .WithDatasets([DatasetInfoBuilder.A().WithColumns([DatasetColumnInfoBuilder.A().Build()]).Build()])
+                                     .Build());
     }
 
     [Fact]
@@ -82,16 +94,20 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Asset_and_net_worth_types_round_trip()
     {
-        var valuation = new AssetValuationDto(Id1, 100m, D, "Manual", null, At);
+        var valuation = AssetValuationDtoBuilder.A().WithId(Id1).WithAsOf(D).WithRecordedAt(At).Build();
         AssetDto asset = AssetDtoBuilder.A().WithId(Id1).WithValuations([valuation]).Build();
-        var worth = new NetWorthDto(10m, 4m, 3m, 9m, 1m, "USD", true, [new CurrencyTotalDto("EUR", 1m, 0m, 0m, 1m, 0m)]);
+        var worth = NetWorthDtoBuilder.A().WithByCurrency([CurrencyTotalDtoBuilder.A().Build()]).Build();
 
         AssertRoundTrips(asset);
         AssertRoundTrips(worth);
         AssertRoundTrips(valuation);
-        AssertRoundTrips(new AssetCategoryTemplateDto("Vehicle", "Vehicle", "Depreciation", 0.15m, 10, ["vin"]));
-        AssertRoundTrips(new AssetSummaryDto(1, 1m, 1m, 0m, 0m, 1m, [new AssetCategoryBreakdownDto("Vehicle", 1, 1m)], [asset], worth));
-        AssertRoundTrips(new AssetRefreshResultDto(true, "ok", asset));
+        AssertRoundTrips(AssetCategoryTemplateDtoBuilder.A().Build());
+        AssertRoundTrips(AssetSummaryDtoBuilder.A()
+                                     .WithByCategory([AssetCategoryBreakdownDtoBuilder.A().Build()])
+                                     .WithTopAssets([asset])
+                                     .WithNetWorth(worth)
+                                     .Build());
+        AssertRoundTrips(AssetRefreshResultDtoBuilder.A().WithAsset(asset).Build());
         AssertRoundTrips(CreateAssetRequestBuilder.A().Named("Car").InCategory("Vehicle").Worth(1m).ValuedOn(D).PurchasedOn(D, 1m).MadeBy(null, null)
             .Valued(null).WithAttributes(new Dictionary<string, string> { ["a"] = "b" }).Build());
         AssertRoundTrips(UpdateAssetRequestBuilder.A().Named("Car").InCategory("Vehicle").PurchasedOn(D, 1m).MadeBy(null, null).Valued("Manual", 0.1m).Build());
@@ -101,29 +117,44 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Bill_sheet_types_round_trip()
     {
-        var totals = new SheetTotalsDto(new SheetTotalsLine(1m, 2m, 3m, 4m, 5m), new SheetTotalsLine(1m, 1m, 1m, 1m, 1m));
+        var totals = SheetTotalsDtoBuilder.A()
+                                 .WithEstimated(SheetTotalsLineBuilder.A().WithOptional(2m).WithRequired(3m).WithPersonal(4m).WithBusiness(5m).Build())
+                                 .WithActual(SheetTotalsLineBuilder.A()
+                                                                                             .WithOptional(1m)
+                                                                                             .WithRequired(1m)
+                                                                                             .WithPersonal(1m)
+                                                                                             .WithBusiness(1m)
+                                                                                             .Build())
+                                 .Build();
         SheetRowDto row = SheetRowDtoBuilder.A().WithId(Id1).Build();
-        var view = new SheetViewDto(["2026-03"], "2026-03", [new SheetSectionDto("Home", [row], totals)], totals,
-            new SheetMonthSummaryDto("2026-03", 1, 2, 88m, 90m));
+        var view = SheetViewDtoBuilder.A()
+                               .WithSections([SheetSectionDtoBuilder.A().WithRows([row]).WithTotals(totals).Build()])
+                               .WithGrandTotals(totals)
+                               .Build();
 
         AssertRoundTrips(view);
         AssertRoundTrips(SaveBillRequestBuilder.A().InSection("Home").Named("Power").Perpetual().AutoPaying().DueOn(5).Estimating(90m).MatchingText("power")
             .Recurring(BillFrequency.EveryNWeeks, 2, D).Build());
         AssertRoundTrips(SetPaymentRequestBuilder.A().Paid().ForAmount(88m).InSlot(1).Build());
         AssertRoundTrips(ImportSheetRequestBuilder.A().OfCsv("a,b").Replacing().Build());
-        AssertRoundTrips(new SheetImportResult(1, 2, 3));
-        AssertRoundTrips(new SheetRefreshResult(1, 2, 3));
+        AssertRoundTrips(SheetImportResultBuilder.A().WithSections(1).WithBills(2).Build());
+        AssertRoundTrips(SheetRefreshResultBuilder.A().WithMarked(1).WithCleared(2).WithAdded(3).Build());
     }
 
     [Fact]
     public void Duplicate_import_sync_and_local_ai_types_round_trip()
     {
-        var side = new DuplicateSideDto(Id1, Id2, "AMZN", "Amazon", 5m, "Outflow", "Posted", D, null, "Auto", null, true);
-        AssertRoundTrips(new CategoryRuleDto("amzn", "Shopping.Online"));
-        AssertRoundTrips(new DuplicateSuggestionDto("k", "High", 0.97, 1, "same amount", side, side with { Id = Id2 }));
-        AssertRoundTrips(new ImportSummaryDto(Id1, 5, 1, 1, 0, [new RowErrorDto(3, "a,b", "bad date")]));
-        AssertRoundTrips(new MerchantGroupDto("Amazon", [new MerchantOccurrence("AMZN", 2)], 2, 0.8, "Amazon"));
-        AssertRoundTrips(new SimilarTransactionDto(Id1, D, "Amazon", "AMZN", 5m, "Outflow", null, 0.9));
-        AssertRoundTrips(new SyncResult(1, 2, 3, 4));
+        var side = DuplicateSideDtoBuilder.A().WithId(Id1).WithAccountId(Id2).WithEffectiveDate(D).Build();
+        AssertRoundTrips(CategoryRuleDtoBuilder.A().WithPattern("amzn").WithCategoryPath("Shopping.Online").Build());
+        AssertRoundTrips(DuplicateSuggestionDtoBuilder.A().WithKeep(side).WithRemove(side with { Id = Id2 }).Build());
+        AssertRoundTrips(ImportSummaryDtoBuilder.A().WithImportBatchId(Id1).WithRowErrors([RowErrorDtoBuilder.A().Build()]).Build());
+        AssertRoundTrips(MerchantGroupDtoBuilder.A().WithMembers([MerchantOccurrenceBuilder.A().WithRaw("AMZN").WithCount(2).Build()]).Build());
+        AssertRoundTrips(SimilarTransactionDtoBuilder.A().WithId(Id1).WithDate(D).Build());
+        AssertRoundTrips(SyncResultBuilder.A()
+                                     .WithAccountsUpserted(1)
+                                     .WithTransactionsAdded(2)
+                                     .WithTransactionsSkipped(3)
+                                     .WithRecurringFlowsAdded(4)
+                                     .Build());
     }
 }

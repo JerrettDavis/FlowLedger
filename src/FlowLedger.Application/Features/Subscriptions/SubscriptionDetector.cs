@@ -150,7 +150,7 @@ internal static class SubscriptionDetector
 }
 
 /// <summary>Lists the household's detected subscriptions with their price changes.</summary>
-public sealed class ListSubscriptionsHandler(
+internal sealed class ListSubscriptionsHandler(
     Abstractions.ITransactionRepository transactions, Abstractions.IAccountRepository accounts, TimeProvider clock)
 {
     /// <summary>Two years: enough for two yearly charges.</summary>

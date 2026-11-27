@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Insights;
@@ -25,8 +26,8 @@ public sealed class SpendingInsightsAnalyzerTests
 
     private static TransactionDto Tx(decimal amount, string dir, string date, Guid? cat, Guid? account = null,
         string? merchant = null, string[]? tags = null, string desc = "x") =>
-        new(Guid.NewGuid(), account ?? Card, amount, "USD", dir, desc, "Posted", "Manual",
-            DateOnly.Parse(date), DateOnly.Parse(date), cat, merchant, null, null, TestClock.Instant, null, tags);
+        TransactionDtoBuilder.A().OnAccount(account ?? Card).WithAmount(amount).WithDirection(dir).Described(desc).FromSource("Manual")
+            .On(DateOnly.Parse(date)).WithCategory(cat).WithMerchant(merchant).WithCreatedAt(TestClock.Instant).WithTags(tags).Build();
 
     private static BreakdownResult Run(IReadOnlyList<TransactionDto> txs, BreakdownQuery q) =>
         SpendingInsightsAnalyzer.Analyze(q, txs, Cats, Names, Types);
@@ -152,7 +153,10 @@ public sealed class SpendingInsightsAnalyzerTests
     {
         var parent = Tx(100, "Debit", "2026-11-03", Groceries) with
         {
-            Splits = [new TransactionSplitDto(70, Groceries, null), new TransactionSplitDto(30, Utilities, null)],
+            Splits = [TransactionSplitDtoBuilder.A().WithCategoryId(Groceries).Build(), TransactionSplitDtoBuilder.A()
+                                                                                    .WithAmount(30)
+                                                                                    .WithCategoryId(Utilities)
+                                                                                    .Build()],
         };
 
         var res = Run([parent], Q());

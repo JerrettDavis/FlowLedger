@@ -20,7 +20,7 @@ public sealed class TenantDataVersion(int maxTenants = TenantDataVersion.Default
 {
     public const int DefaultMaxTenants = 10_000;
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly Dictionary<Guid, (long Stamp, long Touched)> _stamps = [];
     private long _next;
     private long _tick;
@@ -77,7 +77,7 @@ public sealed class TenantResultCache(ITenantDataVersion versions, TimeProvider 
 {
     public const int DefaultMaxEntries = 200;
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly Dictionary<(Guid Tenant, string Key, long Version), (object Value, DateTimeOffset Expires, long Order)> _items = [];
     private readonly TimeProvider _time = time;
     private long _order;

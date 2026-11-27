@@ -20,7 +20,7 @@ public sealed class TenantLimitsTests
 
         public Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
         {
-            var dto = new SavedReportDto(Guid.NewGuid().ToString(), request.Name, request.Description, request.Kind, false, request.Panels, null, null);
+            var dto = SavedReportDtoBuilder.A().WithId(Guid.NewGuid().ToString()).Named(request.Name).WithDescription(request.Description).OfKind(request.Kind).WithPanels([.. request.Panels]).CreatedAt(null).Build();
             _items.Add(dto);
             return Task.FromResult(dto);
         }
@@ -31,7 +31,9 @@ public sealed class TenantLimitsTests
     }
 
     private static SaveReportRequest Report(string name) =>
-        new(name, null, "View", [new ReportPanel("p", "transactions | take 1", new VizSpec("table"))]);
+        SaveReportRequestBuilder.A().Named(name).OfKind("View")
+            .WithPanels(ReportPanelBuilder.A().WithQuery("transactions | take 1").WithViz(VizSpecBuilder.A().WithKind("table").Build()).Build())
+            .Build();
 
     [Fact]
     public void EnsureRoom_allows_up_to_the_limit_and_refuses_beyond_it()
@@ -79,7 +81,13 @@ public sealed class TenantLimitsTests
     public void Saved_report_payload_over_the_character_cap_fails_validation()
     {
         var huge = SaveReportRequestBuilder.A().Named("big")
-            .WithPanels(new ReportPanel("p", "transactions", new VizSpec("table", Y: Enumerable.Range(0, 20_000).Select(i => "column" + i).ToList()))).Build();
+            .WithPanels(ReportPanelBuilder.A()
+                                        .WithQuery("transactions")
+                                        .WithViz(VizSpecBuilder.A()
+                                                                             .WithKind("table")
+                                                                             .WithY(Enumerable.Range(0, 20_000).Select(i => "column" + i).ToList())
+                                                                             .Build())
+                                        .Build()).Build();
 
         var result = new SaveReportRequestValidator().Validate(huge);
 

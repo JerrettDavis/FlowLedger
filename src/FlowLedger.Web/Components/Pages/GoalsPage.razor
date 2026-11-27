@@ -29,7 +29,8 @@ else
             <MudTextField T="string" Immediate="true" Value="_name" ValueChanged="OnNameChanged" Label="Name" Style="min-width:min(220px,100%)" Margin="Margin.Dense"
                           Error="@(_feedback.Has("name") || _feedback.Has("goal"))" ErrorText="@(_feedback.For("name") ?? _feedback.For("goal"))" />
             <MudNumericField T="decimal" Immediate="true" Value="_target" ValueChanged="OnTargetChanged" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense"
-                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Target" />
+                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Target"
+                             Error="@_feedback.Has("targetAmount")" ErrorText="@_feedback.For("targetAmount")" />
             <MudSelect T="Guid?" @bind-Value="_linkedAccountId" ToStringFunc="@AccountName" Label="Track with account (optional)" Style="min-width:min(240px,100%)" Margin="Margin.Dense" Clearable="true"
                        HelperText="@(_linkedAccountId is null ? null : "Progress follows this account's balance.")" aria-label="Track with account"
                        Error="@_feedback.Has("linkedAccountId")" ErrorText="@_feedback.For("linkedAccountId")">
@@ -39,7 +40,8 @@ else
                 }
             </MudSelect>
             <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense"
-                             Disabled="@(_linkedAccountId is not null)" Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Saved so far" />
+                             Disabled="@(_linkedAccountId is not null)" Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Saved so far"
+                             Error="@_feedback.Has("savedAmount")" ErrorText="@_feedback.For("savedAmount")" />
             <MudDatePicker @bind-Date="_date" Label="Target date (optional)" Margin="Margin.Dense" Style="max-width:200px" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Goal(_name, _target) is not null)" aria-describedby="goal-reason">Save goal</MudButton>
             @if (_editId is not null)

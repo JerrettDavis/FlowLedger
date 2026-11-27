@@ -169,8 +169,8 @@ internal static class QueryPrompt
         return sb.ToString().TrimEnd();
     }
 
-    private static readonly Regex Think = new(@"<think>.*?</think>", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex Fence = new(@"```(?:[a-zA-Z]*)\s*\n?(.*?)```", RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex Think = new(@"<think>.*?</think>", RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+    private static readonly Regex Fence = new(@"```(?:[a-zA-Z]*)\s*\n?(?<body>.*?)```", RegexOptions.Singleline | RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     /// <summary>Strips reasoning tags, code fences and a leading "Query:" label, leaving just the query text.</summary>
     public static string ExtractQuery(string reply)
@@ -179,10 +179,10 @@ internal static class QueryPrompt
         var fence = Fence.Match(text);
         if (fence.Success)
         {
-            text = fence.Groups[1].Value.Trim();
+            text = fence.Groups["body"].Value.Trim();
         }
 
-        text = Regex.Replace(text, @"^\s*(query|answer)\s*:\s*", string.Empty, RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"^\s*(?:query|answer)\s*:\s*", string.Empty, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         return text.Trim().TrimEnd(';').Trim();
     }
 }
@@ -191,7 +191,7 @@ internal static class QueryPrompt
 /// Plain-English question to validated query. The model's output is only ever fed to the read-only in-memory query engine, and
 /// it is parsed AND executed here; on a parse/run error the error is sent back to the model for up to <see cref="MaxAttempts"/> tries.
 /// </summary>
-public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
+internal sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetProvider datasets, TimeProvider clock, QueryBudget? budget = null)
 {
     public const int MaxAttempts = 3;
     public const int MaxQuestionLength = 500;

@@ -6,7 +6,7 @@ using FlowLedger.SharedKernel;
 namespace FlowLedger.Application.Features.Categories;
 
 /// <summary>Lists all categories for the current tenant.</summary>
-public sealed class ListCategoriesHandler
+internal sealed class ListCategoriesHandler
 {
     private readonly ICategoryRepository _repo;
     private readonly ITenantContext _tenant;
@@ -34,7 +34,7 @@ public sealed class ListCategoriesHandler
 }
 
 /// <summary>Additively creates any default categories the tenant is missing; existing ones are never touched.</summary>
-public sealed class RestoreDefaultCategoriesHandler
+internal sealed class RestoreDefaultCategoriesHandler
 {
     private readonly ICategoryRepository _repo;
     private readonly ITenantContext _tenant;
@@ -66,7 +66,7 @@ public sealed class RestoreDefaultCategoriesHandler
 }
 
 /// <summary>Returns a single category by ID.</summary>
-public sealed class GetCategoryHandler
+internal sealed class GetCategoryHandler
 {
     private readonly ICategoryRepository _repo;
 
@@ -81,7 +81,7 @@ public sealed class GetCategoryHandler
 }
 
 /// <summary>Creates a new category for the current tenant.</summary>
-public sealed class CreateCategoryHandler
+internal sealed class CreateCategoryHandler
 {
     private readonly ICategoryRepository _repo;
     private readonly ITenantContext _tenant;
@@ -119,7 +119,7 @@ public sealed class CreateCategoryHandler
 }
 
 /// <summary>Renames a category.</summary>
-public sealed class UpdateCategoryHandler
+internal sealed class UpdateCategoryHandler
 {
     private readonly ICategoryRepository _repo;
     private readonly IRowVersionGuard? _guard;
@@ -148,7 +148,7 @@ public sealed class UpdateCategoryHandler
 }
 
 /// <summary>Deletes a non-system category.</summary>
-public sealed class DeleteCategoryHandler
+internal sealed class DeleteCategoryHandler
 {
     private readonly ICategoryRepository _repo;
     private readonly IRowVersionGuard? _guard;

@@ -21,7 +21,7 @@ internal sealed partial class ScheduledBackupJob : IJob
         _rawArchive = rawArchive;
     }
 
-    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken = default)
         => FlowLedger.Worker.Scheduling.JobTrace.RunAsync(context, _logger, ct => ExecuteCoreAsync(context, ct), cancellationToken);
 
     private async ValueTask ExecuteCoreAsync(IJobExecutionContext context, CancellationToken cancellationToken)

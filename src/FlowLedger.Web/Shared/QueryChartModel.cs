@@ -69,7 +69,7 @@ public sealed record ChartModel(IReadOnlyList<string> Categories, IReadOnlyList<
         }
 
         var xIsTime = result.Columns[xi].Type == "date" || (ToElement(result.Rows[0][xi]) is { ValueKind: JsonValueKind.String } first
-            && System.Text.RegularExpressions.Regex.IsMatch(first.GetString() ?? "", @"^\d{4}-(\d{2}|Q\d)"));
+            && System.Text.RegularExpressions.Regex.IsMatch(first.GetString() ?? "", @"^\d{4}-(?:\d{2}|Q\d)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)));
 
         var categories = new List<string>();
         var catIndex = new Dictionary<string, int>();

@@ -17,15 +17,13 @@ internal sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetReq
 {
     public SetBudgetRequestValidator()
     {
-        RuleFor(x => x)
-            .Must(r => !string.IsNullOrWhiteSpace(r.Category) && r.MonthlyLimit >= 0 && r.MonthlyLimit <= 100_000_000m)
-            .WithMessage("A category and a non-negative limit are required.")
-            .OverridePropertyName("budget");
+        RuleFor(x => x.Category).NotEmpty().WithMessage("Pick a category for the budget.");
+        RuleFor(x => x.MonthlyLimit).InclusiveBetween(0m, 100_000_000m).WithMessage("The monthly limit must be between 0 and 100,000,000.");
     }
 }
 
 /// <summary>Budgets with this month's actual spending (transfers excluded), rolled up from child categories.</summary>
-public sealed class ListBudgetsHandler(EffectiveBudgetService budgets, GetMonthlySpendByCategoryHandler spend, TimeProvider clock)
+internal sealed class ListBudgetsHandler(EffectiveBudgetService budgets, GetMonthlySpendByCategoryHandler spend, TimeProvider clock)
 {
     public async Task<BudgetOverview> HandleAsync(CancellationToken ct = default) => await HandleAsync(null, ct);
 
@@ -54,7 +52,7 @@ public static class BudgetLimits
 }
 
 /// <summary>Creates or updates one budget, refusing a new one past <see cref="BudgetLimits.MaxBudgets"/>; updating an existing one is always allowed.</summary>
-public sealed class SetBudgetHandler(IBudgetStore store, ITenantContext tenant)
+internal sealed class SetBudgetHandler(IBudgetStore store, ITenantContext tenant)
 {
     public async Task<uint> HandleAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default, bool? rollover = null)
     {

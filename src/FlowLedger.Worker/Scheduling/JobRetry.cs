@@ -1,3 +1,4 @@
+using System.Globalization;
 using FlowLedger.Infrastructure.Observability;
 using Quartz;
 
@@ -51,7 +52,7 @@ internal sealed partial class JobRetryScheduler(JobRetryOptions options, TimePro
     public const string AttemptKey = "retryAttempt";
 
     public static int AttemptOf(IJobExecutionContext context)
-        => context.MergedJobDataMap.ContainsKey(AttemptKey) && int.TryParse(context.MergedJobDataMap[AttemptKey]?.ToString(), out var n) ? n : 1;
+        => context.MergedJobDataMap.ContainsKey(AttemptKey) && int.TryParse(context.MergedJobDataMap[AttemptKey]?.ToString(), CultureInfo.InvariantCulture, out var n) ? n : 1;
 
     public async ValueTask TryScheduleAsync(IJobExecutionContext context, CancellationToken ct)
     {

@@ -112,7 +112,7 @@ public sealed class BillSheetServiceTests
 
         var result = await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
 
-        result.Should().Be(new SheetImportResult(2, 4, 3));
+        result.Should().Be(SheetImportResultBuilder.A().Build());
         var bills = await store.ListBillsAsync();
         bills.Select(b => b.Section).Distinct().Should().BeEquivalentTo(["Bills", "Sam Expenses"]);
         var power = bills.Single(b => b.Name == "Power Co");
@@ -145,7 +145,7 @@ public sealed class BillSheetServiceTests
 
         view.Months.Should().HaveCount(3).And.EndWith(BillSheetService.Key(ThisMonth));
         var bills = view.Sections.Single(s => s.Name == "Bills");
-        bills.Totals.Estimated.Should().Be(new SheetTotalsLine(530m, 30m, 500m, 520m, 10m));
+        bills.Totals.Estimated.Should().Be(SheetTotalsLineBuilder.A().WithTotal(530m).Build());
         view.GrandTotals.Estimated.Total.Should().Be(1530.5m);
         bills.Rows.Single(r => r.Name == "Power Co").AccountRefMasked.Should().Be("••••7890");
         view.Sections.Single(s => s.Name == "Sam Expenses").Rows.Single().AccountRefMasked.Should().Be("12 mo no interest");
@@ -169,7 +169,7 @@ public sealed class BillSheetServiceTests
         view.Summary.PaidAmount.Should().BeGreaterThanOrEqualTo(455.10m);
 
         // Idempotent: nothing new on a second run.
-        (await svc.RefreshAsync()).Should().Be(new SheetRefreshResult(0, 0));
+        (await svc.RefreshAsync()).Should().Be(SheetRefreshResultBuilder.A().Build());
     }
 
     [Fact]

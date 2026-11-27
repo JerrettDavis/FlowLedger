@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Bunit;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Web.ApiClient;
 using FlowLedger.Web.Components.Pages;
 using FlowLedger.Web.Shared;
@@ -80,6 +81,16 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
         await cut.InvokeAsync(() => field.Instance.ValueChanged.InvokeAsync("coffee shop"));
 
         handler.Queries.Last().Should().Contain("search=coffee%20shop");
+    }
+
+    [Fact]
+    public void The_amount_filters_show_the_display_currency_symbol()
+    {
+        var cut = RenderPage(new Handler());
+
+        cut.WaitForAssertion(() => cut.FindAll(".mud-input-adornment-start").Select(a => a.TextContent.Trim()).Should().Contain("$"));
+        cut.Find("input[aria-label='Minimum amount']").ParentElement!.QuerySelector(".mud-input-adornment-start")!.TextContent.Trim().Should().Be("$");
+        cut.Find("input[aria-label='Maximum amount']").ParentElement!.QuerySelector(".mud-input-adornment-start")!.TextContent.Trim().Should().Be("$");
     }
 
     [Fact]
@@ -173,8 +184,8 @@ public sealed class TransactionsPageTests : BunitContext, IAsyncLifetime
     }
 
     private static TransactionDto Tx(string merchant, Guid? id = null) =>
-        new(id ?? Guid.NewGuid(), AccountId, 5m, "USD", "Debit", merchant.ToUpperInvariant() + " #1", "Posted", "x",
-            new DateOnly(2026, 1, 1), null, null, merchant, null, null, DateTimeOffset.UnixEpoch);
+        TransactionDtoBuilder.A().WithId(id ?? Guid.NewGuid()).OnAccount(AccountId).WithAmount(5m).Described(merchant.ToUpperInvariant() + " #1")
+            .FromSource("x").Unposted(new DateOnly(2026, 1, 1)).WithMerchant(merchant).WithCreatedAt(DateTimeOffset.UnixEpoch).Build();
 
     [Fact]
     public void Merchant_match_counts_other_rows_from_the_same_merchant_case_insensitively()

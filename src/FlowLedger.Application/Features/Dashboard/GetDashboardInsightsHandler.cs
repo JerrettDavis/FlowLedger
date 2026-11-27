@@ -11,7 +11,7 @@ namespace FlowLedger.Application.Features.Dashboard;
 /// the bounded balance-history window, so no request loads the transaction history (#160); without them (unit tests, bare hosts) the same
 /// figures are composed from the query engine over its already-scoped datasets. The two paths are pinned equal by equivalence tests.
 /// </summary>
-public sealed class GetDashboardInsightsHandler(
+internal sealed class GetDashboardInsightsHandler(
     RunQueryHandler query,
     TimeProvider clock,
     TenantResultCache? cache = null,

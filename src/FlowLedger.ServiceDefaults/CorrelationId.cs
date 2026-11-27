@@ -19,7 +19,7 @@ public static partial class CorrelationId
     public const string HeaderName = "X-Correlation-Id";
     public const string ItemKey = "FlowLedger.CorrelationId";
 
-    [GeneratedRegex("^[A-Za-z0-9._-]{1,64}$")]
+    [GeneratedRegex("^[A-Za-z0-9._-]{1,64}$", RegexOptions.None, 1000)]
     private static partial Regex Safe();
 
     /// <summary>Accepts only short, header/log-safe tokens so the value can never smuggle markup or log-forging text.</summary>

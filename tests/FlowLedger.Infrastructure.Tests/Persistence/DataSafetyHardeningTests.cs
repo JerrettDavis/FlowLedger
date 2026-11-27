@@ -6,6 +6,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Npgsql;
 
@@ -121,7 +122,7 @@ public sealed class DataSafetyHardeningTests : IAsyncLifetime
         public Task<SyncResult> SyncAsync(CancellationToken ct = default)
         {
             Calls++;
-            return Task.FromResult(new SyncResult(0, 0, 0, 0));
+            return Task.FromResult(SyncResultBuilder.A().Build());
         }
     }
 

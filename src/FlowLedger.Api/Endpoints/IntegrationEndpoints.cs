@@ -106,4 +106,11 @@ internal static class IntegrationEndpoints
 
     private static IResult Failed(string title, string? detail)
         => Results.Problem(title: title, detail: detail, statusCode: StatusCodes.Status422UnprocessableEntity);
+
+    /// <summary>A rejected console call: with a field it is a 422 validation problem so the console can mark that input (#211).</summary>
+    private static IResult Failed(string title, CallRejection? rejection)
+        => rejection?.Field is { } field
+            ? Results.ValidationProblem(
+                new Dictionary<string, string[]> { [field] = [rejection.Message] }, detail: rejection.Message, title: title, statusCode: StatusCodes.Status422UnprocessableEntity)
+            : Failed(title, rejection?.Message);
 }

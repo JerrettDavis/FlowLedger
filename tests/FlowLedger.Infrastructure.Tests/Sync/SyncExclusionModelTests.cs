@@ -2,6 +2,7 @@ using CsCheck;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
@@ -58,7 +59,7 @@ public sealed class SyncExclusionModelTests
                 }
 
                 LastCommit = clock.GetUtcNow();
-                return new SyncResult(0, 0, 0, 0);
+                return SyncResultBuilder.A().Build();
             }
             finally
             {

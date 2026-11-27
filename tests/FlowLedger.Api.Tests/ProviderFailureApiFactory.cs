@@ -1,5 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.SharedKernel;
+using FlowLedger.TestSupport.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,7 +36,7 @@ public sealed class ProviderFailureApiFactory : FlowLedgerApiFactory
         public Task<string> ConnectAsync(CancellationToken ct = default) => Task.FromResult("fake-member");
 
         public Task<SyncResult> SyncAsync(CancellationToken ct = default) =>
-            owner.Failure is { } ex ? Task.FromException<SyncResult>(ex) : Task.FromResult(new SyncResult(0, 0, 0, 0));
+            owner.Failure is { } ex ? Task.FromException<SyncResult>(ex) : Task.FromResult(SyncResultBuilder.A().Build());
     }
 
     private sealed class FakeConnectionStore(ProviderFailureApiFactory owner) : IProviderConnectionStore

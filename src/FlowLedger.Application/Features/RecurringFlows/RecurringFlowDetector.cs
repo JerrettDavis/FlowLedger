@@ -162,10 +162,10 @@ internal static partial class RecurringFlowDetector
     // the amount tells a $260 biweekly top-up from a $50 monthly one on the very same account pair. Merchant normalization
     // drops the suffix (it contains digits), so transfers carry their reference and amount into the grouping name.
     private static readonly System.Text.RegularExpressions.Regex TransferText = new(
-        @"(transfer|xfer)\s+(to|from)\s", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        @"(?:transfer|xfer)\s+(?:to|from)\s", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private static readonly System.Text.RegularExpressions.Regex AccountRef = new(
-        @"[*#x]\s*(\d{3,})", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        @"[*#x]\s*(?<ref>\d{3,})", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private const char TransferMarker = '§';
 
@@ -175,7 +175,7 @@ internal static partial class RecurringFlowDetector
     public static string TransferRef(string? text)
     {
         var m = text is null ? null : AccountRef.Match(text);
-        return m is { Success: true } ? m.Groups[1].Value : string.Empty;
+        return m is { Success: true } ? m.Groups["ref"].Value : string.Empty;
     }
 
     private static string GroupingName(FlowTxn t)

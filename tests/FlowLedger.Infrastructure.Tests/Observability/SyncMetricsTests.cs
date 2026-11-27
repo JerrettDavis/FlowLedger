@@ -3,6 +3,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Sync;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Observability;
@@ -60,7 +61,7 @@ public sealed class SyncMetricsTests
     public async Task Successful_sync_is_counted_as_success()
     {
         using var capture = new Capture();
-        await Service(() => Task.FromResult(new SyncResult(1, 2, 0, 0)), TimeSpan.Zero).SyncAsync();
+        await Service(() => Task.FromResult(SyncResultBuilder.A().WithAccountsUpserted(1).WithTransactionsAdded(2).Build()), TimeSpan.Zero).SyncAsync();
         capture.Outcomes.Should().Contain("success");
     }
 
@@ -77,7 +78,7 @@ public sealed class SyncMetricsTests
     public async Task Throttled_sync_is_counted_as_throttled()
     {
         using var capture = new Capture();
-        var act = () => Service(() => Task.FromResult(new SyncResult(0, 0, 0, 0)), TimeSpan.FromHours(1), TestClock.Instant.AddMinutes(-1)).SyncAsync();
+        var act = () => Service(() => Task.FromResult(SyncResultBuilder.A().Build()), TimeSpan.FromHours(1), TestClock.Instant.AddMinutes(-1)).SyncAsync();
         await act.Should().ThrowAsync<SyncThrottledException>();
         capture.Outcomes.Should().Contain("throttled");
     }

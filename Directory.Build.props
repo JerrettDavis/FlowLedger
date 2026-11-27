@@ -36,6 +36,9 @@
   <!-- Banned APIs (#113): BannedSymbols.txt at the repo root states the rationale per entry. Production code only; tests may print and block. -->
   <ItemGroup Condition="'$(IsTestProject)' != 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
+    <!-- Curated Meziantou rule set (#113): every rule parked at none except the ones the tree is held to; reasons in the file and in .editorconfig. -->
+    <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)eng/meziantou.globalconfig" />
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
   </ItemGroup>
 </Project>

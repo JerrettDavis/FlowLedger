@@ -1,5 +1,6 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Infrastructure.Sync;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Infrastructure.Tests.Sync;
@@ -23,7 +24,12 @@ public sealed class GuardedSyncServiceTests
                 await Gate.Task;
             }
 
-            return new SyncResult(1, 2, 3, 4);
+            return SyncResultBuilder.A()
+                                   .WithAccountsUpserted(1)
+                                   .WithTransactionsAdded(2)
+                                   .WithTransactionsSkipped(3)
+                                   .WithRecurringFlowsAdded(4)
+                                   .Build();
         }
     }
 

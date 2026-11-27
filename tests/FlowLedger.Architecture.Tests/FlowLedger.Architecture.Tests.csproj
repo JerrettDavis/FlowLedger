@@ -35,4 +35,16 @@
     <ProjectReference Include="..\..\src\FlowLedger.Web\FlowLedger.Web.csproj" />
   </ItemGroup>
 
+  <!-- Build order only (#173): PositionalDtoConstructionTests reads the built test assemblies, so they must exist before this project runs. -->
+  <ItemGroup>
+    <ProjectReference Include="..\FlowLedger.Domain.Tests\FlowLedger.Domain.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Application.Tests\FlowLedger.Application.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Infrastructure.Tests\FlowLedger.Infrastructure.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Integrations.Tests\FlowLedger.Integrations.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Worker.Tests\FlowLedger.Worker.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Api.Tests\FlowLedger.Api.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Web.Tests\FlowLedger.Web.Tests.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FlowLedger.Bdd.Tests\FlowLedger.Bdd.Tests.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
 </Project>

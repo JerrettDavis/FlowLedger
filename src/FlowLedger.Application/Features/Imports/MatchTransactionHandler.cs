@@ -7,7 +7,7 @@ namespace FlowLedger.Application.Features.Imports;
 /// <summary>
 /// Manually links an actual transaction to a planned occurrence.
 /// </summary>
-public sealed class MatchTransactionHandler
+internal sealed class MatchTransactionHandler
 {
     private readonly ITransactionRepository _txRepo;
     private readonly IPlannedOccurrenceRepository _occurrenceRepo;

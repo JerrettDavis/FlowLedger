@@ -171,7 +171,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
         // overlap would step back over what the previous page covered and never finish.
         var continuing = cursor.Value.StartsWith(ContinuationPrefix, StringComparison.Ordinal);
         var cursorText = continuing ? cursor.Value[ContinuationPrefix.Length..] : cursor.Value;
-        var from = cursor.IsInitial || !DateOnly.TryParse(cursorText, out var c)
+        var from = cursor.IsInitial || !DateOnly.TryParse(cursorText, CultureInfo.InvariantCulture, out var c)
             ? today.AddDays(-Math.Max(1, _options.InitialHistoryDays))
             : continuing ? c : c.AddDays(-Math.Max(0, _options.OverlapDays));
 

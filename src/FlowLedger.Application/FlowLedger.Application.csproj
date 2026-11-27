@@ -9,6 +9,14 @@
   <ItemGroup>
     <!-- Feature internals (calculators, detectors, result records) are exercised directly by the unit tests. -->
     <InternalsVisibleTo Include="FlowLedger.Application.Tests" />
+    <!-- Use-case handlers are internal (#121): only the hosts that wire them to a transport, and the tests that drive them, see them. -->
+    <InternalsVisibleTo Include="FlowLedger.Api" />
+    <InternalsVisibleTo Include="FlowLedger.Worker" />
+    <InternalsVisibleTo Include="FlowLedger.Infrastructure" />
+    <InternalsVisibleTo Include="FlowLedger.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="FlowLedger.Bdd.Tests" />
+    <InternalsVisibleTo Include="FlowLedger.Api.Tests" />
+    <InternalsVisibleTo Include="FlowLedger.Worker.Tests" />
   </ItemGroup>
 
   <ItemGroup>

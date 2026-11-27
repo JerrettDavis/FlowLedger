@@ -11,7 +11,7 @@ internal static class AutoTagger
 {
     public const decimal LargeThreshold = 500m;
 
-    private static Regex Rx(string p) => new(p, RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static Regex Rx(string p) => new(p, RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private static readonly (string Tag, Regex Pattern, string? Direction)[] Rules =
     [

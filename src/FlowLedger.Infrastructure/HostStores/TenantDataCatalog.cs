@@ -14,7 +14,7 @@ internal sealed record TenantTable(string Schema, string Table, string TenantCol
 /// </summary>
 internal static partial class TenantDataCatalog
 {
-    [GeneratedRegex("^[a-z_][a-z0-9_]*$")]
+    [GeneratedRegex("^[a-z_][a-z0-9_]*$", RegexOptions.None, 1000)]
     private static partial Regex SafeIdentifier();
 
     /// <summary>Every non-owned root entity that carries a tenant column, one entry per table. Owned collections live in tables that

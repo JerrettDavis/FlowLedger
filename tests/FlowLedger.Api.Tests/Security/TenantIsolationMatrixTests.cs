@@ -108,7 +108,12 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             SaveBillRequestBuilder.A().InSection(secret).Named($"{secret} Bill").DueOn(4).Build());
         var report = await CreateAsync(a, "/api/reports",
             SaveReportRequestBuilder.A().Named($"{secret} Report").Described("d")
-                .WithPanels(new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build());
+                .WithPanels(ReportPanelBuilder.A()
+                                                .WithViz(VizSpecBuilder.A()
+                                                                                                                             .WithX("merchant")
+                                                                                                                             .WithY(["t"])
+                                                                                                                             .Build())
+                                                .Build()).Build());
         var goal = await CreateAsync(a, "/api/goals", new { name = $"{secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
 
         var transaction2 = await CreateAsync(a, "/api/transactions",

@@ -299,7 +299,7 @@ internal static partial class SpendingInsightsAnalyzer
 /// (a constant number of statements, whatever the history size) and only the split ones are read as rows; without it (or for an inverted
 /// range) the history is loaded and analyzed in memory.
 /// </summary>
-public sealed class GetSpendingBreakdownHandler(
+internal sealed class GetSpendingBreakdownHandler(
     ITransactionRepository repo, IAccountRepository accounts, ICategoryRepository categories,
     IBreakdownStore? store = null, ITransactionAggregateStore? transferSource = null)
 {

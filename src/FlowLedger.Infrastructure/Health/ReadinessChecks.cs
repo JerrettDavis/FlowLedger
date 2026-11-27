@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -131,7 +132,7 @@ internal sealed class RedisReadinessCheck(IConfiguration configuration) : IHealt
         }
 
         host = endpoint[..colon];
-        return host.Length > 0 && int.TryParse(endpoint[(colon + 1)..], out port);
+        return host.Length > 0 && int.TryParse(endpoint[(colon + 1)..], CultureInfo.InvariantCulture, out port);
     }
 }
 
@@ -156,7 +157,7 @@ internal sealed class BackupFreshnessCheck(IConfiguration configuration, TimePro
             return HealthCheckResult.Degraded("Connection string 'flowledger' is not configured.");
         }
 
-        var maxAge = TimeSpan.FromHours(double.TryParse(configuration["Health:BackupMaxAgeHours"], out var h) && h > 0 ? h : 36);
+        var maxAge = TimeSpan.FromHours(double.TryParse(configuration["Health:BackupMaxAgeHours"], CultureInfo.InvariantCulture, out var h) && h > 0 ? h : 36);
 
         try
         {
@@ -249,7 +250,7 @@ internal sealed class LastSyncAgeCheck(IConfiguration configuration, TimeProvide
             return HealthCheckResult.Degraded("Connection string 'flowledger' is not configured.");
         }
 
-        var maxAge = TimeSpan.FromHours(double.TryParse(configuration["Health:SyncMaxAgeHours"], out var h) && h > 0 ? h : 48);
+        var maxAge = TimeSpan.FromHours(double.TryParse(configuration["Health:SyncMaxAgeHours"], CultureInfo.InvariantCulture, out var h) && h > 0 ? h : 48);
 
         try
         {
@@ -342,7 +343,7 @@ internal sealed class CachedHealthCheck(IHealthCheck inner, TimeSpan ttl, TimePr
 
     /// <summary>Health:CacheSeconds (default 5, 0 disables caching).</summary>
     public static TimeSpan TtlFrom(IConfiguration configuration)
-        => int.TryParse(configuration["Health:CacheSeconds"], out var seconds) && seconds >= 0 ? TimeSpan.FromSeconds(seconds) : DefaultTtl;
+        => int.TryParse(configuration["Health:CacheSeconds"], CultureInfo.InvariantCulture, out var seconds) && seconds >= 0 ? TimeSpan.FromSeconds(seconds) : DefaultTtl;
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {

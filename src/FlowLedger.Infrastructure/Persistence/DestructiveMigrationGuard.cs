@@ -105,6 +105,6 @@ internal static partial class DestructiveMigrationGuard
             && !string.Equals(old.ColumnType, a.ColumnType, StringComparison.OrdinalIgnoreCase);
     }
 
-    [GeneratedRegex(@"\b(DROP\s+(TABLE|COLUMN|SCHEMA)|DELETE\s+FROM|TRUNCATE)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:DROP\s+(?:TABLE|COLUMN|SCHEMA)|DELETE\s+FROM|TRUNCATE)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 1000)]
     private static partial Regex DestructiveSql();
 }

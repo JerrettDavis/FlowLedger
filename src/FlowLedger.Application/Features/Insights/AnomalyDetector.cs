@@ -19,8 +19,8 @@ internal static class AnomalyDetector
     private const double ZThreshold = 5.0;
     private const double MadToSigma = 1.4826;
 
-    private static readonly Regex NonLetters = new(@"[^A-Z&\s]", RegexOptions.Compiled);
-    private static readonly Regex Spaces = new(@"\s+", RegexOptions.Compiled);
+    private static readonly Regex NonLetters = new(@"[^A-Z&\s]", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+    private static readonly Regex Spaces = new(@"\s+", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     /// <summary>Merchant key with store numbers/ids stripped so "SHELL #123" and "SHELL #456" group together.</summary>
     public static string MerchantKey(TransactionDto t)

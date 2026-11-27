@@ -21,7 +21,7 @@ public sealed record AutoAddResult(int Added, IReadOnlyList<string> Names);
 /// Obvious ones (fixed amount, very regular) are added automatically after a sync; everything else is offered as a
 /// suggestion the user can accept or dismiss. Patterns already covered by an existing flow, or dismissed, never reappear.
 /// </summary>
-public sealed class RecurringSuggestionService(
+internal sealed class RecurringSuggestionService(
     ITransactionRepository transactions,
     IAccountRepository accounts,
     IRecurringFlowRepository flows,

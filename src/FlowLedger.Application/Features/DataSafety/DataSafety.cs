@@ -57,7 +57,7 @@ public sealed record DataStatus(
     BackupRunView? LastRun, IReadOnlyList<BackupRunView> Runs, IReadOnlyList<JobRunView> JobRuns, ProviderUsageView ProviderUsage);
 
 /// <summary>Composes the Data page status from the reader port; the staleness rule lives here so it is testable without HTTP (#94).</summary>
-public sealed class GetDataStatusHandler(IDataSafetyReader reader, TimeProvider clock)
+internal sealed class GetDataStatusHandler(IDataSafetyReader reader, TimeProvider clock)
 {
     public static readonly TimeSpan StaleAfter = TimeSpan.FromHours(36);
 
@@ -87,7 +87,7 @@ public sealed record ExportDataOutcome(string? ZipPath, bool AllTenants, string?
 /// Export scope rules (#139): the DEFAULT is the caller's own tenant (also <c>scope=tenant</c>); the whole-database dump is the explicit
 /// <c>scope=all</c> (disaster recovery only); an explicit tenant id exports that tenant. Callers are gated by the endpoint, not here.
 /// </summary>
-public sealed class ExportDataHandler(IDataArchive archive, ITenantContext tenant)
+internal sealed class ExportDataHandler(IDataArchive archive, ITenantContext tenant)
 {
     public async Task<ExportDataOutcome> HandleAsync(string? scope, Guid? tenantId, CancellationToken ct = default)
     {
@@ -105,7 +105,7 @@ public sealed class ExportDataHandler(IDataArchive archive, ITenantContext tenan
 }
 
 /// <summary>Imports an export zip into an empty database; the archive port enforces the size, path and emptiness guards.</summary>
-public sealed class ImportDataHandler(IDataArchive archive)
+internal sealed class ImportDataHandler(IDataArchive archive)
 {
     public Task<DataImportOutcome> HandleAsync(Stream zip, CancellationToken ct = default) => archive.ImportAsync(zip, ct);
 }
