@@ -22,7 +22,7 @@ public static class DependencyInjection
         AddServices(services);
 
         // ── FluentValidation ─────────────────────────────────────────────────────
-        services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);
+        services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped, includeInternalTypes: true);
 
         return services;
     }

@@ -12,7 +12,7 @@ internal static class AssetRules
     public static bool IsMethod(string? v) => string.IsNullOrWhiteSpace(v) || Methods.Contains(v, StringComparer.OrdinalIgnoreCase);
 }
 
-public sealed class CreateAssetRequestValidator : AbstractValidator<CreateAssetRequest>
+internal sealed class CreateAssetRequestValidator : AbstractValidator<CreateAssetRequest>
 {
     public CreateAssetRequestValidator()
     {
@@ -39,7 +39,7 @@ public sealed class CreateAssetRequestValidator : AbstractValidator<CreateAssetR
     }
 }
 
-public sealed class UpdateAssetRequestValidator : AbstractValidator<UpdateAssetRequest>
+internal sealed class UpdateAssetRequestValidator : AbstractValidator<UpdateAssetRequest>
 {
     public UpdateAssetRequestValidator()
     {
@@ -63,7 +63,7 @@ public sealed class UpdateAssetRequestValidator : AbstractValidator<UpdateAssetR
     }
 }
 
-public sealed class RecordValuationRequestValidator : AbstractValidator<RecordValuationRequest>
+internal sealed class RecordValuationRequestValidator : AbstractValidator<RecordValuationRequest>
 {
     public RecordValuationRequestValidator()
     {

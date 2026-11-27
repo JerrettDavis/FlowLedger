@@ -11,7 +11,7 @@ public sealed record BudgetStatus(string Category, decimal MonthlyLimit, decimal
 
 public sealed record BudgetOverview(string Month, IReadOnlyList<BudgetStatus> Budgets, Dictionary<string, decimal> SpendByCategory);
 
-public sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetRequest>
+internal sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetRequest>
 {
     public SetBudgetRequestValidator()
     {

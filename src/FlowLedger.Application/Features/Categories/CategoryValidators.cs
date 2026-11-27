@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.Categories;
 
-public sealed class CreateCategoryRequestValidator : AbstractValidator<CreateCategoryRequest>
+internal sealed class CreateCategoryRequestValidator : AbstractValidator<CreateCategoryRequest>
 {
     public CreateCategoryRequestValidator()
     {
@@ -16,7 +16,7 @@ public sealed class CreateCategoryRequestValidator : AbstractValidator<CreateCat
     }
 }
 
-public sealed class UpdateCategoryRequestValidator : AbstractValidator<UpdateCategoryRequest>
+internal sealed class UpdateCategoryRequestValidator : AbstractValidator<UpdateCategoryRequest>
 {
     public UpdateCategoryRequestValidator()
     {
