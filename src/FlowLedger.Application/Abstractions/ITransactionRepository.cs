@@ -3,6 +3,15 @@ using FlowLedger.Domain.ValueObjects;
 
 namespace FlowLedger.Application.Abstractions;
 
+/// <summary>Column a transaction list can be ordered by on the server (#209). Date is the default and the tie-break for the others.</summary>
+public enum TransactionSortKey
+{
+    Date,
+    Merchant,
+    Description,
+    Amount,
+}
+
 /// <summary>
 /// Repository abstraction for the Transaction aggregate.
 /// All methods are tenant-scoped via the ambient ITenantContext.
@@ -30,7 +39,9 @@ public interface ITransactionRepository
         int take = 100,
         CancellationToken ct = default,
         bool everydayOnly = false,
-        string? search = null);
+        string? search = null,
+        TransactionSortKey sort = TransactionSortKey.Date,
+        bool descending = true);
 
     /// <summary>
     /// How many transactions match the same filters as <see cref="ListAsync"/> (ignoring paging), so a grid can show
