@@ -19,6 +19,7 @@ namespace FlowLedger.Infrastructure.Tests.Persistence;
 /// shared Postgres container, so they never disturb the shared migrated database.
 /// </summary>
 [Collection("Integration")]
+[Trait("Invariant", "INV-08")]
 public sealed class MigrationTests : IAsyncLifetime
 {
     private const string Initial = "20260612041641_InitialCreate";
