@@ -119,7 +119,7 @@ public sealed class ScheduledSyncJobRetryTests
         public int RefireCount => 0;
         public int RetryAttempt => 0;
         public JobDataMap MergedJobDataMap => new();
-        public IJobDetail JobDetail => throw new NotImplementedException();
+        public IJobDetail JobDetail { get; } = JobBuilder.Create<ScheduledSyncJob>().WithIdentity(nameof(ScheduledSyncJob), "FlowLedger").Build();
         public IJob JobInstance => throw new NotImplementedException();
         public DateTimeOffset FireTimeUtc => TestClock.Instant;
         public DateTimeOffset? ScheduledFireTimeUtc => null;

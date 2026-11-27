@@ -152,7 +152,7 @@ internal sealed partial class DataEnvironmentGuardService : IHostedService
     {
         await using var scope = _sp.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FlowLedgerDbContext>();
-        var conn = db.Database.GetConnectionString()
+        var conn = FlowLedger.Infrastructure.Persistence.DatabaseDataSource.Resolve(_config, db.Database)
             ?? throw new InvalidOperationException("No connection string available for the data-environment guard.");
 
         var mxEnabled = bool.TryParse(_config["Mx:Enabled"], out var e) && e;

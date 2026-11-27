@@ -39,7 +39,10 @@ internal sealed partial class ScheduledSyncJob : IJob
     }
 
     /// <inheritdoc/>
-    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    public ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+        => FlowLedger.Worker.Scheduling.JobTrace.RunAsync(context, _logger, ct => ExecuteCoreAsync(context, ct), cancellationToken);
+
+    private async ValueTask ExecuteCoreAsync(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         if (!_options.Enabled)
         {

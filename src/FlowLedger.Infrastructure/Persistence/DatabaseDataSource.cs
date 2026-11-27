@@ -63,6 +63,13 @@ public static class DatabaseDataSource
         return builder.ConnectionString;
     }
 
+    /// <summary>
+    /// The real connection string (password included). Once EF is given a data source, <c>Database.GetConnectionString()</c> reports a
+    /// redacted copy, so tooling that opens its own connection (migrations, advisory locks, version probes) reads it from configuration.
+    /// </summary>
+    public static string? Resolve(IConfiguration configuration, Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade database)
+        => configuration.GetConnectionString("flowledger") ?? Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.GetConnectionString(database);
+
     public static NpgsqlDataSource Create(string connectionString, DatabaseConnectionOptions options)
         => new NpgsqlDataSourceBuilder(Normalize(connectionString, options)).Build();
 }

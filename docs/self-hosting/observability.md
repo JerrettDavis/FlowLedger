@@ -8,8 +8,7 @@ characters) is kept; anything else is replaced by the request's trace id. The id
 web and API log lines of a request. The W3C `traceparent` header also propagates between web and API through the
 standard HTTP instrumentation, so traces join up in your OTLP backend.
 
-Not done yet: the worker does not start a trace per job run, so worker log lines do not share an id with the request
-that triggered them (a Quartz job listener cannot set the ambient activity for the job body; it needs a job wrapper).
+Background jobs: every worker job run is its own root trace (`job <name>`, span source `FlowLedger.Worker`, with a `tenant work` child span per tenant). The run's correlation id is the trace id: it is the span tag `correlation.id`, W3C baggage (so internal HTTP calls forward it as `X-Correlation-Id`) and the `CorrelationId` log scope of every log line in the run. Quartz's own firing spans and meter are exported as well.
 
 ## Metrics
 
@@ -29,6 +28,8 @@ Meter `FlowLedger`, exported when `OTEL_EXPORTER_OTLP_ENDPOINT` is set:
 | `flowledger.audit.events` | `action` | Audit events written. |
 
 The `Npgsql` meter (connection pool and command metrics) and the `Npgsql` trace source are exported too.
+
+EF Core has no stable built-in ActivitySource; its queries are traced through the `Npgsql` command spans (one per SQL command, parented to the request or job run). No third-party EF instrumentation package is used.
 
 ## Job history and retries
 
@@ -55,7 +56,8 @@ Sensitive actions append a row to `audit_events` (created on first use, included
 `occurred_utc, tenant_id, actor, action, target, remote_ip, trace_id, status_code`. `trace_id` is the same W3C trace id that
 appears in the logs, so a row can be joined to the log lines of that request. Audited actions: `connector.link`,
 `connector.unlink`, `connector.connect`, `connector.mx_connect`, `connector.quiltt_session`, `data.export`, `data.import`,
-`data.backup_now`, `home_assistant.save`, `integration.create|update|delete|rotate_secret`, `user.link_code|link|unlink`.
+`data.backup_now`, `home_assistant.save`, `integration.create|update|delete|rotate_secret`, `user.link_code|link|unlink`,
+`secrets.reencrypt` (key rotation), `archive.seal`, `tenant.offboard`, `account.deactivate`, `asset.deactivate`, `recurring.deactivate`, `category.delete`, `category.clear_auto`, `transaction.merge_duplicate`, `budget.delete`, `goal.delete`.
 Failed and denied attempts are recorded as well (`status_code`). The table is append-only by construction (the application has
 no update or delete path), not by a database trigger; restrict the database role if you need it enforced. A failed audit write
 is logged and does not change the response.
@@ -98,5 +100,5 @@ Prometheus, so it commonly becomes `exported_job`); adjust the selectors to matc
 
 - Failed API-key authentication attempts are not written to `audit_events` (an anonymous caller could otherwise fill the table);
   they are visible in the request logs only.
-- Destructive edits of ordinary data (delete a transaction, ...) are not audited, only the actions listed above.
-- EF and Quartz instrumentation, a trace per worker job, dashboards.
+- Not every destructive edit is audited: deleting a single transaction, saved report, sheet row or rule is not (the actions listed above are).
+- Dashboards (the metrics and spans are exported; no dashboard is shipped).
