@@ -594,7 +594,7 @@ else
 
     // Configurable ranges: history window for the insight charts, and forward horizon for the projection.
     private static readonly string[] HistoryPresets =
-        ["This month", "Last month", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", "Custom"];
+        ["1M", "6M", "1Y", "All", "This month", "Last month", "Last 30 days", "Last 90 days", "Last 6 months", "Year to date", "Last 12 months", "All time", "Custom"];
     private string _rangePreset = "Last 6 months";
     private DateOnly? _rangeFrom = DateRangeSelector.Resolve("Last 6 months").From;
     private DateOnly _rangeTo = DateRangeSelector.Resolve("Last 6 months").To;
@@ -637,7 +637,10 @@ else
 
     private string RangeLabel => _rangePreset switch
     {
-        "All time" => "All time",
+        "All time" or "All" => "All time",
+        "1M" => "Past month",
+        "6M" => "Past 6 months",
+        "1Y" => "Past year",
         "Custom" => $"{Format.FullDate(_rangeFrom ?? _rangeTo)} – {Format.FullDate(_rangeTo)}",
         _ => _rangePreset,
     };

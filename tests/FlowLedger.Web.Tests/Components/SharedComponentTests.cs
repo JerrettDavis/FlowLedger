@@ -173,6 +173,27 @@ public sealed class SharedComponentTests : IAsyncDisposable
     }
 
     [Fact]
+    public void DateRangeSelector_chart_presets_resolve_1M_6M_1Y_and_All()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        DateRangeSelector.Resolve("1M").Should().Be((today.AddMonths(-1), today));
+        DateRangeSelector.Resolve("6M").Should().Be((today.AddMonths(-6), today));
+        DateRangeSelector.Resolve("1Y").Should().Be((today.AddYears(-1), today));
+        DateRangeSelector.Resolve("All").Should().Be((null, today));
+        DateRangeSelector.ChartPresets.Should().Equal("1M", "6M", "1Y", "All", DateRangeSelector.Custom);
+    }
+
+    [Fact]
+    public void DateRangeSelector_offers_the_chart_presets_in_the_dropdown()
+    {
+        var cut = _ctx.Render<DateRangeSelector>(p => p.Add(c => c.Preset, "6M").Add(c => c.Presets, DateRangeSelector.ChartPresets));
+
+        cut.Markup.Should().Contain("6M");
+        DateRangeSelector.ChartPresets.Should().Contain(["1M", "6M", "1Y", "All"]);
+    }
+
+    [Fact]
     public void DateRangeSelector_renders_without_pickers_unless_Custom()
     {
         var cut = _ctx.Render<DateRangeSelector>(p => p.Add(c => c.Preset, "Last 30 days"));
