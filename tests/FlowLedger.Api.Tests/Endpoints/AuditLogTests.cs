@@ -92,7 +92,7 @@ public sealed class AuditLogTests(FlowLedgerApiFactory factory)
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand("SELECT target FROM audit_events WHERE action = @a ORDER BY id DESC LIMIT 1", conn);
         cmd.Parameters.AddWithValue("a", action);
-        (await cmd.ExecuteScalarAsync()).Should().Be(url.Split('?')[0], "the path of the deleted record is recorded (the query string is not)");
+        (await cmd.ExecuteScalarAsync()).Should().Be(url, "the path (and the pattern that identifies a rule or alias) of the deleted record is recorded");
     }
 
     [Fact]
