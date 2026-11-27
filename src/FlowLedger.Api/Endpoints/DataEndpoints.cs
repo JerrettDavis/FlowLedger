@@ -189,6 +189,27 @@ internal static class DataEndpoints
         .WithSummary("Re-encrypt stored secrets under the current key (key rotation, idempotent)")
         .RequireRateLimiting("write");
 
+        group.MapPost("/raw-archive/seal", async (
+            FlowLedger.Infrastructure.Storage.RawArchiveMaintenance archive, ILoggerFactory loggers, CancellationToken ct) =>
+        {
+            try
+            {
+                var r = await archive.SealPlaintextAsync(ct);
+                loggers.CreateLogger("RawArchive").LogWarning(
+                    "Raw archive sealed: {Sealed} sealed, {Already} already sealed, {Skipped} skipped, {Recovered} recovered",
+                    r.Sealed, r.AlreadySealed, r.Skipped, r.Recovered);
+                return Results.Ok(new { sealedCount = r.Sealed, alreadySealed = r.AlreadySealed, skipped = r.Skipped, recovered = r.Recovered });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(title: "Raw archive cannot be sealed", detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
+        })
+        .WithName("SealRawArchive")
+        .AddEndpointFilter(LoopbackOnlyAsync)
+        .WithSummary("Opt-in: encrypt raw provider payloads written before Storage:EncryptionKey was set (in place, verified, idempotent)")
+        .RequireRateLimiting("write");
+
         return app;
     }
 
