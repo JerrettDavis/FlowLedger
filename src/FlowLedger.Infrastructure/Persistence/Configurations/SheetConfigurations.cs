@@ -22,8 +22,8 @@ internal sealed class SheetBillRecordConfiguration : IEntityTypeConfiguration<Sh
         builder.Property(r => r.IsBusiness).HasColumnName("is_business");
         builder.Property(r => r.AutoPay).HasColumnName("auto_pay");
         builder.Property(r => r.DueDay).HasColumnName("due_day");
-        builder.Property(r => r.Estimated).HasColumnName("estimated").HasColumnType("numeric(18,4)");
-        builder.Property(r => r.Actual).HasColumnName("actual").HasColumnType("numeric(18,4)");
+        builder.Property(r => r.Estimated).HasColumnName("estimated").HasColumnType("numeric(19,4)");
+        builder.Property(r => r.Actual).HasColumnName("actual").HasColumnType("numeric(19,4)");
         builder.Property(r => r.Service).HasColumnName("service").HasMaxLength(300);
         builder.Property(r => r.AccountRef).HasColumnName("account_ref").HasMaxLength(300);
         builder.Property(r => r.MatchText).HasColumnName("match_text").HasMaxLength(300);
@@ -52,7 +52,7 @@ internal sealed class SheetPaymentRecordConfiguration : IEntityTypeConfiguration
         builder.Property(r => r.Month).HasColumnName("month").IsRequired();
         builder.Property(r => r.Slot).HasColumnName("slot").HasDefaultValue(0);
         builder.Property(r => r.IsPaid).HasColumnName("is_paid");
-        builder.Property(r => r.Amount).HasColumnName("amount").HasColumnType("numeric(18,4)");
+        builder.Property(r => r.Amount).HasColumnName("amount").HasColumnType("numeric(19,4)");
         builder.Property(r => r.PaidOn).HasColumnName("paid_on");
         builder.Property(r => r.TransactionId).HasColumnName("transaction_id");
         builder.Property(r => r.Source).HasColumnName("source").HasMaxLength(10).IsRequired();

@@ -31,12 +31,12 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasConversion(StronglyTypedIdConverters.AccountIdConverter)
             .IsRequired();
 
-        // Money: Amount — numeric(18,4), never float.
+        // Money: Amount — numeric(19,4), never float.
         builder.OwnsOne(t => t.Amount, money =>
         {
             money.Property(m => m.Amount)
                 .HasColumnName("amount")
-                .HasColumnType("numeric(18,4)")
+                .HasColumnType("numeric(19,4)")
                 .IsRequired();
 
             money.Property(m => m.Currency)
@@ -144,7 +144,7 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             {
                 money.Property(m => m.Amount)
                     .HasColumnName("amount")
-                    .HasColumnType("numeric(18,4)")
+                    .HasColumnType("numeric(19,4)")
                     .IsRequired();
 
                 money.Property(m => m.Currency)

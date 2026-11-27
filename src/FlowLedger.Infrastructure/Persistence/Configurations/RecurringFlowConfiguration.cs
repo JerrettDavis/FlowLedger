@@ -41,7 +41,7 @@ internal sealed class RecurringFlowConfiguration : IEntityTypeConfiguration<Recu
         {
             money.Property(m => m.Amount)
                 .HasColumnName("amount")
-                .HasColumnType("numeric(18,4)")
+                .HasColumnType("numeric(19,4)")
                 .IsRequired();
 
             money.Property(m => m.Currency)
@@ -155,7 +155,7 @@ internal sealed class RecurringFlowConfiguration : IEntityTypeConfiguration<Recu
             {
                 money.Property(m => m.Amount)
                     .HasColumnName("planned_amount")
-                    .HasColumnType("numeric(18,4)")
+                    .HasColumnType("numeric(19,4)")
                     .IsRequired();
 
                 money.Property(m => m.Currency)
@@ -195,7 +195,7 @@ internal sealed class RecurringFlowConfiguration : IEntityTypeConfiguration<Recu
             {
                 money.Property(m => m.Amount)
                     .HasColumnName("amount_variance")
-                    .HasColumnType("numeric(18,4)");
+                    .HasColumnType("numeric(19,4)");
 
                 money.Property(m => m.Currency)
                     .HasColumnName("amount_variance_currency")

@@ -35,6 +35,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.MoveSuspiciousDismissalsT
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveSystemSettingsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveUserDirectoryAndTenantsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.RowVersionOnTransactionsFlowsCategoriesBudgetsGoals
+class FlowLedger.Infrastructure.Persistence.Migrations.UnifyMoneyPrecision
 enum FlowLedger.Infrastructure.DataSafety.DataEnvironment
 enum FlowLedger.Infrastructure.Sync.SyncRetryAction
 enum FlowLedger.Infrastructure.Sync.SyncTrigger

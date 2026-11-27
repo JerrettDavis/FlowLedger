@@ -44,7 +44,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
 
         builder.OwnsOne(a => a.CurrentValue, money =>
         {
-            money.Property(m => m.Amount).HasColumnName("value_amount").HasColumnType("numeric(18,4)").IsRequired();
+            money.Property(m => m.Amount).HasColumnName("value_amount").HasColumnType("numeric(19,4)").IsRequired();
             money.Property(m => m.Currency).HasColumnName("value_currency").HasMaxLength(3)
                 .HasConversion(CurrencyConverter.Instance).IsRequired();
         });
@@ -52,7 +52,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
 
         builder.OwnsOne(a => a.PurchasePrice, money =>
         {
-            money.Property(m => m.Amount).HasColumnName("purchase_price_amount").HasColumnType("numeric(18,4)");
+            money.Property(m => m.Amount).HasColumnName("purchase_price_amount").HasColumnType("numeric(19,4)");
             money.Property(m => m.Currency).HasColumnName("purchase_price_currency").HasMaxLength(3)
                 .HasConversion(CurrencyConverter.Instance);
         });
@@ -60,7 +60,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
         builder.Property(a => a.ValuedOn).HasColumnName("valued_on").IsRequired();
         builder.Property(a => a.Method).HasColumnName("valuation_method").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(a => a.AnnualRate).HasColumnName("annual_rate").HasColumnType("numeric(9,6)").IsRequired();
-        builder.Property(a => a.SalvageValue).HasColumnName("salvage_value").HasColumnType("numeric(18,4)");
+        builder.Property(a => a.SalvageValue).HasColumnName("salvage_value").HasColumnType("numeric(19,4)");
         builder.Property(a => a.UsefulLifeYears).HasColumnName("useful_life_years");
         builder.Property(a => a.LinkedAccountId).HasColumnName("linked_account_id");
 
@@ -79,7 +79,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             v.WithOwner().HasForeignKey("asset_id");
             v.HasKey(x => x.Id);
             v.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
-            v.Property(x => x.Amount).HasColumnName("amount").HasColumnType("numeric(18,4)").IsRequired();
+            v.Property(x => x.Amount).HasColumnName("amount").HasColumnType("numeric(19,4)").IsRequired();
             v.Property(x => x.AsOf).HasColumnName("as_of").IsRequired();
             v.Property(x => x.Source).HasColumnName("source").HasMaxLength(100).IsRequired();
             v.Property(x => x.Note).HasColumnName("note").HasMaxLength(1000);
