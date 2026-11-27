@@ -22,7 +22,11 @@ public static class RateLimitPartitions
 {
     public const int DefaultGlobalPerIpPerMinute = 1200;
     public const int DefaultFailedAuthPerIpPerMinute = 20;
-    public const int DefaultWebhookPerIpPerMinute = 300;
+    /// <summary>
+    /// Blanket pre-verification webhook cap per (provider, IP). Deliberately as generous as the global per-IP cap: the signature-aware
+    /// <c>WebhookAbuseLimiter</c> does the real throttling after verification, so junk cannot use up what real deliveries need (#152).
+    /// </summary>
+    public const int DefaultWebhookPerIpPerMinute = 1200;
     private const int DefaultRetryAfterSeconds = 60;
 
     /// <summary>Partition count for tenant headers that were NOT cryptographically verified; bounds limiter memory when a caller rotates <c>X-Tenant-Id</c>.</summary>

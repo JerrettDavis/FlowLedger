@@ -82,6 +82,7 @@ internal static class MxEndpoints
             ISchedulerFactory schedulerFactory,
             IWebhookTenantResolver tenantResolver,
             IWebhookReplayStore? replayStore,
+            WebhookAbuseLimiter abuse,
             ILoggerFactory loggers,
             IConfiguration configuration,
             CancellationToken ct) =>
@@ -107,11 +108,20 @@ internal static class MxEndpoints
             catch (InvalidWebhookSignatureException)
             {
                 FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "invalid_signature");
-                return Results.Unauthorized();
+                // Failed verifications spend a small per-(provider, IP) budget; verified deliveries never do (#152).
+                return abuse.AllowInvalidResponse(ConnectorIds.Mx, request.HttpContext.Connection.RemoteIpAddress?.ToString())
+                    ? Results.Unauthorized()
+                    : WebhookAbuse.TooManyRequests(request.HttpContext);
             }
 
             // Replay protection: a captured, validly signed body replayed within the window is acknowledged but not re-processed.
-            if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
+            if (!abuse.AllowVerifiedDelivery(ConnectorIds.Mx))
+                {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "rate_limited");
+                    return WebhookAbuse.TooManyRequests(request.HttpContext);
+                }
+
+                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Mx, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
             {
                 FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Mx, "duplicate");
                 return Results.Accepted(value: new { duplicate = true });
