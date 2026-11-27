@@ -1,9 +1,7 @@
-using FlowLedger.Api.Jobs;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Quiltt;
 using Microsoft.AspNetCore.Http;
-using Quartz;
 
 namespace FlowLedger.Api.Endpoints;
 
@@ -69,103 +67,20 @@ internal static class QuilttEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("write");
 
-        group.MapPost("/webhooks", async (
-                HttpRequest request,
-                IConnectorRegistry connectors,
-                IRawPayloadArchive archive,
-                ISchedulerFactory schedulerFactory,
-                IWebhookTenantResolver tenantResolver,
-                IWebhookReplayStore? replayStore,
-                WebhookAbuseLimiter abuse,
-                ILoggerFactory loggers,
-                CancellationToken ct) =>
-            {
-                if (!connectors.IsEnabled(QuilttFinancialDataProvider.Name))
-                {
-                    return Results.NotFound();
-                }
-
-                var provider = connectors.Resolve(QuilttFinancialDataProvider.Name);
-                var rawBody = await WebhookBody.ReadBoundedAsync(request.Body, WebhookBody.MaxBytes, ct);
-                if (rawBody is null)
-                {
-                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "too_large");
-                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-                }
-
-                // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
-                var signature = request.Headers.TryGetValue("Quiltt-Signature", out var sig)
-                                && request.Headers.TryGetValue("Quiltt-Timestamp", out var ts)
-                    ? $"t={ts},v1={sig}"
-                    : string.Empty;
-                try
-                {
-                    await provider.VerifyWebhookAsync(rawBody, signature, ct);
-                }
-                catch (InvalidWebhookSignatureException)
-                {
-                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "invalid_signature");
-                    // Failed verifications spend a small per-(provider, IP) budget; verified deliveries never do (#152).
-                    return abuse.AllowInvalidResponse(ConnectorIds.Quiltt, request.HttpContext.Connection.RemoteIpAddress?.ToString())
-                        ? Results.Unauthorized()
-                        : WebhookAbuse.TooManyRequests(request.HttpContext);
-                }
-
-                if (!abuse.AllowVerifiedDelivery(ConnectorIds.Quiltt))
-                {
-                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "rate_limited");
-                    return WebhookAbuse.TooManyRequests(request.HttpContext);
-                }
-
-                if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))
-                {
-                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "duplicate");
-                    return Results.Accepted(value: new { duplicate = true });
-                }
-
-                var attributedTenant = await WebhookAttribution.TryResolveTenantAsync(provider, rawBody, tenantResolver, ct);
-                await archive.ArchiveAsync(ConnectorIds.Quiltt, "Webhook", rawBody, new RawPayloadContext("POST", request.Path.Value ?? string.Empty, 200, attributedTenant), ct);
-
-                ProviderWebhookEvent evt;
-                try
-                {
-                    evt = await provider.ParseWebhookAsync(rawBody, ct);
-                }
-                catch (FatalProviderException ex)
-                {
-                    return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "Malformed webhook payload");
-                }
-
-                if (!QuilttFinancialDataProvider.IsSyncTrigger(evt.EventType))
-                {
-                    return Results.Accepted(value: new { ignored = evt.EventType });
-                }
-
-                // The Quiltt profile id maps to exactly one tenant; unknown profiles are acknowledged and ignored (#150).
-                var owner = await tenantResolver.ResolveAsync(QuilttFinancialDataProvider.Name, evt.MemberId, ct);
-                if (owner is null)
-                {
-                    return Results.Accepted(value: new { ignored = "unknown profile", profileId = evt.MemberId });
-                }
-
-                var jobData = new JobDataMap
-                {
-                    [OnDemandSyncJob.TenantIdKey] = owner.Value.ToString(),
-                    [OnDemandSyncJob.MemberIdKey] = evt.MemberId,
-                    [OnDemandSyncJob.EventTypeKey] = evt.EventType,
-                };
-                var scheduler = await schedulerFactory.GetScheduler(ct);
-                await scheduler.TriggerJob(OnDemandSyncJob.Key, jobData, ct);
-
-                FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "accepted");
-                return Results.Accepted(value: new { received = evt.EventType, profileId = evt.MemberId });
-            })
+        group.MapWebhook("/webhooks", CreateWebhookPolicy())
             .WithName("QuilttWebhook")
-            .WithSummary("Receive and verify a Quiltt webhook, then enqueue a background sync")
-            .AllowAnonymous() // the HMAC signature is the sole auth mechanism
-            .RequireRateLimiting("webhook");
+            .WithSummary("Receive and verify a Quiltt webhook, then enqueue a background sync");
 
         return app;
     }
 
+    private static WebhookPolicy CreateWebhookPolicy() => new(
+        ConnectorIds.Quiltt,
+        (connectors, _) => connectors.IsEnabled(QuilttFinancialDataProvider.Name) ? connectors.Resolve(QuilttFinancialDataProvider.Name) : null,
+        // Quiltt signs "1" + Quiltt-Timestamp + body; the verifier takes both headers as "t=<ts>,v1=<sig>".
+        request => request.Headers.TryGetValue("Quiltt-Signature", out var sig) && request.Headers.TryGetValue("Quiltt-Timestamp", out var ts)
+            ? $"t={ts},v1={sig}"
+            : string.Empty,
+        MemberKey: "profileId",
+        UnknownOwnerLabel: "unknown profile");
 }
