@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -115,9 +116,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     public async Task Post_with_zero_amount_returns_400()
     {
         var account = await CreateAccount();
-        var request = new CreateTransactionRequest(
-            account.Id, 0m, "USD", "Debit", "Test",
-            new DateOnly(2026, 1, 15), null, null, null, null);
+        var request = CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(0m).WithDirection("Debit").Described("Test").On(new DateOnly(2026, 1, 15)).Build();
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
 
@@ -128,9 +127,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     public async Task Post_with_invalid_direction_returns_400()
     {
         var account = await CreateAccount();
-        var request = new CreateTransactionRequest(
-            account.Id, 10m, "USD", "BadDirection", "Test",
-            new DateOnly(2026, 1, 15), null, null, null, null);
+        var request = CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(10m).WithDirection("BadDirection").Described("Test").On(new DateOnly(2026, 1, 15)).Build();
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
 
@@ -141,9 +138,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     public async Task Post_with_invalid_currency_returns_400()
     {
         var account = await CreateAccount();
-        var request = new CreateTransactionRequest(
-            account.Id, 10m, "US", "Debit", "Test",
-            new DateOnly(2026, 1, 15), null, null, null, null);
+        var request = CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(10m).InCurrency("US").WithDirection("Debit").Described("Test").On(new DateOnly(2026, 1, 15)).Build();
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
 
@@ -179,8 +174,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
         // Paging beyond one export page of 500 rows, and the keyset tie-breaks, are covered against the real store in Infrastructure.Tests.
         for (var i = 0; i < 12; i++)
         {
-            var request = new CreateTransactionRequest(account.Id, 10m + i, "USD", i % 3 == 0 ? "Credit" : "Debit", $"Row {i}, \"quoted\"",
-                new DateOnly(2026, 1, 10 + (i % 4)), null, null, null, null);
+            var request = CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(10m + i).WithDirection(i % 3 == 0 ? "Credit" : "Debit").Described($"Row {i}, \"quoted\"").On(new DateOnly(2026, 1, 10 + (i % 4))).Build();
             (await _client.PostAsJsonAsync("/api/transactions", request)).EnsureSuccessStatusCode();
         }
 
@@ -200,8 +194,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
         var account = await CreateAccount();
         for (var i = 0; i < 6; i++)
         {
-            (await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
-                account.Id, 5m + i, "USD", "Debit", i < 3 ? $"Coffee {i}" : $"Rent {i}", new DateOnly(2026, 2, 1 + i), null, null, null, null))).EnsureSuccessStatusCode();
+            (await _client.PostAsJsonAsync("/api/transactions", CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(5m + i).WithDirection("Debit").Described(i < 3 ? $"Coffee {i}" : $"Rent {i}").On(new DateOnly(2026, 2, 1 + i)).Build())).EnsureSuccessStatusCode();
         }
 
         var csv = await _client.GetStringAsync("/api/transactions/export.csv?search=coffee");
@@ -219,7 +212,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
     {
         var response = await _client.PostAsJsonAsync(
             "/api/accounts",
-            new CreateAccountRequest(name, "Checking", 0m, "USD", null, null));
+            CreateAccountRequestBuilder.A().Named(name).OfType("Checking").StartingAt(0m).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>())!;
     }

@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Infrastructure.Events;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -55,7 +56,7 @@ public sealed class OutboxFollowUpTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task An_import_records_TransactionsImported_and_delivery_completes_without_dead_letters()
     {
         var account = await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Outbox Import", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>();
+            CreateAccountRequestBuilder.A().Named("Outbox Import").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>();
 
         var response = await _client.PostAsJsonAsync("/api/imports", new ImportRequest(
             account!.Id, "Date,Amount,Description\n2026-01-15,50.00,Coffee Shop\n2026-01-16,100.00,Grocery Store\n"));
@@ -73,7 +74,7 @@ public sealed class OutboxFollowUpTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task An_import_that_adds_nothing_records_no_event()
     {
         var account = await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Outbox Empty", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>();
+            CreateAccountRequestBuilder.A().Named("Outbox Empty").OfType("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>();
         var csv = "Date,Amount,Description\n2026-01-15,50.00,Coffee Shop\n";
         (await _client.PostAsJsonAsync("/api/imports", new ImportRequest(account!.Id, csv))).EnsureSuccessStatusCode();
         await DrainAsync();

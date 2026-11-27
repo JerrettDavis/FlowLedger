@@ -5,6 +5,7 @@ using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.SharedKernel;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -147,7 +148,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
     {
         var response = await _client.PostAsJsonAsync(
             "/api/categories",
-            new CreateCategoryRequest(string.Empty, "Food", null));
+            CreateCategoryRequestBuilder.A().AtPath(string.Empty).Named("Food").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -157,7 +158,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
     {
         var response = await _client.PostAsJsonAsync(
             "/api/categories",
-            new CreateCategoryRequest("food", string.Empty, null));
+            CreateCategoryRequestBuilder.A().AtPath("food").Named(string.Empty).Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -183,7 +184,7 @@ public sealed class CategoryEndpointTests(FlowLedgerApiFactory factory) : IAsync
 
     private async Task<CategoryDto> CreateCategory(string path = "food", string display = "Food")
     {
-        var response = await _client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest(path, display, null));
+        var response = await _client.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath(path).Named(display).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CategoryDto>())!;
     }

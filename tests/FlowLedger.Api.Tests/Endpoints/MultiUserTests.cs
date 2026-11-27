@@ -5,6 +5,7 @@ using FlowLedger.Application.Features.Assets;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.RecurringFlows;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -80,7 +81,7 @@ public sealed class MultiUserTests(FlowLedgerApiFactory factory) : IAsyncLifetim
         var aliceClient = factory.CreateAuthenticatedClient(alice.TenantId);
         var bobClient = factory.CreateAuthenticatedClient(bob.TenantId);
 
-        var created = await aliceClient.PostAsJsonAsync("/api/accounts", new CreateAccountRequest("Alice Checking", "Checking", 1234m, "USD", null, null));
+        var created = await aliceClient.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Alice Checking").OfType("Checking").StartingAt(1234m).Build());
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var account = (await created.Content.ReadFromJsonAsync<AccountDto>())!;
 
@@ -146,21 +147,21 @@ public sealed class MultiUserTests(FlowLedgerApiFactory factory) : IAsyncLifetim
 
         if (resource == "accounts")
         {
-            return await Post("/api/accounts", new CreateAccountRequest("Alice Checking", "Checking", 1234m, "USD", null, null));
+            return await Post("/api/accounts", CreateAccountRequestBuilder.A().Named("Alice Checking").OfType("Checking").StartingAt(1234m).Build());
         }
 
         var account = accountId ?? await SeedAsync(c, "accounts");
         return resource switch
         {
             "transactions" => await Post("/api/transactions",
-                new CreateTransactionRequest(account, 50m, "USD", "Debit", "Coffee Shop", new DateOnly(2026, 1, 15), null, null, null, null)),
+                CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described("Coffee Shop").On(new DateOnly(2026, 1, 15)).Build()),
             "assets" => await Post("/api/assets",
                 new CreateAssetRequest("MacBook", "Electronics", 2000m, "USD", null, new DateOnly(2024, 1, 1), 2400m, "Apple", "MBP", null, null,
                     "Manual", null, null, null, null, null)),
             "recurring-flows" => await Post("/api/recurring-flows",
                 new CreateRecurringFlowRequest(account, "Rent", 1200m, "USD", "Debit", "Fixed", "Monthly", 1, null, null, null,
                     new DateOnly(2026, 1, 1), null, null, "Landlord")),
-            "categories" => await Post("/api/categories", new CreateCategoryRequest("food", "Food", null)),
+            "categories" => await Post("/api/categories", CreateCategoryRequestBuilder.A().AtPath("food").Named("Food").Build()),
             _ => throw new ArgumentOutOfRangeException(nameof(resource)),
         };
     }

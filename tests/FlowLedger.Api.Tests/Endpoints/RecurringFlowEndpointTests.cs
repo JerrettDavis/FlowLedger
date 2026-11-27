@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.RecurringFlows;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -217,7 +218,7 @@ public sealed class RecurringFlowEndpointTests(FlowLedgerApiFactory factory) : I
     {
         var response = await _client.PostAsJsonAsync(
             "/api/accounts",
-            new CreateAccountRequest(name, "Checking", 0m, "USD", null, null));
+            CreateAccountRequestBuilder.A().Named(name).OfType("Checking").StartingAt(0m).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>())!;
     }

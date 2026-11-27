@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Features.Categories;
@@ -13,7 +14,7 @@ public sealed class CategoryHandlersTests
     public async Task CreateCategory_ValidRequest_StoresAndReturnsDto()
     {
         var handler = new CreateCategoryHandler(_repo, _tenant);
-        var dto = await handler.HandleAsync(new CreateCategoryRequest("Food/Groceries", "Groceries", null));
+        var dto = await handler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Food/Groceries").Named("Groceries").Build());
 
         dto.Path.Should().Be("Food/Groceries");
         dto.DisplayName.Should().Be("Groceries");
@@ -24,7 +25,7 @@ public sealed class CategoryHandlersTests
     public async Task CreateCategory_with_a_parent_that_is_not_in_the_tenant_is_rejected()
     {
         var handler = new CreateCategoryHandler(_repo, _tenant);
-        var act = () => handler.HandleAsync(new CreateCategoryRequest("Food/Groceries", "Groceries", Guid.NewGuid()));
+        var act = () => handler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Food/Groceries").Named("Groceries").Under(Guid.NewGuid()).Build());
         await act.Should().ThrowAsync<FlowLedger.Application.Abstractions.ReferencedEntityNotFoundException>();
     }
 
@@ -32,7 +33,7 @@ public sealed class CategoryHandlersTests
     public async Task GetCategory_ExistingId_ReturnsDto()
     {
         var createHandler = new CreateCategoryHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateCategoryRequest("Housing", "Housing", null));
+        var created = await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Housing").Build());
 
         var getHandler = new GetCategoryHandler(_repo);
         var dto = await getHandler.HandleAsync(created.Id);
@@ -45,8 +46,8 @@ public sealed class CategoryHandlersTests
     public async Task ListCategories_ReturnsAll()
     {
         var createHandler = new CreateCategoryHandler(_repo, _tenant);
-        await createHandler.HandleAsync(new CreateCategoryRequest("Food", "Food", null));
-        await createHandler.HandleAsync(new CreateCategoryRequest("Transport", "Transport", null));
+        await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Food").Build());
+        await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Transport").Build());
 
         var listHandler = new ListCategoriesHandler(_repo, _tenant);
         var categories = await listHandler.HandleAsync();
@@ -67,7 +68,7 @@ public sealed class CategoryHandlersTests
     public async Task UpdateCategory_ExistingId_RenamesCategory()
     {
         var createHandler = new CreateCategoryHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateCategoryRequest("OldPath", "Old Name", null));
+        var created = await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("OldPath").Named("Old Name").Build());
 
         var updateHandler = new UpdateCategoryHandler(_repo);
         var updated = await updateHandler.HandleAsync(created.Id, new UpdateCategoryRequest("NewPath", "New Name"));
@@ -81,7 +82,7 @@ public sealed class CategoryHandlersTests
     public async Task DeleteCategory_NonSystem_Succeeds()
     {
         var createHandler = new CreateCategoryHandler(_repo, _tenant);
-        var created = await createHandler.HandleAsync(new CreateCategoryRequest("Temp", "Temp", null));
+        var created = await createHandler.HandleAsync(CreateCategoryRequestBuilder.A().AtPath("Temp").Build());
 
         var deleteHandler = new DeleteCategoryHandler(_repo);
         var found = await deleteHandler.HandleAsync(created.Id);

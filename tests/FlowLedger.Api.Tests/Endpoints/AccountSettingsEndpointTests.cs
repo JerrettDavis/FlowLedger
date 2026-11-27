@@ -64,11 +64,11 @@ public sealed class AccountSettingsEndpointTests(FlowLedgerApiFactory factory) :
         var chk = await CreateAccountAsync("Checking", "Checking");
         await AddTxAsync(chk.Id, "Coffee");
 
-        var put = await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", new AccountSettingsRequest(true, "Standard", true));
+        var put = await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", AccountSettingsRequestBuilder.A().Active(true).InMode("Standard").HidingTransactions().Build());
         put.StatusCode.Should().Be(HttpStatusCode.OK);
         (await ListAsync()).Should().BeEmpty();
 
-        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", new AccountSettingsRequest(true, "Standard", false));
+        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", AccountSettingsRequestBuilder.A().Active(true).InMode("Standard").Build());
         (await ListAsync()).Should().HaveCount(1);
     }
 
@@ -78,13 +78,13 @@ public sealed class AccountSettingsEndpointTests(FlowLedgerApiFactory factory) :
         var chk = await CreateAccountAsync("Checking", "Checking");
         await AddTxAsync(chk.Id, "Coffee");
 
-        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", new AccountSettingsRequest(false, "Standard", false));
+        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", AccountSettingsRequestBuilder.A().Active(false).InMode("Standard").Build());
 
         (await _client.GetFromJsonAsync<List<AccountDto>>("/api/accounts"))!.Should().BeEmpty();
         (await _client.GetFromJsonAsync<List<AccountDto>>("/api/accounts?includeInactive=true"))!.Should().ContainSingle(a => !a.IsActive);
         (await ListAsync()).Should().BeEmpty();
 
-        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", new AccountSettingsRequest(true, "Standard", false));
+        await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", AccountSettingsRequestBuilder.A().Active(true).InMode("Standard").Build());
         (await ListAsync()).Should().HaveCount(1);
     }
 
@@ -92,9 +92,9 @@ public sealed class AccountSettingsEndpointTests(FlowLedgerApiFactory factory) :
     public async Task Invalid_mode_is_rejected_and_unknown_account_is_404()
     {
         var chk = await CreateAccountAsync("Checking", "Checking");
-        (await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", new AccountSettingsRequest(true, "Bogus", false)))
+        (await _client.PutAsJsonAsync($"/api/accounts/{chk.Id}/settings", AccountSettingsRequestBuilder.A().Active(true).InMode("Bogus").Build()))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await _client.PutAsJsonAsync($"/api/accounts/{Guid.NewGuid()}/settings", new AccountSettingsRequest(true, "Standard", false)))
+        (await _client.PutAsJsonAsync($"/api/accounts/{Guid.NewGuid()}/settings", AccountSettingsRequestBuilder.A().Active(true).InMode("Standard").Build()))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

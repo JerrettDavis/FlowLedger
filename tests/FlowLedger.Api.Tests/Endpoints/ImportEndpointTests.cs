@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Api.Endpoints;
 using FlowLedger.Application.Features.Accounts;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -121,7 +122,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     {
         var response = await _client.PostAsJsonAsync(
             "/api/accounts",
-            new CreateAccountRequest("Import Test Account", "Checking", 0m, "USD", null, null));
+            CreateAccountRequestBuilder.A().Named("Import Test Account").OfType("Checking").StartingAt(0m).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>())!;
     }

@@ -3,6 +3,7 @@ using FlowLedger.Application.Features.BillSheet;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.BillSheet;
@@ -72,7 +73,7 @@ public sealed class BillSheetServiceTests
     {
         var (svc, store, _) = Make();
 
-        var result = await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        var result = await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
 
         result.Should().Be(new SheetImportResult(2, 4, 3));
         var bills = await store.ListBillsAsync();
@@ -88,12 +89,12 @@ public sealed class BillSheetServiceTests
     public async Task Import_refuses_to_overwrite_unless_replace_is_set()
     {
         var (svc, _, _) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
 
-        var again = () => svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        var again = () => svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
         await again.Should().ThrowAsync<SheetOperationException>().WithMessage("*replace*");
 
-        var replaced = await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), true));
+        var replaced = await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Replacing().Build());
         replaced.Bills.Should().Be(4);
     }
 
@@ -101,7 +102,7 @@ public sealed class BillSheetServiceTests
     public async Task View_has_per_section_and_grand_totals_and_masks_account_numbers()
     {
         var (svc, _, _) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
 
         var view = await svc.GetViewAsync(BillSheetService.Key(ThisMonth), 3);
 
@@ -117,7 +118,7 @@ public sealed class BillSheetServiceTests
     public async Task Refresh_marks_cells_from_transactions_and_summary_tracks_progress()
     {
         var (svc, _, txns) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
         var day = new DateOnly(Today.Year, Today.Month, Math.Min(4, DateTime.DaysInMonth(Today.Year, Today.Month)));
         await AddTxn(txns, "AEP POWER CO ONLINE", 455.10m, day);
 
@@ -138,7 +139,7 @@ public sealed class BillSheetServiceTests
     public async Task Manual_unpaid_stops_automation_and_manual_paid_survives_refresh()
     {
         var (svc, store, txns) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
         var power = (await store.ListBillsAsync()).Single(b => b.Name == "Power Co");
         var cur = BillSheetService.Key(ThisMonth);
         await AddTxn(txns, "POWER CO", 400m, new DateOnly(Today.Year, Today.Month, Math.Min(4, DateTime.DaysInMonth(Today.Year, Today.Month))));
@@ -178,21 +179,21 @@ public sealed class BillSheetServiceTests
     public async Task Importing_another_tab_keeps_existing_sections_and_replace_is_per_section()
     {
         var (svc, store, _) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
         const string cards = " ,Payer,Perpetual,Optional,Business/Personal,Service,Auto/Manual,Account Number,Due Date,Estimated Cost,Actual Cost\n" +
             "Credit Cards,JD,No,No,,,,,,,\n" +
             "Amazon,JD,No,No,,,,,5th,0,0\n";
         var csv = cards.Replace("Credit Cards,JD,No,No,,,,,,,\n", "");
         csv = csv.Replace(" ,Payer", "Credit Cards,Payer");
 
-        var result = await svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+        var result = await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(csv).Build());
 
         result.Bills.Should().Be(1);
         (await store.ListBillsAsync()).Should().HaveCount(5);
 
-        var again = () => svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+        var again = () => svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(csv).Build());
         await again.Should().ThrowAsync<SheetOperationException>().WithMessage("*Credit Cards*");
-        await svc.ImportCsvAsync(new ImportSheetRequest(csv, true));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(csv).Replacing().Build());
         (await store.ListBillsAsync()).Should().HaveCount(5);
     }
 
@@ -203,7 +204,7 @@ public sealed class BillSheetServiceTests
         const string csv = "Credit Cards,Payer,Perpetual,Optional,Business/Personal,Service,Auto/Manual,Account Number,Due Date,Estimated Cost,Actual Cost\n" +
             "LL Flooring,JD,No,No,,,,,,520,520,x\n";
 
-        var result = await svc.ImportCsvAsync(new ImportSheetRequest(csv, false));
+        var result = await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(csv).Build());
 
         result.Bills.Should().Be(1);
         (await store.ListBillsAsync()).Single().Estimated.Should().Be(520m);
@@ -255,7 +256,7 @@ public sealed class BillSheetServiceTests
     public async Task Clear_returns_a_cell_to_automatic_and_hint_flags_unmatched_rows()
     {
         var (svc, store, _) = Make();
-        await svc.ImportCsvAsync(new ImportSheetRequest(SampleCsv(), false));
+        await svc.ImportCsvAsync(ImportSheetRequestBuilder.A().OfCsv(SampleCsv()).Build());
         var power = (await store.ListBillsAsync()).Single(b => b.Name == "Power Co");
         var cur = BillSheetService.Key(ThisMonth);
 

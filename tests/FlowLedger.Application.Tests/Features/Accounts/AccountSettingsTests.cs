@@ -23,7 +23,7 @@ public sealed class AccountSettingsTests
     public async Task Settings_update_persists_mode_hide_and_enabled()
     {
         var a = await AddAsync("Chk", AccountType.Checking);
-        var dto = await new UpdateAccountSettingsHandler(_repo).HandleAsync(a.Id, new AccountSettingsRequest(true, "holding", true));
+        var dto = await new UpdateAccountSettingsHandler(_repo).HandleAsync(a.Id, AccountSettingsRequestBuilder.A().Active(true).InMode("holding").HidingTransactions().Build());
 
         dto!.Mode.Should().Be("Holding");
         dto.HideTransactions.Should().BeTrue();
@@ -33,7 +33,7 @@ public sealed class AccountSettingsTests
     [Fact]
     public async Task Settings_for_unknown_account_returns_null()
     {
-        (await new UpdateAccountSettingsHandler(_repo).HandleAsync(Guid.NewGuid(), new AccountSettingsRequest(true, "Standard", false)))
+        (await new UpdateAccountSettingsHandler(_repo).HandleAsync(Guid.NewGuid(), AccountSettingsRequestBuilder.A().Active(true).InMode("Standard").Build()))
             .Should().BeNull();
     }
 
@@ -42,7 +42,7 @@ public sealed class AccountSettingsTests
     {
         var a = await AddAsync("Old", AccountType.Savings);
         await AddAsync("Chk", AccountType.Checking);
-        await new UpdateAccountSettingsHandler(_repo).HandleAsync(a.Id, new AccountSettingsRequest(false, "Standard", false));
+        await new UpdateAccountSettingsHandler(_repo).HandleAsync(a.Id, AccountSettingsRequestBuilder.A().Active(false).InMode("Standard").Build());
 
         var list = new ListAccountsHandler(_repo);
         (await list.HandleAsync()).Should().HaveCount(1);

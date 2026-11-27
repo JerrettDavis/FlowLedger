@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using FlowLedger.Api.Middleware;
 using FlowLedger.Contracts;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,7 +57,7 @@ public sealed class AuditLogTests(FlowLedgerApiFactory factory)
     {
         await factory.ResetAsync();
         using var client = factory.CreateAuthenticatedClient();
-        var created = await client.PostAsJsonAsync("/api/accounts", new CreateAccountRequest("Audit me", "Checking", 0m, "USD", null, null));
+        var created = await client.PostAsJsonAsync("/api/accounts", CreateAccountRequestBuilder.A().Named("Audit me").OfType("Checking").StartingAt(0m).Build());
         created.EnsureSuccessStatusCode();
         var account = (await created.Content.ReadFromJsonAsync<AccountDto>())!;
         var before = await CountAsync("account.deactivate");

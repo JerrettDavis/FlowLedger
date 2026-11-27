@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Assets;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -35,7 +36,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     private async Task<AccountDto> CreateAccount(string name, string type, decimal balance, HttpClient? client = null)
     {
         var resp = await (client ?? _client).PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest(name, type, balance, "USD", null, null));
+            CreateAccountRequestBuilder.A().Named(name).OfType(type).StartingAt(balance).Build());
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<AccountDto>())!;
     }
@@ -64,11 +65,11 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         var a = await Create(NewAsset());
 
         var resp = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(1500m, factory.ServerToday, "Appraiser", "Insurance appraisal"));
+            RecordValuationRequestBuilder.A().Worth(1500m).AsOf(factory.ServerToday).From("Appraiser").WithNote("Insurance appraisal").Build());
         resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
 
         var third = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(1400m, factory.ServerToday, null, null));
+            RecordValuationRequestBuilder.A().Worth(1400m).AsOf(factory.ServerToday).Build());
         third.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var reread = await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}");
@@ -117,7 +118,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         (await _client.PostAsJsonAsync("/api/assets", NewAsset(link: Guid.NewGuid()))).StatusCode
             .Should().Be(HttpStatusCode.BadRequest);
         (await _client.GetAsync($"/api/assets/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await _client.PostAsJsonAsync($"/api/assets/{Guid.NewGuid()}/valuations", new RecordValuationRequest(1m, null, null, null)))
+        (await _client.PostAsJsonAsync($"/api/assets/{Guid.NewGuid()}/valuations", RecordValuationRequestBuilder.A().Worth(1m).Build()))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -153,7 +154,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         s.NetWorth.CarriedByAccounts.Should().Be(300000m);
 
         (await _client.PostAsJsonAsync($"/api/assets/{house.Id}/valuations",
-            new RecordValuationRequest(320000m, null, "Appraiser", null))).EnsureSuccessStatusCode();
+            RecordValuationRequestBuilder.A().Worth(320000m).From("Appraiser").Build())).EnsureSuccessStatusCode();
 
         var account = await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{acct.Id}");
         // Initial Manual 300000 and Appraiser 320000 (same day, different sources) blend to 310000.
@@ -169,18 +170,18 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
 
         // Different source, same window: average of 1000 (Manual) and 2000 (Appraiser).
         var blended = await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(2000m, today, "Appraiser", null));
+            RecordValuationRequestBuilder.A().Worth(2000m).AsOf(today).From("Appraiser").Build());
         blended.EnsureSuccessStatusCode();
         (await blended.Content.ReadFromJsonAsync<AssetDto>())!.CurrentValue.Should().Be(1500m);
 
         // Same source twice counts once (latest per source), so the feed does not outweigh others.
         (await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(3000m, today, "Appraiser", null))).EnsureSuccessStatusCode();
+            RecordValuationRequestBuilder.A().Worth(3000m).AsOf(today).From("Appraiser").Build())).EnsureSuccessStatusCode();
         (await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}"))!.CurrentValue.Should().Be(2000m);
 
         // A valuation dated more than 7 days later leaves earlier ones outside the window: latest wins.
         (await _client.PostAsJsonAsync($"/api/assets/{a.Id}/valuations",
-            new RecordValuationRequest(500m, today.AddDays(8), "Manual", null))).EnsureSuccessStatusCode();
+            RecordValuationRequestBuilder.A().Worth(500m).AsOf(today.AddDays(8)).From("Manual").Build())).EnsureSuccessStatusCode();
         (await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}"))!.CurrentValue.Should().Be(500m);
     }
 
@@ -241,7 +242,7 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         (await Balance(acct.Id)).Should().Be(50000m);
         (await Summary()).NetWorth.NetWorth.Should().Be(50000m);
 
-        (await _client.PostAsJsonAsync($"/api/assets/{car.Id}/valuations", new RecordValuationRequest(18000m, null, null, null)))
+        (await _client.PostAsJsonAsync($"/api/assets/{car.Id}/valuations", RecordValuationRequestBuilder.A().Worth(18000m).Build()))
             .EnsureSuccessStatusCode();
         (await Balance(acct.Id)).Should().Be(48000m);
         (await Summary()).NetWorth.NetWorth.Should().Be(48000m);
