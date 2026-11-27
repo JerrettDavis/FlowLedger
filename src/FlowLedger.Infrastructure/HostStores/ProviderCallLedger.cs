@@ -1,9 +1,10 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using FlowLedger.Integrations.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>
 /// <see cref="IProviderCallLedger"/> through EF (#154): the host-wide <c>provider_api_calls</c> table has no tenant column, so it is

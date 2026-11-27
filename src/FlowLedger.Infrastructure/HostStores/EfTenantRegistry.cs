@@ -1,9 +1,10 @@
 using FlowLedger.Application.Features.Users;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>
 /// The tenants registry (#169, #154) through EF. A tenant used to exist only implicitly as a <c>tenant_id</c> value on rows, so a tenant

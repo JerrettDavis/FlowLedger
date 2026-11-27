@@ -1,8 +1,9 @@
 using System.Text.RegularExpressions;
+using FlowLedger.Infrastructure.DataSafety;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>One tenant-owned table: where it lives and which column holds the owning tenant.</summary>
 internal sealed record TenantTable(string Schema, string Table, string TenantColumn, string EntityName);
