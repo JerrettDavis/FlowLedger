@@ -1,3 +1,4 @@
+using FlowLedger.Api.Auth;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Integrations.Abstractions;
 
@@ -147,7 +148,7 @@ internal static class ConnectorEndpoints
                     unassignedAccounts = unassigned,
                 });
             })
-            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
+            .RequireAuthorization(HouseholdPolicy.Name)
             .RequireRateLimiting("api")
             .WithTags("Integrations")
             .WithName("ListConnectors")

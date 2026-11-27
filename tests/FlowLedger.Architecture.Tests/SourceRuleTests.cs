@@ -297,6 +297,33 @@ public sealed class SourceRuleTests
         Assert.True(offenders.Count == 0, $"Use ConstantTime.SecretEquals (or add a reasoned allow-list entry) in: {string.Join(", ", offenders)}");
     }
 
+    // ── No service locator on the request in the API (#94) ───────────────────
+
+    [Fact]
+    public void Api_does_not_pull_required_services_off_the_request()
+    {
+        var offenders = SourceFiles("FlowLedger.Api")
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"RequestServices\s*\.\s*GetRequiredService"))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Inject the dependency (endpoint parameter, constructor or an authorization policy) instead of HttpContext.RequestServices.GetRequiredService in: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void Endpoints_do_not_hand_roll_the_whole_endpoint_household_guard()
+    {
+        var offenders = SourceFiles("FlowLedger.Api")
+            .Where(f => Rel(f).StartsWith("src/FlowLedger.Api/Endpoints/", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains("HouseholdTenantOnlyFilter", StringComparison.Ordinal))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Whole-endpoint household access is the registered 'Household' authorization policy: use .RequireAuthorization(HouseholdPolicy.Name) in: {string.Join(", ", offenders)}");
+    }
+
     // ── Options go through IOptions + ValidateOnStart, never new XOptions() in DI (#108) ─
 
     [Fact]

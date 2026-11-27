@@ -1,3 +1,4 @@
+using FlowLedger.Api.Auth;
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.ValueObjects;
 using FlowLedger.Integrations.Abstractions;
@@ -23,15 +24,8 @@ internal static class MxEndpoints
             IConnectorRegistry connectors,
             ITenantContext tenant,
             IProviderConnectionStore connections,
-            IHouseholdTenantAccess household,
             CancellationToken ct) =>
         {
-            // Provisioning MX members is billable on the operator's key; only the household tenant may do it.
-            if (!household.IsHouseholdTenant)
-            {
-                return Results.Problem(title: "Bank linking via MX is limited to the household owner", statusCode: StatusCodes.Status403Forbidden);
-            }
-
             // With several connectors enabled the primary provider may not be MX: use the MX connector when it is on.
             var provider = connectors.IsEnabled(ConnectorIds.Mx) ? connectors.Resolve(ConnectorIds.Mx) : primary;
             if (provider is not MxFinancialDataProvider mx)
@@ -66,7 +60,7 @@ internal static class MxEndpoints
         })
         .WithName("MxConnectToken")
         .WithSummary("Begin an MX connection and return the Connect widget URL for the current tenant")
-        .RequireAuthorization()        // explicit; also covered by the FallbackPolicy
+        .RequireAuthorization(HouseholdPolicy.Name) // provisioning MX members is billable on the operator's key: household tenant only
         .RequireRateLimiting("write");
 
         // ── Webhook (shared pipeline, MX specifics only) ─────────────────────────
