@@ -72,12 +72,12 @@ public static partial class ImportNormalizer
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            throw new InvalidOperationException("The file is empty.");
+            throw new ImportFailedException("The file is empty.");
         }
 
         if (content.Length > MaxContentChars)
         {
-            throw new InvalidOperationException("The file is too large to import in one go (limit 5 MB). Split it and import it in parts.");
+            throw new ImportFailedException("The file is too large to import in one go (limit 5 MB). Split it and import it in parts.");
         }
 
         content = content.TrimStart('﻿');
@@ -104,7 +104,7 @@ public static partial class ImportNormalizer
         var rows = CsvParser.Parse(content, delimiter).Where(r => r.Any(c => c.Length > 0)).ToList();
         if (rows.Count == 0)
         {
-            throw new InvalidOperationException("No rows were found in the file.");
+            throw new ImportFailedException("No rows were found in the file.");
         }
 
         var header = rows[0].Select(h => h.Trim().ToLowerInvariant()).ToList();
@@ -143,7 +143,7 @@ public static partial class ImportNormalizer
         var descCol = Find(DescriptionHeaders);
         if (dateCol < 0 || descCol < 0)
         {
-            throw new InvalidOperationException(
+            throw new ImportFailedException(
                 "Could not recognise this file. Expected a header row with a date and description column (for example Date, Description, Amount).");
         }
 
@@ -156,7 +156,7 @@ public static partial class ImportNormalizer
 
         if (amountCol < 0 && debitCol < 0 && creditCol < 0)
         {
-            throw new InvalidOperationException("No amount column found (expected Amount, or Debit/Credit, or Outflow/Inflow).");
+            throw new ImportFailedException("No amount column found (expected Amount, or Debit/Credit, or Outflow/Inflow).");
         }
 
         var formatId = requested is not null && requested != Generic && requested != "ofx" && requested != "qif"
@@ -451,12 +451,12 @@ public static partial class ImportNormalizer
     {
         if (rows.Count == 0)
         {
-            throw new InvalidOperationException("No transactions could be read from this file.");
+            throw new ImportFailedException("No transactions could be read from this file.");
         }
 
         if (rows.Count > ImportTransactionsHandler.MaxImportRows)
         {
-            throw new InvalidOperationException(
+            throw new ImportFailedException(
                 $"The file has {rows.Count} transactions; the limit per import is {ImportTransactionsHandler.MaxImportRows}. Split the file and import it in parts.");
         }
 
@@ -510,7 +510,7 @@ public static partial class ImportNormalizer
             {
                 "mdy" => DateOrder.MonthFirst,
                 "dmy" => DateOrder.DayFirst,
-                _ => throw new InvalidOperationException("dateOrder must be 'mdy' or 'dmy'."),
+                _ => throw new ImportFailedException("dateOrder must be 'mdy' or 'dmy'."),
             };
         }
 
@@ -538,7 +538,7 @@ public static partial class ImportNormalizer
 
         if (monthFirstFails && dayFirstFails)
         {
-            throw new InvalidOperationException(
+            throw new ImportFailedException(
                 "The dates in this file mix month/day and day/month order. Fix the file or import it in parts.");
         }
 
@@ -558,7 +558,7 @@ public static partial class ImportNormalizer
             // Every date is valid in both orders. US institutions are month-first; for a generic file there is no safe guess.
             if (formatId == Generic)
             {
-                throw new InvalidOperationException(
+                throw new ImportFailedException(
                     "The dates in this file could be month/day or day/month (for example 03/04/2025). Choose a date format (dateOrder: 'mdy' or 'dmy') and import again.");
             }
 
@@ -579,7 +579,7 @@ public static partial class ImportNormalizer
             {
                 "us" => '.',
                 "eu" => ',',
-                _ => throw new InvalidOperationException("numberFormat must be 'us' or 'eu'."),
+                _ => throw new ImportFailedException("numberFormat must be 'us' or 'eu'."),
             };
         }
 
@@ -626,7 +626,7 @@ public static partial class ImportNormalizer
 
         if (dotVotes > 0 && commaVotes > 0)
         {
-            throw new InvalidOperationException(
+            throw new ImportFailedException(
                 "The amounts in this file mix decimal comma and decimal point formats. Fix the file or choose a number format (numberFormat: 'us' or 'eu').");
         }
 
@@ -639,7 +639,7 @@ public static partial class ImportNormalizer
         if (dotVotes == 0 && ambiguous && delimiter == ';')
         {
             // A semicolon-delimited export is the European case, where "1,234" may be 1.234. No safe guess.
-            throw new InvalidOperationException(
+            throw new ImportFailedException(
                 "The amounts in this file could use a decimal comma or a decimal point (for example 1,234). Choose a number format (numberFormat: 'us' or 'eu') and import again.");
         }
 

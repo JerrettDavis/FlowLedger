@@ -39,28 +39,18 @@ internal static class ImportEndpoints
                 });
             }
 
-            try
-            {
-                var mapping = new CsvColumnMapping(
-                    DateColumnIndex: request.DateColumnIndex,
-                    AmountColumnIndex: request.AmountColumnIndex,
-                    DescriptionColumnIndex: request.DescriptionColumnIndex,
-                    MerchantColumnIndex: request.MerchantColumnIndex,
-                    CategoryColumnIndex: request.CategoryColumnIndex,
-                    Delimiter: string.IsNullOrEmpty(request.Delimiter) ? ',' : request.Delimiter[0],
-                    DateFormats: request.DateFormats,
-                    HasHeaderRow: request.HasHeaderRow);
+            var mapping = new CsvColumnMapping(
+                DateColumnIndex: request.DateColumnIndex,
+                AmountColumnIndex: request.AmountColumnIndex,
+                DescriptionColumnIndex: request.DescriptionColumnIndex,
+                MerchantColumnIndex: request.MerchantColumnIndex,
+                CategoryColumnIndex: request.CategoryColumnIndex,
+                Delimiter: string.IsNullOrEmpty(request.Delimiter) ? ',' : request.Delimiter[0],
+                DateFormats: request.DateFormats,
+                HasHeaderRow: request.HasHeaderRow);
 
-                var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
-                return Results.Ok(await coordinator.ImportAsync(command, ct));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(
-                    title: "Import failed",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
-            }
+            var command = new ImportTransactionsCommand(request.AccountId, request.CsvContent, mapping);
+            return Results.Ok(await coordinator.ImportAsync(command, ct));
         })
         .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ApiLimits.CsvImportBytes))
         .WithName("ImportTransactions")
@@ -84,15 +74,8 @@ internal static class ImportEndpoints
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["import"] = ["An account and file content are required."] });
             }
 
-            try
-            {
-                return Results.Ok(await coordinator.ImportAutoAsync(
-                    request.AccountId, request.Content, request.FormatId, new ImportHints(request.DateOrder, request.NumberFormat), ct));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(title: "Import failed", detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
-            }
+            return Results.Ok(await coordinator.ImportAutoAsync(
+                request.AccountId, request.Content, request.FormatId, new ImportHints(request.DateOrder, request.NumberFormat), ct));
         })
         .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(ApiLimits.ImportRequestBytes))
         .WithName("ImportTransactionsAuto")
@@ -130,19 +113,9 @@ internal static class ImportEndpoints
                 });
             }
 
-            try
-            {
-                var result = await handler.HandleAsync(
-                    new MatchTransactionCommand(id, request.PlannedOccurrenceId), ct);
-                return Results.Ok(result);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(
-                    title: "Match failed",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
-            }
+            var result = await handler.HandleAsync(
+                new MatchTransactionCommand(id, request.PlannedOccurrenceId), ct);
+            return Results.Ok(result);
         })
         .WithName("MatchTransaction")
         .WithTags("Imports")
@@ -156,18 +129,8 @@ internal static class ImportEndpoints
             UnmatchTransactionHandler handler,
             CancellationToken ct) =>
         {
-            try
-            {
-                var result = await handler.HandleAsync(new UnmatchTransactionCommand(id), ct);
-                return Results.Ok(result);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(
-                    title: "Unmatch failed",
-                    detail: ex.Message,
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
-            }
+            var result = await handler.HandleAsync(new UnmatchTransactionCommand(id), ct);
+            return Results.Ok(result);
         })
         .WithName("UnmatchTransaction")
         .WithTags("Imports")

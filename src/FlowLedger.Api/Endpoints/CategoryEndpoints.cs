@@ -56,18 +56,7 @@ internal static class CategoryEndpoints
             CategoryRestructureService service,
             CancellationToken ct) =>
         {
-            try
-            {
-                return Results.Ok(await service.MoveAsync(request.Path, request.NewPath, request.DryRun, ct));
-            }
-            catch (KeyNotFoundException)
-            {
-                return Results.NotFound();
-            }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["category"] = [ex.Message] });
-            }
+            return Results.Ok(await service.MoveAsync(request.Path, request.NewPath, request.DryRun, ct));
         })
         .WithName("MoveCategory")
         .WithSummary("Rename/move a category and its subtree to a new path; where the path already exists the categories are merged. dryRun previews.")
@@ -109,15 +98,8 @@ internal static class CategoryEndpoints
                 return RowVersioning.Malformed("category");
             }
 
-            try
-            {
-                var found = await handler.HandleAsync(id, ct, expected);
-                return found ? Results.NoContent() : Results.NotFound();
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Problem(ex.Message, statusCode: 409);
-            }
+            var found = await handler.HandleAsync(id, ct, expected);
+            return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteCategory")
         .WithSummary("Delete a non-system category")

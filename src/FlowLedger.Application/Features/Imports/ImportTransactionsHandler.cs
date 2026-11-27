@@ -78,7 +78,7 @@ public sealed class ImportTransactionsHandler
         var account = await _accountRepo.GetByIdAsync(accountId, ct);
         if (account is null)
         {
-            throw new InvalidOperationException($"Account {command.AccountId} not found.");
+            throw new ImportFailedException($"Account {command.AccountId} not found.");
         }
 
         var mapping = command.Mapping;
@@ -88,7 +88,7 @@ public sealed class ImportTransactionsHandler
         var rows = CsvParser.Parse(command.CsvContent, mapping.Delimiter);
         if (rows.Count > MaxImportRows)
         {
-            throw new InvalidOperationException($"CSV has {rows.Count} rows; the limit per import is {MaxImportRows}. Split the file and import it in parts.");
+            throw new ImportFailedException($"CSV has {rows.Count} rows; the limit per import is {MaxImportRows}. Split the file and import it in parts.");
         }
 
         if (rows.Count == 0)
@@ -308,7 +308,7 @@ public sealed class ImportTransactionsHandler
         var description = descStartIdx < fields.Count ? fields[descStartIdx].Trim() : string.Empty;
         if (string.IsNullOrWhiteSpace(description))
         {
-            throw new InvalidOperationException($"Description is empty on row {rowNumber}.");
+            throw new ImportFailedException($"Description is empty on row {rowNumber}.");
         }
 
         // Optional — apply the same field-offset logic for coalesced date/amount fields
