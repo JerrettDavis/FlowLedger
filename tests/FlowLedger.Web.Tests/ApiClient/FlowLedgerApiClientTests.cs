@@ -114,6 +114,49 @@ public sealed class FlowLedgerApiClientTests
         }
     }
 
+    // ── Budgets and goals: optimistic concurrency (#157) ──────────────────────
+
+    [Fact]
+    public async Task SetBudgetAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
+
+        var act = () => client.SetBudgetAsync("Food", 100m, expectedVersion: 3);
+
+        var thrown = (await act.Should().ThrowAsync<ApiClientException>()).Which;
+        thrown.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        FlowLedger.Web.Shared.SnackbarExtensions.ProblemText(thrown).Should().Contain("budget was changed elsewhere");
+    }
+
+    [Fact]
+    public async Task BudgetAndGoalWrites_SendTheVersionAsIfMatch()
+    {
+        var sent = new List<string?>();
+        var handler = new CapturingHandler(r => sent.Add(r.Headers.TryGetValues("If-Match", out var v) ? v.Single() : null));
+        var client = new FlowLedgerApiClient(
+            new HttpClient(handler) { BaseAddress = new Uri("http://localhost") },
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FlowLedgerApiClient>.Instance);
+
+        // the capturing handler answers 404, so the calls throw after the request was captured
+        await ((Func<Task>)(() => client.SetBudgetAsync("Food", 1m, 11))).Should().ThrowAsync<ApiClientException>();
+        await ((Func<Task>)(() => client.DeleteBudgetAsync("Food", 12))).Should().ThrowAsync<ApiClientException>();
+        await ((Func<Task>)(() => client.SaveGoalAsync(Guid.NewGuid(), "Trip", 5m, 1m, null, 13))).Should().ThrowAsync<ApiClientException>();
+        await ((Func<Task>)(() => client.DeleteGoalAsync(Guid.NewGuid(), 14))).Should().ThrowAsync<ApiClientException>();
+
+        sent.Should().Equal("\"11\"", "\"12\"", "\"13\"", "\"14\"");
+    }
+
+    [Fact]
+    public async Task DeleteGoalAsync_On409_ThrowsAFriendlyChangedElsewhereMessage()
+    {
+        var client = BuildClient(new HttpResponseMessage(HttpStatusCode.Conflict));
+
+        var act = () => client.DeleteGoalAsync(Guid.NewGuid(), 5);
+
+        FlowLedger.Web.Shared.SnackbarExtensions.ProblemText((await act.Should().ThrowAsync<ApiClientException>()).Which)
+            .Should().Contain("goal was changed elsewhere");
+    }
+
     // ── Account connector calls: failures surface, bodies are not echoed ──────
 
     [Fact]
