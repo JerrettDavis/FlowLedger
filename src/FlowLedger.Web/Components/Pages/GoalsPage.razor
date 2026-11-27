@@ -21,10 +21,19 @@ else
 {
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editId is null ? "New goal" : "Edit goal")</MudText>
+        @if (_feedback.Summary is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+        }
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudTextField T="string" Immediate="true" @bind-Value="_name" Label="Name" Style="min-width:min(220px,100%)" Margin="Margin.Dense" />
-            <MudNumericField T="decimal" Immediate="true" @bind-Value="_target" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
-            <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense" />
+            <MudTextField T="string" Immediate="true" Value="_name" ValueChanged="OnNameChanged" Label="Name" Style="min-width:min(220px,100%)" Margin="Margin.Dense"
+                          Error="@(_feedback.Has("name") || _feedback.Has("goal"))" ErrorText="@(_feedback.For("name") ?? _feedback.For("goal"))" />
+            <MudNumericField T="decimal" Immediate="true" Value="_target" ValueChanged="OnTargetChanged" Label="Target" Min="0" Style="max-width:160px" Margin="Margin.Dense"
+                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Target"
+                             Error="@_feedback.Has("targetAmount")" ErrorText="@_feedback.For("targetAmount")" />
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_saved" Label="Saved so far" Min="0" Style="max-width:160px" Margin="Margin.Dense"
+                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Saved so far"
+                             Error="@_feedback.Has("savedAmount")" ErrorText="@_feedback.For("savedAmount")" />
             <MudDatePicker @bind-Date="_date" Label="Target date (optional)" Margin="Margin.Dense" Style="max-width:200px" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Goal(_name, _target) is not null)" aria-describedby="goal-reason">Save goal</MudButton>
             @if (_editId is not null)
@@ -74,6 +83,20 @@ else
     private decimal _target;
     private decimal _saved;
     private DateTime? _date;
+    private readonly FormFeedback _feedback = new();
+
+    // Editing a field clears the previous server verdict, so a stale message never sits next to a corrected value.
+    private void OnNameChanged(string? value)
+    {
+        _name = value;
+        _feedback.Clear();
+    }
+
+    private void OnTargetChanged(decimal value)
+    {
+        _target = value;
+        _feedback.Clear();
+    }
 
     private string _rangePreset = "All time";
     private DateOnly? _rangeFrom;
@@ -108,16 +131,22 @@ else
     private void Reset()
     {
         _editId = null; _editVersion = null; _name = null; _target = 0; _saved = 0; _date = null;
+        _feedback.Clear();
     }
 
     private async Task Save()
     {
+        _feedback.Clear();
         try
         {
             await ApiClient.SaveGoalAsync(_editId, _name!, _target, _saved, _date is { } d ? DateOnly.FromDateTime(d) : null, _editVersion);
             Snackbar.Add("Goal saved.", Severity.Success);
             Reset();
             await LoadAsync();
+        }
+        catch (Exception ex) when (_feedback.TryCaptureFields(ex))
+        {
+            // Stay on the form: the summary and the field messages are now rendered.
         }
         catch (Exception ex)
         {

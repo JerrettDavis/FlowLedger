@@ -27,6 +27,20 @@ public sealed class FormFeedback
     }
 
     /// <summary>
+    /// For inline (non-dialog) forms: records the API's per-field errors and returns true when <paramref name="ex"/> carries any, so the
+    /// form can mark those fields. Anything else (a conflict, a network failure) returns false and the page reports it as a snackbar.
+    /// </summary>
+    public bool TryCaptureFields(Exception ex)
+    {
+        if (ex is ApiClientException { FieldErrors.Count: > 0 })
+        {
+            return TryCapture(ex);
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Records a failed submit. Returns true when it was an API or network failure the form can show (the dialog stays open);
     /// false for anything else, which the caller lets propagate.
     /// </summary>

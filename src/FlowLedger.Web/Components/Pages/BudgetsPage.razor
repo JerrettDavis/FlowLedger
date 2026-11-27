@@ -35,14 +35,21 @@ else
 
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">Add or change a budget</MudText>
+        @if (_feedback.Summary is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+        }
         <div class="d-flex align-center gap-3 flex-wrap">
-            <MudSelect T="string" Value="_category" ValueChanged="OnCategoryChanged" Label="Category" Style="min-width:min(240px,100%)" Margin="Margin.Dense">
+            <MudSelect T="string" Value="_category" ValueChanged="OnCategoryChanged" Label="Category" Style="min-width:min(240px,100%)" Margin="Margin.Dense"
+                       Error="@(_feedback.Has("category") || _feedback.Has("budget"))" ErrorText="@(_feedback.For("category") ?? _feedback.For("budget"))">
                 @foreach (var c in Choices)
                 {
                     <MudSelectItem Value="@c">@c@(SpentFor(c) > 0 ? $"  ({Format.Money(SpentFor(c))} this month)" : "")</MudSelectItem>
                 }
             </MudSelect>
-            <MudNumericField T="decimal" @bind-Value="_limit" Label="Monthly limit" Min="0" Style="max-width:180px" Margin="Margin.Dense" />
+            <MudNumericField T="decimal" Value="_limit" ValueChanged="OnLimitChanged" Label="Monthly limit" Min="0" Style="max-width:180px" Margin="Margin.Dense"
+                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Monthly limit"
+                             Error="@_feedback.Has("monthlyLimit")" ErrorText="@_feedback.For("monthlyLimit")" />
             <MudCheckBox T="bool" @bind-Value="_rollover" Label="Roll over unspent" Dense="true" aria-label="Roll over what is left unspent into next month" data-testid="budget-rollover" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(FormRules.Budget(_category) is not null)" aria-describedby="budget-reason">Save budget</MudButton>
         </div>
@@ -101,6 +108,14 @@ else
     private string? _category;
     private decimal _limit;
     private bool _rollover;
+    private readonly FormFeedback _feedback = new();
+
+    // Editing the limit clears the previous server verdict, so a stale message never sits next to a corrected value.
+    private void OnLimitChanged(decimal value)
+    {
+        _limit = value;
+        _feedback.Clear();
+    }
 
     private IEnumerable<string> Choices => _data is null
         ? []
@@ -165,12 +180,17 @@ else
 
     private async Task Save()
     {
+        _feedback.Clear();
         try
         {
             var expected = _data?.Budgets.FirstOrDefault(b => b.Category == _category!.Trim())?.Version;
             await ApiClient.SetBudgetAsync(_category!, _limit, expected, rollover: _rollover);
             Snackbar.Add("Budget saved.", Severity.Success);
             await LoadAsync();
+        }
+        catch (Exception ex) when (_feedback.TryCaptureFields(ex))
+        {
+            // Stay on the form: the summary and the field messages are now rendered.
         }
         catch (Exception ex)
         {

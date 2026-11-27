@@ -115,7 +115,8 @@ else
             {
                 <div class="d-flex align-center gap-3 flex-wrap mb-1">
                     <MudText Style="min-width:min(220px,100%);flex:1">@row.Name <span class="fl-muted">(@row.Type)</span></MudText>
-                    <MudNumericField T="decimal?" Immediate="true" @bind-Value="row.Rate" Label="@(row.IsLiability ? "APR %" : "APY %")" Min="0" Max="100" Margin="Margin.Dense" Style="max-width:120px" />
+                    <MudNumericField T="decimal?" Immediate="true" Value="row.Rate" ValueChanged="@(v => { row.Rate = v; row.Feedback.Clear(); })" Label="@(row.IsLiability ? "APR %" : "APY %")" Min="0" Max="100" Margin="Margin.Dense" Style="max-width:120px"
+                                     aria-label="@($"{(row.IsLiability ? "APR" : "APY")} for {row.Name}")" Error="@row.Feedback.Has("rate")" ErrorText="@row.Feedback.For("rate")" />
                     @if (row.IsLiability)
                     {
                         <MudNumericField T="int?" Immediate="true" @bind-Value="row.Months" Label="Months left" Min="1" Max="600" Margin="Margin.Dense" Style="max-width:130px" />
@@ -304,6 +305,7 @@ else
         public decimal? Rate { get; set; }
         public int? Months { get; set; }
         public bool Saved { get; set; }
+        public FormFeedback Feedback { get; } = new();
     }
 
     private List<RateRow> _rateRows = [];
@@ -490,14 +492,23 @@ else
 
     private async Task SaveRate(RateRow row)
     {
-        await Safe(async () =>
+        row.Feedback.Clear();
+        try
         {
             await ApiClient.SaveAccountRateAsync(row.Id, row.Rate ?? 0, row.IsLiability ? row.Months : null);
             row.Saved = true;
             _report = await ApiClient.GetStrategiesAsync();
             BuildTrajectory();
             Snackbar.Add("Rate saved. Suggestions updated.", Severity.Success);
-        });
+        }
+        catch (Exception ex) when (row.Feedback.TryCaptureFields(ex))
+        {
+            // The message is rendered on the rate field of this row; the other rows keep what was typed.
+        }
+        catch (Exception ex)
+        {
+            Snackbar.AddFailure(ex);
+        }
     }
 
     private async Task ClearRate(RateRow row)

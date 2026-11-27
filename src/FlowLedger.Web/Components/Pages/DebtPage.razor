@@ -17,19 +17,27 @@
 else
 {
     <MudPaper Class="pa-4 mb-4" Outlined="true">
+        @if (_feedback.Summary is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@(_feedback.For("debts") ?? _feedback.Summary)</MudAlert>
+        }
         @foreach (var d in _rows)
         {
             <div class="d-flex align-center gap-3 flex-wrap mb-2">
                 <MudTextField T="string" Immediate="true" @bind-Value="d.Name" Label="Debt" Style="min-width:min(200px,100%)" Margin="Margin.Dense" />
-                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Balance" Label="Balance" Min="0" Style="max-width:150px" Margin="Margin.Dense"
+                                 Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="@($"Balance for {d.Name}")" />
                 <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Rate" Label="APR %" Min="0" Max="100" Style="max-width:110px" Margin="Margin.Dense" />
-                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Min="0" Style="max-width:150px" Margin="Margin.Dense" />
+                <MudNumericField T="decimal" Immediate="true" @bind-Value="d.Minimum" Label="Min payment" Min="0" Style="max-width:150px" Margin="Margin.Dense"
+                                 Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="@($"Minimum payment for {d.Name}")" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => _rows.Remove(d))" aria-label="@($"Remove {d.Name}")" />
             </div>
         }
         <div class="d-flex align-center gap-3 flex-wrap mt-2">
             <MudButton OnClick="AddRow" StartIcon="@Icons.Material.Filled.Add">Add debt</MudButton>
-            <MudNumericField T="decimal" Immediate="true" @bind-Value="_extra" Label="Extra per month" Min="0" Style="max-width:170px" Margin="Margin.Dense" />
+            <MudNumericField T="decimal" Immediate="true" @bind-Value="_extra" Label="Extra per month" Min="0" Style="max-width:170px" Margin="Margin.Dense"
+                             Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Extra per month"
+                             Error="@_feedback.Has("extraMonthly")" ErrorText="@_feedback.For("extraMonthly")" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Calculate" Disabled="@(FormRules.Debt(_rows.Count) is not null)" aria-describedby="debt-reason">Compare</MudButton>
         </div>
         <SubmitReason Id="debt-reason" Reason="@FormRules.Debt(_rows.Count)" />
@@ -78,6 +86,7 @@ else
 
     private readonly List<Row> _rows = [];
     private decimal _extra;
+    private readonly FormFeedback _feedback = new();
     private FlowLedger.Web.ApiClient.DebtPlanDto? _result;
     private bool _loading = true;
 
@@ -108,10 +117,15 @@ else
 
     private async Task Calculate()
     {
+        _feedback.Clear();
         try
         {
             _result = await ApiClient.PlanDebtAsync(
                 _rows.Select(r => new FlowLedger.Web.ApiClient.DebtRowDto(r.Name, r.Balance, r.Rate, r.Minimum)).ToList(), _extra);
+        }
+        catch (Exception ex) when (_feedback.TryCaptureFields(ex))
+        {
+            // The summary (and the extra-payment field message) are rendered; nothing is lost from the rows.
         }
         catch (Exception ex)
         {

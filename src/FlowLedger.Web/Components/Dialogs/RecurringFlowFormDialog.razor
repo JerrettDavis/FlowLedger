@@ -29,6 +29,7 @@
                 </MudSelect>
 
                 <MudNumericField @bind-Value="Amount" Label="Amount" Min="0.01m" Format="F2"
+                                 Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment"
                                  Error="@_feedback.Has("amount")" ErrorText="@_feedback.For("amount")"
                                  aria-label="Amount" Class="mb-3" />
 
@@ -62,9 +63,12 @@
             else
             {
                 <!-- Edit mode: amount + model only -->
-                <MudNumericField @bind-Value="_amount" Label="Amount" Min="0.01m" Format="F2"
+                <MudNumericField @bind-Value="Amount" Label="Amount" Min="0.01m" Format="F2"
+                                 Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment"
+                                 Error="@_feedback.Has("amount")" ErrorText="@_feedback.For("amount")"
                                  aria-label="Amount" Class="mb-3" />
-                <MudSelect @bind-Value="_amountModel" Label="Amount Model" aria-label="Amount model" Class="mb-3">
+                <MudSelect @bind-Value="_amountModel" @bind-Value:after="_feedback.Clear" Label="Amount Model" aria-label="Amount model" Class="mb-3"
+                           Error="@_feedback.Has("amountModel")" ErrorText="@_feedback.For("amountModel")">
                     <MudSelectItem Value="@("Fixed")">Fixed</MudSelectItem>
                     <MudSelectItem Value="@("Estimated")">Estimated</MudSelectItem>
                     <MudSelectItem Value="@("LastObserved")">Last Observed</MudSelectItem>
@@ -91,6 +95,12 @@
     /// appear next to the fields they belong to. Used for new flows; editing keeps the close-then-save flow (its 409 handling lives on the page).
     /// </summary>
     [Parameter] public Func<FlowLedger.Contracts.CreateRecurringFlowRequest, Task>? CreateAsync { get; set; }
+
+    /// <summary>
+    /// When set, an edit is saved by the dialog itself and the dialog stays open on failure, so the API's per-field errors appear on the
+    /// fields (#211). Conflict handling (reloading the stale row) belongs to the callback.
+    /// </summary>
+    [Parameter] public Func<FlowLedger.Contracts.UpdateRecurringFlowRequest, Task>? UpdateAsync { get; set; }
 
     private readonly FormFeedback _feedback = new();
 
@@ -153,7 +163,13 @@
             result = new FlowLedger.Contracts.UpdateRecurringFlowRequest(_amount, _amountModel);
         }
 
-        if (CreateAsync is null || result is not FlowLedger.Contracts.CreateRecurringFlowRequest create)
+        var commit = result switch
+        {
+            FlowLedger.Contracts.CreateRecurringFlowRequest create when CreateAsync is not null => () => CreateAsync(create),
+            FlowLedger.Contracts.UpdateRecurringFlowRequest update when UpdateAsync is not null => () => UpdateAsync(update),
+            _ => (Func<Task>?)null,
+        };
+        if (commit is null)
         {
             MudDialog.Close(DialogResult.Ok(result));
             return;
@@ -162,7 +178,7 @@
         _feedback.Clear();
         try
         {
-            await CreateAsync(create);
+            await commit();
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex) when (_feedback.TryCapture(ex))

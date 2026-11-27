@@ -536,62 +536,59 @@
             return;
         }
 
-        var outcome = await ShowSaveDialogAsync(asPanel: false);
-        if (outcome is null)
-        {
-            return;
-        }
-
-        await PersistAsync(new SaveReportRequest(outcome.Name, outcome.Description, "View", [CurrentPanel(outcome.PanelTitle)]), null, "View saved");
+        // The dialog performs the save itself, so a validation failure shows next to the field and the dialog stays open (#211).
+        await ShowSaveDialogAsync(asPanel: false, outcome =>
+            SaveAsync(new SaveReportRequest(outcome.Name, outcome.Description, "View", [CurrentPanel(outcome.PanelTitle)]), null, "View saved"));
     }
 
     private async Task AddToReportAsync()
     {
-        var outcome = await ShowSaveDialogAsync(asPanel: true);
-        if (outcome is null)
+        await ShowSaveDialogAsync(asPanel: true, outcome =>
         {
-            return;
-        }
+            if (outcome.ExistingReportId is { } id)
+            {
+                var existing = _reports.First(r => r.Id == id);
+                var panels = existing.Panels.Append(CurrentPanel(outcome.PanelTitle)).ToList();
+                return SaveAsync(new SaveReportRequest(existing.Name, existing.Description, "Report", panels), Guid.Parse(id), "Panel added to report");
+            }
 
-        if (outcome.ExistingReportId is { } id)
-        {
-            var existing = _reports.First(r => r.Id == id);
-            var panels = existing.Panels.Append(CurrentPanel(outcome.PanelTitle)).ToList();
-            await PersistAsync(new SaveReportRequest(existing.Name, existing.Description, "Report", panels), Guid.Parse(id), "Panel added to report");
-        }
-        else
-        {
-            await PersistAsync(new SaveReportRequest(outcome.Name, outcome.Description, "Report", [CurrentPanel(outcome.PanelTitle)]), null, "Report created");
-        }
+            return SaveAsync(new SaveReportRequest(outcome.Name, outcome.Description, "Report", [CurrentPanel(outcome.PanelTitle)]), null, "Report created");
+        });
     }
 
-    private async Task<SaveReportDialog.Outcome?> ShowSaveDialogAsync(bool asPanel)
+    private async Task ShowSaveDialogAsync(bool asPanel, Func<SaveReportDialog.Outcome, Task> commit)
     {
         var parameters = new DialogParameters<SaveReportDialog>
         {
             { x => x.AsPanel, asPanel },
             { x => x.Reports, _reports },
             { x => x.SuggestedName, _loadedTitle ?? "" },
+            { x => x.CommitAsync, commit },
         };
         var dialog = await DialogService.ShowAsync<SaveReportDialog>(asPanel ? "Add to report" : "Save view", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        var result = await dialog.Result;
-        return result is { Canceled: false, Data: SaveReportDialog.Outcome o } ? o : null;
+        await dialog.Result;
+    }
+
+    /// <summary>Saves and refreshes; failures propagate so the caller (a dialog or <see cref="PersistAsync"/>) decides how to show them.</summary>
+    private async Task SaveAsync(SaveReportRequest request, Guid? id, string success)
+    {
+        var saved = await ApiClient.SaveReportAsync(request, id);
+        _reports = await ApiClient.GetReportsAsync();
+        if (saved is { Kind: "View" })
+        {
+            _loadedView = saved;
+            _loadedTitle = saved.Name;
+        }
+
+        Snackbar.Add(success, Severity.Success);
     }
 
     private async Task PersistAsync(SaveReportRequest request, Guid? id, string success)
     {
         try
         {
-            var saved = await ApiClient.SaveReportAsync(request, id);
-            _reports = await ApiClient.GetReportsAsync();
-            if (saved is { Kind: "View" })
-            {
-                _loadedView = saved;
-                _loadedTitle = saved.Name;
-            }
-
-            Snackbar.Add(success, Severity.Success);
+            await SaveAsync(request, id, success);
         }
         catch (ApiClientException ex)
         {

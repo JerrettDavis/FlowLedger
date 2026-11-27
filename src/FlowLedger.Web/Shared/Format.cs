@@ -14,6 +14,12 @@ public static class Format
     public static string Money(decimal v) =>
         v.ToString("C", CultureInfo.CurrentCulture);
 
+    /// <summary>
+    /// The display currency's symbol (the current culture follows the display settings), for the start adornment of a money input so
+    /// the field says which currency it takes.
+    /// </summary>
+    public static string CurrencyAdornment => CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
+
     private static readonly Dictionary<string, string> CurrencySymbols = new(StringComparer.OrdinalIgnoreCase)
     {
         ["USD"] = "$",
