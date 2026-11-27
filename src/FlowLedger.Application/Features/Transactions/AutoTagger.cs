@@ -15,17 +15,17 @@ internal static class AutoTagger
 
     private static readonly (string Tag, Regex Pattern, string? Direction)[] Rules =
     [
-        ("refund", Rx(@"refund|\breturn\b|reversal|chargeback|credit adj"), "Credit"),
-        ("interest", Rx(@"interest"), "Credit"),
-        ("payroll", Rx(@"payroll|direct dep|salary|paycheck"), "Credit"),
+        ("refund", Rx(@"refund|\breturn\b|reversal|chargeback|credit adj"), nameof(TransactionDirection.Credit)),
+        ("interest", Rx(@"interest"), nameof(TransactionDirection.Credit)),
+        ("payroll", Rx(@"payroll|direct dep|salary|paycheck"), nameof(TransactionDirection.Credit)),
         ("fee", Rx(@"\bfee\b|service charge|overdraft|maintenance fee|finance charge"), null),
         ("atm", Rx(@"\batm\b|cash withdrawal"), null),
-        ("subscription", Rx(@"subscription|netflix|spotify|hulu|disney\+|patreon|prime video|anthropic|openai|github|adobe|jetbrains|digitalocean|icloud|google (one|storage|workspace)"), "Debit"),
+        ("subscription", Rx(@"subscription|netflix|spotify|hulu|disney\+|patreon|prime video|anthropic|openai|github|adobe|jetbrains|digitalocean|icloud|google (one|storage|workspace)"), nameof(TransactionDirection.Debit)),
         ("online", Rx(@"\.com\b|\.net\b|\.org\b|\.io\b|www\.|paypal|amzn|amazon|\bsq \*|\btst\*|\bpp\*"), null),
         ("international", Rx(@"foreign|intl|international|\bfx\b|currency conversion|\b(sgp|gbr|can|mex|irl|deu|fra|jpn|aus)\b"), null),
         ("peer-payment", Rx(@"venmo|zelle|cash app"), null),
         ("food-delivery", Rx(@"doordash|grubhub|uber ?eats|postmates|instacart"), null),
-        ("loan-payment", Rx(@"loan|mortgage|\bhmf\b|auto fin|principal"), "Debit"),
+        ("loan-payment", Rx(@"loan|mortgage|\bhmf\b|auto fin|principal"), nameof(TransactionDirection.Debit)),
     ];
 
     /// <summary>Every tag this class can assign (including the amount/status based ones).</summary>
@@ -49,7 +49,7 @@ internal static class AutoTagger
             }
         }
 
-        if (string.Equals(direction, "Debit", StringComparison.OrdinalIgnoreCase) && amount >= LargeThreshold)
+        if (string.Equals(direction, nameof(TransactionDirection.Debit), StringComparison.OrdinalIgnoreCase) && amount >= LargeThreshold)
         {
             tags.Add("large");
         }

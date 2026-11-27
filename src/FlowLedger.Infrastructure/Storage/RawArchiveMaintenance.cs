@@ -1,3 +1,4 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Users;
 using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Integrations.Abstractions;
@@ -124,7 +125,7 @@ public sealed class RawArchiveMaintenance : IRawPayloadDecryptor, ITenantFileEra
     {
         if (!settings.Encrypts)
         {
-            throw new InvalidOperationException("Set Storage:EncryptionKey before sealing the raw archive.");
+            throw new ConflictException("Set Storage:EncryptionKey before sealing the raw archive.", "Raw archive cannot be sealed");
         }
 
         var all = new List<string>();

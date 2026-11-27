@@ -1,4 +1,5 @@
 using FlowLedger.Infrastructure.DataSafety;
+using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Tests.Helpers;
 using FluentAssertions;
 using Npgsql;

@@ -1,5 +1,7 @@
 sealed class FlowLedger.Integrations.Mx.CostControl.MxRefreshCooldown
 sealed class FlowLedger.Integrations.Mx.MxArchiveReplayHandler
+sealed class FlowLedger.Integrations.Mx.MxCredentialsOptions
+sealed class FlowLedger.Integrations.Mx.MxCredentialsOptionsValidator
 sealed class FlowLedger.Integrations.Mx.MxFinancialDataProvider
 sealed class FlowLedger.Integrations.Mx.MxProviderOptions
 static class FlowLedger.Integrations.Mx.MxWebhookEvents

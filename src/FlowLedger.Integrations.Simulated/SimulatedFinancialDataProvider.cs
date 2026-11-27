@@ -125,9 +125,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
         }
 
         var expected = BuildSignature(rawBody.Span, _options.WebhookSecret);
-        if (!CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expected),
-            Encoding.UTF8.GetBytes(signatureHeader)))
+        if (!HmacWebhookSignature.Matches(expected, signatureHeader))
         {
             throw new InvalidWebhookSignatureException(
                 "Simulated webhook signature verification failed. " +
@@ -186,9 +184,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
     /// </summary>
     public static string BuildSignature(ReadOnlySpan<byte> rawBody, string secret)
     {
-        var keyBytes = Encoding.UTF8.GetBytes(secret);
-        var hash = HMACSHA256.HashData(keyBytes, rawBody);
-        return Convert.ToHexString(hash).ToLowerInvariant();
+        return HmacWebhookSignature.ComputeHex(Encoding.UTF8.GetBytes(secret), rawBody);
     }
 
     /// <summary>

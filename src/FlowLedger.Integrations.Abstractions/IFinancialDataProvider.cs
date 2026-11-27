@@ -125,6 +125,12 @@ public interface IFinancialDataProvider
     Task<ProviderWebhookEvent> ParseWebhookAsync(
         ReadOnlyMemory<byte> rawBody,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Whether a verified webhook event means new bank data is available and so is worth a (billable) sync. Events that carry no
+    /// new financial data are acknowledged and ignored; the scheduled sync stays the backstop. Defaults to true (sync on every event).
+    /// </summary>
+    bool IsWebhookSyncTrigger(string? eventType) => true;
 }
 
 /// <summary>

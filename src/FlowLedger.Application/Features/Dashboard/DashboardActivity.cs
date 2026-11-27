@@ -2,6 +2,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Dashboard;
 
@@ -36,7 +37,7 @@ internal static class DashboardActivityAnalyzer
 
         bool IsPending(TransactionDto t) => t.Status == "Pending";
         DateOnly Date(TransactionDto t) => t.PostedDate ?? t.EffectiveDate;
-        decimal Signed(TransactionDto t) => t.Direction == "Debit" ? -t.Amount : t.Amount;
+        decimal Signed(TransactionDto t) => t.Direction == nameof(TransactionDirection.Debit) ? -t.Amount : t.Amount;
 
         var pending = real.Where(IsPending).OrderByDescending(t => t.EffectiveDate).ToList();
         var recent = real.Where(t => !IsPending(t)).OrderByDescending(Date).ThenByDescending(t => t.CreatedAt)
@@ -47,8 +48,8 @@ internal static class DashboardActivityAnalyzer
         var counted = real.Where(t => !transfers.Contains(t.Id)).ToList();
         var allInWindow = real.Where(t => Date(t) >= windowStart && Date(t) <= today).ToList();
         var inWindow = allInWindow.Where(t => !transfers.Contains(t.Id)).ToList();
-        var moneyIn = inWindow.Where(t => t.Direction == "Credit").Sum(t => t.Amount);
-        var moneyOut = inWindow.Where(t => t.Direction == "Debit").Sum(t => t.Amount);
+        var moneyIn = inWindow.Where(t => t.Direction == nameof(TransactionDirection.Credit)).Sum(t => t.Amount);
+        var moneyOut = inWindow.Where(t => t.Direction == nameof(TransactionDirection.Debit)).Sum(t => t.Amount);
 
         var threshold = LargeThreshold(counted.Where(t => Date(t) >= today.AddDays(-HistoryDays)).Select(t => t.Amount).ToList());
         var large = inWindow.Where(t => t.Amount >= threshold)
@@ -92,7 +93,7 @@ internal static class DashboardActivityAnalyzer
         // pass linear in history size instead of re-scanning (and copying) all of it for every candidate.
         var historyByKey = history.GroupBy(Key).ToDictionary(g => g.Key, g => g.ToList());
 
-        foreach (var t in candidates.Where(c => c.Direction == "Debit"))
+        foreach (var t in candidates.Where(c => c.Direction == nameof(TransactionDirection.Debit)))
         {
             var reasons = new List<string>();
             var key = Key(t);
@@ -105,7 +106,7 @@ internal static class DashboardActivityAnalyzer
                 reasons.Add("Possible duplicate charge");
             }
 
-            var sameMerchant = others.Where(o => o.Direction == "Debit" && Key(o) == key).Select(o => o.Amount).OrderBy(a => a).ToList();
+            var sameMerchant = others.Where(o => o.Direction == nameof(TransactionDirection.Debit) && Key(o) == key).Select(o => o.Amount).OrderBy(a => a).ToList();
             if (sameMerchant.Count >= 3)
             {
                 var median = sameMerchant[sameMerchant.Count / 2];
@@ -174,7 +175,7 @@ public sealed class DismissSuspiciousHandler(ISuspiciousDismissalStore dismissal
         var trimmed = note?.Trim();
         if (trimmed is { Length: > MaxNoteLength })
         {
-            throw new ArgumentException($"Note must be {MaxNoteLength} characters or fewer.");
+            throw new RequestValidationException("note", $"Note must be {MaxNoteLength} characters or fewer.");
         }
 
         await dismissals.DismissAsync(transactionId, string.IsNullOrEmpty(trimmed) ? null : trimmed, ct);

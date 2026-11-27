@@ -1,6 +1,7 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Investments;
 
@@ -83,7 +84,7 @@ public sealed class InvestmentPerformanceService(
 
     public async Task<IReadOnlyList<AccountPerformance>> GetAsync(DateOnly today, CancellationToken ct = default, DateOnly? from = null, DateOnly? to = null)
     {
-        var investment = (await accounts.ListAsync(ct)).Where(a => a.IsActive && a.AccountType.ToString() == "Investment").ToList();
+        var investment = (await accounts.ListAsync(ct)).Where(a => a.IsActive && a.AccountType == AccountType.Investment).ToList();
         if (investment.Count == 0)
         {
             return [];
@@ -103,7 +104,7 @@ public sealed class InvestmentPerformanceService(
         foreach (var a in investment)
         {
             var flows = dtos.Where(t => t.AccountId == a.Id && transferIds.Contains(t.Id))
-                .Select(t => new CashFlowPoint(t.PostedDate ?? t.EffectiveDate, t.Direction == "Credit" ? t.Amount : -t.Amount))
+                .Select(t => new CashFlowPoint(t.PostedDate ?? t.EffectiveDate, t.Direction == nameof(TransactionDirection.Credit) ? t.Amount : -t.Amount))
                 .ToList();
             var accountPoints = points.Where(p => p.AccountId == a.Id).ToList();
             var periods = from is { } f

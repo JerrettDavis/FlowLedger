@@ -1,8 +1,9 @@
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Observability;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>One security-relevant action: who did what to which target, from where, under which trace.</summary>
 /// <param name="Action">Stable dotted name, e.g. <c>connector.link</c>, <c>data.import</c>.</param>

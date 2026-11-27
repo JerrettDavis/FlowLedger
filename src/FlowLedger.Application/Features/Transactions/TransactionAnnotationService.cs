@@ -18,7 +18,7 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
     {
         if (note is { Length: > MaxNoteLength })
         {
-            throw new ArgumentException($"Notes are limited to {MaxNoteLength} characters.");
+            throw new RequestValidationException("note", $"Notes are limited to {MaxNoteLength} characters.");
         }
 
         var tx = await FindAsync(transactionId, ct);
@@ -32,12 +32,12 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
     {
         if (splits.Count == 1)
         {
-            throw new ArgumentException("A split needs at least two parts.");
+            throw new RequestValidationException("splits", "A split needs at least two parts.");
         }
 
         if (splits.Count > 20)
         {
-            throw new ArgumentException("A transaction can have at most 20 splits.");
+            throw new RequestValidationException("splits", "A transaction can have at most 20 splits.");
         }
 
         var tx = await FindAsync(transactionId, ct);
@@ -56,13 +56,13 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
         {
             if (s.Amount <= 0)
             {
-                throw new ArgumentException("Each split must be a positive amount.");
+                throw new RequestValidationException("splits", "Each split must be a positive amount.");
             }
 
             CategoryId? categoryId = null;
             if (s.CategoryId is { } id)
             {
-                categoryId = known.TryGetValue(id, out var c) ? c : throw new KeyNotFoundException("Category not found.");
+                categoryId = known.TryGetValue(id, out var c) ? c : throw new NotFoundException("Category not found.");
             }
 
             parts.Add(new TransactionSplit(new Money(s.Amount, tx.Amount.Currency), categoryId, s.Notes));
@@ -74,7 +74,7 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
         }
         catch (SplitAmountMismatchException)
         {
-            throw new ArgumentException($"The splits must add up to the transaction amount ({tx.Amount.Amount:0.00}).");
+            throw new RequestValidationException("splits", $"The splits must add up to the transaction amount ({tx.Amount.Amount:0.00}).");
         }
 
         await store.SaveAsync(ct);
@@ -82,5 +82,5 @@ public sealed class TransactionAnnotationService(ICategorizationStore store, ICa
 
     private async Task<Transaction> FindAsync(Guid id, CancellationToken ct)
         => await store.FindTrackedAsync(id, ct)
-           ?? throw new KeyNotFoundException("Transaction not found.");
+           ?? throw new NotFoundException("Transaction not found.");
 }

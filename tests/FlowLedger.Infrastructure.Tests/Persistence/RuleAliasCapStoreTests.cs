@@ -90,7 +90,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         }
 
         var overBudget = () => budgets.SetAsync(tenant, "One too many", 10m);
-        await overBudget.Should().ThrowAsync<InvalidOperationException>();
+        await overBudget.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
         await budgets.SetAsync(tenant, "Cat1", 99m);
 
         var goals = new FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore(db, new TestTenantContext(tenant));
@@ -102,7 +102,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         }
 
         var overGoal = () => goals.UpsertAsync(tenant, null, "one too many", 100m, 0m, null);
-        await overGoal.Should().ThrowAsync<InvalidOperationException>();
+        await overGoal.Should().ThrowAsync<FlowLedger.Application.Abstractions.RequestValidationException>();
         await goals.UpsertAsync(tenant, first, "renamed", 100m, 5m, null);
     }
 }

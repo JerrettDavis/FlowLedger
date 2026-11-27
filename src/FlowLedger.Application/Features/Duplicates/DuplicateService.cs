@@ -84,7 +84,7 @@ public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions opt
 
         if (a.Amount != b.Amount || a.Direction != b.Direction)
         {
-            throw new ArgumentException("Only transactions with the same account, direction and amount can be merged.");
+            throw new MergeRefusedException("Only transactions with the same account, direction and amount can be merged.");
         }
 
         var (survivor, duplicate) = keepId switch
@@ -92,14 +92,14 @@ public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions opt
             null => DuplicateDetector.ChooseSurvivor(a, b),
             var k when k == a.Id => (a, b),
             var k when k == b.Id => (b, a),
-            _ => throw new ArgumentException("keepId must be one of the two transactions."),
+            _ => throw new MergeRefusedException("keepId must be one of the two transactions."),
         };
 
         if (duplicate.Status == TransactionStatus.Matched || duplicate.Status == TransactionStatus.Reconciled || duplicate.MatchedOccurrenceId is not null)
         {
             if (survivor.Status is TransactionStatus.Matched or TransactionStatus.Reconciled || survivor.MatchedOccurrenceId is not null)
             {
-                throw new InvalidOperationException("Both transactions are matched to a plan or reconciled; unmatch one first.");
+                throw new MergeRefusedException("Both transactions are matched to a plan or reconciled; unmatch one first.");
             }
 
             // The plan link lives on the removed row; keep that one instead of orphaning the occurrence.

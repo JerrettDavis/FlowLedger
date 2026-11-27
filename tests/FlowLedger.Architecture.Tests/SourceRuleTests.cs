@@ -195,7 +195,7 @@ public sealed class SourceRuleTests
     /// <summary>Files that still hold a bare connector literal (OpenAPI tag text or a private const). Shrink only.</summary>
     private static readonly HashSet<string> ConnectorLiteralAllowlist =
     [
-        "src/FlowLedger.Infrastructure/DependencyInjection.cs", // display names in the descriptor list
+        "src/FlowLedger.Infrastructure/DependencyInjection.Connectors.cs", // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/ConnectorEndpoints.cs",     // display names in the descriptor list
         "src/FlowLedger.Api/Endpoints/MxEndpoints.cs",
         "src/FlowLedger.Api/Endpoints/QuilttEndpoints.cs",
@@ -234,6 +234,22 @@ public sealed class SourceRuleTests
         Assert.True(offenders.Count == 0, $"Declare a ConnectorTraits flag instead of naming a connector in: {string.Join(", ", offenders)}");
     }
 
+    // ── 6a. Endpoints do not translate BCL exceptions to HTTP (#90) ──────────
+
+    [Fact]
+    public void Endpoints_do_not_catch_BCL_exceptions_the_central_handler_maps_typed_ones()
+    {
+        var bcl = new Regex(@"catch\s*\(\s*(ArgumentException|InvalidOperationException|KeyNotFoundException)\b|catch\s*\(\s*Exception\s+\w+\s*\)\s*when\s*\(\s*\w+\s+is\s+(ArgumentException|InvalidOperationException)");
+        var offenders = SourceFiles("FlowLedger.Api")
+            .Where(f => Rel(f).StartsWith("src/FlowLedger.Api/Endpoints/", StringComparison.Ordinal))
+            .Where(f => bcl.IsMatch(File.ReadAllText(f)))
+            .Select(Rel)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Throw a typed application exception (NotFound/RequestValidation/Conflict/UnprocessableRequest) and let ProviderExceptionHandler map it; do not catch BCL exceptions in: {string.Join(", ", offenders)}");
+    }
+
     // ── 6b. No new oversized source files (#103) ─────────────────────────────
 
     private const int MaxSourceLines = 500;
@@ -241,11 +257,8 @@ public sealed class SourceRuleTests
     /// <summary>Files over the limit today, with their current length as a ceiling. A file may shrink but not grow; one that fits must leave the list.</summary>
     private static readonly Dictionary<string, int> OversizedCeilings = new()
     {
-        ["src/FlowLedger.Infrastructure/Sync/FinancialSyncService.cs"] = 923,
         ["src/FlowLedger.Application/Features/Imports/ImportNormalizer.cs"] = 747,
-        ["src/FlowLedger.Application/Features/Query/QueryEngine.cs"] = 710,
         ["src/FlowLedger.Integrations.Simulated/SimulatedDataFactory.cs"] = 687,
-        ["src/FlowLedger.Integrations.Mx/MxFinancialDataProvider.cs"] = 647,
         ["src/FlowLedger.Application/Features/Query/QueryParser.cs"] = 611,
         ["src/FlowLedger.Application/Features/RecurringFlows/RecurringFlowDetector.cs"] = 538,
         ["src/FlowLedger.Application/Features/Forecasting/ForecastEngine.cs"] = 522,
@@ -275,9 +288,7 @@ public sealed class SourceRuleTests
     private static readonly HashSet<string> FixedTimeAllowlist =
     [
         "src/FlowLedger.SharedKernel/ConstantTime.cs",
-        "src/FlowLedger.Integrations.Mx/MxWebhookVerifier.cs",
-        "src/FlowLedger.Integrations.Quiltt/QuilttWebhookVerifier.cs",
-        "src/FlowLedger.Integrations.Simulated/SimulatedFinancialDataProvider.cs",
+        "src/FlowLedger.Integrations.Abstractions/HmacWebhookSignature.cs", // the one shared webhook HMAC comparison
         "src/FlowLedger.Api/Tenancy/TenantAssertion.cs",
     ];
 
