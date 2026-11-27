@@ -1,0 +1,230 @@
+class FlowLedger.Web.Components.App
+class FlowLedger.Web.Components.Dialogs.AccountConnectorDialog
+class FlowLedger.Web.Components.Dialogs.AccountFormDialog
+class FlowLedger.Web.Components.Dialogs.AliasDialog
+class FlowLedger.Web.Components.Dialogs.AssetDetailDialog
+class FlowLedger.Web.Components.Dialogs.AssetFormDialog
+class FlowLedger.Web.Components.Dialogs.ConfirmDialog
+class FlowLedger.Web.Components.Dialogs.DismissFlagDialog
+class FlowLedger.Web.Components.Dialogs.ImportTransactionsDialog
+class FlowLedger.Web.Components.Dialogs.IntegrationFormDialog
+class FlowLedger.Web.Components.Dialogs.MoveCategoryDialog
+class FlowLedger.Web.Components.Dialogs.NoteDialog
+class FlowLedger.Web.Components.Dialogs.RecategorizeDialog
+class FlowLedger.Web.Components.Dialogs.RecurringFlowFormDialog
+class FlowLedger.Web.Components.Dialogs.SaveReportDialog
+class FlowLedger.Web.Components.Dialogs.SecretRevealDialog
+class FlowLedger.Web.Components.Dialogs.SheetBillDialog
+class FlowLedger.Web.Components.Dialogs.SheetImportDialog
+class FlowLedger.Web.Components.Dialogs.SplitDialog
+class FlowLedger.Web.Components.Dialogs.TransactionDetailsDialog
+class FlowLedger.Web.Components.Layout.AppBar
+class FlowLedger.Web.Components.Layout.MainLayout
+class FlowLedger.Web.Components.Layout.NavMenu
+class FlowLedger.Web.Components.Layout.ReconnectModal
+class FlowLedger.Web.Components.Pages.Accounts
+class FlowLedger.Web.Components.Pages.AssetsPage
+class FlowLedger.Web.Components.Pages.BudgetsPage
+class FlowLedger.Web.Components.Pages.CategoriesPage
+class FlowLedger.Web.Components.Pages.ConnectorsPage
+class FlowLedger.Web.Components.Pages.DataPage
+class FlowLedger.Web.Components.Pages.DebtPage
+class FlowLedger.Web.Components.Pages.DisplaySettingsPage
+class FlowLedger.Web.Components.Pages.DuplicatesPage
+class FlowLedger.Web.Components.Pages.Error
+class FlowLedger.Web.Components.Pages.Forbidden
+class FlowLedger.Web.Components.Pages.Forecasts
+class FlowLedger.Web.Components.Pages.GoalsPage
+class FlowLedger.Web.Components.Pages.Home
+class FlowLedger.Web.Components.Pages.HomeAssistantPage
+class FlowLedger.Web.Components.Pages.IntegrationsPage
+class FlowLedger.Web.Components.Pages.InvestmentsPage
+class FlowLedger.Web.Components.Pages.LinkedLoginsPage
+class FlowLedger.Web.Components.Pages.LocalAiPage
+class FlowLedger.Web.Components.Pages.MoneyPlan
+class FlowLedger.Web.Components.Pages.NotFound
+class FlowLedger.Web.Components.Pages.QueryPage
+class FlowLedger.Web.Components.Pages.RecurringFlows
+class FlowLedger.Web.Components.Pages.ReportViewPage
+class FlowLedger.Web.Components.Pages.ReportsPage
+class FlowLedger.Web.Components.Pages.RulesPage
+class FlowLedger.Web.Components.Pages.SheetPage
+class FlowLedger.Web.Components.Pages.SpendingPage
+class FlowLedger.Web.Components.Pages.StatusCodePage
+class FlowLedger.Web.Components.Pages.StrategiesPage
+class FlowLedger.Web.Components.Pages.Transactions
+class FlowLedger.Web.Components.Routes
+class FlowLedger.Web.Components.Shared.AlertsPanel
+class FlowLedger.Web.Components.Shared.AllocationLegend
+class FlowLedger.Web.Components.Shared.AppErrorBoundary
+class FlowLedger.Web.Components.Shared.CardSkeleton
+class FlowLedger.Web.Components.Shared.CategoryChip
+class FlowLedger.Web.Components.Shared.ChartFigure
+class FlowLedger.Web.Components.Shared.ConnectionHealthBadge
+class FlowLedger.Web.Components.Shared.DashboardCard
+class FlowLedger.Web.Components.Shared.DateRangeSelector
+class FlowLedger.Web.Components.Shared.EmptyState
+class FlowLedger.Web.Components.Shared.FocusHeadingOnNavigate
+class FlowLedger.Web.Components.Shared.PageHeader
+class FlowLedger.Web.Components.Shared.QueryChart
+class FlowLedger.Web.Components.Shared.ResultTable
+class FlowLedger.Web.Components.Shared.StatusMessage
+class FlowLedger.Web.Components.Shared.SubmitReason
+class FlowLedger.Web.Components._Imports
+class Program
+enum FlowLedger.Web.Auth.TenantMappingValidator+Outcome
+enum FlowLedger.Web.Connections.ConnectOutcome
+enum FlowLedger.Web.Connections.ConnectionIssueCategory
+enum FlowLedger.Web.Connections.HealthTone
+enum FlowLedger.Web.Connections.RepairStatus
+enum FlowLedger.Web.Shared.DashboardCardState
+interface FlowLedger.Web.Connections.IConnectionRepairHandler
+sealed class FlowLedger.Web.ApiClient.AccountConnectorLinkDto
+sealed class FlowLedger.Web.ApiClient.AccountForecastSeriesDto
+sealed class FlowLedger.Web.ApiClient.AccountLowWaterMarkDto
+sealed class FlowLedger.Web.ApiClient.AccountPerformanceDto
+sealed class FlowLedger.Web.ApiClient.AccountRateDto
+sealed class FlowLedger.Web.ApiClient.AggregateForecastPointDto
+sealed class FlowLedger.Web.ApiClient.AggregateLowWaterMarkDto
+sealed class FlowLedger.Web.ApiClient.AlertDto
+sealed class FlowLedger.Web.ApiClient.ApiAuthOptions
+sealed class FlowLedger.Web.ApiClient.ApiClientException
+sealed class FlowLedger.Web.ApiClient.AskQueryAnswer
+sealed class FlowLedger.Web.ApiClient.AutoAddResultDto
+sealed class FlowLedger.Web.ApiClient.AutoImportResultDto
+sealed class FlowLedger.Web.ApiClient.AutoMergeDto
+sealed class FlowLedger.Web.ApiClient.AvailableProviderAccountDto
+sealed class FlowLedger.Web.ApiClient.BackupRunDto
+sealed class FlowLedger.Web.ApiClient.BackupStatusDto
+sealed class FlowLedger.Web.ApiClient.BreakdownGroupDto
+sealed class FlowLedger.Web.ApiClient.BreakdownResultDto
+sealed class FlowLedger.Web.ApiClient.BreakdownTransactionDto
+sealed class FlowLedger.Web.ApiClient.BudgetStatusDto
+sealed class FlowLedger.Web.ApiClient.BudgetsDto
+sealed class FlowLedger.Web.ApiClient.CashTrajectoryDto
+sealed class FlowLedger.Web.ApiClient.CategorizationResultDto
+sealed class FlowLedger.Web.ApiClient.CategoryMergeDto
+sealed class FlowLedger.Web.ApiClient.CategoryMoveDto
+sealed class FlowLedger.Web.ApiClient.CategoryMoveResultDto
+sealed class FlowLedger.Web.ApiClient.CoachPlanDto
+sealed class FlowLedger.Web.ApiClient.ConnectResult
+sealed class FlowLedger.Web.ApiClient.ConnectionIssueDto
+sealed class FlowLedger.Web.ApiClient.ConnectorAccountDto
+sealed class FlowLedger.Web.ApiClient.ConnectorDto
+sealed class FlowLedger.Web.ApiClient.ConnectorLinkDto
+sealed class FlowLedger.Web.ApiClient.ConnectorUsageDto
+sealed class FlowLedger.Web.ApiClient.ConnectorsOverviewDto
+sealed class FlowLedger.Web.ApiClient.DataStatusDto
+sealed class FlowLedger.Web.ApiClient.DebtPayoffDto
+sealed class FlowLedger.Web.ApiClient.DebtPlanDto
+sealed class FlowLedger.Web.ApiClient.DebtRowDto
+sealed class FlowLedger.Web.ApiClient.DuplicateScanDto
+sealed class FlowLedger.Web.ApiClient.EndpointUsageDto
+sealed class FlowLedger.Web.ApiClient.EnvironmentInfo
+sealed class FlowLedger.Web.ApiClient.EvalMethodDto
+sealed class FlowLedger.Web.ApiClient.EvalPointDto
+sealed class FlowLedger.Web.ApiClient.EvaluationDto
+sealed class FlowLedger.Web.ApiClient.FireDto
+sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient
+sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient+LinkCodeDto
+sealed class FlowLedger.Web.ApiClient.FlowLedgerApiClient+LinkedLoginDto
+sealed class FlowLedger.Web.ApiClient.ForecastBandPointDto
+sealed class FlowLedger.Web.ApiClient.ForecastLineItemDto
+sealed class FlowLedger.Web.ApiClient.ForecastPointDto
+sealed class FlowLedger.Web.ApiClient.ForecastResultDto
+sealed class FlowLedger.Web.ApiClient.GoalDto
+sealed class FlowLedger.Web.ApiClient.GoalLeverDto
+sealed class FlowLedger.Web.ApiClient.GoalPlanDto
+sealed class FlowLedger.Web.ApiClient.GrowthComparisonDto
+sealed class FlowLedger.Web.ApiClient.GrowthPointDto
+sealed class FlowLedger.Web.ApiClient.HomeAssistantSaveRequest
+sealed class FlowLedger.Web.ApiClient.HomeAssistantSettingsDto
+sealed class FlowLedger.Web.ApiClient.HomeAssistantStateDto
+sealed class FlowLedger.Web.ApiClient.ImportFormatDto
+sealed class FlowLedger.Web.ApiClient.IntegrationCallResultDto
+sealed class FlowLedger.Web.ApiClient.IntegrationConfigDto
+sealed class FlowLedger.Web.ApiClient.IntegrationDeliveryDto
+sealed class FlowLedger.Web.ApiClient.IntegrationDto
+sealed class FlowLedger.Web.ApiClient.IntegrationSaveDto
+sealed class FlowLedger.Web.ApiClient.IntegrationSavedDto
+sealed class FlowLedger.Web.ApiClient.IntegrationsStateDto
+sealed class FlowLedger.Web.ApiClient.LadderPlanDto
+sealed class FlowLedger.Web.ApiClient.LadderRungDto
+sealed class FlowLedger.Web.ApiClient.LocalAiDownloadDto
+sealed class FlowLedger.Web.ApiClient.LocalAiModelDto
+sealed class FlowLedger.Web.ApiClient.LocalAiStatusDto
+sealed class FlowLedger.Web.ApiClient.MarketRatesDto
+sealed class FlowLedger.Web.ApiClient.MerchantGroupsDto
+sealed class FlowLedger.Web.ApiClient.MyConnectionDto
+sealed class FlowLedger.Web.ApiClient.OverdraftWarningDto
+sealed class FlowLedger.Web.ApiClient.PastPointDto
+sealed class FlowLedger.Web.ApiClient.PastWhatIfDto
+sealed class FlowLedger.Web.ApiClient.PayoffPlanDto
+sealed class FlowLedger.Web.ApiClient.PeriodPerformanceDto
+sealed class FlowLedger.Web.ApiClient.ProblemDocument
+sealed class FlowLedger.Web.ApiClient.ProblemExtensions
+sealed class FlowLedger.Web.ApiClient.ProviderInfoDto
+sealed class FlowLedger.Web.ApiClient.ProviderUsageDto
+sealed class FlowLedger.Web.ApiClient.QueryRunOutcome
+sealed class FlowLedger.Web.ApiClient.QuilttConfigDto
+sealed class FlowLedger.Web.ApiClient.QuilttConnectResult
+sealed class FlowLedger.Web.ApiClient.QuilttSessionDto
+sealed class FlowLedger.Web.ApiClient.RefinanceDto
+sealed class FlowLedger.Web.ApiClient.RestCallDto
+sealed class FlowLedger.Web.ApiClient.SetAccountConnectorRequest
+sealed class FlowLedger.Web.ApiClient.SoapInvokeDto
+sealed class FlowLedger.Web.ApiClient.SoapOperationsDto
+sealed class FlowLedger.Web.ApiClient.StrategyReportDto
+sealed class FlowLedger.Web.ApiClient.SuggestionDto
+sealed class FlowLedger.Web.ApiClient.SyncStatusDto
+sealed class FlowLedger.Web.ApiClient.TrajectoryPointDto
+sealed class FlowLedger.Web.ApiClient.TransactionPage
+sealed class FlowLedger.Web.ApiClient.TrendPointDto
+sealed class FlowLedger.Web.ApiClient.UnassignedAccountDto
+sealed class FlowLedger.Web.ApiClient.WsdlOperationDto
+sealed class FlowLedger.Web.Auth.OidcOptions
+sealed class FlowLedger.Web.Auth.TenantRevalidatingAuthenticationStateProvider
+sealed class FlowLedger.Web.Components.Dialogs.AccountFormDialog+AccountEditResult
+sealed class FlowLedger.Web.Components.Dialogs.SaveReportDialog+Outcome
+sealed class FlowLedger.Web.Components.Shared.DateRangeSelector+DateRange
+sealed class FlowLedger.Web.Connections.AutoSyncDecision
+sealed class FlowLedger.Web.Connections.ConnectionHealthView
+sealed class FlowLedger.Web.Connections.ConnectionRef
+sealed class FlowLedger.Web.Connections.ConnectionRepairService
+sealed class FlowLedger.Web.Connections.QuilttRepairHandler
+sealed class FlowLedger.Web.Connections.RepairResult
+sealed class FlowLedger.Web.Connections.ToastModel
+sealed class FlowLedger.Web.Services.DisplayCultureCircuitHandler
+sealed class FlowLedger.Web.Services.DisplaySettingsService
+sealed class FlowLedger.Web.Services.LayoutStatus
+sealed class FlowLedger.Web.Services.SyncCoordinator
+sealed class FlowLedger.Web.Services.ThemeService
+sealed class FlowLedger.Web.Shared.AllocationItem
+sealed class FlowLedger.Web.Shared.ChartModel
+sealed class FlowLedger.Web.Shared.ChartRow
+sealed class FlowLedger.Web.Shared.ChartSeries
+sealed class FlowLedger.Web.Shared.DisplaySettings
+static class FlowLedger.Web.ApiClient.TenantAssertionSigner
+static class FlowLedger.Web.Auth.AuthSetup
+static class FlowLedger.Web.Auth.HouseholdAccess
+static class FlowLedger.Web.Auth.TenantMappingValidator
+static class FlowLedger.Web.Components.Shared.CategoryColors
+static class FlowLedger.Web.Connections.AutoSyncPolicy
+static class FlowLedger.Web.Connections.ConnectExit
+static class FlowLedger.Web.Connections.ConnectionHealth
+static class FlowLedger.Web.Connections.ProblemToast
+static class FlowLedger.Web.Connections.SnackbarProblemExtensions
+static class FlowLedger.Web.Security.SecurityHeaders
+static class FlowLedger.Web.Services.DisplayCultureMiddleware
+static class FlowLedger.Web.Services.LayoutStatusLoader
+static class FlowLedger.Web.Shared.ChartSummary
+static class FlowLedger.Web.Shared.ConfirmationExtensions
+static class FlowLedger.Web.Shared.FormRules
+static class FlowLedger.Web.Shared.Format
+static class FlowLedger.Web.Shared.MerchantMatch
+static class FlowLedger.Web.Shared.OnboardingCopy
+static class FlowLedger.Web.Shared.QueryChartSvg
+static class FlowLedger.Web.Shared.SnackbarExtensions
+static class FlowLedger.Web.Shared.SvgChart
+static class FlowLedger.Web.Theme.FlowLedgerTheme
+static class FlowLedger.Web.Theme.ThemeBootstrap

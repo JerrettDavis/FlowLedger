@@ -16,6 +16,16 @@ public interface ICategorizationStore
     Task SaveAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Untracked rows with exactly these ids (the rows a sync inserted or settled, #163). Stores should override with an indexed lookup; the
+    /// default filters the newest-first window, which is correct but loads it.
+    /// </summary>
+    async Task<IReadOnlyList<Transaction>> LoadByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+    {
+        var wanted = ids as ISet<Guid> ?? ids.ToHashSet();
+        return (await LoadAsync(TransactionQuota.ProcessingCap, ct)).Where(t => wanted.Contains(t.Id)).ToList();
+    }
+
+    /// <summary>
     /// Newest-first transactions WITHOUT change tracking. Use for whole-history analysis; mutate the rows you change and pass
     /// them to <see cref="SaveChangedAsync"/>. Default falls back to the tracked load for simple stores.
     /// </summary>
@@ -42,7 +52,8 @@ public interface ICategorizationStore
 }
 
 public sealed record CategorizationResult(
-    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0);
+    int Categorized, int ByLearnedMerchant, int ByKeyword, int Transfers, int StillUncategorized, int ByModel = 0, int Suggested = 0, int ByLlm = 0,
+    bool Partial = false);   // true: more history exists than the processing cap, so the oldest rows were not considered
 
 /// <summary>Tuning for the ML categorizer step (bound from the "Categorization" configuration section).</summary>
 public sealed class CategorizationOptions
@@ -99,7 +110,7 @@ public sealed class CategorizationService(
         var uncategorized = real.Where(t => t.CategoryId is null).ToList();
         if (uncategorized.Count == 0)
         {
-            return new CategorizationResult(0, 0, 0, 0, 0);
+            return new CategorizationResult(0, 0, 0, 0, 0, Partial: TransactionQuota.IsPartial(txs.Count));
         }
 
         var accountTypes = (await accounts.ListAsync(ct)).ToDictionary(a => a.Id, a => a.AccountType.ToString());
@@ -222,7 +233,7 @@ public sealed class CategorizationService(
 
         await categories.SaveChangesAsync(ct);
         await store.SaveChangedAsync(changedRows, ct);
-        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm);
+        return new CategorizationResult(byLearned + byKeyword + byModel + transfers, byLearned, byKeyword, transfers, left, byModel, suggested, byLlm, TransactionQuota.IsPartial(txs.Count));
     }
 
     /// <summary>Fixed confidence shown for a language-model pick (it has no calibrated probability).</summary>

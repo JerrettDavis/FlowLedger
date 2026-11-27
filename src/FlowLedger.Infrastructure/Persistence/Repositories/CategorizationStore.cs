@@ -44,6 +44,17 @@ internal sealed class CategorizationStore(FlowLedgerDbContext db) : ICategorizat
             .Take(max)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Transaction>> LoadByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+    {
+        var rows = new List<Transaction>(ids.Count);
+        foreach (var chunk in ids.Chunk(1000))
+        {
+            rows.AddRange(await db.Transactions.AsNoTracking().Where(t => chunk.Contains(t.Id)).ToListAsync(ct));
+        }
+
+        return rows;
+    }
+
     /// <summary>
     /// Writes rows that were loaded without tracking. Each batch is attached as modified, saved, then detached, so the change tracker
     /// holds at most one batch however many rows the post-sync step touched (the whole history used to stay tracked, #163).

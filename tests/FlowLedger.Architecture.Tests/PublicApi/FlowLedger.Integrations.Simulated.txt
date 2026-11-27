@@ -1,0 +1,4 @@
+sealed class FlowLedger.Integrations.Simulated.SimulatedFinancialDataProvider
+sealed class FlowLedger.Integrations.Simulated.SimulatedProviderOptions
+static class FlowLedger.Integrations.Simulated.ServiceCollectionExtensions
+static class FlowLedger.Integrations.Simulated.SimulatedDataFactory

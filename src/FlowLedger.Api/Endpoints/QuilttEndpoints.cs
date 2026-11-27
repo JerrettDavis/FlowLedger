@@ -76,6 +76,7 @@ internal static class QuilttEndpoints
                 ISchedulerFactory schedulerFactory,
                 IWebhookTenantResolver tenantResolver,
                 IWebhookReplayStore? replayStore,
+                WebhookAbuseLimiter abuse,
                 ILoggerFactory loggers,
                 CancellationToken ct) =>
             {
@@ -104,7 +105,16 @@ internal static class QuilttEndpoints
                 catch (InvalidWebhookSignatureException)
                 {
                     FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "invalid_signature");
-                    return Results.Unauthorized();
+                    // Failed verifications spend a small per-(provider, IP) budget; verified deliveries never do (#152).
+                    return abuse.AllowInvalidResponse(ConnectorIds.Quiltt, request.HttpContext.Connection.RemoteIpAddress?.ToString())
+                        ? Results.Unauthorized()
+                        : WebhookAbuse.TooManyRequests(request.HttpContext);
+                }
+
+                if (!abuse.AllowVerifiedDelivery(ConnectorIds.Quiltt))
+                {
+                    FlowLedger.Infrastructure.Observability.FlowLedgerTelemetry.RecordWebhook(ConnectorIds.Quiltt, "rate_limited");
+                    return WebhookAbuse.TooManyRequests(request.HttpContext);
                 }
 
                 if (await WebhookReplayGuard.SeenRecentlyAsync(rawBody, ConnectorIds.Quiltt, replayStore, ct, loggers.CreateLogger("WebhookReplay")))

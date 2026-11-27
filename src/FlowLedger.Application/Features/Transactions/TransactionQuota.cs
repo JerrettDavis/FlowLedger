@@ -17,6 +17,12 @@ public static class TransactionQuota
     /// </summary>
     public const int ProcessingCap = 50_000;
 
+    /// <summary>
+    /// True when a whole-history engine that loaded <paramref name="loaded"/> newest-first rows hit <see cref="ProcessingCap"/>, so older rows
+    /// were left out of its answer. Engines surface this as a <c>Partial</c> flag instead of silently dropping the oldest history (#166).
+    /// </summary>
+    public static bool IsPartial(int loaded) => loaded >= ProcessingCap;
+
     public static async Task EnsureRoomAsync(ITransactionRepository repo, int adding, CancellationToken ct = default)
         => EnsureRoom(await repo.CountAsync(ct), adding);
 

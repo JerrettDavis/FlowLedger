@@ -152,6 +152,7 @@ public sealed class TenantIsolationWriteTests(FlowLedgerApiFactory factory, Xuni
         ["POST /api/data/tenants/{tenantId:guid}/offboard"] = Case(c => Json(c.B, HttpMethod.Post, $"/api/data/tenants/{TenantIsolationMatrixTests.TenantA}/offboard",
             new { confirmTenantId = TenantIsolationMatrixTests.TenantA }), HttpStatusCode.Forbidden),
         ["POST /api/data/reencrypt-secrets"] = Case(c => Json(c.B, HttpMethod.Post, "/api/data/reencrypt-secrets"), HttpStatusCode.Forbidden),
+        ["POST /api/data/raw-archive/seal"] = Case(c => Json(c.B, HttpMethod.Post, "/api/data/raw-archive/seal"), HttpStatusCode.Forbidden),
         ["POST /api/integrations/mx/connect-token"] = Case(c => Json(c.B, HttpMethod.Post, "/api/integrations/mx/connect-token"), HttpStatusCode.Forbidden),
     };
 

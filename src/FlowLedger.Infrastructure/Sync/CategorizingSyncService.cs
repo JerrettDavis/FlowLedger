@@ -16,8 +16,18 @@ internal sealed partial class CategorizingSyncService(
     MerchantAliasService aliases,
     CategoryRuleService rules,
     TransactionEnrichmentService enrichment,
-    ILogger<CategorizingSyncService> logger) : IFinancialSyncService
+    ILogger<CategorizingSyncService> logger,
+    Guid tenantId = default) : IFinancialSyncService
 {
+    /// <summary>
+    /// Tenants whose last sync failed part-way: rows it already saved were never handed to the id-scoped steps, so the next successful
+    /// sync sweeps the whole window once. Process-local and bounded (entries are removed on the next success; capped at <see cref="MaxPendingSweeps"/>).
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> PendingFullSweep = new();
+    internal const int MaxPendingSweeps = 10_000;
+
+    internal static int PendingFullSweeps => PendingFullSweep.Count;
+
     public Task<string> ConnectAsync(CancellationToken ct = default) => inner.ConnectAsync(ct);
 
     // A user edit that lands while a step is writing is not a failure: the step is re-run on fresh rows and respects the edit (#157).
@@ -26,12 +36,25 @@ internal sealed partial class CategorizingSyncService(
 
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
-        var result = await inner.SyncAsync(ct);
-        // Aliases, rules and enrichment only matter for rows this sync brought in; each re-loads the whole history, so skip them on a no-op sync.
-        var hasNew = result.TransactionsAdded > 0;
+        SyncResult result;
         try
         {
-            var renamed = hasNew ? await Retry("Merchant aliases", () => aliases.ApplyAsync(ct), ct) : 0;
+            result = await inner.SyncAsync(ct);
+        }
+        catch (Exception ex) when (ex is not (SyncThrottledException or SyncAlreadyRunningException) && tenantId != Guid.Empty && PendingFullSweep.Count < MaxPendingSweeps)
+        {
+            PendingFullSweep[tenantId] = 0;
+            throw;
+        }
+
+        // Aliases, rules and enrichment only matter for rows this sync inserted or settled: they get exactly those ids (#163) instead of
+        // re-reading the history. Unknown ids (a service that does not report them) or a failed earlier sync fall back to the whole window.
+        var needsSweep = tenantId != Guid.Empty && PendingFullSweep.TryRemove(tenantId, out _);
+        IReadOnlyCollection<Guid>? scope = needsSweep ? null : result.ChangedTransactionIds;
+        var hasNew = needsSweep || (scope is null ? result.TransactionsAdded > 0 : scope.Count > 0);
+        try
+        {
+            var renamed = hasNew ? await Retry("Merchant aliases", () => aliases.ApplyToAsync(scope, ct), ct) : 0;
             if (renamed > 0)
             {
                 LogAppliedMerchantAliasesToTransactions(logger, renamed);
@@ -44,7 +67,7 @@ internal sealed partial class CategorizingSyncService(
 
         try
         {
-            var ruled = hasNew ? await Retry("Categorization rules", () => rules.ApplyAsync(ct), ct) : 0;
+            var ruled = hasNew ? await Retry("Categorization rules", () => rules.ApplyToAsync(scope, ct), ct) : 0;
             if (ruled > 0)
             {
                 LogAppliedCategorizationRulesToTransactions(logger, ruled);
@@ -70,7 +93,7 @@ internal sealed partial class CategorizingSyncService(
 
         try
         {
-            var e = hasNew ? await Retry("Transaction enrichment", () => enrichment.RunAsync(ct), ct) : new FlowLedger.Application.Features.Transactions.EnrichmentResult(0, 0);
+            var e = hasNew ? await Retry("Transaction enrichment", () => enrichment.RunForAsync(scope, ct), ct) : new FlowLedger.Application.Features.Transactions.EnrichmentResult(0, 0);
             if (e.Tagged + e.Named > 0)
             {
                 LogEnrichedTransactionsAutoTaggedGiven(logger, e.Tagged, e.Named);

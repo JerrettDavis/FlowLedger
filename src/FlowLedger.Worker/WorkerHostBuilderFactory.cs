@@ -15,7 +15,7 @@ namespace FlowLedger.Worker;
 /// Centralises worker host configuration so both <c>Program.cs</c> and the test suite
 /// can build a fully wired host without duplicating DI setup.
 /// </summary>
-public static class WorkerHostBuilderFactory
+internal static class WorkerHostBuilderFactory
 {
     /// <summary>
     /// Applies all service registrations to <paramref name="builder"/>.

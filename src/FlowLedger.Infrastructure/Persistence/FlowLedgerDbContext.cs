@@ -85,11 +85,20 @@ public sealed class FlowLedgerDbContext : DbContext
     public FlowLedgerDbContext(
         DbContextOptions<FlowLedgerDbContext> options,
         IDomainEventDispatcher eventDispatcher, // retained for constructor compatibility; delivery now goes through the outbox
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        FlowLedger.Application.Abstractions.ITenantDataVersion? dataVersion = null)
         : base(options)
     {
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
+        _dataVersion = dataVersion;
     }
+
+    private readonly FlowLedger.Application.Abstractions.ITenantDataVersion? _dataVersion;
+
+    /// <summary>True when the pending changes touch data the cached dashboard/insight results are derived from.</summary>
+    private bool TouchesCachedReads() => ChangeTracker.Entries().Any(e =>
+        e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+        && e.Entity is Transaction or Account or Category or AccountBalanceSnapshotRecord);
 
     // ── Model building ───────────────────────────────────────────────────────
 
@@ -232,6 +241,7 @@ public sealed class FlowLedgerDbContext : DbContext
         var (outbox, aggregates) = CollectDomainEvents();
         OutboxMessages.AddRange(outbox);
 
+        var touchesCachedReads = _dataVersion is not null && TouchesCachedReads();
         int result;
         try
         {
@@ -247,6 +257,11 @@ public sealed class FlowLedgerDbContext : DbContext
             }
 
             throw;
+        }
+
+        if (touchesCachedReads)
+        {
+            _dataVersion!.Bump(_tenantContext.TenantId);   // explicit invalidation of the tenant's cached reads (#160)
         }
 
         // Only a committed save consumes the events.

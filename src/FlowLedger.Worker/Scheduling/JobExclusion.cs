@@ -13,7 +13,7 @@ namespace FlowLedger.Worker.Scheduling;
 /// lock (<c>flowledger:job:&lt;name&gt;</c>) for the length of a run. It prevents OVERLAP, not a second run
 /// that starts after the first finished (that needs a persisted last-fire marker).
 /// </summary>
-public sealed partial class JobExclusion(IConfiguration configuration, ILogger<JobExclusion> logger)
+internal sealed partial class JobExclusion(IConfiguration configuration, ILogger<JobExclusion> logger)
 {
     private readonly ConcurrentDictionary<string, PostgresAdvisoryLock> _held = new();
 
@@ -64,7 +64,7 @@ public sealed partial class JobExclusion(IConfiguration configuration, ILogger<J
 }
 
 /// <summary>Quartz adapter: takes the lock in <c>VetoJobExecution</c> and releases it in <c>TriggerComplete</c>.</summary>
-public sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITriggerListener
+internal sealed class JobExclusionTriggerListener(JobExclusion exclusion) : ITriggerListener
 {
     public string Name => nameof(JobExclusionTriggerListener);
 
