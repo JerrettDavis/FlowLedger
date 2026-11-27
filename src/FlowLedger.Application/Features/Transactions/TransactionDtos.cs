@@ -12,8 +12,26 @@ public sealed record ListTransactionsQuery(
     bool IncludeHidden = false,
     string? Search = null,
     string? Sort = null,
-    string? Dir = null)
+    string? Dir = null,
+    Guid? CategoryId = null,
+    bool Uncategorized = false,
+    string? Status = null,
+    decimal? MinAmount = null,
+    decimal? MaxAmount = null)
 {
+    /// <summary>The column filters (#72); null when none were asked for.</summary>
+    public FlowLedger.Application.Abstractions.TransactionFilter? Filter
+    {
+        get
+        {
+            var f = new FlowLedger.Application.Abstractions.TransactionFilter(
+                CategoryId, Uncategorized,
+                Enum.TryParse<FlowLedger.Domain.Aggregates.TransactionStatus>(Status, ignoreCase: true, out var st) ? st : null,
+                MinAmount, MaxAmount);
+            return f.IsEmpty ? null : f;
+        }
+    }
+
     /// <summary>Sort keys the list endpoint accepts (case-insensitive); anything else is a 400.</summary>
     public static readonly IReadOnlyList<string> SortKeys = ["date", "merchant", "description", "amount"];
 

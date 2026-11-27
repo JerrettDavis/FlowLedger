@@ -42,6 +42,33 @@
                 }
             </MudSelect>
         </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect T="string" Value="_filterCategory" ValueChanged="OnCategoryFilterChanged" Label="Category" Clearable="true"
+                       aria-label="Filter by category">
+                <MudSelectItem T="string" Value="@UncategorizedFilter">Uncategorized</MudSelectItem>
+                @foreach (var c in _sortedCategories)
+                {
+                    <MudSelectItem T="string" Value="@c.Id.ToString()">@c.Path</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect T="string" Value="_filterStatus" ValueChanged="OnStatusFilterChanged" Label="Status" Clearable="true"
+                       aria-label="Filter by status">
+                @foreach (var s in StatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@s">@s</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="2" md="2">
+            <MudNumericField T="decimal?" Value="_minAmount" ValueChanged="OnMinAmountChanged" Label="Min amount" Min="0m"
+                             Immediate="false" HideSpinButtons="true" aria-label="Minimum amount" />
+        </MudItem>
+        <MudItem xs="6" sm="2" md="2">
+            <MudNumericField T="decimal?" Value="_maxAmount" ValueChanged="OnMaxAmountChanged" Label="Max amount" Min="0m"
+                             Immediate="false" HideSpinButtons="true" aria-label="Maximum amount" />
+        </MudItem>
         <MudItem xs="12" sm="8" md="6">
             <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Immediate="true" DebounceInterval="300" Label="Search description or merchant" Clearable="true"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
@@ -246,6 +273,12 @@
     private Guid? _filterAccountId;
     private bool _includeHidden;
     private string? _search;
+    private const string UncategorizedFilter = "uncategorized";
+    private static readonly string[] StatusOptions = ["Posted", "Pending", "Matched", "Reconciled", "NeedsReview"];
+    private string? _filterCategory;
+    private string? _filterStatus;
+    private decimal? _minAmount;
+    private decimal? _maxAmount;
     private bool _applyToMerchant;
     private bool _categorizing;
     private static readonly int[] PageSizes = [25, 50, 100, 250];
@@ -390,7 +423,8 @@
                 includeHidden: _includeHidden,
                 search: _search,
                 sort: _sortKey,
-                descending: _sortDescending);
+                descending: _sortDescending,
+                filter: ColumnFilter);
             if (seq != _loadSeq)
             {
                 return; // a newer filter or search superseded this response
@@ -421,6 +455,22 @@
     private Task OnFromChanged(DateTime? value) { _fromDate = value; return LoadAsync(); }
 
     private Task OnToChanged(DateTime? value) { _toDate = value; return LoadAsync(); }
+
+    private FlowLedger.Web.ApiClient.TransactionColumnFilter? ColumnFilter =>
+        _filterCategory is null && _filterStatus is null && _minAmount is null && _maxAmount is null
+            ? null
+            : new FlowLedger.Web.ApiClient.TransactionColumnFilter(
+                Guid.TryParse(_filterCategory, out var category) ? category : null,
+                _filterCategory == UncategorizedFilter,
+                _filterStatus, _minAmount, _maxAmount);
+
+    private Task OnCategoryFilterChanged(string? value) { _filterCategory = value; return LoadAsync(); }
+
+    private Task OnStatusFilterChanged(string? value) { _filterStatus = value; return LoadAsync(); }
+
+    private Task OnMinAmountChanged(decimal? value) { _minAmount = value; return LoadAsync(); }
+
+    private Task OnMaxAmountChanged(decimal? value) { _maxAmount = value; return LoadAsync(); }
 
     private Task OnAccountChanged(Guid? value) { _filterAccountId = value; return LoadAsync(); }
 
@@ -661,6 +711,10 @@
         _fromDate = null;
         _toDate = null;
         _filterAccountId = null;
+        _filterCategory = null;
+        _filterStatus = null;
+        _minAmount = null;
+        _maxAmount = null;
         _ = LoadAsync();
     }
 

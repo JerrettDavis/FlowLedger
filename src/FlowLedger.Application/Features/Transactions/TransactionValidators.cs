@@ -52,5 +52,13 @@ public sealed class ListTransactionsQueryValidator : AbstractValidator<ListTrans
         RuleFor(x => x.Dir)
             .Must(d => d is null || d.Equals("asc", StringComparison.OrdinalIgnoreCase) || d.Equals("desc", StringComparison.OrdinalIgnoreCase))
             .WithMessage("Dir must be asc or desc.");
+
+        RuleFor(x => x.Status)
+            .Must(s => s is null || Enum.TryParse<FlowLedger.Domain.Aggregates.TransactionStatus>(s, ignoreCase: true, out _))
+            .WithMessage("Status must be a known transaction status (for example Posted or Pending).");
+
+        RuleFor(x => x.MaxAmount)
+            .Must((q, max) => max is null || q.MinAmount is null || max >= q.MinAmount)
+            .WithMessage("MaxAmount must be at least MinAmount.");
     }
 }

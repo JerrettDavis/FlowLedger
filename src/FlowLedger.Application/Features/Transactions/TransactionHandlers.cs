@@ -21,7 +21,7 @@ public sealed class ListTransactionsHandler
             ? AccountId.From(query.AccountId.Value)
             : null;
 
-        var txs = await _repo.ListAsync(accountId, query.From, query.To, query.Skip, query.Take, ct, everydayOnly: !query.IncludeHidden, search: query.Search, sort: query.SortKey, descending: query.Descending);
+        var txs = await _repo.ListAsync(accountId, query.From, query.To, query.Skip, query.Take, ct, everydayOnly: !query.IncludeHidden, search: query.Search, sort: query.SortKey, descending: query.Descending, filter: query.Filter);
         return txs.Select(TransactionMapper.ToDto).ToList().AsReadOnly();
     }
 
@@ -40,8 +40,8 @@ public sealed class ListTransactionsHandler
         {
             var take = Math.Min(pageSize, maxRows - sent);
             var page = query.SortKey == TransactionSortKey.Date
-                ? await _repo.ListAfterAsync(after, accountId, query.From, query.To, take, query.Descending, !query.IncludeHidden, query.Search, ct)
-                : await _repo.ListAsync(accountId, query.From, query.To, sent, take, ct, everydayOnly: !query.IncludeHidden, search: query.Search, sort: query.SortKey, descending: query.Descending);
+                ? await _repo.ListAfterAsync(after, accountId, query.From, query.To, take, query.Descending, !query.IncludeHidden, query.Search, ct, query.Filter)
+                : await _repo.ListAsync(accountId, query.From, query.To, sent, take, ct, everydayOnly: !query.IncludeHidden, search: query.Search, sort: query.SortKey, descending: query.Descending, filter: query.Filter);
             if (page.Count == 0)
             {
                 yield break;
@@ -65,7 +65,7 @@ public sealed class ListTransactionsHandler
         AccountId? accountId = query.AccountId.HasValue
             ? AccountId.From(query.AccountId.Value)
             : null;
-        return _repo.CountMatchingAsync(accountId, query.From, query.To, ct, everydayOnly: !query.IncludeHidden, search: query.Search);
+        return _repo.CountMatchingAsync(accountId, query.From, query.To, ct, everydayOnly: !query.IncludeHidden, search: query.Search, filter: query.Filter);
     }
 }
 
