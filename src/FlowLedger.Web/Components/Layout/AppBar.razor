@@ -143,11 +143,22 @@
 
     private string ThemeLabel => ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode";
 
-    protected override async Task OnInitializedAsync()
+    private bool _lastSyncedRequested;
+
+    protected override void OnInitialized()
     {
         Sync.Changed += OnSyncChanged;
         ThemeService.ThemeChanged += OnSyncChanged;
-        await Sync.RefreshLastSyncedAsync();
+    }
+
+    // Only production shows the last-sync time, so only production pays for the extra status call (once per bar).
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_lastSyncedRequested && Status.Environment == "production")
+        {
+            _lastSyncedRequested = true;
+            await Sync.RefreshLastSyncedAsync();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
