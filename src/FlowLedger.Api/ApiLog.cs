@@ -19,6 +19,10 @@ internal static partial class ApiLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Secrets re-encrypted: {Resealed} resealed, {Current} already current, {Unreadable} unreadable")]
     internal static partial void SecretsReencrypted(ILogger logger, int resealed, int current, int unreadable);
 
+    // Counts only.
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Raw archive sealed: {Sealed} sealed, {Already} already sealed, {Skipped} skipped, {Recovered} recovered")]
+    internal static partial void RawArchiveSealed(ILogger logger, int @sealed, int already, int skipped, int recovered);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Webhook replay store unavailable; relying on the in-process guard for this delivery.")]
     internal static partial void ReplayStoreUnavailable(ILogger logger, Exception exception);
 

@@ -29,4 +29,9 @@ public sealed record SyncResult(
     int AccountsUpserted,
     int TransactionsAdded,
     int TransactionsSkipped,
-    int RecurringFlowsAdded);
+    int RecurringFlowsAdded,
+    [property: System.Text.Json.Serialization.JsonIgnore] IReadOnlyList<Guid>? ChangedTransactionIds = null)
+{
+    // ChangedTransactionIds: ids of rows this sync inserted or settled in place, carried to the post-sync steps so they process only
+    // those rows (#163). Null means "unknown" (a service that does not track them): callers fall back to processing the whole window.
+}

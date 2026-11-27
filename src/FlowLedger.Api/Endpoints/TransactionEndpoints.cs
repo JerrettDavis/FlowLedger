@@ -35,6 +35,10 @@ internal static class TransactionEndpoints
         .WithName("ListTransactions")
         .WithSummary("List transactions with optional filtering");
 
+        group.MapGet("/processing-window", async (GetProcessingWindowHandler h, CancellationToken ct) => Results.Ok(await h.HandleAsync(ct)))
+            .WithName("GetProcessingWindow")
+            .WithSummary("Whether more transactions are stored than the whole-history engines process (results are then partial)");
+
         group.MapGet("/export.csv", async (
             [AsParameters] ListTransactionsQuery query,
             ListTransactionsHandler handler,

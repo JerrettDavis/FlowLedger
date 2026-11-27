@@ -118,7 +118,10 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
     public Task<bool> RemoveAsync(string pattern, CancellationToken ct = default) => store.RemoveAsync(NormalizePattern(pattern), ct);
 
     /// <summary>Applies every rule to all transactions. Idempotent; returns the number of transactions renamed.</summary>
-    public async Task<int> ApplyAsync(CancellationToken ct = default)
+    public Task<int> ApplyAsync(CancellationToken ct = default) => ApplyToAsync(null, ct);
+
+    /// <summary>Applies every rule to just <paramref name="onlyIds"/> (the rows a sync touched); null means the whole processing window.</summary>
+    public async Task<int> ApplyToAsync(IReadOnlyCollection<Guid>? onlyIds, CancellationToken ct = default)
     {
         var rules = (await store.ListAsync(ct)).OrderByDescending(r => r.Pattern.Length).ToList();
         if (rules.Count == 0)
@@ -128,7 +131,7 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
 
         var changed = 0;
         var changedRows = new List<FlowLedger.Domain.Aggregates.Transaction>();
-        foreach (var t in await transactions.LoadAsync(Max, ct))
+        foreach (var t in onlyIds is null ? await transactions.LoadAsync(Max, ct) : await transactions.LoadByIdsAsync(onlyIds, ct))
         {
             var description = NormalizePattern(t.Description);
             var rule = rules.FirstOrDefault(r => description.Contains(r.Pattern, StringComparison.Ordinal));

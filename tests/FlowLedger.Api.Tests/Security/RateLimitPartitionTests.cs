@@ -10,6 +10,9 @@ namespace FlowLedger.Api.Tests.Security;
 /// <summary>Pure unit tests (no host / database): how requests are assigned to rate-limit partitions.</summary>
 public sealed class RateLimitPartitionTests
 {
+    // KeyFor verifies signatures against the real clock, so signed assertions must be fresh: one read, shared by the tests that sign.
+    private static readonly DateTimeOffset SignedAt = DateTimeOffset.UtcNow;
+
     private static DefaultHttpContext Ctx(string? authType, string? tenant = null, string ip = "203.0.113.7")
     {
         var http = new DefaultHttpContext();
@@ -74,12 +77,42 @@ public sealed class RateLimitPartitionTests
         var tenant = Guid.NewGuid();
 
         var good = Ctx(ApiKeyAuthenticationHandler.SchemeName, tenant.ToString(), "10.0.0.1");
-        good.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, DateTimeOffset.UtcNow);
+        good.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, SignedAt);
         var forged = Ctx(ApiKeyAuthenticationHandler.SchemeName, Guid.NewGuid().ToString(), "10.0.0.1");
         forged.Request.Headers["X-Tenant-Sig"] = "1.deadbeef";
 
         RateLimitPartitions.KeyFor(good, key).Should().Be("tenant:" + tenant.ToString("N"));
         RateLimitPartitions.KeyFor(forged, key).Should().Be("ip:10.0.0.1", "an unverifiable tenant must not mint a partition");
+    }
+
+    [Fact]
+    public void Verified_tenant_partitions_are_capped_and_overflow_into_shared_buckets()
+    {
+        const string key = "test-signing-key-0123456789abcdef0123456789";
+        var registry = new TenantPartitionRegistry();
+        var keys = new HashSet<string>();
+        for (var i = 0; i < 500; i++)
+        {
+            var tenant = Guid.NewGuid();
+            var http = Ctx(ApiKeyAuthenticationHandler.SchemeName, tenant.ToString(), "10.0.0.1");
+            http.Request.Headers["X-Tenant-Sig"] = FlowLedger.Api.Tenancy.TenantAssertion.Sign(key, tenant, SignedAt);
+            keys.Add(RateLimitPartitions.KeyFor(http, key, maxTenantPartitions: 50, registry));
+        }
+
+        registry.Count.Should().Be(50);
+        keys.Count(k => k.StartsWith("tenant:o")).Should().BeLessThanOrEqualTo(RateLimitPartitions.OverflowBuckets);
+        keys.Count.Should().BeLessThanOrEqualTo(50 + RateLimitPartitions.OverflowBuckets);
+    }
+
+    [Fact]
+    public void Idle_partitions_are_released_so_new_tenants_are_admitted_again()
+    {
+        var registry = new TenantPartitionRegistry();
+        var t0 = new DateTimeOffset(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
+        registry.TryAdmit("a", 1, t0).Should().BeTrue();
+        registry.TryAdmit("b", 1, t0).Should().BeFalse();
+        registry.TryAdmit("b", 1, t0 + TenantPartitionRegistry.IdleAfter + TimeSpan.FromSeconds(1)).Should().BeTrue();
+        registry.Count.Should().Be(1);
     }
 
     private static DefaultHttpContext Req(string ip, string? bearer = null, bool authenticated = false, string path = "/api/accounts")

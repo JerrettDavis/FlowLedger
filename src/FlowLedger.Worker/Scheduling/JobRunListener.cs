@@ -10,7 +10,7 @@ namespace FlowLedger.Worker.Scheduling;
 /// <see cref="JobRunHistory"/> and the <c>flowledger.job.*</c> metrics. A job that logs an error but returns normally is
 /// recorded as a success; jobs that must show up as failed throw.
 /// </summary>
-public sealed partial class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger, IJobRunStore? store = null)
+internal sealed partial class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger, IJobRunStore? store = null)
 {
     /// <summary>Persists the run to <c>job_runs</c> (Data page history). A storage failure is logged, never thrown into the scheduler.</summary>
     public async Task PersistAsync(JobRunRecord record, int attempt, CancellationToken ct = default)
@@ -69,7 +69,7 @@ public sealed partial class JobRunRecorder(JobRunHistory history, ILogger<JobRun
 }
 
 /// <summary>Quartz adapter for <see cref="JobRunRecorder"/>.</summary>
-public sealed class JobRunListener(JobRunRecorder recorder, TimeProvider clock, JobRetryScheduler? retries = null) : IJobListener
+internal sealed class JobRunListener(JobRunRecorder recorder, TimeProvider clock, JobRetryScheduler? retries = null) : IJobListener
 {
     public string Name => nameof(JobRunListener);
 

@@ -1,11 +1,19 @@
 namespace FlowLedger.Api.Endpoints;
 
-/// <summary>Remembers SHA-256 hashes of recently processed (already signature-verified) webhook bodies.</summary>
+/// <summary>
+/// Remembers SHA-256 hashes of recently processed (already signature-verified) webhook bodies. The in-process map is a SINGLE-INSTANCE
+/// first line only: it is bounded at <see cref="MaxEntries"/> (oldest entries are evicted once expired ones are gone, #179) and is not
+/// shared between replicas or kept across restarts; the durable cross-instance check is the <c>IWebhookReplayStore</c> second line.
+/// </summary>
 public static class WebhookReplayGuard
 {
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
-    private const int MaxEntries = 4096;
+    /// <summary>Hard cap on the in-process map.</summary>
+    public const int MaxEntries = 4096;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> Seen = new();
+
+    /// <summary>Entries currently held in the in-process map (for tests and diagnostics).</summary>
+    internal static int TrackedCount => Seen.Count;
 
     /// <summary>
     /// Replay check with the shared store as the durable second line (#152): the in-process map answers first (cheap, per instance), then the
@@ -50,6 +58,16 @@ public static class WebhookReplayGuard
             foreach (var kv in Seen.Where(kv => t - kv.Value > Window).ToList())
             {
                 Seen.TryRemove(new KeyValuePair<string, DateTimeOffset>(kv.Key, kv.Value));
+            }
+
+            // Still full of live entries (a burst of distinct signed bodies): drop the oldest tenth rather than grow without bound.
+            // The shared replay store remains the durable check for anything evicted here.
+            if (Seen.Count >= MaxEntries)
+            {
+                foreach (var kv in Seen.OrderBy(kv => kv.Value).Take(MaxEntries / 10).ToList())
+                {
+                    Seen.TryRemove(new KeyValuePair<string, DateTimeOffset>(kv.Key, kv.Value));
+                }
             }
         }
 

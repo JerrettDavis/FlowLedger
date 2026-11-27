@@ -216,7 +216,7 @@ internal static class QuilttIssueMapper
 /// <c>ERROR_REPAIRABLE:conn_14TJ...</c>). Public so the host can read the connection id to launch the Connector in reconnect mode
 /// without knowing anything else about Quiltt's status strings.
 /// </summary>
-public static class QuilttProviderCode
+internal static class QuilttProviderCode
 {
     public static string? Format(string? status, string? connectionId) =>
         string.IsNullOrWhiteSpace(status) ? null : string.IsNullOrWhiteSpace(connectionId) ? status : $"{status}:{connectionId}";

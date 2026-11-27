@@ -42,7 +42,7 @@ internal static class QueryEngine
 {
     public const int MaxResultRows = 5000;
 
-    public static QueryResult Execute(string query, IReadOnlyDictionary<string, QueryTable> datasets, DateOnly today)
+    public static QueryResult Execute(string query, IReadOnlyDictionary<string, QueryTable> datasets, DateOnly today, QueryBudget? budget = null, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
         var parsed = QueryParser.Parse(query);
@@ -53,7 +53,7 @@ internal static class QueryEngine
                 $"Unknown dataset '{parsed.Source}'. Available: {string.Join(", ", datasets.Keys.Order())}.", 0);
         }
 
-        var ctx = new EvalContext(today);
+        var ctx = new EvalContext(today, budget ?? QueryBudget.Default, sw, ct);
         var names = source.Columns.ToList();
         var rows = source.Rows;
 
@@ -61,7 +61,7 @@ internal static class QueryEngine
         {
             foreach (var op in parsed.Operators)
             {
-                (names, rows) = Apply(op, names, rows, ctx);
+                (names, rows) = ctx.Guard(Apply(op, names, rows, ctx));
             }
         }
         catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException or ArgumentException or FormatException or InvalidCastException)
@@ -398,12 +398,11 @@ internal static class Values
     };
 }
 
-internal sealed class EvalContext(DateOnly today)
+internal sealed partial class EvalContext(DateOnly today, QueryBudget budget, Stopwatch clock, CancellationToken ct)
 {
-    public static bool Truthy(object? v) => v is true;
-
     public object? Eval(Expr e, Scope scope, object?[] row)
     {
+        Tick();
         switch (e)
         {
             case Literal l: return l.Value;

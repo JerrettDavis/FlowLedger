@@ -54,6 +54,7 @@ public sealed class CreateAccountHandler
 
     public async Task<AccountDto> HandleAsync(CreateAccountRequest request, CancellationToken ct = default)
     {
+        TenantLimits.EnsureRoom((await _repo.ListIncludingInactiveAsync(ct)).Count, 1, TenantLimits.MaxAccounts, "accounts");
         var accountType = Enum.Parse<AccountType>(request.AccountType, ignoreCase: true);
         var currency = new Currency(request.Currency.ToUpperInvariant());
         var balance = new Money(request.StartingBalance, currency);

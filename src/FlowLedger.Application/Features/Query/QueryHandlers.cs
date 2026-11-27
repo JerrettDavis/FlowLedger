@@ -5,6 +5,9 @@ namespace FlowLedger.Application.Features.Query;
 
 public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportRequest>
 {
+    /// <summary>Cap on the serialized panel JSON of one saved item (#166), so one row cannot be made arbitrarily large.</summary>
+    public const int MaxPayloadChars = 65_536;
+
     public SaveReportRequestValidator()
     {
         RuleFor(r => r.Name).NotEmpty().MaximumLength(100);
@@ -12,6 +15,8 @@ public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportReq
         RuleFor(r => r.Kind).Must(k => k is "View" or "Report").WithMessage("Kind must be View or Report.");
         RuleFor(r => r.Panels).NotNull().Must(p => p is { Count: >= 1 and <= 12 })
             .WithMessage("A saved item needs 1–12 panels.");
+        RuleFor(r => r.Panels).Must(p => p is null || System.Text.Json.JsonSerializer.Serialize(p).Length <= MaxPayloadChars)
+            .WithMessage($"A saved item may not exceed {MaxPayloadChars:N0} characters of panel definitions.");
         RuleFor(r => r).Must(r => r.Kind != "View" || r.Panels?.Count == 1)
             .WithMessage("A view holds exactly one panel; save several as a report.");
         RuleForEach(r => r.Panels).ChildRules(p =>
@@ -33,10 +38,11 @@ public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportReq
 }
 
 /// <summary>Runs an ad-hoc query against the caller's own data.</summary>
-public sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider? clock = null)
+public sealed class RunQueryHandler(QueryDatasetProvider datasets, TimeProvider? clock = null, QueryBudget? budget = null)
 {
     public async Task<QueryResult> HandleAsync(string query, CancellationToken ct = default)
-        => QueryEngine.Execute(query, await datasets.BuildAsync(ct), DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime));
+        => QueryEngine.Execute(
+            query, await datasets.BuildAsync(ct), DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().UtcDateTime), budget, ct);
 }
 
 public sealed class GetQuerySchemaHandler
@@ -69,8 +75,11 @@ public sealed class GetReportHandler(ISavedReportStore store)
 
 public sealed class SaveReportHandler(ISavedReportStore store)
 {
-    public Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
-        => store.CreateAsync(request, ct);
+    public async Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
+    {
+        TenantLimits.EnsureRoom((await store.ListAsync(ct)).Count, 1, TenantLimits.MaxSavedReports, "saved views and reports");
+        return await store.CreateAsync(request, ct);
+    }
 
     public Task<SavedReportDto?> UpdateAsync(Guid id, SaveReportRequest request, CancellationToken ct = default)
         => store.UpdateAsync(id, request, ct);
@@ -79,7 +88,7 @@ public sealed class SaveReportHandler(ISavedReportStore store)
 }
 
 /// <summary>Runs every panel of a saved or preset report; a failing panel reports its error instead of failing the report.</summary>
-public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider? clock = null)
+public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvider datasets, TimeProvider? clock = null, QueryBudget? budget = null)
 {
     /// <summary>
     /// Narrows a panel query to a date window by inserting a date filter right after the dataset name; only datasets that
@@ -129,9 +138,13 @@ public sealed class RunReportHandler(GetReportHandler reports, QueryDatasetProvi
         {
             try
             {
-                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(ApplyRange(p.Query, from, to), tables, today), null);
+                return new PanelResultDto(p.Title, p.Query, p.Viz, QueryEngine.Execute(ApplyRange(p.Query, from, to), tables, today, budget, ct), null);
             }
             catch (QueryException ex)
+            {
+                return new PanelResultDto(p.Title, p.Query, p.Viz, null, ex.Message);
+            }
+            catch (QueryBudgetExceededException ex)
             {
                 return new PanelResultDto(p.Title, p.Query, p.Viz, null, ex.Message);
             }
