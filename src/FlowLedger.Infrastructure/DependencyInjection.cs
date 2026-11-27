@@ -329,9 +329,10 @@ public static class DependencyInjection
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."),
                 TenancySettings.Legacy(configuration)));
         services.AddSingleton<FlowLedger.Application.Abstractions.IWebhookReplayStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlWebhookReplayStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+            new FlowLedger.Infrastructure.DataSafety.EfWebhookReplayStore(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
         services.AddSingleton<FlowLedger.Application.Features.Users.ITenantRegistry>(_ =>
             new FlowLedger.Infrastructure.DataSafety.NpgsqlTenantRegistry(
                 configuration.GetConnectionString("flowledger")
@@ -363,16 +364,18 @@ public static class DependencyInjection
             new FlowLedger.Infrastructure.DataSafety.ProviderCallLedger(
                 configuration.GetConnectionString("flowledger")
                 ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Audit log of sensitive actions (append-only, ad hoc table) --
+        // -- Audit log of sensitive actions (append-only, host-wide EF table) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IAuditLog>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlAuditLog(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
-        // -- Durable background job run history (ad hoc table; worker writes, API reads) --
+            new FlowLedger.Infrastructure.DataSafety.EfAuditLog(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
+        // -- Durable background job run history (host-wide EF table; worker writes, API reads) --
         services.AddSingleton<FlowLedger.Infrastructure.DataSafety.IJobRunStore>(_ =>
-            new FlowLedger.Infrastructure.DataSafety.NpgsqlJobRunStore(
-                configuration.GetConnectionString("flowledger")
-                ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found.")));
+            new FlowLedger.Infrastructure.DataSafety.EfJobRunStore(
+                new FlowLedger.Infrastructure.Persistence.HostDb(
+                    configuration.GetConnectionString("flowledger")
+                    ?? throw new InvalidOperationException("Required connection string 'flowledger' was not found."))));
         // -- Budgets and savings goals (per-tenant, EF: tenant filter + guard) --
         services.AddScoped<FlowLedger.Application.Features.Budgets.IBudgetStore,
             FlowLedger.Infrastructure.Persistence.Repositories.EfBudgetStore>();

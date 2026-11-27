@@ -11,5 +11,8 @@ internal static class HostWideEntities
     {
         ["provider_api_calls"] = "provider API call accounting for the whole host (cost control)",
         ["backup_runs"] = "host backup history",
+        ["audit_events"] = "append-only audit trail (#193); tenant_id is informational and the rows survive tenant erasure as the record",
+        ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
+        ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
     };
 }

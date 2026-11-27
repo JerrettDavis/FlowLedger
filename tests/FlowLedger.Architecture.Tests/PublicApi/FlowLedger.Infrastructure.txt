@@ -21,6 +21,7 @@ class FlowLedger.Infrastructure.Persistence.Migrations.DedupeDetectedBills
 class FlowLedger.Infrastructure.Persistence.Migrations.InitialCreate
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveAccountConnectorLinksToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveAccountRatesToEf
+class FlowLedger.Infrastructure.Persistence.Migrations.MoveAuditJobRunsWebhookReplaysToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveBudgetsAndGoalsToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveDuplicatesToEf
 class FlowLedger.Infrastructure.Persistence.Migrations.MoveHomeAssistantToEf

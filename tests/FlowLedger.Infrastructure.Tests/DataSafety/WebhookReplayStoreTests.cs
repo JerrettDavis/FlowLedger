@@ -11,14 +11,7 @@ public sealed class WebhookReplayStoreTests(IntegrationTestFixture fixture) : IA
 {
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
 
-    public async Task InitializeAsync()
-    {
-        await fixture.ResetAsync();
-        await using var conn = new NpgsqlConnection(fixture.ConnectionString);
-        await conn.OpenAsync();
-        await using var drop = new NpgsqlCommand("DROP TABLE IF EXISTS webhook_replays", conn);
-        await drop.ExecuteNonQueryAsync();
-    }
+    public Task InitializeAsync() => fixture.ResetAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 
@@ -27,10 +20,10 @@ public sealed class WebhookReplayStoreTests(IntegrationTestFixture fixture) : IA
     {
         var hash = Guid.NewGuid().ToString("N");
 
-        (await new NpgsqlWebhookReplayStore(fixture.ConnectionString).TryRecordAsync("MX", hash, Window)).Should().BeTrue();
+        (await new EfWebhookReplayStore(new FlowLedger.Infrastructure.Persistence.HostDb(fixture.ConnectionString)).TryRecordAsync("MX", hash, Window)).Should().BeTrue();
 
         // "Restart": a brand-new store object (no memory) still sees the earlier delivery.
-        var restarted = new NpgsqlWebhookReplayStore(fixture.ConnectionString);
+        var restarted = new EfWebhookReplayStore(new FlowLedger.Infrastructure.Persistence.HostDb(fixture.ConnectionString));
         (await restarted.TryRecordAsync("MX", hash, Window)).Should().BeFalse();
         (await restarted.TryRecordAsync("Quiltt", hash, Window)).Should().BeTrue();
         (await restarted.TryRecordAsync("MX", Guid.NewGuid().ToString("N"), Window)).Should().BeTrue();
@@ -41,7 +34,7 @@ public sealed class WebhookReplayStoreTests(IntegrationTestFixture fixture) : IA
     {
         var hash = Guid.NewGuid().ToString("N");
         var results = await Task.WhenAll(Enumerable.Range(0, 8)
-            .Select(_ => new NpgsqlWebhookReplayStore(fixture.ConnectionString).TryRecordAsync("MX", hash, Window)));
+            .Select(_ => new EfWebhookReplayStore(new FlowLedger.Infrastructure.Persistence.HostDb(fixture.ConnectionString)).TryRecordAsync("MX", hash, Window)));
         results.Count(r => r).Should().Be(1);
 
         // Age the row past the window: the same body is then processed again (a legitimate re-send much later).
@@ -52,6 +45,6 @@ public sealed class WebhookReplayStoreTests(IntegrationTestFixture fixture) : IA
             await age.ExecuteNonQueryAsync();
         }
 
-        (await new NpgsqlWebhookReplayStore(fixture.ConnectionString).TryRecordAsync("MX", hash, Window)).Should().BeTrue();
+        (await new EfWebhookReplayStore(new FlowLedger.Infrastructure.Persistence.HostDb(fixture.ConnectionString)).TryRecordAsync("MX", hash, Window)).Should().BeTrue();
     }
 }
