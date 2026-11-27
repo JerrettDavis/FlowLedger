@@ -20,7 +20,7 @@ internal sealed class DataSafetyReader(
 
     public async Task<IReadOnlyList<BackupRunView>> RecentBackupsAsync(int limit, CancellationToken ct = default) =>
         (await backups.RecentAsync(limit, ct))
-        .Select(r => new BackupRunView(r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error))
+        .Select(r => new BackupRunView(r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error, RestoreDrillSummary.ToView(r.Drill)))
         .ToList();
 
     public async Task<IReadOnlyList<JobRunView>> RecentJobRunsAsync(int limit, CancellationToken ct = default) =>

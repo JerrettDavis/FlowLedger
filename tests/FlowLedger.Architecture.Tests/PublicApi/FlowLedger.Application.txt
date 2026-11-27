@@ -154,6 +154,7 @@ sealed class FlowLedger.Application.Features.Dashboard.GetDashboardInsightsHandl
 sealed class FlowLedger.Application.Features.DataSafety.BackupRunView
 sealed class FlowLedger.Application.Features.DataSafety.DataImportOutcome
 sealed class FlowLedger.Application.Features.DataSafety.DataStatus
+sealed class FlowLedger.Application.Features.DataSafety.DrillTableView
 sealed class FlowLedger.Application.Features.DataSafety.ExportDataHandler
 sealed class FlowLedger.Application.Features.DataSafety.ExportDataOutcome
 sealed class FlowLedger.Application.Features.DataSafety.GetDataStatusHandler
@@ -161,6 +162,7 @@ sealed class FlowLedger.Application.Features.DataSafety.ImportDataHandler
 sealed class FlowLedger.Application.Features.DataSafety.JobRunView
 sealed class FlowLedger.Application.Features.DataSafety.ProviderEndpointUsageView
 sealed class FlowLedger.Application.Features.DataSafety.ProviderUsageView
+sealed class FlowLedger.Application.Features.DataSafety.RestoreDrillView
 sealed class FlowLedger.Application.Features.Debt.DebtInput
 sealed class FlowLedger.Application.Features.Debt.DebtPayoffResult
 sealed class FlowLedger.Application.Features.Debt.PayoffPlan

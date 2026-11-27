@@ -194,7 +194,7 @@ internal static class DataEndpoints
     internal const long MaxImportBytes = ApiLimits.DataImportBytes;
 
     /// <summary>Response projection: the snapshot folder name only (never the absolute server path).</summary>
-    private static object Public(BackupRunResult r) => Public(new BackupRunView(r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error));
+    private static object Public(BackupRunResult r) => Public(new BackupRunView(r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error, RestoreDrillSummary.ToView(r.Drill)));
 
     private static object Public(BackupRunView r) => new
     {

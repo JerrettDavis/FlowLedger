@@ -2,10 +2,17 @@ using FlowLedger.SharedKernel;
 
 namespace FlowLedger.Application.Features.DataSafety;
 
+/// <summary>One table of a restore drill: rows in the backup, rows after the scratch restore, and the live row count when known.</summary>
+public sealed record DrillTableView(string Table, long ExpectedRows, long RestoredRows, long? LiveRows, bool Ok);
+
+/// <summary>What a restore drill verified: per-table counts plus the raw-archive hash check (#62).</summary>
+public sealed record RestoreDrillView(
+    IReadOnlyList<DrillTableView> Tables, bool RawArchiveChecked, int RawObjectsVerified, int RawObjectsSealed, IReadOnlyList<string> Problems);
+
 /// <summary>One backup run as the Data page shows it (host-wide, no tenant data).</summary>
 public sealed record BackupRunView(
     bool Ok, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, string? SnapshotDir, long Rows,
-    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error);
+    bool? OffsiteOk, string? OffsiteDetail, bool? DrillOk, string? Error, RestoreDrillView? Drill = null);
 
 /// <summary>One finished background job run.</summary>
 public sealed record JobRunView(string Job, DateTimeOffset StartedUtc, DateTimeOffset FinishedUtc, bool Success, string? Error, int Attempt);
