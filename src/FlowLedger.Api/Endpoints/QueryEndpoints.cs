@@ -11,7 +11,7 @@ internal static class QueryEndpoints
     {
         var query = app.MapGroup("/api/query").WithTags("Query").RequireRateLimiting("api");
 
-        query.MapGet("/schema", (GetQuerySchemaHandler h) => Results.Ok(h.Handle()))
+        query.MapGet("/schema", () => Results.Ok(GetQuerySchemaHandler.Handle()))
             .WithName("GetQuerySchema").WithSummary("Datasets, columns, functions and operators available to queries");
 
         query.MapPost("/run", async ([FromBody] RunQueryRequest request, RunQueryHandler h, CancellationToken ct) =>

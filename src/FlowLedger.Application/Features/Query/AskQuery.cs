@@ -295,7 +295,7 @@ public sealed class AskQueryHandler(IQueryTranslator translator, QueryDatasetPro
         try
         {
             return QueryEngine.Execute(query, tables, today).Rows
-                .Select(r => r.FirstOrDefault()?.ToString()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToList();
+                .Select(r => (r.Count > 0 ? r[0] : null)?.ToString()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!).ToList();
         }
         catch (QueryException)
         {

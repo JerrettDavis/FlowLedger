@@ -116,7 +116,7 @@ internal static class QueryEngine
         {
             case WhereOp w:
                 scope.Check(w.Predicate);
-                return (names, rows.Where(r => ctx.Truthy(ctx.Eval(w.Predicate, scope, r))).ToList());
+                return (names, rows.Where(r => EvalContext.Truthy(ctx.Eval(w.Predicate, scope, r))).ToList());
 
             case ProjectOp p:
                 foreach (var i in p.Items)
@@ -400,7 +400,7 @@ internal static class Values
 
 internal sealed class EvalContext(DateOnly today)
 {
-    public bool Truthy(object? v) => v is true;
+    public static bool Truthy(object? v) => v is true;
 
     public object? Eval(Expr e, Scope scope, object?[] row)
     {
