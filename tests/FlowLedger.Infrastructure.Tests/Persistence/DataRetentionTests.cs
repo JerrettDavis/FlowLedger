@@ -15,7 +15,8 @@ public sealed class DataRetentionTests(IntegrationTestFixture fixture) : IAsyncL
     {
         await fixture.ResetAsync();
         await ExecAsync(NpgsqlUserDirectory.CreateSqlText);
-        await ExecAsync("DELETE FROM merged_transactions; DELETE FROM app_user_link_codes;");
+        await ExecAsync(FlowLedger.Infrastructure.DataSafety.NpgsqlProviderCallLedger.CreateSqlText);
+        await ExecAsync("DELETE FROM merged_transactions; DELETE FROM app_user_link_codes; DELETE FROM provider_api_calls;");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -93,6 +94,33 @@ public sealed class DataRetentionTests(IntegrationTestFixture fixture) : IAsyncL
         var result = await new DataRetention(fixture.ConnectionString, settings).PruneAsync();
 
         result.SnapshotsBlanked.Should().Be(1, "10 days is older than the configured 7");
+    }
+
+    [DockerFact]
+    public async Task Old_provider_call_rows_are_deleted_but_the_recent_budget_window_is_kept()
+    {
+        await ExecAsync(
+            "INSERT INTO provider_api_calls (provider, method, path, status_code, duration_ms, occurred_utc) VALUES " +
+            "('mx','GET','/old',200,1, now() - interval '400 days')," +
+            "('mx','GET','/mid',200,1, now() - interval '20 days')," +
+            "('mx','GET','/new',200,1, now())");
+
+        // 1 day requested, but the floor (35 days) protects the monthly budget window.
+        var result = await new DataRetention(fixture.ConnectionString).PruneAsync(TimeSpan.FromDays(90), TimeSpan.FromHours(24), TimeSpan.FromDays(1));
+
+        result.ProviderCallsDeleted.Should().Be(1);
+        (await ScalarAsync("SELECT count(*) FROM provider_api_calls WHERE path IN ('/mid','/new')")).Should().Be(2);
+    }
+
+    [Fact]
+    public void Provider_call_retention_is_configurable_with_a_floor()
+    {
+        static RetentionSettings With(string days) => RetentionSettings.From(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Retention:ProviderCallDays"] = days }).Build());
+
+        With("400").ProviderCallAge.Should().Be(TimeSpan.FromDays(400));
+        With("7").ProviderCallAge.Should().Be(RetentionSettings.MinProviderCallAge);
+        With("0").ProviderCallAge.Should().Be(RetentionSettings.Default.ProviderCallAge);
     }
 
     [Fact]
