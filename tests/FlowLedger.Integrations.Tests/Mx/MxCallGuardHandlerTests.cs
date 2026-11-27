@@ -3,7 +3,6 @@ using FlowLedger.Integrations.Abstractions;
 using FlowLedger.Integrations.Mx;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Integrations.Tests.Mx;
 
@@ -40,20 +39,14 @@ public sealed class MxCallGuardHandlerTests
         }
     }
 
-    private sealed class Monitor(MxProviderOptions o) : IOptionsMonitor<MxProviderOptions>
-    {
-        public MxProviderOptions CurrentValue => o;
-
-        public MxProviderOptions Get(string? name) => o;
-
-        public IDisposable? OnChange(Action<MxProviderOptions, string?> listener) => null;
-    }
-
     private static (HttpClient Client, StubInner Inner, FakeLedger Ledger) Build(MxProviderOptions opts, FakeLedger? ledger = null)
     {
         ledger ??= new FakeLedger();
         var inner = new StubInner();
-        var handler = new MxCallGuardHandler(ledger, new Monitor(opts), NullLogger<MxCallGuardHandler>.Instance) { InnerHandler = inner };
+        var handler = new ConnectorCallGuardHandler(
+            ledger, ConnectorIds.Mx, "Mx:Provider:CallsPaused",
+            () => new ConnectorCallPolicy(opts.CallsPaused, opts.DailyCallBudget, opts.MonthlyCallBudget),
+            NullLogger<ConnectorCallGuardHandler>.Instance) { InnerHandler = inner };
         return (new HttpClient(handler) { BaseAddress = new Uri("https://mx.example") }, inner, ledger);
     }
 

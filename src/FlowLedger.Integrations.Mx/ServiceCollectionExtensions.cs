@@ -99,20 +99,15 @@ public static class ServiceCollectionExtensions
         });
 
         // Innermost: ledger + budget + kill switch. Skipped when replaying the archive (no network = no cost).
-        mxHttp.AddHttpMessageHandler(sp =>
-        {
-            var replay = sp.GetRequiredService<IOptions<MxProviderOptions>>().Value.ReplayArchivePath;
-            var ledger = sp.GetService<IProviderCallLedger>();
-            if (!string.IsNullOrWhiteSpace(replay) || ledger is null)
+        mxHttp.AddConnectorCallGuard(
+            ConnectorIds.Mx,
+            "Mx:Provider:CallsPaused",
+            sp =>
             {
-                return new PassThroughHandler();
-            }
-
-            return new MxCallGuardHandler(
-                ledger,
-                sp.GetRequiredService<IOptionsMonitor<MxProviderOptions>>(),
-                sp.GetRequiredService<ILogger<MxCallGuardHandler>>());
-        });
+                var o = sp.GetRequiredService<IOptionsMonitor<MxProviderOptions>>().CurrentValue;
+                return new ConnectorCallPolicy(o.CallsPaused, o.DailyCallBudget, o.MonthlyCallBudget);
+            },
+            sp => !string.IsNullOrWhiteSpace(sp.GetRequiredService<IOptions<MxProviderOptions>>().Value.ReplayArchivePath));
 
         // ── Provider ───────────────────────────────────────────────────────────────
         // Factory registration (not ActivatorUtilities) so the provider can keep an internal
@@ -131,8 +126,4 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
-}
-
-internal sealed class PassThroughHandler : DelegatingHandler
-{
 }

@@ -38,7 +38,15 @@ public static class ServiceCollectionExtensions
             http.BaseAddress = new Uri(clean.ToString().TrimEnd('/') + "/");
             http.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(userInfo)));
-        });
+        })
+        .AddConnectorCallGuard(
+            ConnectorIds.SimpleFin,
+            "SimpleFin:CallsPaused",
+            sp =>
+            {
+                var o = sp.GetRequiredService<IOptionsMonitor<SimpleFinOptions>>().CurrentValue;
+                return new ConnectorCallPolicy(o.CallsPaused, o.DailyCallBudget, o.MonthlyCallBudget);
+            });
 
         services.AddKeyedScoped<IFinancialDataProvider>("SimpleFIN", (sp, _) => sp.GetRequiredService<SimpleFinFinancialDataProvider>());
         if (registerAsDefault)
