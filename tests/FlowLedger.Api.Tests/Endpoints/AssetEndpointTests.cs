@@ -21,8 +21,9 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     private static CreateAssetRequest NewAsset(
         string name = "MacBook", string category = "Electronics", decimal value = 2000m, Guid? link = null,
         Dictionary<string, string>? attrs = null, decimal? price = 2400m, string? method = "Manual", decimal? rate = null, DateOnly? valuedOn = null) =>
-        new(name, category, value, "USD", valuedOn, new DateOnly(2024, 1, 1), price, "Apple", "MBP 14", "SN-SECRET-1", "note",
-            method, rate, null, null, link, attrs);
+        CreateAssetRequestBuilder.A().Named(name).InCategory(category).Worth(value).ValuedOn(valuedOn)
+            .PurchasedOn(new DateOnly(2024, 1, 1), price).MadeBy("Apple", "MBP 14").WithSerial("SN-SECRET-1").WithNotes("note")
+            .Valued(method, rate).LinkedTo(link).WithAttributes(attrs).Build();
 
     private async Task<AssetDto> Create(CreateAssetRequest r)
     {
@@ -83,8 +84,8 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     {
         var a = await Create(NewAsset("Rifle", "Firearm", 800m, attrs: new() { ["Caliber"] = ".22" }));
 
-        var upd = new UpdateAssetRequest("Rifle", "Firearm", null, 800m, "Ruger", "10/22", "SN-2", null, "Manual", null, null, null,
-            null, new() { ["Caliber"] = ".223", ["Action"] = "Semi" });
+        var upd = UpdateAssetRequestBuilder.A().Named("Rifle").InCategory("Firearm").PurchasedOn(null, 800m).MadeBy("Ruger", "10/22").WithSerial("SN-2")
+            .WithAttributes(new() { ["Caliber"] = ".223", ["Action"] = "Semi" }).Build();
         (await _client.PutAsJsonAsync($"/api/assets/{a.Id}", upd)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var reread = await _client.GetFromJsonAsync<AssetDto>($"/api/assets/{a.Id}");
@@ -187,8 +188,10 @@ public sealed class AssetEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         => (await _client.GetFromJsonAsync<AccountDto>($"/api/accounts/{accountId}"))!.BalanceAmount;
 
     private static UpdateAssetRequest ToUpdate(AssetDto a, Guid? link) =>
-        new(a.Name, a.Category, a.PurchaseDate, a.PurchasePrice, a.Manufacturer, a.Model, a.SerialNumber, a.Notes,
-            a.ValuationMethod, a.AnnualRate, a.SalvageValue, a.UsefulLifeYears, link, new Dictionary<string, string>(a.Attributes));
+        UpdateAssetRequestBuilder.A().Named(a.Name).InCategory(a.Category).PurchasedOn(a.PurchaseDate, a.PurchasePrice)
+            .MadeBy(a.Manufacturer, a.Model).WithSerial(a.SerialNumber).WithNotes(a.Notes)
+            .Valued(a.ValuationMethod, a.AnnualRate, a.SalvageValue, a.UsefulLifeYears).LinkedTo(link)
+            .WithAttributes(new Dictionary<string, string>(a.Attributes)).Build();
 
     [Fact]
     public async Task Unlinking_a_manual_asset_account_zeroes_it_so_net_worth_is_not_doubled()

@@ -44,7 +44,8 @@ public static class ServiceCollectionExtensions
                 ? null
                 : new QuilttWebhookVerifier(opts.Value.WebhookSecret!, opts.Value.WebhookTolerance, sp.GetRequiredService<TimeProvider>());
             return new QuilttFinancialDataProvider(
-                sp.GetRequiredService<QuilttApiClient>(), opts, verifier, sp.GetRequiredService<ILogger<QuilttFinancialDataProvider>>());
+                sp.GetRequiredService<QuilttApiClient>(), opts, verifier, sp.GetRequiredService<ILogger<QuilttFinancialDataProvider>>(),
+                sp.GetRequiredService<TimeProvider>());
         });
 
         services.AddKeyedScoped<IFinancialDataProvider>(QuilttFinancialDataProvider.Name,

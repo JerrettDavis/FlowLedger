@@ -39,7 +39,7 @@ public sealed class TransferLinkPersistenceTests(IntegrationTestFixture fixture)
 
         await using (var db = fixture.CreateDbContext(tenant))
         {
-            var service = new CategorizationService(new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant);
+            var service = new CategorizationService(new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant, new FlowLedger.Application.Features.Categories.CategorizationOptions(), new FlowLedger.Application.Features.LocalAi.LocalAiOptions());
             var result = await service.RunAsync();
             result.TransfersLinked.Should().Be(2);
         }
@@ -70,7 +70,7 @@ public sealed class TransferLinkPersistenceTests(IntegrationTestFixture fixture)
 
         await using (var db = fixture.CreateDbContext(tenant))
         {
-            var service = new CategorizationService(new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant);
+            var service = new CategorizationService(new CategorizationStore(db), new CategoryRepository(db), new AccountRepository(db), tenant, new FlowLedger.Application.Features.Categories.CategorizationOptions(), new FlowLedger.Application.Features.LocalAi.LocalAiOptions());
             await service.RunForAsync([newId]);
         }
 

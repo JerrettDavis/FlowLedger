@@ -28,6 +28,7 @@ public static partial class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        AttachHouseholdTenantSource(services, configuration);
         AddCategorizationAndLocalAi(services, configuration);
         AddPersistence(services, configuration);
         AddConnectors(services, configuration);
@@ -42,6 +43,21 @@ public static partial class DependencyInjection
         services.AddPostgresVersionGuard();
 
         return services;
+    }
+
+    /// <summary>
+    /// #135: a configuration source (added last, so it would win, but it holds a value only when no household tenant id is configured) through which the
+    /// generated household id reaches the synchronous <see cref="TenancySettings.Legacy"/> readers. Skipped when the configuration is not a mutable builder.
+    /// </summary>
+    private static void AttachHouseholdTenantSource(IServiceCollection services, IConfiguration configuration)
+    {
+        var provider = new HouseholdTenantConfigProvider();
+        if (configuration is IConfigurationBuilder builder)
+        {
+            builder.Add(provider);
+        }
+
+        services.AddSingleton(provider);
     }
 
     /// <summary>ML categorizer tuning and the in-process local AI stack.</summary>
@@ -147,7 +163,12 @@ public static partial class DependencyInjection
         services.AddScoped<IProviderConnectionStore, EfProviderConnectionStore>();
         services.AddScoped<IWebhookTenantResolver, EfWebhookTenantResolver>();
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, TimeProvider.System); // one injectable clock for handlers and sync (#127); tests replace it
-        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetService<TimeProvider>()));
+        services.AddOptions<SyncRetryOptions>()
+            .BindConfiguration(SyncRetryOptions.SectionName)
+            .Validate(o => o.BaseDelay > TimeSpan.Zero && o.MaxDelay >= o.BaseDelay && o.MaxRetryAfter > TimeSpan.Zero && o.MaxRetryableFailures > 0 && o.MaxBoundedFailures > 0,
+                "Sync:Retry delays must be positive, MaxDelay at least BaseDelay, and the failure caps positive.")
+            .ValidateOnStart();
+        services.AddSingleton(sp => new SyncRetryPolicy(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IOptions<SyncRetryOptions>>().Value));
         services.AddScoped<SyncAttemptGate>();
         services.AddScoped<IConnectorStatusReader, FlowLedger.Infrastructure.Sync.ConnectorStatusReader>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISavedReportStore, FlowLedger.Infrastructure.Reports.EfSavedReportStore>();

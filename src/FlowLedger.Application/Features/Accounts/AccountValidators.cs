@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.Accounts;
 
-public sealed class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequest>
+internal sealed class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequest>
 {
     private static readonly string[] ValidAccountTypes = Enum.GetNames<Domain.Aggregates.AccountType>();
 
@@ -26,7 +26,7 @@ public sealed class CreateAccountRequestValidator : AbstractValidator<CreateAcco
     }
 }
 
-public sealed class ChangeAccountTypeRequestValidator : AbstractValidator<ChangeAccountTypeRequest>
+internal sealed class ChangeAccountTypeRequestValidator : AbstractValidator<ChangeAccountTypeRequest>
 {
     private static readonly string[] ValidAccountTypes = Enum.GetNames<Domain.Aggregates.AccountType>();
 
@@ -39,7 +39,7 @@ public sealed class ChangeAccountTypeRequestValidator : AbstractValidator<Change
     }
 }
 
-public sealed class UpdateAccountRequestValidator : AbstractValidator<UpdateAccountRequest>
+internal sealed class UpdateAccountRequestValidator : AbstractValidator<UpdateAccountRequest>
 {
     public UpdateAccountRequestValidator()
     {

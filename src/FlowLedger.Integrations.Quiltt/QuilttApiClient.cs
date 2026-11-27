@@ -51,11 +51,14 @@ internal sealed class QuilttApiClient
 
     private readonly QuilttSessionCache _sessions;
 
-    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options, QuilttSessionCache? sessions = null)
+    private readonly TimeProvider _time;
+
+    public QuilttApiClient(HttpClient http, IOptions<QuilttOptions> options, QuilttSessionCache? sessions = null, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _http = http;
         _options = options.Value;
-        _sessions = sessions ?? new QuilttSessionCache();
+        _sessions = sessions ?? new QuilttSessionCache(_time);
     }
 
     /// <summary>
@@ -158,7 +161,7 @@ internal sealed class QuilttApiClient
                    ?? throw new FatalProviderException("Quiltt returned an empty GraphQL body.");
         if (body.Errors is { Count: > 0 } errors)
         {
-            throw QuilttIssueMapper.FromGraphQlErrors(errors, _options.RateLimitFallback);
+            throw QuilttIssueMapper.FromGraphQlErrors(errors, _options.RateLimitFallback, _time);
         }
 
         return body.Data;
@@ -186,8 +189,8 @@ internal sealed class QuilttApiClient
             return;
         }
 
-        var retry = resp.Headers.RetryAfter is { } ra ? ra.Delta ?? (ra.Date is { } d ? d - DateTimeOffset.UtcNow : null) : null;
-        throw QuilttIssueMapper.FromHttpFailure(resp.StatusCode, endpoint, retry, _options.RateLimitFallback);
+        var retry = resp.Headers.RetryAfter is { } ra ? ra.Delta ?? (ra.Date is { } d ? d - _time.GetUtcNow() : null) : null;
+        throw QuilttIssueMapper.FromHttpFailure(resp.StatusCode, endpoint, retry, _options.RateLimitFallback, _time);
     }
 
     private static string? FirstNonEmpty(params string?[] values) => values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));

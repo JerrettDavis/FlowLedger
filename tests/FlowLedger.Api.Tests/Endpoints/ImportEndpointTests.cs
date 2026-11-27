@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using FlowLedger.Api.Endpoints;
+using FlowLedger.Api.Tests.Builders;
 using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
@@ -30,13 +30,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task Post_imports_csv_and_returns_200_with_imported_count()
     {
         var account = await CreateAccount();
-        var request = new ImportRequest(
-            AccountId: account.Id,
-            CsvContent: TestCsv,
-            DateColumnIndex: 0,
-            AmountColumnIndex: 1,
-            DescriptionColumnIndex: 2,
-            HasHeaderRow: true);
+        var request = ImportRequestBuilder.A().IntoAccount(account.Id).OfCsv(TestCsv).Columns(0, 1, 2).WithHeaderRow(true).Build();
 
         var response = await _client.PostAsJsonAsync("/api/imports", request);
 
@@ -52,13 +46,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task Post_second_import_of_same_csv_deduplicates()
     {
         var account = await CreateAccount();
-        var request = new ImportRequest(
-            AccountId: account.Id,
-            CsvContent: TestCsv,
-            DateColumnIndex: 0,
-            AmountColumnIndex: 1,
-            DescriptionColumnIndex: 2,
-            HasHeaderRow: true);
+        var request = ImportRequestBuilder.A().IntoAccount(account.Id).OfCsv(TestCsv).Columns(0, 1, 2).WithHeaderRow(true).Build();
 
         // First import
         var first = await _client.PostAsJsonAsync("/api/imports", request);
@@ -78,9 +66,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task Post_with_empty_csv_content_returns_400()
     {
         var account = await CreateAccount();
-        var request = new ImportRequest(
-            AccountId: account.Id,
-            CsvContent: string.Empty);
+        var request = ImportRequestBuilder.A().IntoAccount(account.Id).OfCsv(string.Empty).Build();
 
         var response = await _client.PostAsJsonAsync("/api/imports", request);
 
@@ -90,10 +76,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     [Fact]
     public async Task Post_with_empty_account_id_returns_400()
     {
-        var request = new ImportRequest(
-            AccountId: Guid.Empty,
-            CsvContent: TestCsv,
-            HasHeaderRow: true);
+        var request = ImportRequestBuilder.A().IntoAccount(Guid.Empty).OfCsv(TestCsv).WithHeaderRow(true).Build();
 
         var response = await _client.PostAsJsonAsync("/api/imports", request);
 
@@ -106,9 +89,7 @@ public sealed class ImportEndpointTests(FlowLedgerApiFactory factory) : IAsyncLi
     public async Task Post_without_auth_returns_401()
     {
         using var anon = factory.CreateClient();
-        var request = new ImportRequest(
-            AccountId: Guid.NewGuid(),
-            CsvContent: TestCsv);
+        var request = ImportRequestBuilder.A().OfCsv(TestCsv).Build();
 
         var response = await anon.PostAsJsonAsync("/api/imports", request);
 

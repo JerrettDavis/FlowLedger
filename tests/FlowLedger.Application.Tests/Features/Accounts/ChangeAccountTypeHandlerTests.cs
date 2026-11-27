@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
@@ -26,7 +27,7 @@ public sealed class ChangeAccountTypeHandlerTests
     private TenantId TenantId => TenantId.From(_tenant.TenantId);
 
     private ChangeAccountTypeHandler Handler() =>
-        new(_accounts, new CategorizationService(new Store(_txs), _categories, _accounts, _tenant));
+        new(_accounts, new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, new CategorizationOptions(), new LocalAiOptions()));
 
     private async Task<Account> AddAccountAsync(string name, AccountType type, decimal balance)
     {
@@ -100,7 +101,7 @@ public sealed class ChangeAccountTypeHandlerTests
         var handler = Handler();
         var a = AddDebit(checking, 300m, "CHASE CARD PAYMENT");
         var b = AddDebit(card, 300m, "CHASE CARD PAYMENT");
-        await new CategorizationService(new Store(_txs), _categories, _accounts, _tenant).RunAsync();
+        await new CategorizationService(new Store(_txs), _categories, _accounts, _tenant, new CategorizationOptions(), new LocalAiOptions()).RunAsync();
         var transfer = _categories.All.Single(c => c.Path.Value == "Transfer");
         a.CategoryId.Should().Be(transfer.CategoryId);
 

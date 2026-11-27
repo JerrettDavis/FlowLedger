@@ -255,8 +255,13 @@ When OIDC sign-in is on, outside Development (full upgrade table and opt-outs: [
   tenant id. `Api:RequireSignedTenant` therefore defaults to true; startup fails unless `Api:TenantSigningKey` is set (same value on api and web,
   >= 32 characters, different from `Api:Key`). The api learns that OIDC is on from `Auth:Oidc:Authority`/`ClientId` (compose passes them).
 - **Household tenant id (#135).** The household/admin tenant gates `/api/data/*` and billable provisioning, so with OIDC on it must not be the
-  well-known `00000000-0000-0000-0000-000000000001`. Use a random GUID on a new install; an existing install keeps its id and sets
-  `Tenancy__AllowWellKnownLegacyTenantId=true`.
+  well-known `00000000-0000-0000-0000-000000000001`. A new install (empty database) needs no setting: the api generates a random id on its first
+  start and stores it in the database (`system_settings`); the worker reads it, so start the api first. An existing install keeps its id (set
+  `Api__TenantId` to it) or acknowledges the constant with `Tenancy__AllowWellKnownLegacyTenantId=true`. An explicit `Api__TenantId` always wins.
+  Importing an export restores the source's id; restart api and worker afterwards.
+- **Tenant signature v2 (#135).** The signature is bound to the HTTP method and path and carries a single-use nonce (bounded cache, 60-second
+  window). `Api__AcceptLegacyTenantSignature` (default true) keeps the old format working during a rolling upgrade; upgrade the api first, then
+  set it to false once the web is upgraded.
 - **Sign-up (#145).** `Auth:SignUp:Mode` is `Open`, `InviteOnly` (default) or `Closed`. InviteOnly admits only logins whose verified email is on
   `Auth:Oidc:AllowedEmails` / `AllowedEmailDomains`; existing logins and the configured household owner always sign in. `Auth:SignUp:LegacyOpen=true`
   restores open sign-up (startup Warning). Prefer also restricting the application at the IdP. Email trust: leave `Tenancy:TrustUnverifiedEmail` off.

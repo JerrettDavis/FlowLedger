@@ -78,8 +78,8 @@ public sealed class TenantLimitsTests
     [Fact]
     public void Saved_report_payload_over_the_character_cap_fails_validation()
     {
-        var huge = new SaveReportRequest("big", null, "View",
-            [new ReportPanel("p", "transactions", new VizSpec("table", Y: Enumerable.Range(0, 20_000).Select(i => "column" + i).ToList()))]);
+        var huge = SaveReportRequestBuilder.A().Named("big")
+            .WithPanels(new ReportPanel("p", "transactions", new VizSpec("table", Y: Enumerable.Range(0, 20_000).Select(i => "column" + i).ToList()))).Build();
 
         var result = new SaveReportRequestValidator().Validate(huge);
 

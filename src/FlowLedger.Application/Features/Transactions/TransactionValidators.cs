@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.Transactions;
 
-public sealed class CreateTransactionRequestValidator : AbstractValidator<CreateTransactionRequest>
+internal sealed class CreateTransactionRequestValidator : AbstractValidator<CreateTransactionRequest>
 {
     private static readonly string[] ValidDirections = Enum.GetNames<Domain.Aggregates.TransactionDirection>();
 
@@ -32,7 +32,7 @@ public sealed class CreateTransactionRequestValidator : AbstractValidator<Create
     }
 }
 
-public sealed class ListTransactionsQueryValidator : AbstractValidator<ListTransactionsQuery>
+internal sealed class ListTransactionsQueryValidator : AbstractValidator<ListTransactionsQuery>
 {
     public ListTransactionsQueryValidator()
     {

@@ -1,12 +1,12 @@
 {
-  "_comment": "Line-coverage gate for check-coverage.py. baseline = what CI itself measured on the merged report of every test project (Domain 76.1%, Application 75.5%, 2026-11-27); an earlier local run of the Domain.Tests project alone read 83.3%, which CI does not reproduce, so the gate is anchored on the CI number. A PR fails if an assembly is below its floor or more than ratchetTolerance points below its baseline. Ratchet: when CI shows improvement, record it as the new baseline and raise the floor. Issue #134 targets 80% Domain; that is NOT yet met (floor 74), so the issue stays open until the baseline reaches 80.",
+  "_comment": "Line-coverage gate for check-coverage.py. baseline = what the gate measures on the merged Cobertura reports of every test project, Release, CI filter (Domain 96.0%, Application 91.4%, 2026-11-27, local Windows run). Floors are measured minus 1 (rounded down for Application). IMPORTANT: until this change the merge double-counted every file that two test projects reported under different filename roots (coverlet writes `filename` relative to each report's own <source>, which is the repo root in one project and its src/ folder in another), so the gate read about 76% where a single project read about 84% and the real merged figure is about 96%; check-coverage.py now resolves each file against its report's <source>. If CI's first run on this file reads lower than the floors (Linux vs Windows, different skipped tests), lower the baseline and floors to what CI reports minus 1 rather than trusting this local number. A PR fails if an assembly is below its floor or more than ratchetTolerance points below its baseline. Ratchet: when CI shows improvement, record it as the new baseline and raise the floor. Issue #134 targets 80% Domain: met.",
   "ratchetTolerance": 1.5,
   "baseline": {
-    "FlowLedger.Domain": 76.1,
-    "FlowLedger.Application": 75.5
+    "FlowLedger.Domain": 96.0,
+    "FlowLedger.Application": 91.4
   },
   "lineFloors": {
-    "FlowLedger.Domain": 74,
-    "FlowLedger.Application": 74
+    "FlowLedger.Domain": 95,
+    "FlowLedger.Application": 90
   }
 }

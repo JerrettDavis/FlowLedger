@@ -25,7 +25,7 @@ internal static class MxErrorMapper
 {
     // Context tuple used as input to the Strategy. Bundling response + operation avoids
     // a separate closure capture per call, keeping the strategy a pure value-mapping artifact.
-    private readonly record struct MxErrorContext(HttpResponseMessage Response, string Operation);
+    private readonly record struct MxErrorContext(HttpResponseMessage Response, string Operation, TimeProvider Time);
 
     // Built once at class-load time; Strategy is an immutable, compiled artifact.
     private static readonly Strategy<MxErrorContext, ProviderException> _strategy =
@@ -35,7 +35,7 @@ internal static class MxErrorMapper
             .When(static (in MxErrorContext ctx) => ctx.Response.StatusCode == HttpStatusCode.TooManyRequests)
             .Then(static (in MxErrorContext ctx) => (ProviderException)new RateLimitedProviderException(
                 $"MX rate limit exceeded during '{ctx.Operation}'.",
-                retryAfter: ResolveRetryAfter(ctx.Response.Headers.RetryAfter),
+                retryAfter: ResolveRetryAfter(ctx.Response.Headers.RetryAfter, ctx.Time),
                 providerCode: ctx.Response.StatusCode.ToString()))
 
             // 401 / 403 / 404 → fatal (auth failure or MX 404-for-401 pattern).
@@ -71,10 +71,10 @@ internal static class MxErrorMapper
             .Build();
 
     /// <summary>Builds the appropriate <see cref="ProviderException"/> for a non-success response.</summary>
-    public static ProviderException FromResponse(HttpResponseMessage response, string operation)
+    public static ProviderException FromResponse(HttpResponseMessage response, string operation, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(response);
-        var ctx = new MxErrorContext(response, operation);
+        var ctx = new MxErrorContext(response, operation, time);
         return _strategy.Execute(in ctx);
     }
 
@@ -85,7 +85,7 @@ internal static class MxErrorMapper
             providerCode: "NETWORK",
             inner: inner);
 
-    private static DateTimeOffset? ResolveRetryAfter(RetryConditionHeaderValue? retryAfter)
+    private static DateTimeOffset? ResolveRetryAfter(RetryConditionHeaderValue? retryAfter, TimeProvider time)
     {
         if (retryAfter is null)
         {
@@ -99,7 +99,7 @@ internal static class MxErrorMapper
 
         if (retryAfter.Delta is { } delta)
         {
-            return DateTimeOffset.UtcNow.Add(delta);
+            return time.GetUtcNow().Add(delta);
         }
 
         return null;

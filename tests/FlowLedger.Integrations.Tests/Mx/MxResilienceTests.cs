@@ -80,7 +80,7 @@ public sealed class MxResilienceTests : IDisposable
             new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", basic);
         http.DefaultRequestHeaders.Accept.Add(
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue(Vnd));
-        return new MxApiClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<MxApiClient>.Instance, new InMemoryRawPayloadArchive());
+        return new MxApiClient(http, Microsoft.Extensions.Logging.Abstractions.NullLogger<MxApiClient>.Instance, new InMemoryRawPayloadArchive(), FlowLedger.TestSupport.TestClock.Provider);
     }
 
     private IFinancialDataProvider CreateProvider() =>
@@ -136,7 +136,7 @@ public sealed class MxResilienceTests : IDisposable
 
         var ex = (await act.Should().ThrowAsync<RateLimitedProviderException>()).Which;
         ex.RetryAfter.Should().NotBeNull();
-        ex.RetryAfter!.Value.Should().BeAfter(DateTimeOffset.UtcNow.AddSeconds(30));
+        ex.RetryAfter!.Value.Should().Be(FlowLedger.TestSupport.TestClock.Instant.AddSeconds(42));
     }
 
     // ── 401 → Fatal ──────────────────────────────────────────────────────────────

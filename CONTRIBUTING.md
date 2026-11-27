@@ -28,7 +28,19 @@ Docker-outside-of-Docker and runs `dotnet restore` on creation.
 - Run `dotnet format` before committing.
 - PRs must pass `dotnet format --verify-no-changes` in CI.
 - The build runs the .NET analyzers at `AnalysisMode=Recommended` with warnings as errors, plus unused usings (IDE0005), file-scoped namespaces (IDE0161) and banned APIs (`BannedSymbols.txt`, rule RS0030; every entry states why). Logging goes through `[LoggerMessage]` source-generated methods (CA1848).
-- Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()` in a `DependencyInjection*.cs` file (an architecture test enforces it).
+- Options are registered with `AddOptions<T>().BindConfiguration(...)` plus validation and `ValidateOnStart()`; never `new XOptions()`, `new XOptions { }` or `?? new XOptions()` anywhere in `src` (an architecture test enforces it; the two allowlisted bootstrap sites say why).
+- `TimeProvider` is a required argument in Domain and Application (no `TimeProvider.System` there); connectors take one so tests pass `TestClock.Provider`. Tests never read the wall clock (the ratchet baseline is empty).
+
+### Third-party analyzers (#113): measured, not adopted yet
+
+Meziantou.Analyzer 3.0 was measured against the whole solution at its defaults (2026-11): about 3,200 distinct warnings, almost all from rules that
+duplicate or contradict decisions already made: MA0004 (ConfigureAwait, ~1,680), MA0048 (file name equals type name, ~840), MA0016 (collection
+abstractions, ~180), MA0006 and MA0002 (string comparison, ~290, close to CA1309/CA1307/CA1310) and MA0051 (method length, ~96).
+A curated set without those is about 100 warnings (MA0009 regex without a match timeout, 42 sites; MA0011 missing `IFormatProvider`, 29; MA0158
+`System.Threading.Lock`, 8; plus MA0074, MA0061, MA0023, MA0046, MA0134, MA0054), which is under the 200 bar the issue set. It was **not** turned on:
+the build treats warnings as errors, so adopting it means fixing every one of those sites in the same change. MA0009 has no CA equivalent and is the
+one worth having (user-influenced regex input). Next step, owner's call: add `Meziantou.Analyzer` to non-test projects, set the excluded rules above
+(and MA0026/MA0061 noise) to `none` in `.editorconfig`, and fix the roughly 100 sites. Roslynator was not measured.
 
 ### Suppression policy
 

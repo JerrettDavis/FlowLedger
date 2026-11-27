@@ -5,9 +5,8 @@ namespace FlowLedger.Architecture.Tests;
 
 /// <summary>
 /// Ratchet for issue #144: tests must not read the wall clock (month-end / midnight flakes). New direct reads fail the
-/// build; the baseline below lists the remaining ones, each of which cannot move yet because the production code under
-/// test reads the system clock itself (no TimeProvider seam), so the test and the server must agree on "now".
-/// When you remove a read, lower the number (the test fails if the baseline is stale, so the ratchet only tightens).
+/// build. The baseline is empty (#144): every provider, mapper and sync seam takes a TimeProvider, so tests pass a fixed one.
+/// Do not add entries; give the code under test a TimeProvider seam instead.
 /// Use <c>FlowLedger.TestSupport.TestClock</c> for a fixed instant instead.
 /// E2E tests (real browser polling deadlines) and Web.Tests (owned separately) are not scanned.
 /// </summary>
@@ -16,15 +15,7 @@ public sealed class TestClockRatchetTests
     private static readonly Regex ClockRead = new(@"\b(DateTime|DateTimeOffset)\.(UtcNow|Now|Today)\b", RegexOptions.Compiled);
 
     /// <summary>Path relative to tests/ (forward slashes) to number of direct clock reads still allowed.</summary>
-    private static readonly Dictionary<string, int> Baseline = new()
-    {
-        ["FlowLedger.Infrastructure.Tests/Sync/QuilttSyncEndToEndTests.cs"] = 1,
-        ["FlowLedger.Integrations.Tests/Quiltt/QuilttIssueMappingTests.cs"] = 2,
-        ["FlowLedger.Integrations.Tests/Mx/MxResilienceTests.cs"] = 1,
-        ["FlowLedger.Integrations.Tests/SimpleFin/SimpleFinProviderTests.cs"] = 3,
-        ["FlowLedger.Integrations.Tests/Simulated/SimulatedFaultInjectionTests.cs"] = 1,
-        ["FlowLedger.Integrations.Tests/Simulated/SimulatedWebhookTests.cs"] = 2,
-    };
+    private static readonly Dictionary<string, int> Baseline = new();
 
     private static readonly string[] SkippedProjects = ["FlowLedger.E2E.Tests", "FlowLedger.Web.Tests"];
 

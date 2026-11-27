@@ -3,6 +3,7 @@ using FlowLedger.Infrastructure.HostStores;
 using FlowLedger.Infrastructure.Outbound;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Repositories;
+using FlowLedger.Infrastructure.Scheduling;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -93,6 +94,8 @@ public static partial class DependencyInjection
     {
         services.AddSingleton(_ => BackupSettings.From(configuration));
         services.AddSingleton(_ => new BackupRunStore(HostConnectionString(configuration)));
+        services.AddSingleton<FlowLedger.Application.Features.DataSafety.IDataSafetyReader, DataSafetyReader>();
+        services.AddSingleton<FlowLedger.Application.Features.DataSafety.IDataArchive, DataArchive>();
         services.AddSingleton(sp => new BackupFailureNotifier(
             configuration,
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("Backup"),

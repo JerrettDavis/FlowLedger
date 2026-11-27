@@ -37,6 +37,8 @@ public sealed record SyncAttemptDecision(bool Allowed, SyncRetryDecision? Blocki
 /// <summary>Tunables for <see cref="SyncRetryPolicy"/>. Defaults suit a scheduler that fires every few hours.</summary>
 public sealed record SyncRetryOptions
 {
+    public const string SectionName = "Sync:Retry";
+
     /// <summary>Delay after the first failure; doubles with each further consecutive failure.</summary>
     public TimeSpan BaseDelay { get; init; } = TimeSpan.FromMinutes(15);
 
@@ -62,10 +64,10 @@ public sealed class SyncRetryPolicy
 {
     private readonly TimeProvider _time;
 
-    public SyncRetryPolicy(TimeProvider? time = null, SyncRetryOptions? options = null)
+    public SyncRetryPolicy(TimeProvider time, SyncRetryOptions options)
     {
-        _time = time ?? TimeProvider.System;
-        Options = options ?? new SyncRetryOptions();
+        _time = time ?? throw new ArgumentNullException(nameof(time));
+        Options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
     public SyncRetryOptions Options { get; }

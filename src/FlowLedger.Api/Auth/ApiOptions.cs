@@ -52,6 +52,13 @@ public sealed class ApiOptions
     public bool EffectiveRequireSignedTenant { get; set; }
 
     /// <summary>
+    /// Effective value of <c>Api:AcceptLegacyTenantSignature</c> (#135): whether the old v1 tenant signature (not bound to method/path, no nonce) is still
+    /// accepted next to v2. Defaults to true for one release so an old Web app talking to a new API keeps working during a rolling upgrade; set false once
+    /// both are upgraded. Filled in by a PostConfigure (blank compose passthroughs must not fail the bool binder).
+    /// </summary>
+    public bool EffectiveAcceptLegacyTenantSignature { get; set; } = true;
+
+    /// <summary>
     /// Optional rotation key (Api:PreviousKey). While set, callers presenting it are still authenticated (and a Warning is logged),
     /// so Api, Web and Worker can be restarted with the new <see cref="Key"/> one at a time. Remove it once rotation is complete.
     /// </summary>

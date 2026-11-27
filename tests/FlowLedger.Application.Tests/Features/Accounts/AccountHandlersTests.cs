@@ -86,7 +86,7 @@ public sealed class AccountHandlersTests
         var created = await createHandler.HandleAsync(CreateAccountRequestBuilder.A().Named("Old Name").StartingAt(0m).Build());
 
         var updateHandler = new UpdateAccountHandler(_repo);
-        var updated = await updateHandler.HandleAsync(created.Id, new UpdateAccountRequest("New Name"));
+        var updated = await updateHandler.HandleAsync(created.Id, UpdateAccountRequestBuilder.A().Named("New Name").Build());
 
         updated.Should().NotBeNull();
         updated!.Name.Should().Be("New Name");
@@ -96,7 +96,7 @@ public sealed class AccountHandlersTests
     public async Task UpdateAccount_UnknownId_ReturnsNull()
     {
         var handler = new UpdateAccountHandler(_repo);
-        var result = await handler.HandleAsync(Guid.NewGuid(), new UpdateAccountRequest("X"));
+        var result = await handler.HandleAsync(Guid.NewGuid(), UpdateAccountRequestBuilder.A().Named("X").Build());
         result.Should().BeNull();
     }
 

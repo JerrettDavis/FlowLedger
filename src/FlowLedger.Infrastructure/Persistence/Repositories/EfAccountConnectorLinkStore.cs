@@ -20,7 +20,7 @@ internal sealed class EfAccountConnectorLinkStore(FlowLedgerDbContext db, ITenan
     public async Task<AccountConnectorLink?> FindByProviderAccountAsync(ConnectorId connector, string providerAccountId, CancellationToken ct = default)
     {
         var row = await db.AccountConnectorLinks.AsNoTracking()
-            .FirstOrDefaultAsync(l => l.ConnectorId == connector.Value && l.ProviderAccountId == providerAccountId, ct);
+            .FirstOrDefaultAsync(l => l.ConnectorId == connector && l.ProviderAccountId == providerAccountId, ct);
         return row is null ? null : ToLink(row);
     }
 

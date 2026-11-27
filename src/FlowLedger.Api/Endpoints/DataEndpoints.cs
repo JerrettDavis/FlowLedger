@@ -1,6 +1,6 @@
 using FlowLedger.Api.Auth;
+using FlowLedger.Application.Features.DataSafety;
 using FlowLedger.Infrastructure.DataSafety;
-using FlowLedger.Infrastructure.HostStores;
 
 namespace FlowLedger.Api.Endpoints;
 
@@ -9,41 +9,27 @@ internal static class DataEndpoints
 {
     internal static IEndpointRouteBuilder MapDataEndpoints(this IEndpointRouteBuilder app)
     {
-        // Resolved once at registration (not a handler parameter): the backup root is host configuration, never request input.
-        var settings = app.ServiceProvider.GetRequiredService<BackupSettings>();
         // Every /api/data endpoint reports on or acts on the WHOLE database (all tenants): household tenant only.
         var group = app.MapGroup("/api/data").WithTags("Data").RequireRateLimiting("api")
             .RequireAuthorization(HouseholdPolicy.Name);
 
-        group.MapGet("/status", async (
-            BackupRunStore store,
-            ProviderCallLedger ledger,
-            IJobRunStore jobRuns,
-            DataEnvironmentState env,
-            IConfiguration cfg,
-            CancellationToken ct) =>
+        group.MapGet("/status", async (GetDataStatusHandler handler, CancellationToken ct) =>
         {
-            var runs = await store.RecentAsync(10, ct);
-            var lastOk = runs.FirstOrDefault(r => r.Ok);
-            var last = runs is { Count: > 0 } ? runs[0] : null;
-            // Healthy = last run succeeded, was < 36h ago, and (if configured) reached off-site.
-            var stale = last is null || !last.Ok || DateTimeOffset.UtcNow - last.FinishedUtc > TimeSpan.FromHours(36);
-            var usage = await ledger.GetUsageAsync(MxProvider, DateTimeOffset.UtcNow, ct);
-            var recentJobRuns = await jobRuns.RecentAsync(20, ct);
+            var s = await handler.HandleAsync(ct);
             return Results.Ok(new
             {
-                environment = env.Current?.ToString().ToLowerInvariant() ?? "unknown",
+                environment = s.Environment,
                 backup = new
                 {
-                    healthy = !stale,
-                    stale,
-                    offsiteConfigured = settings.OffsiteConfigured,
-                    lastSuccessUtc = lastOk?.FinishedUtc,
-                    lastRun = last is null ? null : Public(last),
-                    runs = runs.Select(Public).ToList(),
+                    healthy = s.BackupHealthy,
+                    stale = s.BackupStale,
+                    offsiteConfigured = s.OffsiteConfigured,
+                    lastSuccessUtc = s.LastSuccessUtc,
+                    lastRun = s.LastRun is null ? null : Public(s.LastRun),
+                    runs = s.Runs.Select(Public).ToList(),
                 },
                 // Durable history of scheduled job runs (worker-written, survives restarts), newest first.
-                jobRuns = recentJobRuns.Select(r => new
+                jobRuns = s.JobRuns.Select(r => new
                 {
                     r.Job,
                     r.StartedUtc,
@@ -55,13 +41,13 @@ internal static class DataEndpoints
                 }).ToList(),
                 providerUsage = new
                 {
-                    provider = MxProvider,
-                    usage.CallsToday,
-                    usage.CallsThisMonth,
-                    dailyBudget = cfg.GetValue("Mx:Provider:DailyCallBudget", 500),
-                    monthlyBudget = cfg.GetValue("Mx:Provider:MonthlyCallBudget", ApiLimits.DefaultMxMonthlyCallBudget),
-                    paused = cfg.GetValue("Mx:Provider:CallsPaused", false),
-                    usage.ByEndpoint,
+                    s.ProviderUsage.Provider,
+                    s.ProviderUsage.CallsToday,
+                    s.ProviderUsage.CallsThisMonth,
+                    dailyBudget = s.ProviderUsage.DailyBudget,
+                    monthlyBudget = s.ProviderUsage.MonthlyBudget,
+                    paused = s.ProviderUsage.Paused,
+                    s.ProviderUsage.ByEndpoint,
                 },
             });
         })
@@ -83,38 +69,34 @@ internal static class DataEndpoints
         .WithSummary("Run a verified backup (snapshot, restore drill, off-site copy) now")
         .RequireRateLimiting("write");
 
-        group.MapGet("/export", async (
-            IConfiguration cfg, FlowLedger.SharedKernel.ITenantContext tenant, string? scope, Guid? tenantId, CancellationToken ct) =>
+        group.MapGet("/export", async (ExportDataHandler handler, string? scope, Guid? tenantId, CancellationToken ct) =>
         {
             // Default stays the whole database (disaster recovery). scope=tenant exports only the caller's tenant; tenantId=<id> exports that tenant (#139).
-            if (scope is not null && !scope.Equals("all", StringComparison.OrdinalIgnoreCase) && !scope.Equals("tenant", StringComparison.OrdinalIgnoreCase))
+            var outcome = await handler.HandleAsync(scope, tenantId, ct);
+            if (outcome.Refused)
             {
-                return Results.Problem(title: "scope must be 'all' or 'tenant'", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem(title: outcome.Refusal, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            Guid? only = tenantId ?? (string.Equals(scope, "tenant", StringComparison.OrdinalIgnoreCase) ? tenant.TenantId : null);
-            var conn = cfg.GetConnectionString("flowledger")!;
-            var zip = await SnapshotImport.ExportZipAsync(conn, Path.Combine(settings.BackupRoot, "exports"), ct, only);
             // DeleteOnClose: the unencrypted export zip is removed from the server as soon as it has been sent.
-            var stream = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, ApiLimits.FileStreamBufferBytes, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
-            return Results.File(stream, "application/zip", $"flowledger-export-{(only is null ? "all" : "tenant")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
+            var stream = new FileStream(outcome.ZipPath!, FileMode.Open, FileAccess.Read, FileShare.Read, ApiLimits.FileStreamBufferBytes, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+            return Results.File(stream, "application/zip", $"flowledger-export-{(outcome.AllTenants ? "all" : "tenant")}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
         })
         .WithName("ExportData")
         .AddEndpointFilter<DataAdminLoopbackFilter>()
         .WithSummary("Download data as a portable zip (CSV per table + manifest with hashes); all tenants by default, scope=tenant or tenantId=<id> for one")
         .RequireRateLimiting("write");
 
-        group.MapPost("/import", async (HttpRequest request, IConfiguration cfg, CancellationToken ct) =>
+        group.MapPost("/import", async (HttpRequest request, ImportDataHandler handler, CancellationToken ct) =>
         {
             if (!request.HasFormContentType || request.Form.Files.Count != 1)
             {
                 return Results.Problem(title: "Upload one export .zip as multipart form field 'file'.", statusCode: 400);
             }
 
-            var conn = cfg.GetConnectionString("flowledger")!;
             await using var upload = request.Form.Files[0].OpenReadStream();
-            var result = await SnapshotImport.ImportZipAsync(conn, upload, Path.Combine(settings.BackupRoot, "imports"), ct);
-            return result.Ok ? Results.Ok(result) : Results.Problem(title: "Import refused or failed", detail: string.Join("; ", result.Problems), statusCode: 409);
+            var result = await handler.HandleAsync(upload, ct);
+            return result.Ok ? Results.Ok(result.Report) : Results.Problem(title: "Import refused or failed", detail: string.Join("; ", result.Problems), statusCode: 409);
         })
         .DisableAntiforgery()
         // Anonymous-sized bodies are never buffered: cap the request and the multipart form (default form limit is 128 MB).
@@ -208,13 +190,13 @@ internal static class DataEndpoints
 
     internal sealed record OffboardRequest(Guid ConfirmTenantId);
 
-    private const string MxProvider = FlowLedger.Integrations.Abstractions.ConnectorIds.Mx;
-
     /// <summary>Largest export zip /api/data/import accepts (a household export is a few MB; this leaves ample headroom).</summary>
     internal const long MaxImportBytes = ApiLimits.DataImportBytes;
 
     /// <summary>Response projection: the snapshot folder name only (never the absolute server path).</summary>
-    private static object Public(BackupRunResult r) => new
+    private static object Public(BackupRunResult r) => Public(new BackupRunView(r.Ok, r.StartedUtc, r.FinishedUtc, r.SnapshotDir, r.Rows, r.OffsiteOk, r.OffsiteDetail, r.DrillOk, r.Error));
+
+    private static object Public(BackupRunView r) => new
     {
         r.Ok,
         r.StartedUtc,

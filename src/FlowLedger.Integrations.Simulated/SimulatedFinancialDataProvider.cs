@@ -27,13 +27,15 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
 
     private readonly SimulatedProviderOptions _options;
     private int _callCount;
+    private readonly TimeProvider _time;
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    public SimulatedFinancialDataProvider(IOptions<SimulatedProviderOptions> options)
+    public SimulatedFinancialDataProvider(IOptions<SimulatedProviderOptions> options, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options.Value;
+        _time = time ?? TimeProvider.System;
     }
 
     // ── IFinancialDataProvider ────────────────────────────────────────────────
@@ -157,8 +159,8 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
             ? (DateTimeOffset.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
                 ? parsed
-                : DateTimeOffset.UtcNow)
-            : DateTimeOffset.UtcNow;
+                : _time.GetUtcNow())
+            : _time.GetUtcNow();
 
         var metadata = new Dictionary<string, string>();
         if (root.TryGetProperty("metadata", out var meta) && meta.ValueKind == JsonValueKind.Object)
@@ -193,13 +195,14 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
     public static (byte[] Body, string Signature) BuildSyntheticWebhookEvent(
         string secret,
         string eventType = "SYNC_COMPLETE",
-        string memberId = SimMemberId)
+        string memberId = SimMemberId,
+        TimeProvider? time = null)
     {
         var payload = new
         {
             event_type = eventType,
             member_id = memberId,
-            occurred_at = DateTimeOffset.UtcNow.ToString("O"),
+            occurred_at = (time ?? TimeProvider.System).GetUtcNow().ToString("O"),
             metadata = new { source = "simulated" },
         };
 
@@ -219,7 +222,7 @@ public sealed class SimulatedFinancialDataProvider : IFinancialDataProvider, IRe
         {
             throw new RateLimitedProviderException(
                 $"Simulated rate limit exceeded after {_options.RateLimitAfter} calls.",
-                retryAfter: DateTimeOffset.UtcNow.AddSeconds(30),
+                retryAfter: _time.GetUtcNow().AddSeconds(30),
                 providerCode: "RATE_LIMITED");
         }
 

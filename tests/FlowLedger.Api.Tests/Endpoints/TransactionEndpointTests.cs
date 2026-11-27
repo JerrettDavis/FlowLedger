@@ -207,7 +207,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
 
     private static async Task<CategoryDto> CreateCategory(HttpClient client, string path)
     {
-        var response = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest(path, path, null));
+        var response = await client.PostAsJsonAsync("/api/categories", CreateCategoryRequestBuilder.A().AtPath(path).Build());
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CategoryDto>())!;
     }
@@ -218,8 +218,7 @@ public sealed class TransactionEndpointTests(FlowLedgerApiFactory factory) : IAs
         var account = await CreateAccount();
         foreach (var (name, amount) in new[] { ("Small", 5m), ("Medium", 50m), ("Large", 500m) })
         {
-            (await _client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(
-                account.Id, amount, "USD", "Debit", name, new DateOnly(2026, 2, 1), null, null, null, null))).EnsureSuccessStatusCode();
+            (await _client.PostAsJsonAsync("/api/transactions", CreateTransactionRequestBuilder.A().OnAccount(account.Id).WithAmount(amount).Described(name).On(new DateOnly(2026, 2, 1)).Build())).EnsureSuccessStatusCode();
         }
 
         var between = await _client.GetAsync("/api/transactions?minAmount=10&maxAmount=100");

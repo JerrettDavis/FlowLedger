@@ -104,7 +104,7 @@ public sealed class QuilttIssueMappingTests
     [MemberData(nameof(HttpTable))]
     public void HttpFailure_MapsToKind(HttpStatusCode status, bool isSession, ProviderIssueKind kind, bool retryable, bool userAction)
     {
-        var ex = QuilttIssueMapper.FromHttpFailure(status, isSession ? QuilttIssueMapper.Endpoint.Session : QuilttIssueMapper.Endpoint.GraphQl, null, TimeSpan.FromMinutes(15));
+        var ex = QuilttIssueMapper.FromHttpFailure(status, isSession ? QuilttIssueMapper.Endpoint.Session : QuilttIssueMapper.Endpoint.GraphQl, null, TimeSpan.FromMinutes(15), FlowLedger.TestSupport.TestClock.Provider);
         var issue = ProviderIssue.FromException(ex);
 
         issue.Kind.Should().Be(kind);
@@ -117,18 +117,18 @@ public sealed class QuilttIssueMappingTests
     public void RateLimit_WithoutRetryAfter_UsesConfiguredFallback()
     {
         var ex = (RateLimitedProviderException)QuilttIssueMapper.FromHttpFailure(
-            HttpStatusCode.TooManyRequests, QuilttIssueMapper.Endpoint.Session, null, TimeSpan.FromMinutes(15));
+            HttpStatusCode.TooManyRequests, QuilttIssueMapper.Endpoint.Session, null, TimeSpan.FromMinutes(15), FlowLedger.TestSupport.TestClock.Provider);
 
-        ex.RetryAfter.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
+        ex.RetryAfter.Should().Be(FlowLedger.TestSupport.TestClock.Instant.AddMinutes(15));
     }
 
     [Fact]
     public void RateLimit_HonoursRetryAfterHeader()
     {
         var ex = (RateLimitedProviderException)QuilttIssueMapper.FromHttpFailure(
-            HttpStatusCode.TooManyRequests, QuilttIssueMapper.Endpoint.GraphQl, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(15));
+            HttpStatusCode.TooManyRequests, QuilttIssueMapper.Endpoint.GraphQl, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(15), FlowLedger.TestSupport.TestClock.Provider);
 
-        ex.RetryAfter.Should().BeCloseTo(DateTimeOffset.UtcNow.AddSeconds(30), TimeSpan.FromSeconds(5));
+        ex.RetryAfter.Should().Be(FlowLedger.TestSupport.TestClock.Instant.AddSeconds(30));
     }
 
     // ── GraphQL error[] shapes ──
@@ -151,7 +151,7 @@ public sealed class QuilttIssueMappingTests
     [InlineData("Upstream timeout", "TIMEOUT", ProviderIssueKind.ServiceUnavailable)]
     public void GraphQlErrors_MapToKind(string message, string? code, ProviderIssueKind kind)
     {
-        var ex = QuilttIssueMapper.FromGraphQlErrors([Err(message, code)], TimeSpan.FromMinutes(15));
+        var ex = QuilttIssueMapper.FromGraphQlErrors([Err(message, code)], TimeSpan.FromMinutes(15), FlowLedger.TestSupport.TestClock.Provider);
 
         ProviderIssue.FromException(ex).Kind.Should().Be(kind);
         ex.Message.Should().NotContain(message.Contains("Field") ? "Field" : "\u0000"); // raw error text is not echoed

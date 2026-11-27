@@ -54,7 +54,7 @@ every active opt-out logs a startup Warning.
 | What changes for an OIDC stack | Symptom after upgrading | Fix (preferred) | Legacy opt-out (not recommended) |
 |---|---|---|---|
 | **Signed tenant assertion is required** outside Development (#135). | api and web refuse to start: `Api:TenantSigningKey` missing, shorter than 32 characters, or equal to `Api:Key`. | Set `API__TENANTSIGNINGKEY` (`openssl rand -hex 32`); compose passes it to api and web. Restart both together. | `API__REQUIRESIGNEDTENANT=false` |
-| **The household tenant id may not be the well-known constant** `00000000-0000-0000-0000-000000000001` (#135). | api and web refuse to start: "household tenant id is the well-known constant". | New install: set `API__TENANTID` to a random GUID before the first sign-in. Existing install: your data lives under the well-known id, so keep it (changing it hides all data) and acknowledge it. | `TENANCY__ALLOWWELLKNOWNLEGACYTENANTID=true` |
+| **The household tenant id may not be the well-known constant** `00000000-0000-0000-0000-000000000001` (#135). | New install (empty database): nothing, the api generates and stores a random id. Existing install with data and no configured id (or `API__TENANTID` set to the constant): api (and web, when it is configured as the constant) refuse to start: "household tenant id is the well-known constant" / "already holds data". | Existing install: your data lives under the well-known id, so keep it (changing it hides all data) and acknowledge it, or set `API__TENANTID` to the id your data uses. | `TENANCY__ALLOWWELLKNOWNLEGACYTENANTID=true` |
 | **Sign-up defaults to InviteOnly** (#145). Only allowlisted emails get a NEW account. Existing logins and the `TENANCY__LEGACYOWNEREMAIL`/`LegacyOwnerSubject` owner keep signing in. | A new person is sent to the sign-in-failed page ("Sign-up is closed"). With no allowlist at all, startup logs a Warning that nobody new can join. | Set `AUTH__OIDC__ALLOWEDEMAILS__0` / `AUTH__OIDC__ALLOWEDEMAILDOMAINS__0`, or `AUTH__SIGNUP__MODE=Closed` to make it explicit. | `AUTH__SIGNUP__LEGACYOPEN=true` (same as `AUTH__SIGNUP__MODE=Open`) |
 | **Billable provisioning under open sign-up** (#145). When sign-up is Open, only the household tenant may create a Quiltt profile. (InviteOnly/Closed tenants are all invited, so they are unaffected.) | `POST /api/integrations/quiltt/session` returns 403 for non-household tenants. | Use InviteOnly. | `Quiltt__AllowOpenSignupTenants=true` (api, via `docker-compose.override.yml`) |
 | **Trusting unverified email with auto-link** (#145). `Tenancy:TrustUnverifiedEmail=true` now warns; combined with `Tenancy:AutoLinkVerifiedEmail=true` it is refused outside Development. | api refuses to start naming both options. | Set `TENANCY__LEGACYOWNERISSUER` to pin the IdP, or drop one option. | `AUTH__SIGNUP__LEGACYEMAILTRUST=true` |
@@ -71,5 +71,15 @@ Notes:
 - Rolling: restart api and web together after setting the signing key; a web without the key against an api that requires it gets 401s.
 - Revocation: unlinking a login ends its session within **5 minutes** (HTTP requests and open Blazor circuits are both re-validated against the
   API at that interval; an unreachable API never signs anyone out).
-- Not changed here: the signature is still over `{tenant}.{timestamp}` only (no method/path binding, no replay cache) and the household tenant id
-  is configured, not generated and stored. Both remain on the #135 follow-up list.
+- Tenant signature v2 (#135). The Web app now signs `v2.{timestamp}.{nonce}.{mac}` over tenant, timestamp, a random nonce, the HTTP method and the
+  request path; the API accepts each nonce once inside the 60-second window (bounded in-memory cache, 100,000 entries) and rejects a header replayed
+  or presented for another endpoint. The query string is not signed. **Upgrade the API first**: it accepts both v1 and v2 while
+  `Api:AcceptLegacyTenantSignature` is true (the default for this release; compose: `API__ACCEPTLEGACYTENANTSIGNATURE`), so an old web keeps working. A new
+  web against an old API gets 401s. Once api and web are both upgraded set `API__ACCEPTLEGACYTENANTSIGNATURE=false`; the default flips in a later release.
+  The replay cache is per API process, so run one API replica (the supported topology) or accept replay protection per replica.
+- Household tenant id for new installs (#135). With OIDC on and **no** `Api:TenantId`/`Tenancy:LegacyTenantId`/`Worker:TenantId` configured, an empty database
+  (no accounts, no tenants) gets a random id generated on the first API start and stored in `system_settings` (`household_tenant_id`); the api and worker
+  read it from there on every start. Compose no longer defaults `API__TENANTID` for the api and worker, so a new OIDC install needs no tenant setting at all.
+  An install that already holds data and has no configured id is refused at start unless `TENANCY__ALLOWWELLKNOWNLEGACYTENANTID=true` (its data lives
+  under the constant). An explicitly configured id always wins. Single-household (non-OIDC) installs are unchanged: api and web must agree on a
+  configured id, and the default stays the constant. The worker only reads the stored id; start the api once before the worker on a brand-new OIDC install.

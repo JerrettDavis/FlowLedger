@@ -25,6 +25,7 @@
     <Using Include="Xunit" />
     <Using Include="FlowLedger.Contracts" />
     <ProjectReference Include="..\..\src\FlowLedger.Web\FlowLedger.Web.csproj" />
+    <ProjectReference Include="..\FlowLedger.TestSupport\FlowLedger.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

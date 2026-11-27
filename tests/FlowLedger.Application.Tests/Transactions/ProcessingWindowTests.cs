@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Duplicates;
+using FlowLedger.Application.Features.LocalAi;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
@@ -63,8 +64,8 @@ public sealed class ProcessingWindowTests
         var accounts = new FakeAccountRepository();
         await accounts.AddAsync(account);
 
-        var big = new CategorizationService(new CapAwareCategorizationStore(History(account, 60_000)), new FakeCategoryRepository(), accounts, new FakeTenantContext());
-        var small = new CategorizationService(new CapAwareCategorizationStore(History(account, 50)), new FakeCategoryRepository(), accounts, new FakeTenantContext());
+        var big = new CategorizationService(new CapAwareCategorizationStore(History(account, 60_000)), new FakeCategoryRepository(), accounts, new FakeTenantContext(), new CategorizationOptions(), new LocalAiOptions());
+        var small = new CategorizationService(new CapAwareCategorizationStore(History(account, 50)), new FakeCategoryRepository(), accounts, new FakeTenantContext(), new CategorizationOptions(), new LocalAiOptions());
 
         (await big.RunAsync()).Partial.Should().BeTrue("the oldest 10,000 rows are outside the processing window");
         (await small.RunAsync()).Partial.Should().BeFalse();

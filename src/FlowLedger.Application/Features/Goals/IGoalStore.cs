@@ -22,7 +22,7 @@ public interface IGoalStore
 
 public sealed record SaveGoalRequest(Guid? Id, string Name, decimal TargetAmount, decimal SavedAmount, DateOnly? TargetDate);
 
-public sealed class SaveGoalRequestValidator : AbstractValidator<SaveGoalRequest>
+internal sealed class SaveGoalRequestValidator : AbstractValidator<SaveGoalRequest>
 {
     public SaveGoalRequestValidator()
     {

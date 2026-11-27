@@ -4,6 +4,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace FlowLedger.Infrastructure;
 
@@ -46,10 +47,10 @@ public static partial class DependencyInjection
         services.AddScoped<FinancialSyncService>();
         services.AddScoped<IBalanceHistoryReader, FlowLedger.Infrastructure.Persistence.Repositories.BalanceHistoryReader>();
         services.AddScoped<FlowLedger.Application.Features.Duplicates.IDuplicateStore, FlowLedger.Infrastructure.Persistence.Repositories.DuplicateStore>();
-        services.AddSingleton(new FlowLedger.Application.Features.Duplicates.DuplicateOptions
-        {
-            AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto,
-        });
+        services.AddOptions<FlowLedger.Application.Features.Duplicates.DuplicateOptions>()
+            .Configure(o => o.AutoMerge = !bool.TryParse(configuration["Duplicates:AutoMerge"], out var dupAuto) || dupAuto) // blank/unparseable compose passthrough = default (true)
+            .ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FlowLedger.Application.Features.Duplicates.DuplicateOptions>>().Value);
         services.AddScoped<FlowLedger.Application.Features.Categories.ICategorizationStore, FlowLedger.Infrastructure.Persistence.Repositories.CategorizationStore>();
         services.AddScoped<MultiConnectorSyncService>();
         services.AddScoped<IFinancialSyncService>(sp => BuildSyncService(sp, configuration));
@@ -84,7 +85,7 @@ public static partial class DependencyInjection
             async ct => await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.MaxAsync(
                 db.SyncCursors.Where(c => c.TenantId == tenant && connectorIds.Contains(c.ProviderName)),
                 c => c.LastSuccessfulSyncAt, ct),
-            crossProcessLock: async ct => await FlowLedger.Infrastructure.DataSafety.PostgresAdvisoryLock.TryAcquireAsync(
+            crossProcessLock: async ct => await FlowLedger.Infrastructure.Persistence.PostgresAdvisoryLock.TryAcquireAsync(
                 configuration.GetConnectionString("flowledger")!, "flowledger-sync:" + tenant, ct));
 
         // After every successful sync, fill in missing categories (never overwrites existing ones).

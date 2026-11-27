@@ -15,7 +15,7 @@ public sealed class SimulatedWebhookTests
     private const string TestSecret = "unit-test-webhook-secret";
 
     private static SimulatedFinancialDataProvider MakeProvider() =>
-        new(Options.Create(new SimulatedProviderOptions { WebhookSecret = TestSecret }));
+        new(Options.Create(new SimulatedProviderOptions { WebhookSecret = TestSecret }), FlowLedger.TestSupport.TestClock.Provider);
 
     // ── VerifyWebhookAsync ────────────────────────────────────────────────────
 
@@ -105,11 +105,11 @@ public sealed class SimulatedWebhookTests
     public async Task ParseWebhook_occurred_at_is_recent()
     {
         var provider = MakeProvider();
-        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret);
+        var (body, _) = SimulatedFinancialDataProvider.BuildSyntheticWebhookEvent(TestSecret, time: FlowLedger.TestSupport.TestClock.Provider);
 
         var evt = await provider.ParseWebhookAsync(body);
 
-        evt.OccurredAt.Should().BeCloseTo(DateTimeOffset.UtcNow, precision: TimeSpan.FromMinutes(1));
+        evt.OccurredAt.Should().Be(FlowLedger.TestSupport.TestClock.Instant);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class SimulatedWebhookTests
         var evt = await provider.ParseWebhookAsync(body);
 
         // Must not throw, must return a valid timestamp close to now
-        evt.OccurredAt.Should().BeCloseTo(DateTimeOffset.UtcNow, precision: TimeSpan.FromSeconds(5));
+        evt.OccurredAt.Should().Be(FlowLedger.TestSupport.TestClock.Instant);
         evt.EventType.Should().Be("SYNC_COMPLETE");
     }
 }

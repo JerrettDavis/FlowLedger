@@ -22,6 +22,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
     private readonly QuilttOptions _options;
     private readonly QuilttWebhookVerifier? _verifier;
     private readonly ILogger<QuilttFinancialDataProvider> _logger;
+    private readonly TimeProvider _time;
 
     private QuilttSession? _session;
     private Task<IReadOnlyList<QAccount>>? _accounts;
@@ -33,8 +34,10 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
         QuilttApiClient client,
         IOptions<QuilttOptions> options,
         QuilttWebhookVerifier? verifier,
-        ILogger<QuilttFinancialDataProvider> logger)
+        ILogger<QuilttFinancialDataProvider> logger,
+        TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         _client = client;
         _options = options.Value;
         _verifier = verifier;
@@ -163,7 +166,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
             "Quiltt accounts must be read before transactions.", "SEQUENCE")
         { Kind = ProviderIssueKind.Internal };
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime);
         // A continuation cursor ("c:yyyy-MM-dd") marks a backfill cut at the page bound; it resumes exactly there. Re-applying the
         // overlap would step back over what the previous page covered and never finish.
         var continuing = cursor.Value.StartsWith(ContinuationPrefix, StringComparison.Ordinal);
@@ -213,7 +216,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
         {
             try
             {
-                mappedItems.Add(QuilttMapper.ToTransaction(raw, fallback));
+                mappedItems.Add(QuilttMapper.ToTransaction(raw, fallback, _time));
             }
             catch (UnknownCurrencyException ex)
             {
@@ -318,7 +321,7 @@ public sealed partial class QuilttFinancialDataProvider : IFinancialDataProvider
                 meta["recordId"] = recordId;
             }
 
-            return Task.FromResult(new ProviderWebhookEvent(type, profile, DateTimeOffset.UtcNow, meta));
+            return Task.FromResult(new ProviderWebhookEvent(type, profile, _time.GetUtcNow(), meta));
         }
         catch (JsonException ex)
         {

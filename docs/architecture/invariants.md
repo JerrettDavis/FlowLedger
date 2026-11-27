@@ -19,9 +19,9 @@ INV-03 to INV-07; there are no stateful-model or TLA+ artefacts yet. Filter a si
 | INV-06 | Recurrence expansion is sorted, bounded, terminating and month-end/leap-year safe | Example tests: `tests/FlowLedger.Domain.Tests/ValueObjects/RecurrenceExpanderTests.cs` | Property tests |
 | INV-07 | Import is idempotent and never throws on arbitrary input | Example tests: `tests/FlowLedger.Application.Tests/Imports/ImportNormalizerTests.cs` | Fuzz / property tests |
 | INV-08 | Migrations preserve data; the EF model equals the snapshot | `tests/FlowLedger.Infrastructure.Tests/Persistence/MigrationTests.cs` (model-snapshot drift, upgrade paths) | Upgrade tests, `HasPendingModelChanges` check |
-| INV-09 | At most one sync per (tenant, connection); the cursor advances only after a durable commit | `tests/FlowLedger.Infrastructure.Tests/Sync/GuardedSyncServiceTests.cs`, `tests/FlowLedger.Worker.Tests/TenantFanOutTests.cs` (the latter is timing-based) | Small TLA+ model of lock, cursor commit, retry and crash; deterministic concurrency tests gated on `TaskCompletionSource` |
+| INV-09 | At most one sync per (tenant, connection); the cursor advances only after a durable commit | `tests/FlowLedger.Infrastructure.Tests/Sync/GuardedSyncServiceTests.cs`, `tests/FlowLedger.Worker.Tests/TenantFanOutTests.cs` (the latter is timing-based); stateful model test `SyncExclusionModelTests.cs` (random start/finish/fail/wait interleavings across 3 tenants checked against a model: one in-flight sync per tenant, nothing inside the minimum interval reaches the provider, the last-sync commit moves only on success, the slot is released) | Small TLA+ model of lock, cursor commit, retry and crash; deterministic concurrency tests gated on `TaskCompletionSource` |
 | INV-10 | A webhook event is accepted at most once (signature, timestamp, replay window) | `tests/FlowLedger.Integrations.Tests/Mx/MxWebhookVerifierTests.cs`, `tests/FlowLedger.Api.Tests/Endpoints/WebhookReplayGuardTests.cs`; no HTTP-level negative tests for every endpoint | Property test over replay windows; HTTP negative tests |
-| INV-11 | Snapshot export and restore is lossless, including the host-wide tables | `tests/FlowLedger.Infrastructure.Tests/Persistence/AdHocSchemaTests.cs` (`AdHocSchemaRestoreTests`), `DatabaseSnapshotTests.cs` | Round-trip property test on random data |
+| INV-11 | Snapshot export and restore is lossless, including the host-wide tables | `tests/FlowLedger.Infrastructure.Tests/Persistence/AdHocSchemaTests.cs` (`AdHocSchemaRestoreTests`), `DatabaseSnapshotTests.cs`; seeded random-data round trip `ExportImportRandomDataTests.cs` (random tenants, accounts and transactions with CSV-hostile text, exported and imported into an empty database, each table compared by content hash) | Done for accounts and transactions; extend to the remaining tenant tables |
 
 ## Why these
 
@@ -32,6 +32,6 @@ INV-03 to INV-07; there are no stateful-model or TLA+ artefacts yet. Filter a si
 
 ## Remaining work (not done)
 
-1. Stateful model / property tests for INV-01 (route sweep), INV-09 and INV-11 (round-trip on random data).
+1. A route sweep for INV-01 (a stateful model of INV-09 and a random-data round trip for INV-11 now exist).
 2. A small TLA+ model for INV-09 (lock plus cursor-commit ordering under retry and crash).
 3. The child testing issues referenced by #178 (mutation testing, coverage gates, E2E auth, wall-clock tests and others) remain open.

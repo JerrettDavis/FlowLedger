@@ -2,7 +2,7 @@ using FluentValidation;
 
 namespace FlowLedger.Application.Features.RecurringFlows;
 
-public sealed class CreateRecurringFlowRequestValidator : AbstractValidator<CreateRecurringFlowRequest>
+internal sealed class CreateRecurringFlowRequestValidator : AbstractValidator<CreateRecurringFlowRequest>
 {
     private static readonly string[] ValidDirections = Enum.GetNames<Domain.Aggregates.TransactionDirection>();
     private static readonly string[] ValidAmountModels = Enum.GetNames<Domain.Aggregates.AmountModel>();
@@ -34,7 +34,7 @@ public sealed class CreateRecurringFlowRequestValidator : AbstractValidator<Crea
     }
 }
 
-public sealed class UpdateRecurringFlowRequestValidator : AbstractValidator<UpdateRecurringFlowRequest>
+internal sealed class UpdateRecurringFlowRequestValidator : AbstractValidator<UpdateRecurringFlowRequest>
 {
     private static readonly string[] ValidAmountModels = Enum.GetNames<Domain.Aggregates.AmountModel>();
 

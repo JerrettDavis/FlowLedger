@@ -53,6 +53,8 @@ interface FlowLedger.Application.Features.Categories.ICategorizationStore
 interface FlowLedger.Application.Features.Categories.ICategoryMaintenanceStore
 interface FlowLedger.Application.Features.Categories.ICategoryRuleStore
 interface FlowLedger.Application.Features.Dashboard.ISuspiciousDismissalStore
+interface FlowLedger.Application.Features.DataSafety.IDataArchive
+interface FlowLedger.Application.Features.DataSafety.IDataSafetyReader
 interface FlowLedger.Application.Features.Duplicates.IDuplicateStore
 interface FlowLedger.Application.Features.Forecasting.IForecastEngine
 interface FlowLedger.Application.Features.Goals.IGoalStore
@@ -95,14 +97,11 @@ sealed class FlowLedger.Application.Abstractions.TenantQuotaExceededException
 sealed class FlowLedger.Application.Abstractions.TenantResultCache
 sealed class FlowLedger.Application.Abstractions.TransactionFilter
 sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeHandler
-sealed class FlowLedger.Application.Features.Accounts.ChangeAccountTypeRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.CreateAccountHandler
-sealed class FlowLedger.Application.Features.Accounts.CreateAccountRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.DeactivateAccountHandler
 sealed class FlowLedger.Application.Features.Accounts.GetAccountHandler
 sealed class FlowLedger.Application.Features.Accounts.ListAccountsHandler
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountHandler
-sealed class FlowLedger.Application.Features.Accounts.UpdateAccountRequestValidator
 sealed class FlowLedger.Application.Features.Accounts.UpdateAccountSettingsHandler
 sealed class FlowLedger.Application.Features.Alerts.ActivityAlert
 sealed class FlowLedger.Application.Features.Alerts.Alert
@@ -112,16 +111,13 @@ sealed class FlowLedger.Application.Features.Alerts.GetAlertsHandler
 sealed class FlowLedger.Application.Features.Assets.AssetOperationException
 sealed class FlowLedger.Application.Features.Assets.AssetValuationSettings
 sealed class FlowLedger.Application.Features.Assets.CreateAssetHandler
-sealed class FlowLedger.Application.Features.Assets.CreateAssetRequestValidator
 sealed class FlowLedger.Application.Features.Assets.DeactivateAssetHandler
 sealed class FlowLedger.Application.Features.Assets.GetAssetHandler
 sealed class FlowLedger.Application.Features.Assets.GetAssetSummaryHandler
 sealed class FlowLedger.Application.Features.Assets.ListAssetsHandler
 sealed class FlowLedger.Application.Features.Assets.RecordAssetValuationHandler
-sealed class FlowLedger.Application.Features.Assets.RecordValuationRequestValidator
 sealed class FlowLedger.Application.Features.Assets.RefreshAssetValuationHandler
 sealed class FlowLedger.Application.Features.Assets.UpdateAssetHandler
-sealed class FlowLedger.Application.Features.Assets.UpdateAssetRequestValidator
 sealed class FlowLedger.Application.Features.BillSheet.BillSheetService
 sealed class FlowLedger.Application.Features.BillSheet.SheetBillData
 sealed class FlowLedger.Application.Features.BillSheet.SheetOperationException
@@ -135,7 +131,6 @@ sealed class FlowLedger.Application.Features.Budgets.GetMonthlySpendByCategoryHa
 sealed class FlowLedger.Application.Features.Budgets.ListBudgetsHandler
 sealed class FlowLedger.Application.Features.Budgets.SetBudgetHandler
 sealed class FlowLedger.Application.Features.Budgets.SetBudgetRequest
-sealed class FlowLedger.Application.Features.Budgets.SetBudgetRequestValidator
 sealed class FlowLedger.Application.Features.Categories.CategorizationOptions
 sealed class FlowLedger.Application.Features.Categories.CategorizationResult
 sealed class FlowLedger.Application.Features.Categories.CategorizationService
@@ -148,16 +143,24 @@ sealed class FlowLedger.Application.Features.Categories.CategoryRestructureResul
 sealed class FlowLedger.Application.Features.Categories.CategoryRestructureService
 sealed class FlowLedger.Application.Features.Categories.CategoryRuleService
 sealed class FlowLedger.Application.Features.Categories.CreateCategoryHandler
-sealed class FlowLedger.Application.Features.Categories.CreateCategoryRequestValidator
 sealed class FlowLedger.Application.Features.Categories.DeleteCategoryHandler
 sealed class FlowLedger.Application.Features.Categories.GetCategoryHandler
 sealed class FlowLedger.Application.Features.Categories.ListCategoriesHandler
 sealed class FlowLedger.Application.Features.Categories.RestoreDefaultCategoriesHandler
 sealed class FlowLedger.Application.Features.Categories.UpdateCategoryHandler
-sealed class FlowLedger.Application.Features.Categories.UpdateCategoryRequestValidator
 sealed class FlowLedger.Application.Features.Dashboard.DismissSuspiciousHandler
 sealed class FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler
 sealed class FlowLedger.Application.Features.Dashboard.GetDashboardInsightsHandler
+sealed class FlowLedger.Application.Features.DataSafety.BackupRunView
+sealed class FlowLedger.Application.Features.DataSafety.DataImportOutcome
+sealed class FlowLedger.Application.Features.DataSafety.DataStatus
+sealed class FlowLedger.Application.Features.DataSafety.ExportDataHandler
+sealed class FlowLedger.Application.Features.DataSafety.ExportDataOutcome
+sealed class FlowLedger.Application.Features.DataSafety.GetDataStatusHandler
+sealed class FlowLedger.Application.Features.DataSafety.ImportDataHandler
+sealed class FlowLedger.Application.Features.DataSafety.JobRunView
+sealed class FlowLedger.Application.Features.DataSafety.ProviderEndpointUsageView
+sealed class FlowLedger.Application.Features.DataSafety.ProviderUsageView
 sealed class FlowLedger.Application.Features.Debt.DebtInput
 sealed class FlowLedger.Application.Features.Debt.DebtPayoffResult
 sealed class FlowLedger.Application.Features.Debt.PayoffPlan
@@ -190,7 +193,6 @@ sealed class FlowLedger.Application.Features.Forecasting.SpendingProfile
 sealed class FlowLedger.Application.Features.Goals.GoalRow
 sealed class FlowLedger.Application.Features.Goals.SaveGoalHandler
 sealed class FlowLedger.Application.Features.Goals.SaveGoalRequest
-sealed class FlowLedger.Application.Features.Goals.SaveGoalRequestValidator
 sealed class FlowLedger.Application.Features.HomeAssistant.HaEvent
 sealed class FlowLedger.Application.Features.HomeAssistant.HaRunResult
 sealed class FlowLedger.Application.Features.HomeAssistant.HomeAssistantService
@@ -271,18 +273,15 @@ sealed class FlowLedger.Application.Features.Query.QueryTable
 sealed class FlowLedger.Application.Features.Query.RunQueryHandler
 sealed class FlowLedger.Application.Features.Query.RunReportHandler
 sealed class FlowLedger.Application.Features.Query.SaveReportHandler
-sealed class FlowLedger.Application.Features.Query.SaveReportRequestValidator
 sealed class FlowLedger.Application.Features.Query.TransactionAggregates
 sealed class FlowLedger.Application.Features.RecurringFlows.AutoAddResult
 sealed class FlowLedger.Application.Features.RecurringFlows.CreateRecurringFlowHandler
-sealed class FlowLedger.Application.Features.RecurringFlows.CreateRecurringFlowRequestValidator
 sealed class FlowLedger.Application.Features.RecurringFlows.DeactivateRecurringFlowHandler
 sealed class FlowLedger.Application.Features.RecurringFlows.DetectedFlow
 sealed class FlowLedger.Application.Features.RecurringFlows.GetRecurringFlowHandler
 sealed class FlowLedger.Application.Features.RecurringFlows.ListRecurringFlowsHandler
 sealed class FlowLedger.Application.Features.RecurringFlows.RecurringSuggestionService
 sealed class FlowLedger.Application.Features.RecurringFlows.UpdateRecurringFlowHandler
-sealed class FlowLedger.Application.Features.RecurringFlows.UpdateRecurringFlowRequestValidator
 sealed class FlowLedger.Application.Features.Strategies.AccountRate
 sealed class FlowLedger.Application.Features.Strategies.CashTrajectory
 sealed class FlowLedger.Application.Features.Strategies.CoachPlan
@@ -307,13 +306,11 @@ sealed class FlowLedger.Application.Features.Subscriptions.DetectedSubscription
 sealed class FlowLedger.Application.Features.Subscriptions.ListSubscriptionsHandler
 sealed class FlowLedger.Application.Features.Subscriptions.SubscriptionOverview
 sealed class FlowLedger.Application.Features.Transactions.CreateTransactionHandler
-sealed class FlowLedger.Application.Features.Transactions.CreateTransactionRequestValidator
 sealed class FlowLedger.Application.Features.Transactions.EnrichmentResult
 sealed class FlowLedger.Application.Features.Transactions.GetProcessingWindowHandler
 sealed class FlowLedger.Application.Features.Transactions.GetTransactionHandler
 sealed class FlowLedger.Application.Features.Transactions.ListTransactionsHandler
 sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQuery
-sealed class FlowLedger.Application.Features.Transactions.ListTransactionsQueryValidator
 sealed class FlowLedger.Application.Features.Transactions.MerchantAliasDto
 sealed class FlowLedger.Application.Features.Transactions.MerchantAliasService
 sealed class FlowLedger.Application.Features.Transactions.ProcessingWindowDto
