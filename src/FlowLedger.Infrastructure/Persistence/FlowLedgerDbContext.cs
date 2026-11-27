@@ -69,6 +69,9 @@ public sealed class FlowLedgerDbContext : DbContext
     // Host-wide tables (#154): no tenant column and no query filter; reached only through HostDb.
     internal DbSet<ProviderApiCallRecord> ProviderApiCalls => Set<ProviderApiCallRecord>();
     internal DbSet<BackupRunRecord> BackupRuns => Set<BackupRunRecord>();
+    internal DbSet<AuditEventRecord> AuditEvents => Set<AuditEventRecord>();
+    internal DbSet<JobRunRecord> JobRuns => Set<JobRunRecord>();
+    internal DbSet<WebhookReplayRecord> WebhookReplays => Set<WebhookReplayRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -120,6 +123,9 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new OutboxMessageRecordConfiguration());
         modelBuilder.ApplyConfiguration(new ProviderApiCallRecordConfiguration());
         modelBuilder.ApplyConfiguration(new BackupRunRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AuditEventRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new JobRunRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new WebhookReplayRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the

@@ -17,10 +17,7 @@ internal static class AdHocSchema
     [
         SystemSettingsSql,
         NpgsqlUserDirectory.CreateSqlText,
-        NpgsqlAuditLog.CreateSqlText,
-        NpgsqlJobRunStore.CreateSqlText,
         NpgsqlTenantRegistry.CreateSqlText,
-        NpgsqlWebhookReplayStore.CreateSqlText,
     ];
 
     public static string AllSql => string.Join("\n", Scripts);

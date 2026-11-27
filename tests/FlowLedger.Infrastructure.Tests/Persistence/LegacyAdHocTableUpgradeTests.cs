@@ -104,4 +104,40 @@ public sealed class LegacyAdHocTableUpgradeTests : IAsyncLifetime
         await store.AddAsync(new BackupRunResult(true, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 9, null, null, null, null));
         (await store.RecentAsync(10)).Should().HaveCount(2).And.Contain(r => r.Rows == 7);
     }
+
+    [DockerFact]
+    public async Task Audit_job_runs_and_webhook_replays_adopt_the_legacy_tables_with_their_rows()
+    {
+        var cs = await NewDatabaseAsync();
+        await MigrateToAsync(cs, BeforeHostWideMoves);
+        await ExecAsync(cs, """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id bigserial PRIMARY KEY, occurred_utc timestamptz NOT NULL, tenant_id uuid NULL, actor text NOT NULL, action text NOT NULL,
+                target text NULL, remote_ip text NULL, trace_id text NULL, status_code int NULL);
+            CREATE INDEX IF NOT EXISTS ix_audit_events_time ON audit_events (occurred_utc);
+            CREATE INDEX IF NOT EXISTS ix_audit_events_tenant_time ON audit_events (tenant_id, occurred_utc);
+            CREATE TABLE IF NOT EXISTS job_runs (
+                id bigserial PRIMARY KEY, job text NOT NULL, started_utc timestamptz NOT NULL, finished_utc timestamptz NOT NULL,
+                success boolean NOT NULL, error text NULL, attempt int NOT NULL DEFAULT 1);
+            CREATE INDEX IF NOT EXISTS ix_job_runs_finished ON job_runs (finished_utc);
+            CREATE TABLE IF NOT EXISTS webhook_replays (
+                provider text NOT NULL, body_hash text NOT NULL, seen_utc timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (provider, body_hash));
+            CREATE INDEX IF NOT EXISTS ix_webhook_replays_seen ON webhook_replays (seen_utc);
+            INSERT INTO audit_events (occurred_utc, actor, action) VALUES (now(), 'old', 'old.action');
+            INSERT INTO job_runs (job, started_utc, finished_utc, success) VALUES ('Old', now(), now(), true);
+            INSERT INTO webhook_replays (provider, body_hash) VALUES ('MX', 'oldhash');
+            """);
+
+        await MigrateToAsync(cs, null);
+
+        var host = new FlowLedger.Infrastructure.Persistence.HostDb(cs);
+        await new EfAuditLog(host).AppendAsync(new AuditEvent("new.action", "me", Guid.NewGuid(), "t", "127.0.0.1", "trace", 200, DateTimeOffset.UtcNow));
+        (await CountAsync(cs, "audit_events")).Should().Be(2);
+        var jobs = new EfJobRunStore(host);
+        await jobs.AppendAsync(new JobRunEntry("New", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, true, null, 1));
+        (await jobs.RecentAsync(10)).Should().HaveCount(2);
+        var replays = new EfWebhookReplayStore(host);
+        (await replays.TryRecordAsync("MX", "oldhash", TimeSpan.FromMinutes(10))).Should().BeFalse("the legacy row is still inside the window");
+        (await replays.TryRecordAsync("MX", "newhash", TimeSpan.FromMinutes(10))).Should().BeTrue();
+    }
 }

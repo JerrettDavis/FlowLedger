@@ -63,9 +63,7 @@ public sealed class TenantScopeGuardTests
     private static readonly Dictionary<string, string> GlobalAdHocTables = new(StringComparer.OrdinalIgnoreCase)
     {
         ["system_settings"] = "host-wide key/value settings",
-        ["job_runs"] = "host-wide background job run history (scheduled jobs are not per tenant)",
         ["tenants"] = "the tenant registry itself (#169), keyed by id; erasure keeps its row as the audit record",
-        ["webhook_replays"] = "webhook body hashes and timestamps only (#152), no tenant data",
     };
 
     [Fact]
@@ -93,11 +91,10 @@ public sealed class TenantScopeGuardTests
         ["DatabaseSnapshotService.cs"] = "whole-database snapshot/restore, never per tenant",
         ["SnapshotImport.cs"] = "whole-database restore, never per tenant",
         ["SnapshotRestoreDrill.cs"] = "whole-database restore drill, never per tenant",
-        ["NpgsqlJobRunStore.cs"] = "host-wide background job run history, no tenant column",
         ["DataEnvironmentGuard.cs"] = "host-wide environment fingerprint in system_settings",
         ["EfTenantErasure.cs"] = "tenant erasure (#169): every DELETE is keyed by the tenant column; the other statements read schema metadata or the tenant registry",
+        ["EfWebhookReplayStore.cs"] = "webhook replay hashes (#152): host-wide, no tenant data",
         ["NpgsqlTenantRegistry.cs"] = "the tenant registry (#169) is keyed by id, not tenant_id",
-        ["NpgsqlWebhookReplayStore.cs"] = "webhook replay hashes (#152): no tenant data",
         ["DataRetention.cs"] = "host-wide maintenance: blanks old merge snapshots and deletes expired link codes across all tenants (#181)",
         ["ReadinessChecks.cs"] = "host-wide readiness probes (migration history, backup freshness); no tenant data is returned",
     };

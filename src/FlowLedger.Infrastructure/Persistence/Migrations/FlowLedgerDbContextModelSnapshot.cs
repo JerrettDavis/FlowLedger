@@ -548,6 +548,60 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("account_rates", (string)null);
                 });
 
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.AuditEventRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid?>("ActingTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("OccurredUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_utc");
+
+                    b.Property<string>("RemoteIp")
+                        .HasColumnType("text")
+                        .HasColumnName("remote_ip");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.Property<string>("Target")
+                        .HasColumnType("text")
+                        .HasColumnName("target");
+
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredUtc")
+                        .HasDatabaseName("ix_audit_events_time");
+
+                    b.HasIndex("ActingTenantId", "OccurredUtc")
+                        .HasDatabaseName("ix_audit_events_tenant_time");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.BackupRunRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -913,6 +967,50 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                     b.HasKey("TenantId", "Id");
 
                     b.ToTable("integrations", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.JobRunRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Attempt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("attempt");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("FinishedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_utc");
+
+                    b.Property<string>("Job")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("job");
+
+                    b.Property<DateTimeOffset>("StartedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_utc");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean")
+                        .HasColumnName("success");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinishedUtc")
+                        .HasDatabaseName("ix_job_runs_finished");
+
+                    b.ToTable("job_runs", (string)null);
                 });
 
             modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.MerchantAliasRecord", b =>
@@ -1591,6 +1689,30 @@ namespace FlowLedger.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_sync_cursors_tenant_provider_account");
 
                     b.ToTable("sync_cursors", (string)null);
+                });
+
+            modelBuilder.Entity("FlowLedger.Infrastructure.Persistence.Entities.WebhookReplayRecord", b =>
+                {
+                    b.Property<string>("Provider")
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("BodyHash")
+                        .HasColumnType("text")
+                        .HasColumnName("body_hash");
+
+                    b.Property<DateTimeOffset>("SeenUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("seen_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Provider", "BodyHash");
+
+                    b.HasIndex("SeenUtc")
+                        .HasDatabaseName("ix_webhook_replays_seen");
+
+                    b.ToTable("webhook_replays", (string)null);
                 });
 
             modelBuilder.Entity("FlowLedger.Domain.Aggregates.Account", b =>
