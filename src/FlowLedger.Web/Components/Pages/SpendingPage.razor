@@ -80,7 +80,7 @@ else if (_result is not null)
                     @(delta >= 0 ? "+" : "−")@Format.Money(Math.Abs(delta))
                     @if (r.PreviousTotal > 0)
                     {
-                        <span style="font-size:.7em"> (@((delta / r.PreviousTotal).ToString("P0")))</span>
+                        <span style="font-size:.7em"> (@Format.Ratio(delta / r.PreviousTotal))</span>
                     }
                 </MudText>
                 <MudText Typo="Typo.caption">Previous: @Format.Money(r.PreviousTotal)</MudText>

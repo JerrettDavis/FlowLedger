@@ -171,8 +171,8 @@
 
     private static string MethodHint(FlowLedger.Contracts.AssetDto a) => a.ValuationMethod switch
     {
-        "DecliningBalance" => $"−{a.AnnualRate:P0}/yr",
-        "Appreciation" => $"+{a.AnnualRate:P0}/yr",
+        "DecliningBalance" => $"−{Format.Ratio(a.AnnualRate)}/yr",
+        "Appreciation" => $"+{Format.Ratio(a.AnnualRate)}/yr",
         "StraightLine" => $"{a.UsefulLifeYears}-yr straight line",
         _ => ""
     };

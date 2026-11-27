@@ -36,7 +36,7 @@
                 <MudSelect T="string" @bind-Value="_providerAccount" Label="Provider account" Class="mb-3" aria-label="Provider account">
                     @foreach (var o in _options)
                     {
-                        <MudSelectItem Value="@o.ProviderAccountId">@o.Name (@o.Balance.ToString("N2") @o.Currency)</MudSelectItem>
+                        <MudSelectItem Value="@o.ProviderAccountId">@o.Name (@Format.Money(o.Balance, o.Currency))</MudSelectItem>
                     }
                 </MudSelect>
             }

@@ -259,8 +259,8 @@
         _transactions.Count == 0
             ? "No transactions"
             : _total is { } total
-                ? $"{_page * PageSize + 1:N0}–{_page * PageSize + _transactions.Count:N0} of {total:N0}"
-                : $"{_page * PageSize + 1:N0}–{_page * PageSize + _transactions.Count:N0}";
+                ? $"{Format.Count(_page * PageSize + 1)}–{Format.Count(_page * PageSize + _transactions.Count)} of {Format.Count(total)}"
+                : $"{Format.Count(_page * PageSize + 1)}–{Format.Count(_page * PageSize + _transactions.Count)}";
 
     private bool HasNextPage => _total is { } total ? (_page + 1) * PageSize < total : _transactions.Count >= PageSize;
 

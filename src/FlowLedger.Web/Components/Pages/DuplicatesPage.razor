@@ -72,7 +72,7 @@ else
             <MudText Typo="Typo.overline">@label</MudText>
             <MudText><strong>@t.Description</strong></MudText>
             <MudText Typo="Typo.body2" Class="fl-muted">
-                @t.EffectiveDate.ToString("yyyy-MM-dd") · @t.Amount.ToString("C") · @t.Status · @(t.BankSynced ? "bank-synced" : "imported/manual")@(t.CategoryId is null ? "" : " · categorized (" + t.CategorySource + ")")
+                @t.EffectiveDate.ToString("yyyy-MM-dd") · @Format.Money(t.Amount) · @t.Status · @(t.BankSynced ? "bank-synced" : "imported/manual")@(t.CategoryId is null ? "" : " · categorized (" + t.CategorySource + ")")
             </MudText>
         </div>
     };

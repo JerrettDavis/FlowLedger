@@ -51,7 +51,7 @@
                 <div class="fl-period">
                     <div class="d-flex justify-space-between align-center">
                         <span class="fl-li__title">@s.Name</span>
-                        <span class="fl-pill @(s.Confidence >= 0.85 ? "fl-pill--pos" : "")">@($"{s.Confidence:P0}") · @s.Occurrences×</span>
+                        <span class="fl-pill @(s.Confidence >= 0.85 ? "fl-pill--pos" : "")">@Format.Ratio(s.Confidence) · @s.Occurrences×</span>
                     </div>
                     <div class="fl-tile__value fl-num @(s.Direction == "Credit" ? "fl-pos" : "")">
                         @Format.Signed(s.Amount, s.Direction == "Credit")@(s.AmountModel == "Estimated" ? " ≈" : "")
