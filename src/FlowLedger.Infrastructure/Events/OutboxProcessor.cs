@@ -39,7 +39,7 @@ public sealed class OutboxOptions
 /// backoff and dead-lettered after <see cref="OutboxOptions.MaxAttempts"/>. Handlers should still be idempotent, because a crash
 /// between a handler finishing and its completion being recorded repeats that one handler.
 /// </summary>
-public sealed class OutboxProcessor
+public sealed partial class OutboxProcessor
 {
     private readonly FlowLedgerDbContext _db;
     private readonly IServiceProvider _services;
@@ -136,8 +136,7 @@ public sealed class OutboxProcessor
                 catch (Exception ex)
                 {
                     var inner = ex is System.Reflection.TargetInvocationException { InnerException: { } i } ? i : ex;
-                    _logger.LogError(inner, "Outbox handler {Handler} failed for {EventType} {MessageId} (attempt {Attempt}).",
-                        key, message.EventType, message.Id, message.Attempts + 1);
+                    LogOutboxHandlerFailedForAttempt(_logger, inner, key, message.EventType, message.Id, message.Attempts + 1);
                     error = $"{key}: {inner.Message}";
                     _db.ChangeTracker.Clear();
                 }
@@ -149,7 +148,7 @@ public sealed class OutboxProcessor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Outbox message {MessageId} ({EventType}) could not be prepared for delivery.", message.Id, message.EventType);
+            LogOutboxMessageCouldNotBe(_logger, ex, message.Id, message.EventType);
             error = ex.Message;
         }
 
@@ -171,8 +170,7 @@ public sealed class OutboxProcessor
         if (attempts >= _options.MaxAttempts)
         {
             FlowLedgerTelemetry.RecordOutbox("dead_lettered");
-            _logger.LogError("Outbox message {MessageId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}",
-                message.Id, message.EventType, attempts, error);
+            LogOutboxMessageDeadLetteredAfter(_logger, message.Id, message.EventType, attempts, error);
             await scoped.ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.Attempts, attempts)
                 .SetProperty(m => m.DeadLetteredUtc, now)
@@ -194,4 +192,13 @@ public sealed class OutboxProcessor
             .SetProperty(m => m.LockToken, (Guid?)null)
             .SetProperty(m => m.LockedUntilUtc, (DateTimeOffset?)null), ct);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox handler {Handler} failed for {EventType} {MessageId} (attempt {Attempt}).")]
+    private static partial void LogOutboxHandlerFailedForAttempt(ILogger logger, Exception exception, string? handler, string? eventType, Guid messageId, int attempt);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox message {MessageId} ({EventType}) could not be prepared for delivery.")]
+    private static partial void LogOutboxMessageCouldNotBe(ILogger logger, Exception exception, Guid messageId, string? eventType);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox message {MessageId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}")]
+    private static partial void LogOutboxMessageDeadLetteredAfter(ILogger logger, Guid messageId, string? eventType, int attempts, string? error);
 }

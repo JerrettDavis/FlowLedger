@@ -78,7 +78,7 @@ public sealed partial class FlowLedgerApiClient
             return;
         }
 
-        _logger.LogError("Non-success status {StatusCode} during {Operation}", (int)response.StatusCode, description);
+        LogNonSuccessDuring((int)response.StatusCode, description);
         var problem = await ReadProblemAsync(response, ct);
         var detail = response.StatusCode == HttpStatusCode.BadRequest
             ? problem.Detail ?? problem.ValidationMessage

@@ -25,10 +25,7 @@ public sealed record TransactionFingerprint
         string? providerTransactionId = null,
         int occurrence = 0)
     {
-        if (occurrence < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(occurrence));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(occurrence);
 
         if (string.IsNullOrWhiteSpace(normalizedDescription))
         {

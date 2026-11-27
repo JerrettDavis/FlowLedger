@@ -85,7 +85,7 @@ public static class SnapshotImport
                 return Fail($"Refusing to import: the target database already contains {existing} rows. Import is only allowed into an empty database.");
             }
 
-            await SnapshotRestoreDrill.MigrateAsync(targetConnectionString, manifest.AppliedMigrations.LastOrDefault(), ct);
+            await SnapshotRestoreDrill.MigrateAsync(targetConnectionString, manifest.AppliedMigrations is { Count: > 0 } applied ? applied[^1] : null, ct);
             await SnapshotRestoreDrill.EnsureAdHocTablesAsync(targetConnectionString, ct);
 
             var problems = new List<string>();

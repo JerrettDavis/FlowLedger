@@ -145,7 +145,7 @@ internal sealed class NaiveBayesCategoryPredictor
             var padded = "^" + w + "$";
             for (var i = 0; i + 3 <= padded.Length; i++)
             {
-                f.Add("c:" + padded.Substring(i, 3));
+                f.Add(string.Concat("c:", padded.AsSpan(i, 3)));
             }
         }
 

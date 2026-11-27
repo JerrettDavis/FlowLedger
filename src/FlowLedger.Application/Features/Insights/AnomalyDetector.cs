@@ -114,7 +114,7 @@ internal static class AnomalyDetector
     }
 
     /// <summary>True when the last charges recur on a weekly or monthly rhythm at a near-constant amount ending near <paramref name="next"/>.</summary>
-    private static bool IsRegular(IReadOnlyList<TransactionDto> last, DateOnly next, out decimal typical)
+    private static bool IsRegular(List<TransactionDto> last, DateOnly next, out decimal typical)
     {
         var t = Median(last.Select(o => o.Amount).ToList());
         typical = t;

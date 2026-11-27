@@ -10,7 +10,7 @@ namespace FlowLedger.Worker;
 /// own scope. Handler failures are retried with backoff and dead-lettered by <see cref="OutboxProcessor"/>; this loop never exits
 /// on a failure, it logs and polls again.
 /// </summary>
-public sealed class OutboxDispatcherService(IServiceProvider services, OutboxOptions options, ILogger<OutboxDispatcherService> logger)
+public sealed partial class OutboxDispatcherService(IServiceProvider services, OutboxOptions options, ILogger<OutboxDispatcherService> logger)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -24,7 +24,7 @@ public sealed class OutboxDispatcherService(IServiceProvider services, OutboxOpt
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Outbox dispatch pass failed; will retry on the next poll.");
+                LogDispatchFailed(ex);
             }
         }
         while (await WaitAsync(timer, stoppingToken));
@@ -51,4 +51,7 @@ public sealed class OutboxDispatcherService(IServiceProvider services, OutboxOpt
             return false;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox dispatch pass failed; will retry on the next poll.")]
+    private partial void LogDispatchFailed(Exception exception);
 }

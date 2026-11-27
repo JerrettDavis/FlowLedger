@@ -10,7 +10,7 @@ namespace FlowLedger.Worker.Scheduling;
 /// <see cref="JobRunHistory"/> and the <c>flowledger.job.*</c> metrics. A job that logs an error but returns normally is
 /// recorded as a success; jobs that must show up as failed throw.
 /// </summary>
-public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger, IJobRunStore? store = null)
+public sealed partial class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder> logger, IJobRunStore? store = null)
 {
     /// <summary>Persists the run to <c>job_runs</c> (Data page history). A storage failure is logged, never thrown into the scheduler.</summary>
     public async Task PersistAsync(JobRunRecord record, int attempt, CancellationToken ct = default)
@@ -26,12 +26,12 @@ public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Job {Job}: run history could not be persisted.", record.Job);
+            LogHistoryNotPersisted(ex, record.Job);
         }
     }
 
     public void Started(string job, DateTimeOffset scheduledUtc)
-        => logger.LogInformation("Job {Job} starting (scheduled {Scheduled:o}).", job, scheduledUtc);
+        => LogStarting(job, scheduledUtc);
 
     public JobRunRecord Finished(string job, DateTimeOffset startedUtc, DateTimeOffset finishedUtc, Exception? failure)
     {
@@ -45,15 +45,27 @@ public sealed class JobRunRecorder(JobRunHistory history, ILogger<JobRunRecorder
 
         if (success)
         {
-            logger.LogInformation("Job {Job} finished OK in {Duration:F1}s.", job, duration.TotalSeconds);
+            LogFinishedOk(job, duration.TotalSeconds);
         }
         else
         {
-            logger.LogError(failure, "Job {Job} FAILED after {Duration:F1}s: {Error}", job, duration.TotalSeconds, error);
+            LogFailed(failure, job, duration.TotalSeconds, error);
         }
 
         return record;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Job {Job}: run history could not be persisted.")]
+    private partial void LogHistoryNotPersisted(Exception exception, string job);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Job {Job} starting (scheduled {Scheduled:o}).")]
+    private partial void LogStarting(string job, DateTimeOffset scheduled);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Job {Job} finished OK in {Duration:F1}s.")]
+    private partial void LogFinishedOk(string job, double duration);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Job {Job} FAILED after {Duration:F1}s: {Error}")]
+    private partial void LogFailed(Exception? exception, string job, double duration, string? error);
 }
 
 /// <summary>Quartz adapter for <see cref="JobRunRecorder"/>.</summary>

@@ -24,7 +24,7 @@ internal sealed class RealtyApiOptions
 /// property (the response embeds <c>details.avm.__root.avmInfo.predictedValue</c>). Only the address leaves
 /// the system, never the serial number.
 /// </summary>
-internal sealed class RealtyApiValuationFeed(
+internal sealed partial class RealtyApiValuationFeed(
     IHttpClientFactory httpFactory,
     IOptions<RealtyApiOptions> options,
     ILogger<RealtyApiValuationFeed> logger) : IAssetValuationFeed
@@ -50,7 +50,7 @@ internal sealed class RealtyApiValuationFeed(
             .FirstOrDefault(kv => string.Equals(kv.Key, _o.AddressAttribute, StringComparison.OrdinalIgnoreCase)).Value;
         if (string.IsNullOrWhiteSpace(address))
         {
-            logger.LogWarning("RealtyAPI skipped: asset has no '{Attr}' attribute.", _o.AddressAttribute);
+            LogRealtyAPISkippedAssetHasNo(logger, _o.AddressAttribute);
             return null;
         }
 
@@ -63,7 +63,7 @@ internal sealed class RealtyApiValuationFeed(
             using var response = await httpFactory.CreateClient(HttpClientName).SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("RealtyAPI returned HTTP {Status}", (int)response.StatusCode);
+                LogRealtyAPIReturnedHTTP(logger, (int)response.StatusCode);
                 return null;
             }
 
@@ -74,8 +74,17 @@ internal sealed class RealtyApiValuationFeed(
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "RealtyAPI feed failed");
+            LogRealtyAPIFeedFailed(logger, ex);
             return null;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "RealtyAPI skipped: asset has no '{Attr}' attribute.")]
+    private static partial void LogRealtyAPISkippedAssetHasNo(ILogger logger, string? attr);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "RealtyAPI returned HTTP {Status}")]
+    private static partial void LogRealtyAPIReturnedHTTP(ILogger logger, int status);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "RealtyAPI feed failed")]
+    private static partial void LogRealtyAPIFeedFailed(ILogger logger, Exception exception);
 }

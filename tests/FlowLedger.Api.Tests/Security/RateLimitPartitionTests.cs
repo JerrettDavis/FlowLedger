@@ -82,7 +82,7 @@ public sealed class RateLimitPartitionTests
         RateLimitPartitions.KeyFor(forged, key).Should().Be("ip:10.0.0.1", "an unverifiable tenant must not mint a partition");
     }
 
-    private static HttpContext Req(string ip, string? bearer = null, bool authenticated = false, string path = "/api/accounts")
+    private static DefaultHttpContext Req(string ip, string? bearer = null, bool authenticated = false, string path = "/api/accounts")
     {
         var http = Ctx(authenticated ? ApiKeyAuthenticationHandler.SchemeName : null, null, ip);
         http.Request.Path = path;

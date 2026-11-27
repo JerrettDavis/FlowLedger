@@ -33,7 +33,10 @@ public static class WebhookReplayGuard
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger?.LogWarning(ex, "Webhook replay store unavailable; relying on the in-process guard for this delivery.");
+            if (logger is not null)
+            {
+                ApiLog.ReplayStoreUnavailable(logger, ex);
+            }
             return false;
         }
     }

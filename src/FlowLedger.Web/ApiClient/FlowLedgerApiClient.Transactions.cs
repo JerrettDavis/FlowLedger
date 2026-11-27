@@ -43,7 +43,7 @@ public sealed partial class FlowLedgerApiClient
             var response = await _http.GetAsync(url, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Non-success status {StatusCode} during {Operation}", (int)response.StatusCode, "load transactions");
+                LogNonSuccessDuring((int)response.StatusCode, "load transactions");
                 throw new ApiClientException(
                     $"Couldn't load transactions (server returned {(int)response.StatusCode}).", response.StatusCode);
             }

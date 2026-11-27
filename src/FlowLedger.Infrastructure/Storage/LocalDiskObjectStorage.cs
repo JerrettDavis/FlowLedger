@@ -15,7 +15,7 @@ namespace FlowLedger.Infrastructure.Storage;
 /// S3/MinIO can be substituted by replacing this registration in
 /// <c>DependencyInjection.cs</c> — no callers are affected.
 /// </summary>
-internal sealed class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBrowser
+internal sealed partial class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBrowser
 {
     private readonly string _rootPath;
     private readonly ILogger<LocalDiskObjectStorage> _logger;
@@ -50,7 +50,7 @@ internal sealed class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBro
 
         await content.CopyToAsync(fileStream, ct);
 
-        _logger.LogDebug("ObjectStorage: uploaded key={Key} contentType={ContentType}", key, contentType);
+        LogObjectStorageUploadedKeyContentType(_logger, key, contentType);
 
         return new Uri($"file://{filePath.Replace('\\', '/')}");
     }
@@ -78,7 +78,7 @@ internal sealed class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBro
         if (File.Exists(filePath))
         {
             File.Delete(filePath);
-            _logger.LogDebug("ObjectStorage: deleted key={Key}", key);
+            LogObjectStorageDeletedKey(_logger, key);
         }
 
         return Task.CompletedTask;
@@ -158,4 +158,10 @@ internal sealed class LocalDiskObjectStorage : IObjectStorage, IObjectStorageBro
 
         return fullPath;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ObjectStorage: uploaded key={Key} contentType={ContentType}")]
+    private static partial void LogObjectStorageUploadedKeyContentType(ILogger logger, string? key, string? contentType);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ObjectStorage: deleted key={Key}")]
+    private static partial void LogObjectStorageDeletedKey(ILogger logger, string? key);
 }

@@ -7,7 +7,7 @@ public sealed class QueryEngineTests
 {
     private static readonly DateOnly Today = new(2026, 11, 13);
 
-    private static IReadOnlyDictionary<string, QueryTable> Data()
+    private static Dictionary<string, QueryTable> Data()
     {
         object?[] Tx(string date, decimal amount, string dir, string cat, string merchant, string status = "Posted")
             => [DateOnly.Parse(date), amount, dir == "Debit" ? -amount : amount, dir, merchant, merchant, cat, "Checking", "Checking", status, "Manual", "USD", null, false];

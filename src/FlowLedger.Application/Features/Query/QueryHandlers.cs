@@ -44,6 +44,7 @@ public sealed class GetQuerySchemaHandler
     private static readonly string[] Operators =
         ["where", "project", "extend", "summarize … by", "sort by", "top N by", "take N", "distinct", "count"];
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "DI-resolved handler, invoked through the container like every other handler.")]
     public QuerySchemaDto Handle() => new(QueryCatalog.Datasets, QueryCatalog.Functions, QueryCatalog.Aggregates, Operators);
 }
 

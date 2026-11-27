@@ -20,7 +20,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private async Task<AccountDto> Account(HttpClient client, string name)
+    private static async Task<AccountDto> Account(HttpClient client, string name)
         => (await (await client.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest(name, "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
 

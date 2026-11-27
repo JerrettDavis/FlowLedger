@@ -66,17 +66,14 @@ public sealed class ApiKeyAuthenticationHandler(
         if (match == ApiKeyMatch.None)
         {
             FailureCounter.Add(1);
-            Logger.LogWarning(
-                "API key authentication failed for {Method} {Path} from {RemoteIp}",
-                Plain(Request.Method), Plain(Request.Path.Value), Context.Connection.RemoteIpAddress);
+            ApiLog.ApiKeyAuthFailed(
+                Logger, Plain(Request.Method), Plain(Request.Path.Value), Context.Connection.RemoteIpAddress);
             return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
         }
 
         if (match == ApiKeyMatch.Previous)
         {
-            Logger.LogWarning(
-                "API request authenticated with Api:PreviousKey (rotation in progress) from {RemoteIp}; update the caller to the current key and remove Api:PreviousKey.",
-                Context.Connection.RemoteIpAddress);
+            ApiLog.PreviousKeyUsed(Logger, Context.Connection.RemoteIpAddress);
         }
 
         var claims = new[] { new Claim(ClaimTypes.Name, "api-client") };

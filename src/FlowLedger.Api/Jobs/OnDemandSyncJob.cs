@@ -20,7 +20,7 @@ namespace FlowLedger.Api.Jobs;
 /// platform-initiated events, not user-initiated refreshes).
 /// </summary>
 [DisallowConcurrentExecution]
-public sealed class OnDemandSyncJob : IJob
+public sealed partial class OnDemandSyncJob : IJob
 {
     /// <summary>Quartz job key used to trigger this job from the webhook endpoint.</summary>
     public static readonly JobKey Key = new("OnDemandSyncJob", "FlowLedger");
@@ -43,21 +43,43 @@ public sealed class OnDemandSyncJob : IJob
         _logger = logger;
     }
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnDemandSyncJob: starting webhook-triggered sync (memberId={MemberId}, eventType={EventType}).")]
+    private partial void LogStarting(string? memberId, string? eventType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "OnDemandSyncJob: no tenant in the job data; refusing to sync (memberId={MemberId}).")]
+    private partial void LogNoTenant(string? memberId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnDemandSyncJob: skipped — {Reason}")]
+    private partial void LogSkipped(string? reason);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.")]
+    private partial void LogComplete(int accounts, int added, int skipped);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnDemandSyncJob: throttled; deferring one sync by {Delay}.")]
+    private partial void LogThrottled(TimeSpan delay);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnDemandSyncJob: a sync is already running; deferring one more run.")]
+    private partial void LogAlreadyRunning();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "OnDemandSyncJob: webhook-triggered sync failed ({Kind}): {Message}")]
+    private partial void LogSyncFailed(object kind, string message);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "OnDemandSyncJob: webhook-triggered sync faulted.")]
+    private partial void LogSyncFaulted(Exception ex);
+
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
         var data = context.MergedJobDataMap;
         var memberId = data.ContainsKey(MemberIdKey) ? data.GetString(MemberIdKey) : null;
         var eventType = data.ContainsKey(EventTypeKey) ? data.GetString(EventTypeKey) : null;
 
-        _logger.LogInformation(
-            "OnDemandSyncJob: starting webhook-triggered sync (memberId={MemberId}, eventType={EventType}).",
-            memberId, eventType);
+        LogStarting(memberId, eventType);
 
         // The webhook endpoint resolved the owning tenant from the verified member id. Never fall back to the
         // household tenant: without a tenant there is nothing safe to sync.
         if (!data.ContainsKey(TenantIdKey) || !Guid.TryParse(data.GetString(TenantIdKey), out var tenantId))
         {
-            _logger.LogWarning("OnDemandSyncJob: no tenant in the job data; refusing to sync (memberId={MemberId}).", memberId);
+            LogNoTenant(memberId);
             return;
         }
 
@@ -68,7 +90,7 @@ public sealed class OnDemandSyncJob : IJob
         var gate = scope.ServiceProvider.GetService<SyncAttemptGate>();
         if (gate is not null && await gate.CheckAsync(SyncTrigger.ProviderEvent, cancellationToken) is { Allowed: false, Blocking: { } blocked })
         {
-            _logger.LogInformation("OnDemandSyncJob: skipped — {Reason}", blocked.Reason);
+            LogSkipped(blocked.Reason);
             return;
         }
 
@@ -79,32 +101,29 @@ public sealed class OnDemandSyncJob : IJob
             // TODO: when IFinancialSyncService gains a targeted per-member overload, pass memberId
             // here so only the affected member's accounts/transactions are refreshed.
             var result = await syncService.SyncAsync(cancellationToken);
-            _logger.LogInformation(
-                "OnDemandSyncJob: complete — {Accounts} accounts, {Added} added, {Skipped} skipped.",
-                result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
+            LogComplete(result.AccountsUpserted, result.TransactionsAdded, result.TransactionsSkipped);
         }
         catch (SyncThrottledException ex)
         {
             // Not a failure: the minimum-interval guard refused the call. Run once more when the window ends (coalesced).
-            _logger.LogInformation("OnDemandSyncJob: throttled; deferring one sync by {Delay}.", ex.RetryAfter);
+            LogThrottled(ex.RetryAfter);
             await DeferAsync(context.Scheduler, tenantId, memberId, eventType, ex.RetryAfter, cancellationToken);
         }
         catch (SyncAlreadyRunningException)
         {
-            _logger.LogInformation("OnDemandSyncJob: a sync is already running; deferring one more run.");
+            LogAlreadyRunning();
             await DeferAsync(context.Scheduler, tenantId, memberId, eventType, TimeSpan.FromMinutes(1), cancellationToken);
         }
         catch (ProviderException ex)
         {
             // Classified and persisted by the sync service; the shared retry policy decides when it is tried again.
-            _logger.LogWarning("OnDemandSyncJob: webhook-triggered sync failed ({Kind}): {Message}",
-                ProviderIssue.FromException(ex).Kind, ex.Message);
+            LogSyncFailed(ProviderIssue.FromException(ex).Kind, ex.Message);
         }
         catch (Exception ex)
         {
             // Swallow-and-log: a webhook-triggered sync failure must not crash the host;
             // the scheduled worker sync remains the durable backstop.
-            _logger.LogError(ex, "OnDemandSyncJob: webhook-triggered sync faulted.");
+            LogSyncFaulted(ex);
         }
     }
 

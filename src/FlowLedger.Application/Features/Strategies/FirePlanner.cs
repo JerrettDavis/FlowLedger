@@ -17,10 +17,7 @@ public static class FirePlanner
         decimal invested, decimal monthlyContribution, decimal annualSpend, decimal withdrawalRatePercent,
         decimal realReturnPercent, decimal? currentAge, int horizonYears)
     {
-        if (withdrawalRatePercent <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(withdrawalRatePercent));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(withdrawalRatePercent);
 
         horizonYears = Math.Clamp(horizonYears, 1, MaxYears);
         var fireNumber = MoneyRounding.Round(annualSpend / (withdrawalRatePercent / 100m), 2);

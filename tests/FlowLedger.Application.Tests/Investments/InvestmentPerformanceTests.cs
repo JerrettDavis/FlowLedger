@@ -17,7 +17,7 @@ public sealed class InvestmentPerformanceTests
         var history = new[] { P(Today.AddDays(-30), 10_000m) };
         var flows = new[] { new CashFlowPoint(Today.AddDays(-10), 1_000m) };
 
-        var p = InvestmentPerformanceCalculator.Compute(history, flows, 11_500m, Today).First();
+        var p = InvestmentPerformanceCalculator.Compute(history, flows, 11_500m, Today)[0];
 
         p.NetContributions.Should().Be(1_000m);
         p.Gain.Should().Be(500m);
@@ -30,7 +30,7 @@ public sealed class InvestmentPerformanceTests
         var history = new[] { P(Today.AddDays(-30), 10_000m) };
         var flows = new[] { new CashFlowPoint(Today.AddDays(-5), -2_000m) };
 
-        var p = InvestmentPerformanceCalculator.Compute(history, flows, 8_100m, Today).First();
+        var p = InvestmentPerformanceCalculator.Compute(history, flows, 8_100m, Today)[0];
 
         p.Gain.Should().Be(100m);
     }
@@ -51,7 +51,7 @@ public sealed class InvestmentPerformanceTests
         var history = new[] { P(Today.AddDays(-30), 10_000m) };
         var flows = new[] { new CashFlowPoint(Today.AddDays(-40), 5_000m) };
 
-        InvestmentPerformanceCalculator.Compute(history, flows, 10_000m, Today).First().Gain.Should().Be(0m);
+        InvestmentPerformanceCalculator.Compute(history, flows, 10_000m, Today)[0].Gain.Should().Be(0m);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class InvestmentPerformanceTests
         InvestmentPerformanceCalculator.Compute([], [], 100m, Today).Should().BeEmpty();
 
         var zero = InvestmentPerformanceCalculator.Compute([P(Today.AddDays(-30), 0m)], [], 100m, Today);
-        zero.First().GainPercent.Should().BeNull();
+        zero[0].GainPercent.Should().BeNull();
     }
 
     [Fact]

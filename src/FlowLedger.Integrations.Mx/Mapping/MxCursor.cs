@@ -60,10 +60,11 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage, string? F
             if (dto is null)
             {
                 // Deserialised to null — treat as corrupt and restart pagination.
-                logger?.LogWarning(
-                    "MX sync cursor decoded to null; pagination is restarting from page 1. " +
-                    "This may cause duplicate imports. Cursor value length: {Length}.",
-                    cursor.Value?.Length ?? 0);
+                if (logger is not null)
+                {
+                    MxLog.CursorDecodedToNull(logger, cursor.Value?.Length ?? 0);
+                }
+
                 return new MxCursor(1, rpp);
             }
 
@@ -74,19 +75,21 @@ internal readonly record struct MxCursor(int Page, int RecordsPerPage, string? F
         catch (FormatException ex)
         {
             // Cursor value is not valid base-64 — it is corrupted. Restart pagination.
-            logger?.LogWarning(ex,
-                "MX sync cursor could not be base64-decoded; pagination is restarting from page 1. " +
-                "This may cause duplicate imports. Cursor value length: {Length}.",
-                cursor.Value?.Length ?? 0);
+            if (logger is not null)
+            {
+                MxLog.CursorNotBase64(logger, ex, cursor.Value?.Length ?? 0);
+            }
+
             return new MxCursor(1, rpp);
         }
         catch (JsonException ex)
         {
             // Cursor contains valid base-64 but the inner JSON is malformed — it is corrupted.
-            logger?.LogWarning(ex,
-                "MX sync cursor JSON is malformed; pagination is restarting from page 1. " +
-                "This may cause duplicate imports. Cursor value length: {Length}.",
-                cursor.Value?.Length ?? 0);
+            if (logger is not null)
+            {
+                MxLog.CursorMalformedJson(logger, ex, cursor.Value?.Length ?? 0);
+            }
+
             return new MxCursor(1, rpp);
         }
     }

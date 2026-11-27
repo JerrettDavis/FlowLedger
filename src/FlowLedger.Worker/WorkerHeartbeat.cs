@@ -11,7 +11,7 @@ namespace FlowLedger.Worker;
 /// <c>dotnet FlowLedger.Worker.dll --healthcheck</c> (exit 0 healthy, 1 stale/missing), which works in the chiseled
 /// image that has no shell or curl. A wedged or stopped scheduler stops refreshing the file and the probe fails.
 /// </summary>
-public sealed class WorkerHeartbeat(ISchedulerFactory schedulers, IConfiguration configuration, ILogger<WorkerHeartbeat> logger) : BackgroundService
+public sealed partial class WorkerHeartbeat(ISchedulerFactory schedulers, IConfiguration configuration, ILogger<WorkerHeartbeat> logger) : BackgroundService
 {
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(15);
     public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(60);
@@ -56,7 +56,7 @@ public sealed class WorkerHeartbeat(ISchedulerFactory schedulers, IConfiguration
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                logger.LogWarning(ex, "Worker heartbeat could not be written to {Path}.", path);
+                LogHeartbeatWriteFailed(ex, path);
             }
 
             try
@@ -70,4 +70,7 @@ public sealed class WorkerHeartbeat(ISchedulerFactory schedulers, IConfiguration
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Worker heartbeat could not be written to {Path}.")]
+    private partial void LogHeartbeatWriteFailed(Exception exception, string path);
 }

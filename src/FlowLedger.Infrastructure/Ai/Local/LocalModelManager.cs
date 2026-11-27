@@ -10,7 +10,7 @@ namespace FlowLedger.Infrastructure.Ai.Local;
 /// Owns the model directory: reports what is installed, downloads catalog models (explicit, owner-initiated, one at a time,
 /// size- and SHA-256-verified, atomically moved into place) and removes them. Nothing downloads at startup.
 /// </summary>
-internal sealed class LocalModelManager(
+internal sealed partial class LocalModelManager(
     LocalAiOptions options,
     IHttpClientFactory http,
     ILogger<LocalModelManager> logger,
@@ -124,7 +124,7 @@ internal sealed class LocalModelManager(
                 }
                 catch (IOException ex)
                 {
-                    logger.LogWarning(ex, "Could not delete model file {File} (in use?)", f.Name);
+                    LogCouldNotDeleteModelFile(logger, ex, f.Name);
                 }
             }
         }
@@ -152,14 +152,14 @@ internal sealed class LocalModelManager(
             }
 
             lock (_gate) { _download = new LocalAiDownload(model.Id, "Done", model.SizeBytes, model.SizeBytes, null); }
-            logger.LogInformation("Local AI model {Model} installed in {Dir}", model.Id, Directory);
+            LogLocalAIModelInstalledIn(logger, model.Id, Directory);
         }
         catch (Exception ex)
         {
             var message = ex is OperationCanceledException && ct.IsCancellationRequested
                 ? "Download cancelled (the host is shutting down)."
                 : ex.Message;
-            logger.LogWarning(ex, "Local AI model download failed for {Model}", model.Id);
+            LogLocalAIModelDownloadFailed(logger, ex, model.Id);
             lock (_gate) { _download = new LocalAiDownload(model.Id, "Failed", 0, model.SizeBytes, message); }
         }
         finally
@@ -382,18 +382,33 @@ internal sealed class LocalModelManager(
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex, "Could not read model file {File} to verify it", f.Name);
+                LogCouldNotReadModelFile(logger, ex, f.Name);
                 return false;
             }
 
             _verified[info.FullName] = (info.Length, info.LastWriteTimeUtc, ok);
             if (!ok)
             {
-                logger.LogWarning("Model file {File} does not match its catalog checksum; refusing to load it. Remove the model and download it again.", f.Name);
+                LogModelFileDoesNotMatch(logger, f.Name);
                 return false;
             }
         }
 
         return true;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not delete model file {File} (in use?)")]
+    private static partial void LogCouldNotDeleteModelFile(ILogger logger, Exception exception, string? file);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Local AI model {Model} installed in {Dir}")]
+    private static partial void LogLocalAIModelInstalledIn(ILogger logger, string? model, string? dir);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Local AI model download failed for {Model}")]
+    private static partial void LogLocalAIModelDownloadFailed(ILogger logger, Exception exception, string? model);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not read model file {File} to verify it")]
+    private static partial void LogCouldNotReadModelFile(ILogger logger, Exception exception, string? file);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Model file {File} does not match its catalog checksum; refusing to load it. Remove the model and download it again.")]
+    private static partial void LogModelFileDoesNotMatch(ILogger logger, string? file);
 }

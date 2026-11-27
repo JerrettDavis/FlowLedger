@@ -60,7 +60,7 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
                 var parsed = ParseAddress(Attr(asset, _o.AddressAttribute));
                 if (parsed is null)
                 {
-                    logger.LogWarning("Tulsa assessor skipped: asset has no usable '{Attr}' street address.", _o.AddressAttribute);
+                    LogTulsaAssessorSkippedAssetHas(logger, _o.AddressAttribute);
                     return null;
                 }
 
@@ -76,7 +76,7 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
                 account = PickAccount(searchHtml, parsed.Value);
                 if (account is null)
                 {
-                    logger.LogWarning("Tulsa assessor: no unique account found for the address.");
+                    LogTulsaAssessorNoUniqueAccount(logger);
                     return null;
                 }
             }
@@ -87,7 +87,7 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Tulsa assessor feed failed");
+            LogTulsaAssessorFeedFailed(logger, ex);
             return null;
         }
     }
@@ -99,7 +99,7 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
         using var response = await http.SendAsync(request, ct);
         if (response.StatusCode != HttpStatusCode.OK)
         {
-            logger.LogWarning("Tulsa assessor returned HTTP {Status}", (int)response.StatusCode);
+            LogTulsaAssessorReturnedHTTP(logger, (int)response.StatusCode);
             return null;
         }
 
@@ -185,4 +185,16 @@ internal sealed partial class TulsaCountyAssessorValuationFeed(
 
     [GeneratedRegex(@"id=""MarketValueHeader""[^>]*></i>\s*\$(?<v>[\d,]+(?:\.\d+)?)")]
     private static partial Regex MarketValueRegex();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tulsa assessor skipped: asset has no usable '{Attr}' street address.")]
+    private static partial void LogTulsaAssessorSkippedAssetHas(ILogger logger, string? attr);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tulsa assessor: no unique account found for the address.")]
+    private static partial void LogTulsaAssessorNoUniqueAccount(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tulsa assessor feed failed")]
+    private static partial void LogTulsaAssessorFeedFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Tulsa assessor returned HTTP {Status}")]
+    private static partial void LogTulsaAssessorReturnedHTTP(ILogger logger, int status);
 }

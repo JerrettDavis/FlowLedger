@@ -80,7 +80,7 @@ internal static class DashboardActivityAnalyzer
     private static string Key(TransactionDto t) =>
         (string.IsNullOrWhiteSpace(t.MerchantName) ? t.Description : t.MerchantName).Trim().ToUpperInvariant();
 
-    private static IReadOnlyList<FlaggedTransactionDto> FindSuspicious(
+    private static List<FlaggedTransactionDto> FindSuspicious(
         List<TransactionDto> real, List<TransactionDto> candidates, decimal threshold, DateOnly today, int take,
         IReadOnlyDictionary<Guid, List<string>> anomalies)
     {

@@ -17,7 +17,7 @@ namespace FlowLedger.Infrastructure.Persistence;
 /// This is registered via AddDatabaseMigrationService() — call that from the
 /// API/Worker host startup only in Development.
 /// </summary>
-internal sealed class DatabaseMigrationService : IHostedService
+internal sealed partial class DatabaseMigrationService : IHostedService
 {
     /// <summary>Advisory-lock name shared by every process that may apply migrations.</summary>
 
@@ -56,18 +56,18 @@ internal sealed class DatabaseMigrationService : IHostedService
             var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
             if (pending.Count == 0)
             {
-                _logger.LogInformation("EF Core schema is up to date; nothing to migrate.");
+                LogEFCoreSchemaIsUp(_logger);
                 return;
             }
 
-            _logger.LogInformation("{Count} pending migration(s) to apply (last: {Last}).", pending.Count, pending[^1]);
+            LogPendingMigrationSToApply(_logger, pending.Count, pending[^1]);
             await SnapshotBeforeMigratingAsync(db, cancellationToken);
             await db.Database.MigrateAsync(cancellationToken);
-            _logger.LogInformation("EF Core migrations applied successfully.");
+            LogEFCoreMigrationsAppliedSuccessfully(_logger);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to apply EF Core migrations. Application may not function correctly.");
+            LogFailedToApplyEFCore(_logger, ex);
             throw;
         }
     }
@@ -95,14 +95,32 @@ internal sealed class DatabaseMigrationService : IHostedService
             ?? throw new InvalidOperationException("No connection string available for the pre-migration snapshot.");
         var root = _config["Backup:Directory"] ?? DatabaseSnapshotService.DefaultBackupRoot();
 
-        _logger.LogWarning("{Count} pending migration(s) ({First}...); taking a verified snapshot first.", pending.Count, pending[0]);
+        LogPendingMigrationSTakingA(_logger, pending.Count, pending[0]);
         var (dir, manifest) = await new DatabaseSnapshotService(conn)
             .CreateAsync(root, $"pre-migration to {pending[^1]}", "premigrate", ct);
-        _logger.LogInformation("Pre-migration snapshot OK -> {Dir} ({Tables} tables, {Rows} rows).",
-            dir, manifest.Tables.Count, manifest.Tables.Sum(t => t.Rows));
+        var totalRows = manifest.Tables.Sum(t => t.Rows);
+        LogPreMigrationSnapshotOKTables(_logger, dir, manifest.Tables.Count, totalRows);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "EF Core schema is up to date; nothing to migrate.")]
+    private static partial void LogEFCoreSchemaIsUp(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Count} pending migration(s) to apply (last: {Last}).")]
+    private static partial void LogPendingMigrationSToApply(ILogger logger, int count, string last);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "EF Core migrations applied successfully.")]
+    private static partial void LogEFCoreMigrationsAppliedSuccessfully(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to apply EF Core migrations. Application may not function correctly.")]
+    private static partial void LogFailedToApplyEFCore(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Count} pending migration(s) ({First}...); taking a verified snapshot first.")]
+    private static partial void LogPendingMigrationSTakingA(ILogger logger, int count, string first);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Pre-migration snapshot OK -> {Dir} ({Tables} tables, {Rows} rows).")]
+    private static partial void LogPreMigrationSnapshotOKTables(ILogger logger, string? dir, int tables, long rows);
 }
 
 public static class DatabaseMigrationExtensions

@@ -48,7 +48,7 @@ public sealed record JobRetryOptions(int MaxAttempts, TimeSpan BaseDelay, TimeSp
 }
 
 /// <summary>Schedules a one-off retry trigger for a failed job.</summary>
-public sealed class JobRetryScheduler(JobRetryOptions options, TimeProvider clock, ILogger<JobRetryScheduler> logger)
+public sealed partial class JobRetryScheduler(JobRetryOptions options, TimeProvider clock, ILogger<JobRetryScheduler> logger)
 {
     public const string AttemptKey = "retryAttempt";
 
@@ -66,7 +66,7 @@ public sealed class JobRetryScheduler(JobRetryOptions options, TimeProvider cloc
         var attempt = AttemptOf(context);
         if (options.NextDelay(attempt, Random.Shared.NextDouble) is not { } delay)
         {
-            logger.LogError("Job {Job} failed on attempt {Attempt} and will not be retried (attempts exhausted or retries disabled).", job.Name, attempt);
+            LogNotRetried(job.Name, attempt);
             return;
         }
 
@@ -78,7 +78,14 @@ public sealed class JobRetryScheduler(JobRetryOptions options, TimeProvider cloc
             .Build();
         await context.Scheduler.ScheduleJob(trigger, new ScheduleJobOptions(), ct);
         FlowLedgerTelemetry.RecordJobRetry(job.Name);
-        logger.LogWarning("Job {Job} failed on attempt {Attempt}; retrying in {Delay:F0}s (attempt {Next} of {Max}).",
-            job.Name, attempt, delay.TotalSeconds, attempt + 1, options.MaxAttempts);
+        LogRetrying(job.Name, attempt, delay.TotalSeconds, attempt + 1, options.MaxAttempts);
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message =
+        "Job {Job} failed on attempt {Attempt} and will not be retried (attempts exhausted or retries disabled).")]
+    private partial void LogNotRetried(string job, int attempt);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message =
+        "Job {Job} failed on attempt {Attempt}; retrying in {Delay:F0}s (attempt {Next} of {Max}).")]
+    private partial void LogRetrying(string job, int attempt, double delay, int next, int max);
 }

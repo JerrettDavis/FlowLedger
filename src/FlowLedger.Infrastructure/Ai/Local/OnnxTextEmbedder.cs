@@ -94,7 +94,7 @@ internal sealed class OnnxTextEmbedder : ITextEmbedder, IDisposable
 
         _ = shape;
         using var outputs = _session.Run(inputs, [_output]);
-        var hidden = outputs.First().AsTensor<float>();
+        var hidden = outputs[0].AsTensor<float>();
         var dims = hidden.Dimensions;
         var width = dims[^1];
         var flat = hidden.ToArray();
