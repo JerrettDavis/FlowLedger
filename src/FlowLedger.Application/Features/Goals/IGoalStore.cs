@@ -26,11 +26,9 @@ internal sealed class SaveGoalRequestValidator : AbstractValidator<SaveGoalReque
 {
     public SaveGoalRequestValidator()
     {
-        RuleFor(x => x)
-            .Must(r => !(string.IsNullOrWhiteSpace(r.Name) || r.Name.Length > 120 || r.TargetAmount <= 0 || r.TargetAmount > 1_000_000_000m
-                || r.SavedAmount < 0 || r.SavedAmount > 1_000_000_000m))
-            .WithMessage("A name, a positive target and a non-negative saved amount are required.")
-            .OverridePropertyName("goal");
+        RuleFor(x => x.Name).Must(n => !string.IsNullOrWhiteSpace(n) && n.Length <= 120).WithMessage("Give the goal a name of up to 120 characters.");
+        RuleFor(x => x.TargetAmount).Must(t => t is > 0m and <= 1_000_000_000m).WithMessage("The target must be greater than 0 and at most 1,000,000,000.");
+        RuleFor(x => x.SavedAmount).InclusiveBetween(0m, 1_000_000_000m).WithMessage("The saved amount must be between 0 and 1,000,000,000.");
     }
 }
 

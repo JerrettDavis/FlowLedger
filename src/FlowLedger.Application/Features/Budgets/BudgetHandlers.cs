@@ -17,10 +17,8 @@ internal sealed class SetBudgetRequestValidator : AbstractValidator<SetBudgetReq
 {
     public SetBudgetRequestValidator()
     {
-        RuleFor(x => x)
-            .Must(r => !string.IsNullOrWhiteSpace(r.Category) && r.MonthlyLimit >= 0 && r.MonthlyLimit <= 100_000_000m)
-            .WithMessage("A category and a non-negative limit are required.")
-            .OverridePropertyName("budget");
+        RuleFor(x => x.Category).NotEmpty().WithMessage("Pick a category for the budget.");
+        RuleFor(x => x.MonthlyLimit).InclusiveBetween(0m, 100_000_000m).WithMessage("The monthly limit must be between 0 and 100,000,000.");
     }
 }
 

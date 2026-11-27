@@ -21,14 +21,14 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Put_budget_with_negative_limit_returns_validation_problem_keyed_budget()
+    public async Task Put_budget_with_negative_limit_returns_validation_problem_keyed_to_the_limit()
     {
         var response = await _client.PutAsJsonAsync("/api/budgets", new { category = "Food", monthlyLimit = -1m });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        doc.RootElement.GetProperty("errors").GetProperty("budget")[0].GetString()
-            .Should().Be("A category and a non-negative limit are required.");
+        doc.RootElement.GetProperty("errors").GetProperty("MonthlyLimit")[0].GetString()
+            .Should().Be("The monthly limit must be between 0 and 100,000,000.");
     }
 
     [Fact]
@@ -105,14 +105,14 @@ public sealed class BudgetAlertEndpointTests(FlowLedgerApiFactory factory) : IAs
     }
 
     [Fact]
-    public async Task Put_goal_with_zero_target_returns_validation_problem_keyed_goal()
+    public async Task Put_goal_with_zero_target_returns_validation_problem_keyed_to_the_target()
     {
         var response = await _client.PutAsJsonAsync("/api/goals", new { name = "Car", targetAmount = 0m, savedAmount = 0m });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        doc.RootElement.GetProperty("errors").GetProperty("goal")[0].GetString()
-            .Should().Be("A name, a positive target and a non-negative saved amount are required.");
+        doc.RootElement.GetProperty("errors").GetProperty("TargetAmount")[0].GetString()
+            .Should().Be("The target must be greater than 0 and at most 1,000,000,000.");
     }
 
     [Fact]

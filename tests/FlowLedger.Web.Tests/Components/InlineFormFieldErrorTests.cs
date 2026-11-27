@@ -46,10 +46,10 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task Budget_error_from_the_api_is_marked_at_form_level_and_the_typed_values_stay()
+    public async Task Budget_limit_error_from_the_api_is_shown_on_the_limit_field_and_the_typed_values_stay()
     {
-        // The API validates the budget as one rule and reports it under "budget": the form shows the message and flags the category.
-        Arrange("""{"budget":["A category and a non-negative limit are required."]}""");
+        // The budget validator keys the limit failure to MonthlyLimit, so the message lands on the limit input itself.
+        Arrange("""{"MonthlyLimit":["The monthly limit must be between 0 and 100,000,000."]}""");
         var cut = Render<BudgetsPage>();
         cut.WaitForAssertion(() => cut.FindAll("button[aria-label='Edit budget for Food']").Should().HaveCount(1));
         await cut.Find("button[aria-label='Edit budget for Food']").ClickAsync(new());
@@ -58,7 +58,7 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
 
         cut.WaitForAssertion(() =>
         {
-            cut.Markup.Should().Contain("A category and a non-negative limit are required.").And.Contain("Fix the highlighted fields");
+            cut.Markup.Should().Contain("The monthly limit must be between 0 and 100,000,000.").And.Contain("Fix the highlighted fields");
             cut.Find("input[aria-label='Monthly limit']").GetAttribute("value").Should().StartWith("100");
         });
     }
@@ -66,22 +66,22 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
     [Fact]
     public async Task Editing_the_budget_limit_clears_the_server_error()
     {
-        Arrange("""{"budget":["A category and a non-negative limit are required."]}""");
+        Arrange("""{"MonthlyLimit":["The monthly limit must be between 0 and 100,000,000."]}""");
         var cut = Render<BudgetsPage>();
         cut.WaitForAssertion(() => cut.FindAll("button[aria-label='Edit budget for Food']").Should().HaveCount(1));
         await cut.Find("button[aria-label='Edit budget for Food']").ClickAsync(new());
         await cut.FindAll("button").Single(b => b.TextContent.Contains("Save budget", StringComparison.Ordinal)).ClickAsync(new());
-        cut.WaitForAssertion(() => cut.Markup.Should().Contain("A category and a non-negative limit are required."));
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("The monthly limit must be between 0 and 100,000,000."));
 
         cut.Find("input[aria-label='Monthly limit']").Change("120");
 
-        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("A category and a non-negative limit are required."));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("The monthly limit must be between 0 and 100,000,000."));
     }
 
     [Fact]
-    public async Task Goal_api_error_is_marked_on_the_name_field_and_the_summary_is_an_alert()
+    public async Task Goal_target_error_is_marked_on_the_target_field_and_the_summary_is_an_alert()
     {
-        Arrange("""{"goal":["A name, a positive target and a non-negative saved amount are required."]}""");
+        Arrange("""{"TargetAmount":["The target must be greater than 0 and at most 1,000,000,000."]}""");
         var cut = Render<GoalsPage>();
         cut.WaitForAssertion(() => cut.FindAll("button").Should().Contain(b => b.TextContent.Contains("Save goal")));
         cut.Find("input[type=text]").Input("Trip");
@@ -92,7 +92,7 @@ public sealed class InlineFormFieldErrorTests : BunitContext, IAsyncLifetime
         cut.WaitForAssertion(() =>
         {
             cut.Find("[role=alert]").TextContent.Should().Contain("Fix the highlighted fields");
-            cut.Markup.Should().Contain("A name, a positive target and a non-negative saved amount are required.");
+            cut.Markup.Should().Contain("The target must be greater than 0 and at most 1,000,000,000.");
         });
     }
 
