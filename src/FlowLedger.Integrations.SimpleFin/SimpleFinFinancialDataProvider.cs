@@ -13,7 +13,7 @@ namespace FlowLedger.Integrations.SimpleFin;
 /// A sync costs exactly one <c>GET /accounts</c> (SimpleFIN allows ~24/day): the response is cached for the
 /// scoped lifetime and serves both accounts and every account's transactions.
 /// </summary>
-public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
+public sealed partial class SimpleFinFinancialDataProvider : IFinancialDataProvider
 {
     public const string MemberId = "simplefin";
 
@@ -123,7 +123,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             }
             else
             {
-                _logger.LogWarning("Skipping a SimpleFIN account: no usable ISO currency reported.");
+                LogSkippingAccountNoCurrency();
             }
         }
     }
@@ -222,7 +222,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
         if (body.Errors is { Count: > 0 })
         {
             // Messages name institutions (e.g. "needs attention"); log them but never the access URL.
-            _logger.LogWarning("SimpleFIN reported {Count} issue(s): {Errors}", body.Errors.Count, string.Join(" | ", body.Errors));
+            LogProviderIssues(body.Errors.Count, string.Join(" | ", body.Errors));
             if (body.Accounts.Count == 0)
             {
                 _cached = null;
@@ -253,7 +253,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
             requests++;
             if (!resp.IsSuccessStatusCode)
             {
-                _logger.LogWarning("SimpleFIN backfill stopped at {Covered} days: HTTP {Status}.", covered, (int)resp.StatusCode);
+                LogBackfillStopped(covered, (int)resp.StatusCode);
                 return false;
             }
 
@@ -270,7 +270,7 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
                 added += acct.Transactions.Count;
             }
 
-            _logger.LogInformation("SimpleFIN backfill window {Covered}-{Next} days: {Count} transaction(s).", covered, covered + span, added);
+            LogBackfillWindow(covered, covered + span, added);
             if (added == 0)
             {
                 return true; // nothing older is available
@@ -281,4 +281,16 @@ public sealed class SimpleFinFinancialDataProvider : IFinancialDataProvider
 
         return covered >= total;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping a SimpleFIN account: no usable ISO currency reported.")]
+    private partial void LogSkippingAccountNoCurrency();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "SimpleFIN reported {Count} issue(s): {Errors}")]
+    private partial void LogProviderIssues(int count, string errors);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "SimpleFIN backfill stopped at {Covered} days: HTTP {Status}.")]
+    private partial void LogBackfillStopped(int covered, int status);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "SimpleFIN backfill window {Covered}-{Next} days: {Count} transaction(s).")]
+    private partial void LogBackfillWindow(int covered, int next, int count);
 }

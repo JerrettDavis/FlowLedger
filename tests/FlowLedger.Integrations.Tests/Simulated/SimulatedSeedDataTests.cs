@@ -212,7 +212,7 @@ public sealed class SimulatedSeedDataTests
     }
 
     private static async Task<List<ProviderTransaction>> DrainAllAsync(
-        IFinancialDataProvider provider,
+        SimulatedFinancialDataProvider provider,
         string accountId)
     {
         var all = new List<ProviderTransaction>();
