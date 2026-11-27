@@ -21,14 +21,14 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.subtitle1" Class="mb-2">Logins on this account</MudText>
         <MudSimpleTable Dense="true">
-            <thead><tr><th>Login</th><th>Email</th><th>Last sign-in</th><th></th></tr></thead>
+            <thead><tr><th>Login</th><th>Email</th><th class="fl-hide-sm">Last sign-in</th><th></th></tr></thead>
             <tbody>
             @foreach (var l in _logins)
             {
                 <tr>
                     <td>@(l.DisplayName ?? l.Subject) @if (l.UserId == _me) { <MudChip T="string" Size="Size.Small" Color="Color.Primary">this login</MudChip> }</td>
-                    <td>@l.Email</td>
-                    <td>@l.LastLoginUtc.ToLocalTime().ToString("g")</td>
+                    <td class="fl-wrap-anywhere">@l.Email</td>
+                    <td class="fl-hide-sm">@l.LastLoginUtc.ToLocalTime().ToString("g")</td>
                     <td>
                         @if (_logins.Count > 1 && l.UserId != _me)
                         {
