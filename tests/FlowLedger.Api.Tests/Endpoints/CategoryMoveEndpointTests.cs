@@ -4,6 +4,7 @@ using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Budgets;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Api.Tests.Endpoints;
@@ -30,7 +31,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
     {
         var today = factory.ServerToday;
         var resp = await _client.PostAsJsonAsync("/api/transactions",
-            new CreateTransactionRequest(account, 10m, "USD", "Debit", desc, today, today, categoryId, desc, null));
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(10m).Described(desc).On(today).PostedOn(today).InCategory(categoryId).AtMerchant(desc).Build());
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<TransactionDto>())!;
     }
@@ -47,7 +48,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
         var food = await Cat("Food");
         var dining = await Cat("Food/Dining");
         var acct = (await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
         var tx = await Spend(acct.Id, "Cafe", dining.Id);
         (await _client.PutAsJsonAsync("/api/budgets", new { category = "Food/Dining", monthlyLimit = 100m })).EnsureSuccessStatusCode();
         (await _client.PutAsJsonAsync("/api/category-rules", new { pattern = "cafe", categoryPath = "Food/Dining" })).EnsureSuccessStatusCode();
@@ -70,7 +71,7 @@ public sealed class CategoryMoveEndpointTests(FlowLedgerApiFactory factory) : IA
         var food = await Cat("Food");
         var eating = await Cat("Eating Out");
         var acct = (await (await _client.PostAsJsonAsync("/api/accounts",
-            new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
+            CreateAccountRequestBuilder.A().Named("Checking").StartingAt(0m).Build())).Content.ReadFromJsonAsync<AccountDto>())!;
         var a = await Spend(acct.Id, "Cafe", food.Id);
         var b = await Spend(acct.Id, "Diner", eating.Id);
         (await _client.PutAsJsonAsync("/api/budgets", new { category = "Food", monthlyLimit = 100m })).EnsureSuccessStatusCode();
