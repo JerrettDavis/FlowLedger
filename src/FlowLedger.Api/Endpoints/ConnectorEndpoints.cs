@@ -113,7 +113,7 @@ internal static class ConnectorEndpoints
                             callsToday = usage.CallsToday,
                             callsThisMonth = usage.CallsThisMonth,
                             dailyBudget = isMx ? cfg.GetValue("Mx:Provider:DailyCallBudget", 500) : (int?)null,
-                            monthlyBudget = isMx ? cfg.GetValue("Mx:Provider:MonthlyCallBudget", 5000) : (int?)null,
+                            monthlyBudget = isMx ? cfg.GetValue("Mx:Provider:MonthlyCallBudget", ApiLimits.DefaultMxMonthlyCallBudget) : (int?)null,
                             paused = isMx && cfg.GetValue("Mx:Provider:CallsPaused", false),
                         },
                         connections = linked

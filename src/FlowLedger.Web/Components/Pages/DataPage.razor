@@ -50,7 +50,7 @@ else
                 <div class="fl-periods">
                     <div class="fl-period"><div class="fl-tile__label">Off-site copy</div><div class="fl-tile__value @(_status.Backup.OffsiteConfigured ? "fl-pos" : "fl-neg")" style="font-size:1.1rem">@(_status.Backup.OffsiteConfigured ? "Configured" : "Not configured")</div></div>
                     <div class="fl-period"><div class="fl-tile__label">Last run</div><div class="fl-tile__value" style="font-size:1.1rem">@(_status.Backup.LastRun is null ? "—" : Ago(_status.Backup.LastRun.FinishedUtc))</div></div>
-                    <div class="fl-period"><div class="fl-tile__label">Rows backed up</div><div class="fl-tile__value fl-num" style="font-size:1.1rem">@(_status.Backup.LastRun?.Rows.ToString("N0") ?? "—")</div></div>
+                    <div class="fl-period"><div class="fl-tile__label">Rows backed up</div><div class="fl-tile__value fl-num" style="font-size:1.1rem">@(_status.Backup.LastRun is { } lastRun ? Format.Count(lastRun.Rows) : "—")</div></div>
                     <div class="fl-period"><div class="fl-tile__label">Restore drill</div><div class="fl-tile__value @(_status.Backup.LastRun?.DrillOk is { } dd ? (dd ? "fl-pos" : "fl-neg") : "")" style="font-size:1.1rem">@(_status.Backup.LastRun?.DrillOk is { } d ? (d ? "Passed" : "FAILED") : "—")</div></div>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_status.Backup.LastRun?.OffsiteDetail))
@@ -117,7 +117,7 @@ else
                                 <div class="fl-li__title">@r.FinishedUtc.ToLocalTime().ToString("g") · @(r.Ok ? "OK" : "FAILED")</div>
                                 <div class="fl-li__sub">@(r.Error ?? r.OffsiteDetail ?? "")</div>
                             </div>
-                            <span class="fl-pill fl-hide-md">@r.Rows.ToString("N0") rows</span>
+                            <span class="fl-pill fl-hide-md">@Format.Count(r.Rows) rows</span>
                             <span class="fl-pill fl-hide-lg @(r.DrillOk is { } dr ? (dr ? "fl-pill--pos" : "fl-pill--neg") : "")">drill @(r.DrillOk is { } d2 ? (d2 ? "pass" : "FAIL") : "—")</span>
                             <span class="fl-pill fl-hide-md @(r.OffsiteOk is { } of ? (of ? "fl-pill--pos" : "fl-pill--neg") : "")">off-site @(r.OffsiteOk is { } o ? (o ? "ok" : "FAIL") : "n/a")</span>
                         </div>
@@ -268,7 +268,7 @@ else
             : $"{(int)d.TotalDays} d ago";
     }
 
-    private static string Budget(int b) => b <= 0 ? "unlimited" : b.ToString("N0");
+    private static string Budget(int b) => b <= 0 ? "unlimited" : Format.Count(b);
 
     private static double Pct(long used, int budget) => budget <= 0 ? 0 : Math.Min(100, used * 100.0 / budget);
 

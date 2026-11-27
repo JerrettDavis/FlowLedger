@@ -16,9 +16,9 @@ internal static class DebtEndpoints
 
         group.MapPost("/plan", ([FromBody] PlanRequest r) =>
         {
-            if (r.Debts is null || r.Debts.Count is 0 or > 50 || r.ExtraMonthly < 0 || r.ExtraMonthly > 10_000_000m
-                || r.Debts.Any(d => string.IsNullOrWhiteSpace(d.Name) || d.Balance < 0 || d.Balance > 1_000_000_000m
-                    || d.AnnualRatePercent < 0 || d.AnnualRatePercent > 100m || d.MinimumPayment < 0 || d.MinimumPayment > 100_000_000m))
+            if (r.Debts is null || r.Debts.Count is 0 or > 50 || r.ExtraMonthly < 0 || r.ExtraMonthly > ApiLimits.SimulationMonthlyCeiling
+                || r.Debts.Any(d => string.IsNullOrWhiteSpace(d.Name) || d.Balance < 0 || d.Balance > ApiLimits.SimulationAmountCeiling
+                    || d.AnnualRatePercent < 0 || d.AnnualRatePercent > 100m || d.MinimumPayment < 0 || d.MinimumPayment > ApiLimits.SimulationAnnualCeiling))
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["debts"] = ["Provide 1-50 debts with non-negative balance, a 0-100% rate and a non-negative minimum payment."] });
             }

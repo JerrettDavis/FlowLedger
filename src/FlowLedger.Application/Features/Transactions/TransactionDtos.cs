@@ -10,4 +10,19 @@ public sealed record ListTransactionsQuery(
     int Skip = 0,
     int Take = 100,
     bool IncludeHidden = false,
-    string? Search = null);
+    string? Search = null,
+    string? Sort = null,
+    string? Dir = null)
+{
+    /// <summary>Sort keys the list endpoint accepts (case-insensitive); anything else is a 400.</summary>
+    public static readonly IReadOnlyList<string> SortKeys = ["date", "merchant", "description", "amount"];
+
+    /// <summary>The requested sort column; the newest-first default when none is given.</summary>
+    public FlowLedger.Application.Abstractions.TransactionSortKey SortKey =>
+        Enum.TryParse<FlowLedger.Application.Abstractions.TransactionSortKey>(Sort, ignoreCase: true, out var key)
+            ? key
+            : FlowLedger.Application.Abstractions.TransactionSortKey.Date;
+
+    /// <summary>Descending unless <c>dir=asc</c> was asked for (the default order is newest first).</summary>
+    public bool Descending => !string.Equals(Dir, "asc", StringComparison.OrdinalIgnoreCase);
+}

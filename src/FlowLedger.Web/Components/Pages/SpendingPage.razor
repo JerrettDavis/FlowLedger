@@ -80,7 +80,7 @@ else if (_result is not null)
                     @(delta >= 0 ? "+" : "−")@Format.Money(Math.Abs(delta))
                     @if (r.PreviousTotal > 0)
                     {
-                        <span style="font-size:.7em"> (@((delta / r.PreviousTotal).ToString("P0")))</span>
+                        <span style="font-size:.7em"> (@Format.Ratio(delta / r.PreviousTotal))</span>
                     }
                 </MudText>
                 <MudText Typo="Typo.caption">Previous: @Format.Money(r.PreviousTotal)</MudText>
@@ -130,7 +130,7 @@ else if (_result is not null)
             {
                 <div class="d-flex" style="gap:24px;flex-wrap:wrap;align-items:flex-start">
                     <div style="flex:0 0 300px;max-width:100%;margin:0 auto">
-                        <svg viewBox="-110 -110 220 220" role="img" aria-label="Breakdown donut chart" style="width:300px;max-width:100%">
+                        <svg viewBox="-110 -110 220 220" role="img" aria-label="@ChartSummary.Categories(_income ? "Income breakdown" : "Spending breakdown", r.Groups.Select(g => (g.Label, g.Amount)), Format.Money)" style="width:300px;max-width:100%">
                             @foreach (var s in Slices())
                             {
                                 <path d="@s.Path" fill="@s.Color" stroke="var(--mud-palette-surface)" stroke-width="1.5"
@@ -191,7 +191,7 @@ else if (_result is not null)
             else
             {
                 <div style="max-width:1000px;margin:0 auto">
-                    <svg viewBox="0 0 800 240" role="img" aria-label="Trend bar chart" style="width:100%">
+                    <svg viewBox="0 0 800 240" role="img" aria-label="@ChartSummary.Trend(_income ? "Income trend" : "Spending trend", r.Trend.Select(t => (TrendLabel(t.Bucket), t.Amount)).ToList(), Format.Money)" style="width:100%">
                         @for (var gi = 0; gi <= 3; gi++)
                         {
                             var gy = 20 + (180 * (3 - gi) / 3.0);

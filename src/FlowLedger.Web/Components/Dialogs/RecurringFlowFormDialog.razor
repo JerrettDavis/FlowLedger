@@ -4,12 +4,18 @@
     </TitleContent>
     <DialogContent>
         <MudForm @ref="_form" aria-label="Recurring flow form">
+            @if (_feedback.Summary is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+            }
             @if (Flow is null)
             {
-                <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required"
+                <MudTextField @bind-Value="Name" Label="Name" Required="true" RequiredError="Name is required"
+                              Error="@_feedback.Has("name")" ErrorText="@_feedback.For("name")"
                               aria-required="true" aria-label="Flow name" Class="mb-3" />
 
                 <MudSelect @bind-Value="_accountId" Label="Account" Required="true"
+                           Error="@_feedback.Has("accountId")" ErrorText="@_feedback.For("accountId")"
                            aria-required="true" aria-label="Account" Class="mb-3">
                     @foreach (var a in Accounts)
                     {
@@ -22,7 +28,8 @@
                     <MudSelectItem Value="@("Credit")">Credit (income)</MudSelectItem>
                 </MudSelect>
 
-                <MudNumericField @bind-Value="_amount" Label="Amount" Min="0.01m" Format="F2"
+                <MudNumericField @bind-Value="Amount" Label="Amount" Min="0.01m" Format="F2"
+                                 Error="@_feedback.Has("amount")" ErrorText="@_feedback.For("amount")"
                                  aria-label="Amount" Class="mb-3" />
 
                 <MudSelect @bind-Value="_frequency" Label="Frequency" aria-label="Frequency" Class="mb-3">
@@ -79,6 +86,18 @@
     [Parameter] public FlowLedger.Contracts.RecurringFlowDto? Flow { get; set; }
     [Parameter] public List<FlowLedger.Contracts.AccountDto> Accounts { get; set; } = [];
 
+    /// <summary>
+    /// When set, the dialog performs the create itself and stays open on failure, so the API's per-field validation errors
+    /// appear next to the fields they belong to. Used for new flows; editing keeps the close-then-save flow (its 409 handling lives on the page).
+    /// </summary>
+    [Parameter] public Func<FlowLedger.Contracts.CreateRecurringFlowRequest, Task>? CreateAsync { get; set; }
+
+    private readonly FormFeedback _feedback = new();
+
+    // Editing a field clears the previous server verdict, so a stale message never sits next to a corrected value.
+    private string Name { get => _name; set { _name = value; _feedback.Clear(); } }
+    private decimal Amount { get => _amount; set { _amount = value; _feedback.Clear(); } }
+
     private MudForm _form = default!;
     private string _name = "";
     private Guid _accountId;
@@ -134,6 +153,21 @@
             result = new FlowLedger.Contracts.UpdateRecurringFlowRequest(_amount, _amountModel);
         }
 
-        MudDialog.Close(DialogResult.Ok(result));
+        if (CreateAsync is null || result is not FlowLedger.Contracts.CreateRecurringFlowRequest create)
+        {
+            MudDialog.Close(DialogResult.Ok(result));
+            return;
+        }
+
+        _feedback.Clear();
+        try
+        {
+            await CreateAsync(create);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) when (_feedback.TryCapture(ex))
+        {
+            // Stay open: the summary and the field messages are now rendered.
+        }
     }
 }

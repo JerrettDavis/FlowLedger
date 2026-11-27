@@ -45,7 +45,7 @@
         if (e.ValueKind == JsonValueKind.Number)
         {
             var d = e.GetDecimal();
-            return d == Math.Floor(d) ? d.ToString("N0") : d.ToString("N2");
+            return Format.Number(d);
         }
 
         return ChartModel.CellText(e);
