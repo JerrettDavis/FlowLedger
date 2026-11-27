@@ -64,6 +64,7 @@ public static class DependencyInjection
         // Query and reports
         services.AddScoped<FlowLedger.Application.Features.Query.QueryDatasetProvider>();
         services.AddScoped<FlowLedger.Application.Features.Query.RunQueryHandler>();
+        services.AddScoped<FlowLedger.Application.Features.Query.GetQuerySchemaHandler>();
         services.AddScoped<FlowLedger.Application.Features.Query.ListReportsHandler>();
         services.AddScoped<FlowLedger.Application.Features.Query.GetReportHandler>();
         services.AddScoped<FlowLedger.Application.Features.Query.SaveReportHandler>();
