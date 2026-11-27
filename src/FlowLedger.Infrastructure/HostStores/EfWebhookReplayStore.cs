@@ -1,8 +1,9 @@
 using FlowLedger.Application.Abstractions;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>
 /// EF-backed <see cref="IWebhookReplayStore"/> (#152). One row per (provider, body hash); the insert is atomic, so exactly one of
