@@ -47,15 +47,8 @@ internal static class GoalEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            try
-            {
-                var (id, version) = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, expected, ct);
-                return RowVersioning.Ok(response, new { id, version }, version);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["goal"] = [ex.Message] });
-            }
+            var (id, version) = await store.UpsertAsync(tenant.TenantId, r.Id, r.Name.Trim(), r.TargetAmount, r.SavedAmount, r.TargetDate, expected, ct);
+            return RowVersioning.Ok(response, new { id, version }, version);
         })
         .WithName("SaveGoal")
         .WithSummary("Create or update a savings goal")

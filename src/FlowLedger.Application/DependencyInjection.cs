@@ -1,6 +1,5 @@
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Assets;
-using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Forecasting;
 using FlowLedger.Application.Features.Imports;
 using FlowLedger.Application.Features.RecurringFlows;
@@ -19,29 +18,42 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        // ── Handlers — Accounts ──────────────────────────────────────────────────
-        services.AddScoped<ListAccountsHandler>();
-        services.AddScoped<GetAccountHandler>();
-        services.AddScoped<CreateAccountHandler>();
-        services.AddScoped<UpdateAccountHandler>();
-        services.AddScoped<DeactivateAccountHandler>();
-        services.AddScoped<UpdateAccountSettingsHandler>();
-        services.AddScoped<ChangeAccountTypeHandler>();
+        AddHandlers(services);
+        AddServices(services);
 
-        // ── Handlers — Transactions ──────────────────────────────────────────────
-        services.AddScoped<ListTransactionsHandler>();
-        services.AddScoped<GetTransactionHandler>();
-        services.AddScoped<GetProcessingWindowHandler>();
+        // ── FluentValidation ─────────────────────────────────────────────────────
+        services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Every public concrete <c>*Handler</c> class in this assembly is a scoped use-case entry point: registered by convention so a
+    /// new handler cannot be forgotten (a test also asserts every handler resolves).
+    /// </summary>
+    private static void AddHandlers(IServiceCollection services)
+    {
+        var handlers = typeof(DependencyInjection).Assembly.GetExportedTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false }
+                        && t.Name.EndsWith("Handler", StringComparison.Ordinal));
+        foreach (var handler in handlers)
+        {
+            services.TryAddScoped(handler);
+        }
+    }
+
+    private static void AddServices(IServiceCollection services)
+    {
         // Process-local, bounded: per-tenant data version + small result cache (#160). Replicas see a write after the cache TTL.
         services.TryAddSingleton<FlowLedger.Application.Abstractions.ITenantDataVersion, FlowLedger.Application.Abstractions.TenantDataVersion>();
         services.TryAddSingleton<FlowLedger.Application.Abstractions.TenantResultCache>();
         services.AddScoped<FlowLedger.Application.Abstractions.IReferenceValidator, FlowLedger.Application.Abstractions.ReferenceValidator>();
-        services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
-        services.AddScoped<FlowLedger.Application.Features.Query.AskQueryHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Query.AskConcurrencyGate>();   // process-local, bounded by in-flight asks
-        services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.TryAddSingleton<FlowLedger.Application.Features.LocalAi.LocalAiOptions>();
+
+        // Transactions, categorization and local AI
+        services.AddScoped<FlowLedger.Application.Features.Categories.CategorizationService>();
         services.AddScoped<FlowLedger.Application.Features.LocalAi.LocalAiService>();
         services.AddScoped<FlowLedger.Application.Features.Transactions.TransactionEnrichmentService>();
         services.AddScoped<MerchantAliasService>();
@@ -50,75 +62,31 @@ public static class DependencyInjection
         services.AddScoped<FlowLedger.Application.Features.Categories.CategoryRestructureService>();
         services.AddScoped<TransactionAnnotationService>();
         services.AddScoped<FlowLedger.Application.Features.Investments.InvestmentPerformanceService>();
-        services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardActivityHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Insights.GetSpendingBreakdownHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Dashboard.DismissSuspiciousHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Dashboard.GetDashboardInsightsHandler>();
 
         // Assets
-        services.AddScoped<ListAssetsHandler>();
-        services.AddScoped<GetAssetHandler>();
-        services.AddScoped<CreateAssetHandler>();
-        services.AddScoped<UpdateAssetHandler>();
-        services.AddScoped<RecordAssetValuationHandler>();
-        services.AddScoped<DeactivateAssetHandler>();
-        services.AddScoped<GetAssetSummaryHandler>();
-        services.AddScoped<RefreshAssetValuationHandler>();
         services.AddSingleton<FlowLedger.Application.Abstractions.IAssetValuationFeed, ModelEstimateFeed>();
 
-        // Query and reports
+        // Query
         services.AddScoped<FlowLedger.Application.Features.Query.QueryDatasetProvider>();
-        services.AddScoped<FlowLedger.Application.Features.Query.RunQueryHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Query.GetQuerySchemaHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Query.ListReportsHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Query.GetReportHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Query.SaveReportHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Query.RunReportHandler>();
 
-        // ── Handlers — Categories ────────────────────────────────────────────────
-        services.AddScoped<ListCategoriesHandler>();
-        services.AddScoped<RestoreDefaultCategoriesHandler>();
-        services.AddScoped<GetCategoryHandler>();
-        services.AddScoped<CreateCategoryHandler>();
-        services.AddScoped<UpdateCategoryHandler>();
-        services.AddScoped<DeleteCategoryHandler>();
-
-        // ── Handlers — RecurringFlows ────────────────────────────────────────────
-        services.AddScoped<ListRecurringFlowsHandler>();
-        services.AddScoped<GetRecurringFlowHandler>();
-        services.AddScoped<CreateRecurringFlowHandler>();
+        // Recurring flows and duplicates
         services.AddScoped<RecurringSuggestionService>();
         services.AddScoped<FlowLedger.Application.Features.Duplicates.DuplicateService>();
-        services.AddScoped<UpdateRecurringFlowHandler>();
-        services.AddScoped<DeactivateRecurringFlowHandler>();
 
-        // ── Bill sheet (spreadsheet mode) ────────────────────────────────────────
+        // Bill sheet (spreadsheet mode)
         services.AddScoped<FlowLedger.Application.Features.BillSheet.BillSheetService>();
         services.AddScoped<FlowLedger.Application.Abstractions.ISheetAutoMarker>(
             sp => sp.GetRequiredService<FlowLedger.Application.Features.BillSheet.BillSheetService>());
 
-        // ── Handlers — Imports and Matching ──────────────────────────────────────
+        // Imports and matching
         services.AddScoped<MatchingEngine>();
-        services.AddScoped<ImportTransactionsHandler>();
         services.AddScoped<ImportCoordinator>();
-        services.AddScoped<MatchTransactionHandler>();
-        services.AddScoped<UnmatchTransactionHandler>();
-        services.AddScoped<ListMatchSuggestionsHandler>();
 
-        // ── Handlers — Forecasting ────────────────────────────────────────────────
+        // Forecasting
         services.AddSingleton<IForecastEngine, ForecastEngine>();
-        services.AddScoped<GetForecastHandler>();
 
-        // ── Handlers — Budgets & Alerts ───────────────────────────────────────────
-        services.AddScoped<FlowLedger.Application.Features.Budgets.GetMonthlySpendByCategoryHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Budgets.ListBudgetsHandler>();
-        services.AddScoped<FlowLedger.Application.Features.Alerts.GetAlertsHandler>();
+        // Home Assistant and outbound integrations
         services.AddScoped<FlowLedger.Application.Features.HomeAssistant.HomeAssistantService>();
         services.AddScoped<FlowLedger.Application.Features.Integrations.IntegrationService>();
-
-        // ── FluentValidation ─────────────────────────────────────────────────────
-        services.AddValidatorsFromAssemblyContaining<CreateAccountRequestValidator>(ServiceLifetime.Scoped);
-
-        return services;
     }
 }

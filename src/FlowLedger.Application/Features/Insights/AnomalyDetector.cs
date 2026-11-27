@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Insights;
 
@@ -36,7 +37,7 @@ internal static class AnomalyDetector
         IReadOnlyList<TransactionDto> candidates,
         IReadOnlyDictionary<Guid, string> categoryPathById)
     {
-        var debits = history.Where(t => t.Direction == "Debit" && t.Amount > 0).ToList();
+        var debits = history.Where(t => t.Direction == nameof(TransactionDirection.Debit) && t.Amount > 0).ToList();
         var byMerchant = debits.Where(t => MerchantKey(t).Length > 0).ToLookup(MerchantKey);
         var byCategory = debits.Where(t => t.CategoryId is not null).ToLookup(t => t.CategoryId!.Value);
         var result = new Dictionary<Guid, List<string>>();
@@ -51,7 +52,7 @@ internal static class AnomalyDetector
             l.Add(reason);
         }
 
-        foreach (var t in candidates.Where(c => c.Direction == "Debit" && c.Amount > 0))
+        foreach (var t in candidates.Where(c => c.Direction == nameof(TransactionDirection.Debit) && c.Amount > 0))
         {
             // Money moving between accounts / into brokerage / paying a card is not spending; never anomalous.
             if (t.CategoryId is { } own && categoryPathById.TryGetValue(own, out var ownPath) && SpendingInsightsAnalyzer.IsNonSpending(ownPath))

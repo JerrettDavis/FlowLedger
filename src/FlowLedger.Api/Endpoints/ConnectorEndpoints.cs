@@ -147,7 +147,7 @@ internal static class ConnectorEndpoints
                     unassignedAccounts = unassigned,
                 });
             })
-            .AddEndpointFilter(DataEndpoints.HouseholdTenantOnlyAsync)
+            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
             .RequireRateLimiting("api")
             .WithTags("Integrations")
             .WithName("ListConnectors")

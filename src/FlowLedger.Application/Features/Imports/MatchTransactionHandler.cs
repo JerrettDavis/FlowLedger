@@ -26,16 +26,16 @@ public sealed class MatchTransactionHandler
         CancellationToken ct = default)
     {
         var tx = await _txRepo.GetByIdAsync(TransactionId.From(command.TransactionId), ct)
-                 ?? throw new InvalidOperationException($"Transaction {command.TransactionId} not found.");
+                 ?? throw new MatchFailedException($"Transaction {command.TransactionId} not found.");
 
         var flow = await _occurrenceRepo.GetOwningFlowAsync(
                        PlannedOccurrenceId.From(command.PlannedOccurrenceId), ct)
-                   ?? throw new InvalidOperationException(
+                   ?? throw new MatchFailedException(
                        $"PlannedOccurrence {command.PlannedOccurrenceId} not found.");
 
         var occurrence = flow.Occurrences.FirstOrDefault(
                              o => o.PlannedOccurrenceId == PlannedOccurrenceId.From(command.PlannedOccurrenceId))
-                         ?? throw new InvalidOperationException(
+                         ?? throw new MatchFailedException(
                              $"PlannedOccurrence {command.PlannedOccurrenceId} not found in flow.");
 
         // Manual match uses Certain confidence

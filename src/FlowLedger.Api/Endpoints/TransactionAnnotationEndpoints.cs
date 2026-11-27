@@ -22,20 +22,9 @@ internal static class TransactionAnnotationEndpoints
                     return RowVersioning.Malformed("transaction");
                 }
 
-                try
-                {
-                    await service.SetNoteAsync(id, request.Note, ct, expected);
-                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
-                    return Results.NoContent();
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
-                }
+                await service.SetNoteAsync(id, request.Note, ct, expected);
+                await RowVersioning.StampTransactionAsync(response, reader, id, ct);
+                return Results.NoContent();
             })
             .WithName("SetTransactionNote")
             .WithSummary("Set a transaction's note (blank removes it)")
@@ -49,20 +38,9 @@ internal static class TransactionAnnotationEndpoints
                     return RowVersioning.Malformed("transaction");
                 }
 
-                try
-                {
-                    await service.SetSplitsAsync(id, request.Splits ?? [], ct, expected);
-                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
-                    return Results.NoContent();
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["splits"] = [ex.Message] });
-                }
+                await service.SetSplitsAsync(id, request.Splits ?? [], ct, expected);
+                await RowVersioning.StampTransactionAsync(response, reader, id, ct);
+                return Results.NoContent();
             })
             .WithName("SetTransactionSplits")
             .WithSummary("Replace a transaction's category splits (parts must add up to the amount; empty removes the split)")

@@ -17,16 +17,7 @@ internal static class CategoryRuleEndpoints
             .WithSummary("List categorization rules");
 
         group.MapPut("/", async ([FromBody] SetRuleRequest request, CategoryRuleService service, CancellationToken ct) =>
-            {
-                try
-                {
-                    return Results.Ok(new { changed = await service.SetAsync(request.Pattern, request.CategoryPath, ct) });
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["rule"] = [ex.Message] });
-                }
-            })
+                Results.Ok(new { changed = await service.SetAsync(request.Pattern, request.CategoryPath, ct) }))
             .WithName("SetCategoryRule")
             .WithSummary("Create or replace a rule and apply it to existing transactions")
             .RequireRateLimiting("write");

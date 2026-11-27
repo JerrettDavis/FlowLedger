@@ -3,6 +3,7 @@ using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Assets;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Query;
 
@@ -189,7 +190,7 @@ public sealed class QueryDatasetProvider(
     {
         accountById.TryGetValue(t.AccountId, out var account);
         var amount = amountOverride ?? t.Amount;
-        var signed = t.Direction == "Debit" ? -amount : amount;
+        var signed = t.Direction == nameof(TransactionDirection.Debit) ? -amount : amount;
         var categoryKey = amountOverride is null ? t.CategoryId : categoryOverride;
         var category = categoryKey is { } cid && categoryById.TryGetValue(cid, out var path) ? path : "Uncategorized";
         return

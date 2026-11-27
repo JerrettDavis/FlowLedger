@@ -34,28 +34,19 @@ internal static class LocalAiEndpoints
                     : Results.ValidationProblem(new Dictionary<string, string[]> { ["id"] = [error ?? "Cannot start download."] }))
             .WithTags("Local AI").WithName("LocalAiDownloadModel")
             .WithSummary("Download a catalog model (pinned revision, SHA-256 verified). Takes a catalog id, never a URL. Household owner only: the model directory is shared by the whole installation.")
-            .AddEndpointFilter(DataEndpoints.HouseholdTenantOnlyAsync)
+            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
             .RequireRateLimiting("write");
 
         app.MapDelete("/api/local-ai/models/{id}", (string id, ILocalAiModels models) =>
                 models.Remove(id) ? Results.NoContent() : Results.NotFound())
             .WithTags("Local AI").WithName("LocalAiRemoveModel")
             .WithSummary("Delete an installed model's files (household owner only)")
-            .AddEndpointFilter(DataEndpoints.HouseholdTenantOnlyAsync)
+            .AddEndpointFilter<HouseholdTenantOnlyFilter>()
             .RequireRateLimiting("write");
 
         app.MapGet("/api/local-ai/similar/{transactionId:guid}", async (
                 Guid transactionId, int? top, LocalAiService service, CancellationToken ct) =>
-            {
-                try
-                {
-                    return Results.Ok(await service.SimilarAsync(transactionId, top ?? 10, ct));
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
-            })
+                Results.Ok(await service.SimilarAsync(transactionId, top ?? 10, ct)))
             .WithTags("Local AI").WithName("LocalAiSimilarTransactions")
             .WithSummary("Transactions whose merchant text is most similar to this one")
             .RequireRateLimiting("write");
