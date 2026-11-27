@@ -25,9 +25,9 @@
       },
       "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
         "type": "Direct",
-        "requested": "[5.3.0, )",
-        "resolved": "5.3.0",
-        "contentHash": "XqW8tfdT1iJ9Xp3N5m2Gl7p7NznDBVxVCf93Wtr9+/QY4yHCOpkYLTTWT/5tzhqFmyDG6eph95zQm0w59mCG6w=="
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "Kcobt3pnOdO0A+6CKiMHZdTEluJpsfxiV20axtZdmfBQnDmiWTKPJADlgAfdTuKNAnVarrkJa0UEGwuOo91muw=="
       },
       "Microsoft.Extensions.Http.Resilience": {
         "type": "Direct",
@@ -41,9 +41,9 @@
       },
       "PatternKit.Core": {
         "type": "Direct",
-        "requested": "[0.147.37, )",
-        "resolved": "0.147.37",
-        "contentHash": "nc1Mw0H+3h2eCLb9ypxF912mMrr3s2aA0/V85DUm2VpeQ4EX5OerYVRKvKYaBjVjWngzysMT/2ZBmhdfS2Gxsw=="
+        "requested": "[0.147.39, )",
+        "resolved": "0.147.39",
+        "contentHash": "IdEt1Z17jgjO45l7JlBt6SLx9N15DEoPeEFB4VgTpFI9sSniiih9qCQFKOtO7TjpoZN4iOD7f8VdJKHc+V0NaA=="
       },
       "Microsoft.Extensions.AmbientMetadata.Application": {
         "type": "Transitive",
