@@ -20,6 +20,7 @@ the first tag is cut; until then everything is "Unreleased".
 - Durable `job_runs` history (shown in `/api/data/status`) and bounded retry with jitter for failed backup/valuation/Home Assistant jobs.
 
 ### Changed
+- Multi-user secure defaults when OIDC is on (#135, #145, #159), each with a legacy opt-out documented in `docs/self-hosting/upgrading.md`: signed tenant assertion required (`API__TENANTSIGNINGKEY`), household tenant id must not be the well-known constant, sign-up defaults to InviteOnly (`AUTH__SIGNUP__MODE`, `AUTH__SIGNUP__LEGACYOPEN`), absolute session cap `AUTH__SESSION__ABSOLUTEMAXDAYS` (30), and a `__Host-` session cookie (signs everyone out once).
 - GitHub Actions are pinned by commit SHA; Dependabot auto-merge skips major updates.
 - Compose smoke test also runs on pull requests; tagged builds gate on fixable CRITICAL vulnerabilities.
 
