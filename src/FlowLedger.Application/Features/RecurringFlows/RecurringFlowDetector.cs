@@ -424,7 +424,7 @@ internal static class RecurringFlowDetector
             Key: $"{accountId:N}|{(isCredit ? "C" : "D")}|{key}",
             AccountId: accountId,
             Name: label,
-            Direction: isCredit ? "Credit" : "Debit",
+            Direction: isCredit ? nameof(FlowLedger.Domain.Aggregates.TransactionDirection.Credit) : nameof(FlowLedger.Domain.Aggregates.TransactionDirection.Debit),
             Amount: MoneyRounding.Round(amount, 2),
             AmountModel: isFixed ? "Fixed" : "Estimated",
             Frequency: frequency,
