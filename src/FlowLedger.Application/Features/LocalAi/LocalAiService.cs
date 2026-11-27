@@ -40,7 +40,7 @@ public sealed class LocalAiService(
     /// <summary>The transactions whose descriptor is most similar to the given one (merchant-name similarity, not amount).</summary>
     public async Task<IReadOnlyList<SimilarTransactionDto>> SimilarAsync(Guid transactionId, int top, CancellationToken ct = default)
     {
-        var target = await store.FindTrackedAsync(transactionId, ct) ?? throw new KeyNotFoundException("Transaction not found.");
+        var target = await store.FindTrackedAsync(transactionId, ct) ?? throw new NotFoundException("Transaction not found.");
         top = Math.Clamp(top, 1, 50);
         var all = (await store.LoadTrackedAsync(Max, ct)).Where(IsReal).Where(t => t.Id != target.Id).ToList();
         var paths = (await categories.ListAsync(ct)).ToDictionary(c => c.Id, c => c.Path.Value);

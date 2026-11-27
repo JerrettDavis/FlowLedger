@@ -171,7 +171,7 @@ public sealed class DeleteCategoryHandler
 
         if (cat.IsSystem)
         {
-            throw new InvalidOperationException("System categories cannot be deleted.");
+            throw new ConflictException("System categories cannot be deleted.");
         }
 
         await _repo.RemoveAsync(cat, ct);

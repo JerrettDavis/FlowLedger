@@ -26,7 +26,7 @@ public sealed class UnmatchTransactionHandler
         CancellationToken ct = default)
     {
         var tx = await _txRepo.GetByIdAsync(TransactionId.From(command.TransactionId), ct)
-                 ?? throw new InvalidOperationException($"Transaction {command.TransactionId} not found.");
+                 ?? throw new UnmatchFailedException($"Transaction {command.TransactionId} not found.");
 
         var previousOccId = tx.Unmatch();
 
