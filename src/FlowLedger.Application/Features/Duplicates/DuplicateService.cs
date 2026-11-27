@@ -25,7 +25,7 @@ public interface IDuplicateStore
 
 public sealed record MergeLogEntry(Guid DuplicateId, Guid SurvivorId, DateTimeOffset MergedUtc, bool Auto, string Reason, string SnapshotJson);
 
-public sealed record DuplicateScanResult(int Total, int AutoMergeable, IReadOnlyList<DuplicateSuggestionDto> Suggestions);
+public sealed record DuplicateScanResult(int Total, int AutoMergeable, IReadOnlyList<DuplicateSuggestionDto> Suggestions, bool Partial = false);
 
 public sealed record AutoMergeResult(int Merged, int Suggested);
 
@@ -46,9 +46,9 @@ public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions opt
 
     public async Task<DuplicateScanResult> ScanAsync(CancellationToken ct = default)
     {
-        var pairs = await FindAsync(ct);
+        var (pairs, partial) = await FindWithWindowAsync(ct);
         var dtos = pairs.Select(ToDto).ToList();
-        return new DuplicateScanResult(dtos.Count, dtos.Count(d => d.Confidence == nameof(DuplicateConfidence.High)), dtos);
+        return new DuplicateScanResult(dtos.Count, dtos.Count(d => d.Confidence == nameof(DuplicateConfidence.High)), dtos, partial);
     }
 
     /// <summary>Merges every High pair (when enabled). Safe to call after any ingest; a no-op on a clean ledger.</summary>
@@ -116,11 +116,14 @@ public sealed class DuplicateService(IDuplicateStore store, DuplicateOptions opt
     public Task<IReadOnlyList<MergeLogEntry>> RecentMergesAsync(int take = 50, CancellationToken ct = default)
         => store.RecentMergesAsync(Math.Clamp(take, 1, 500), ct);
 
-    private async Task<IReadOnlyList<DuplicatePair>> FindAsync(CancellationToken ct)
+    private async Task<IReadOnlyList<DuplicatePair>> FindAsync(CancellationToken ct) => (await FindWithWindowAsync(ct)).Pairs;
+
+    private async Task<(IReadOnlyList<DuplicatePair> Pairs, bool Partial)> FindWithWindowAsync(CancellationToken ct)
     {
         var dismissed = await store.DismissedKeysAsync(ct);
         var rows = await store.LoadTrackedAsync(Max, ct);
-        return DuplicateDetector.Find(rows).Where(p => !dismissed.Contains(p.Key)).ToList();
+        var pairs = DuplicateDetector.Find(rows).Where(p => !dismissed.Contains(p.Key)).ToList();
+        return (pairs, TransactionQuota.IsPartial(rows.Count));
     }
 
     private async Task MergePairAsync(DuplicatePair p, bool auto, CancellationToken ct)

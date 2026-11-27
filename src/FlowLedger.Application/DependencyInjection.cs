@@ -31,6 +31,7 @@ public static class DependencyInjection
         // ── Handlers — Transactions ──────────────────────────────────────────────
         services.AddScoped<ListTransactionsHandler>();
         services.AddScoped<GetTransactionHandler>();
+        services.AddScoped<GetProcessingWindowHandler>();
         services.AddScoped<FlowLedger.Application.Abstractions.IReferenceValidator, FlowLedger.Application.Abstractions.ReferenceValidator>();
         services.AddScoped<CreateTransactionHandler>();
         services.TryAddSingleton<FlowLedger.Application.Features.Categories.CategorizationOptions>();
