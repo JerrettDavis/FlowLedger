@@ -334,11 +334,11 @@ public sealed class CategorizationService(
     public async Task<int> SetCategoryAsync(Guid transactionId, Guid categoryId, bool applyToMerchant, CancellationToken ct = default, uint? expectedVersion = null)
     {
         var target = await store.FindTrackedAsync(transactionId, ct)
-            ?? throw new KeyNotFoundException("Transaction not found.");
+            ?? throw new NotFoundException("Transaction not found.");
         guard?.Expect(target, expectedVersion);
         // The id comes from the request body: it must be one of THIS tenant's categories (the repository is tenant-scoped).
         var category = (await categories.ListAsync(ct)).FirstOrDefault(c => c.Id == categoryId)
-            ?? throw new KeyNotFoundException("Category not found.");
+            ?? throw new NotFoundException("Category not found.");
         var id = category.CategoryId;
         target.Categorize(id);
         var changed = 1;

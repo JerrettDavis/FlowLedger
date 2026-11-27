@@ -1,3 +1,4 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
@@ -108,7 +109,7 @@ public sealed class CategoryRestructureServiceTests
         var sys = await AddAsync("Transfer", system: true);
         var mine = await AddAsync("Misc");
 
-        await FluentActions.Awaiting(() => Service().PlanAsync("Transfer", "Other")).Should().ThrowAsync<InvalidOperationException>();
+        await FluentActions.Awaiting(() => Service().PlanAsync("Transfer", "Other")).Should().ThrowAsync<RequestValidationException>();
 
         var plan = await Service().PlanAsync("Misc", "Transfer");
         plan.Merges.Should().ContainSingle(m => m.TargetId == sys.Id);

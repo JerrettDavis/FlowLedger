@@ -3,6 +3,7 @@ using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Accounts;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
+using FlowLedger.Domain.Aggregates;
 
 namespace FlowLedger.Application.Features.Insights;
 
@@ -64,7 +65,7 @@ internal static class SpendingInsightsAnalyzer
             all = all.Where(t => !excludedAccountIds.Contains(t.AccountId)).ToList();
         }
 
-        var wantDirection = q.Income ? "Credit" : "Debit";
+        var wantDirection = q.Income ? nameof(TransactionDirection.Credit) : nameof(TransactionDirection.Debit);
         var span = q.To.DayNumber - q.From.DayNumber + 1;
         var prevFrom = q.From.AddDays(-span);
         var prevTo = q.From.AddDays(-1);

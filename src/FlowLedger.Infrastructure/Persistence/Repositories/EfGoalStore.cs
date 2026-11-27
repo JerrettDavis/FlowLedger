@@ -46,7 +46,7 @@ internal sealed class EfGoalStore(FlowLedgerDbContext db, ITenantContext tenant)
 
             if (await db.Goals.CountAsync(ct) >= MaxGoals)
             {
-                throw new InvalidOperationException($"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
+                throw new RequestValidationException("goal", $"You can have at most {MaxGoals} savings goals. Remove one before adding another.");
             }
 
             existing = GoalRecord.Create(tenantId, goalId, name, target, saved, targetDate);

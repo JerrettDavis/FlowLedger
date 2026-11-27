@@ -1,4 +1,5 @@
 using FlowLedger.Api.Errors;
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -37,6 +38,25 @@ public sealed class DomainExceptionMappingTests
         var (handled, status, _) = await RunAsync(new NegativeOrZeroAmountException("test"));
         handled.Should().BeTrue();
         status.Should().Be(400);
+    }
+
+    [Fact]
+    public async Task Typed_application_exceptions_map_to_their_statuses()
+    {
+        var (_, notFound, _) = await RunAsync(new NotFoundException("Transaction not found."));
+        notFound.Should().Be(404);
+
+        var (_, invalid, invalidBody) = await RunAsync(new RequestValidationException("note", "Too long."));
+        invalid.Should().Be(400);
+        invalidBody.Should().Contain("\"note\"").And.Contain("Too long.");
+
+        var (_, conflict, conflictBody) = await RunAsync(new ConflictException("Already sealed.", "Cannot seal"));
+        conflict.Should().Be(409);
+        conflictBody.Should().Contain("Cannot seal");
+
+        var (_, unprocessable, unprocessableBody) = await RunAsync(new UnprocessableRequestException("Bad file.", "Import failed"));
+        unprocessable.Should().Be(422);
+        unprocessableBody.Should().Contain("Import failed");
     }
 
     [Fact]

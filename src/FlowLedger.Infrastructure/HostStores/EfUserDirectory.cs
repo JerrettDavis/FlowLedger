@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using FlowLedger.Application.Features.Users;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using FlowLedger.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>
 /// Login (identity) directory through EF (#154). Unique on (issuer, subject), so one login always lands in the same tenant. Several

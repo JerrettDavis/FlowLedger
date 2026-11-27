@@ -1,3 +1,4 @@
+using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Categories;
 
 namespace FlowLedger.Application.Features.Transactions;
@@ -37,18 +38,18 @@ public sealed class MerchantAliasService(IMerchantAliasStore store, ICategorizat
         var name = alias?.Trim() ?? string.Empty;
         if (key.Length == 0 || name.Length == 0)
         {
-            throw new ArgumentException("Both the text to match and the alias are required.");
+            throw new RequestValidationException("alias", "Both the text to match and the alias are required.");
         }
 
         if (key.Length > MaxLength || name.Length > MaxLength)
         {
-            throw new ArgumentException($"Pattern and alias must be {MaxLength} characters or fewer.");
+            throw new RequestValidationException("alias", $"Pattern and alias must be {MaxLength} characters or fewer.");
         }
 
         var existing = await store.ListAsync(ct);
         if (existing.Count >= MaxAliases && !existing.Any(a => string.Equals(a.Pattern, key, StringComparison.Ordinal)))
         {
-            throw new ArgumentException($"You can have at most {MaxAliases} merchant aliases. Remove one before adding another.");
+            throw new RequestValidationException("alias", $"You can have at most {MaxAliases} merchant aliases. Remove one before adding another.");
         }
 
         await store.SetAsync(key, name, ct);

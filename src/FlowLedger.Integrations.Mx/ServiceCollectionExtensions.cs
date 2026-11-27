@@ -22,7 +22,7 @@ public static class ServiceCollectionExtensions
     /// MX vendor Accept header, standard resilience handler), the webhook verifier, the manual
     /// refresh cooldown, options, and <see cref="IFinancialDataProvider"/> → <see cref="MxFinancialDataProvider"/>.
     ///
-    /// Credentials are read from the <c>Mx</c> section (<see cref="FinancialProviderOptions"/>);
+    /// Credentials are read from the <c>Mx</c> section (<see cref="MxCredentialsOptions"/>);
     /// MX-specific tunables from <c>Mx:Provider</c> (<see cref="MxProviderOptions"/>).
     /// </summary>
     public static IServiceCollection AddMxProvider(
@@ -45,10 +45,10 @@ public static class ServiceCollectionExtensions
         // ── Options ──────────────────────────────────────────────────────────────
         // Credentials (Mx:) — AddOptions + fast-fail validator are idempotent if already added
         // by Infrastructure; re-registering is harmless and keeps this extension self-contained.
-        services.AddOptions<FinancialProviderOptions>()
-            .BindConfiguration(FinancialProviderOptions.SectionName)
+        services.AddOptions<MxCredentialsOptions>()
+            .BindConfiguration(MxCredentialsOptions.SectionName)
             .ValidateOnStart();
-        services.AddSingleton<IValidateOptions<FinancialProviderOptions>, FinancialProviderOptionsValidator>();
+        services.AddSingleton<IValidateOptions<MxCredentialsOptions>, MxCredentialsOptionsValidator>();
 
         services.Configure<MxProviderOptions>(configuration.GetSection(MxProviderOptions.SectionName));
 
@@ -63,7 +63,7 @@ public static class ServiceCollectionExtensions
         // ── Webhook verifier (keyed by Mx:WebhookSecret) ───────────────────────────
         services.AddSingleton(sp =>
         {
-            var opts = sp.GetRequiredService<IOptions<FinancialProviderOptions>>().Value;
+            var opts = sp.GetRequiredService<IOptions<MxCredentialsOptions>>().Value;
             var secret = opts.WebhookSecret
                 ?? throw new InvalidOperationException(
                     "Mx:WebhookSecret is required when the MX provider is enabled.");
@@ -71,9 +71,9 @@ public static class ServiceCollectionExtensions
         });
 
         // ── Typed HTTP client + resilience ─────────────────────────────────────────
-        var mxHttp = services.AddHttpClient<MxApiClient>((sp, http) =>
+        var mxHttp = services.AddConnectorHttpClient<MxApiClient>((sp, http) =>
         {
-            var opts = sp.GetRequiredService<IOptions<FinancialProviderOptions>>().Value;
+            var opts = sp.GetRequiredService<IOptions<MxCredentialsOptions>>().Value;
 
             var baseUrl = opts.BaseUrl
                 ?? throw new InvalidOperationException(
@@ -97,7 +97,6 @@ public static class ServiceCollectionExtensions
                 ? new SocketsHttpHandler()
                 : (HttpMessageHandler)new MxArchiveReplayHandler(replay, sp.GetService<IRawPayloadDecryptor>());
         });
-        mxHttp.AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
 
         // Innermost: ledger + budget + kill switch. Skipped when replaying the archive (no network = no cost).
         mxHttp.AddHttpMessageHandler(sp =>
@@ -122,7 +121,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<MxApiClient>(),
             sp.GetRequiredService<MxWebhookVerifier>(),
             sp.GetRequiredService<IOptions<MxProviderOptions>>(),
-            sp.GetRequiredService<ILogger<MxFinancialDataProvider>>()));
+            sp.GetRequiredService<ILogger<MxFinancialDataProvider>>(),
+            MxWebhookEvents.FromConfiguration(sp.GetRequiredService<IConfiguration>())));
         services.AddKeyedScoped<IFinancialDataProvider>("MX", (sp, _) => sp.GetRequiredService<MxFinancialDataProvider>());
         if (registerAsDefault)
         {

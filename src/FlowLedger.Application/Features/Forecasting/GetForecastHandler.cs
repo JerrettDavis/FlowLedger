@@ -193,7 +193,7 @@ public sealed class GetForecastHandler
             }
 
             var unscheduled = dtos
-                .Where(t => t.Direction == "Debit" && FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) && !transfers.Contains(t.Id) && !Scheduled(t))
+                .Where(t => t.Direction == nameof(TransactionDirection.Debit) && FlowLedger.Domain.Aggregates.TransactionStatusExtensions.IsRealStatus(t.Status) && !transfers.Contains(t.Id) && !Scheduled(t))
                 .Select(t => (t.PostedDate ?? t.EffectiveDate, t.Amount));
             var profile = ForecastBands.BuildProfile(unscheduled, query.AsOf);
             result.SpendingProfile = profile;

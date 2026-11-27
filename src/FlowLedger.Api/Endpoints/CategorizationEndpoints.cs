@@ -22,20 +22,9 @@ internal static class CategorizationEndpoints
                     return RowVersioning.Malformed("transaction");
                 }
 
-                try
-                {
-                    var recategorized = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct, request.Note, expected);
-                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
-                    return Results.Ok(new { changed = recategorized });
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = [ex.Message] });
-                }
+                var recategorized = await service.RecategorizeAsync(id, request.CategoryId, request.ApplyToAll, ct, request.Note, expected);
+                await RowVersioning.StampTransactionAsync(response, reader, id, ct);
+                return Results.Ok(new { changed = recategorized });
             })
             .WithTags("Transactions").WithName("RecategorizeTransaction")
             .WithSummary("Set a transaction's category by hand; optionally re-label every matching merchant and remember a rule for future syncs")
@@ -68,16 +57,9 @@ internal static class CategorizationEndpoints
                     return RowVersioning.Malformed("transaction");
                 }
 
-                try
-                {
-                    var changed = await service.SetCategoryAsync(id, request.CategoryId, request.ApplyToMerchant, ct, expected);
-                    await RowVersioning.StampTransactionAsync(response, reader, id, ct);
-                    return Results.Ok(new { changed });
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
+                var changed = await service.SetCategoryAsync(id, request.CategoryId, request.ApplyToMerchant, ct, expected);
+                await RowVersioning.StampTransactionAsync(response, reader, id, ct);
+                return Results.Ok(new { changed });
             })
             .WithTags("Transactions").WithName("SetTransactionCategory")
             .WithSummary("Set a transaction's category (manual); optionally apply to all uncategorized transactions of the same merchant")

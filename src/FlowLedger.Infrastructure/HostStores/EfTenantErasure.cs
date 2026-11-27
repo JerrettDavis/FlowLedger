@@ -1,9 +1,10 @@
 using FlowLedger.Application.Features.Users;
+using FlowLedger.Infrastructure.DataSafety;
 using FlowLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace FlowLedger.Infrastructure.DataSafety;
+namespace FlowLedger.Infrastructure.HostStores;
 
 /// <summary>
 /// Per-tenant erasure (#169, #189). Deletes the tenant's rows from every EF-mapped tenant table (children first, from

@@ -45,22 +45,22 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
         var target = NormalizePath(newPath);
         if (target.Length == 0)
         {
-            throw new ArgumentException("A new name or location is required.");
+            throw new RequestValidationException("category", "A new name or location is required.");
         }
 
         if (target.Length > MaxPathLength)
         {
-            throw new ArgumentException($"Category paths must be {MaxPathLength} characters or fewer.");
+            throw new RequestValidationException("category", $"Category paths must be {MaxPathLength} characters or fewer.");
         }
 
         if (oldPath == target)
         {
-            throw new ArgumentException("That is already this category's path.");
+            throw new RequestValidationException("category", "That is already this category's path.");
         }
 
         if (target.StartsWith(oldPath + "/", StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("A category can't be moved inside itself.");
+            throw new RequestValidationException("category", "A category can't be moved inside itself.");
         }
 
         bool InSubtree(string p) =>
@@ -69,12 +69,12 @@ public sealed class CategoryRestructureService(ICategoryRepository categories, I
         var subtree = all.Where(c => InSubtree(c.Path.Value)).OrderBy(c => c.Path.Value.Count(ch => ch == '/')).ToList();
         if (subtree.Count == 0)
         {
-            throw new KeyNotFoundException("Category not found.");
+            throw new NotFoundException("Category not found.");
         }
 
         if (subtree.Any(c => c.IsSystem))
         {
-            throw new InvalidOperationException("System categories (or categories containing them) can't be moved or renamed.");
+            throw new RequestValidationException("category", "System categories (or categories containing them) can't be moved or renamed.");
         }
 
         // path -> id for every category that is NOT being moved; grows as subtree nodes are placed

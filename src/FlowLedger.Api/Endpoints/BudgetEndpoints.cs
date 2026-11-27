@@ -34,16 +34,9 @@ internal static class BudgetEndpoints
                 return Results.ValidationProblem(validation.ToDictionary());
             }
 
-            try
-            {
-                var version = await store.SetAsync(tenant.TenantId, request.Category.Trim(), request.MonthlyLimit, expected, ct);
-                response.Headers.ETag = $"\"{version}\"";
-                return Results.NoContent();
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["budget"] = [ex.Message] });
-            }
+            var version = await store.SetAsync(tenant.TenantId, request.Category.Trim(), request.MonthlyLimit, expected, ct);
+            response.Headers.ETag = $"\"{version}\"";
+            return Results.NoContent();
         })
         .WithName("SetBudget")
         .WithSummary("Create or update a monthly budget for a category")
