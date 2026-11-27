@@ -89,6 +89,7 @@ builder.Services.AddDataEnvironmentGuard();
 
 // ── ProblemDetails (TenantResolutionException → 401; any ProviderException → ProviderExceptionHandler, ADR 0018) ──
 builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ConcurrencyExceptionHandler>();
+builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.QuotaExceptionHandler>();
 builder.Services.AddExceptionHandler<FlowLedger.Api.Errors.ProviderExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
 {

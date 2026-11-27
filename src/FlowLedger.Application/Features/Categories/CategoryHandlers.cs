@@ -94,6 +94,7 @@ public sealed class CreateCategoryHandler
 
     public async Task<CategoryDto> HandleAsync(CreateCategoryRequest request, CancellationToken ct = default)
     {
+        FlowLedger.Application.Abstractions.TenantLimits.EnsureRoom((await _repo.ListAsync(ct)).Count, 1, FlowLedger.Application.Abstractions.TenantLimits.MaxCategories, "categories");
         var path = new CategoryPath(request.Path);
         CategoryId? parentId = request.ParentId.HasValue
             ? CategoryId.From(request.ParentId.Value)

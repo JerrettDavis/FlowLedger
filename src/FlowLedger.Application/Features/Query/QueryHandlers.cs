@@ -5,6 +5,9 @@ namespace FlowLedger.Application.Features.Query;
 
 public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportRequest>
 {
+    /// <summary>Cap on the serialized panel JSON of one saved item (#166), so one row cannot be made arbitrarily large.</summary>
+    public const int MaxPayloadChars = 65_536;
+
     public SaveReportRequestValidator()
     {
         RuleFor(r => r.Name).NotEmpty().MaximumLength(100);
@@ -12,6 +15,8 @@ public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportReq
         RuleFor(r => r.Kind).Must(k => k is "View" or "Report").WithMessage("Kind must be View or Report.");
         RuleFor(r => r.Panels).NotNull().Must(p => p is { Count: >= 1 and <= 12 })
             .WithMessage("A saved item needs 1–12 panels.");
+        RuleFor(r => r.Panels).Must(p => p is null || System.Text.Json.JsonSerializer.Serialize(p).Length <= MaxPayloadChars)
+            .WithMessage($"A saved item may not exceed {MaxPayloadChars:N0} characters of panel definitions.");
         RuleFor(r => r).Must(r => r.Kind != "View" || r.Panels?.Count == 1)
             .WithMessage("A view holds exactly one panel; save several as a report.");
         RuleForEach(r => r.Panels).ChildRules(p =>
@@ -69,8 +74,11 @@ public sealed class GetReportHandler(ISavedReportStore store)
 
 public sealed class SaveReportHandler(ISavedReportStore store)
 {
-    public Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
-        => store.CreateAsync(request, ct);
+    public async Task<SavedReportDto> CreateAsync(SaveReportRequest request, CancellationToken ct = default)
+    {
+        TenantLimits.EnsureRoom((await store.ListAsync(ct)).Count, 1, TenantLimits.MaxSavedReports, "saved views and reports");
+        return await store.CreateAsync(request, ct);
+    }
 
     public Task<SavedReportDto?> UpdateAsync(Guid id, SaveReportRequest request, CancellationToken ct = default)
         => store.UpdateAsync(id, request, ct);

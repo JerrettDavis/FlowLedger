@@ -67,6 +67,7 @@ public sealed class CreateRecurringFlowHandler
 
     public async Task<RecurringFlowDto> HandleAsync(CreateRecurringFlowRequest request, CancellationToken ct = default)
     {
+        FlowLedger.Application.Abstractions.TenantLimits.EnsureRoom((await _repo.ListAsync(ct)).Count, 1, FlowLedger.Application.Abstractions.TenantLimits.MaxRecurringFlows, "recurring flows");
         await _references.EnsureAccountAsync(request.AccountId, ct);
         await _references.EnsureCategoryAsync(request.CategoryId, ct);
         var direction = Enum.Parse<TransactionDirection>(request.Direction, ignoreCase: true);
