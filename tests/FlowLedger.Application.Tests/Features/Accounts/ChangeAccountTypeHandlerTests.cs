@@ -52,7 +52,7 @@ public sealed class ChangeAccountTypeHandlerTests
     [Fact]
     public async Task Unknown_account_returns_null()
     {
-        var result = await Handler().HandleAsync(Guid.NewGuid(), new ChangeAccountTypeRequest("CreditCard"));
+        var result = await Handler().HandleAsync(Guid.NewGuid(), ChangeAccountTypeRequestBuilder.A().To("CreditCard").Build());
 
         result.Should().BeNull();
     }
@@ -62,7 +62,7 @@ public sealed class ChangeAccountTypeHandlerTests
     {
         var card = await AddAccountAsync("J. DAVIS", AccountType.Checking, -45.60m);
 
-        var dto = await Handler().HandleAsync(card.Id, new ChangeAccountTypeRequest("creditcard"));
+        var dto = await Handler().HandleAsync(card.Id, ChangeAccountTypeRequestBuilder.A().To("creditcard").Build());
 
         dto!.AccountType.Should().Be("CreditCard");
         dto.TypeLockedByUser.Should().BeTrue();
@@ -85,7 +85,7 @@ public sealed class ChangeAccountTypeHandlerTests
         await _categories.AddAsync(mine);
         manual.Categorize(mine.CategoryId);
 
-        await Handler().HandleAsync(card.Id, new ChangeAccountTypeRequest("CreditCard"));
+        await Handler().HandleAsync(card.Id, ChangeAccountTypeRequestBuilder.A().To("CreditCard").Build());
 
         var transfer = _categories.All.Single(c => c.Path.Value == "Transfer");
         fromChecking.CategoryId.Should().Be(transfer.CategoryId);
@@ -105,7 +105,7 @@ public sealed class ChangeAccountTypeHandlerTests
         var transfer = _categories.All.Single(c => c.Path.Value == "Transfer");
         a.CategoryId.Should().Be(transfer.CategoryId);
 
-        await handler.HandleAsync(card.Id, new ChangeAccountTypeRequest("Savings"));
+        await handler.HandleAsync(card.Id, ChangeAccountTypeRequestBuilder.A().To("Savings").Build());
 
         a.CategoryId.Should().NotBe(transfer.CategoryId);
         b.CategoryId.Should().NotBe(transfer.CategoryId);
@@ -116,7 +116,7 @@ public sealed class ChangeAccountTypeHandlerTests
     {
         var card = await AddAccountAsync("Card", AccountType.CreditCard, -10m);
 
-        var act = () => Handler().HandleAsync(card.Id, new ChangeAccountTypeRequest("Checking"));
+        var act = () => Handler().HandleAsync(card.Id, ChangeAccountTypeRequestBuilder.A().To("Checking").Build());
 
         await act.Should().ThrowAsync<FlowLedger.Domain.Exceptions.InvalidBalanceException>();
     }

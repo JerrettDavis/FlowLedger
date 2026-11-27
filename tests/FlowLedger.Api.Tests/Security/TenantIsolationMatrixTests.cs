@@ -94,28 +94,28 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
             : throw new InvalidOperationException($"No id in response from {url}: {text}");
     }
 
-    internal static async Task<Seeded> SeedTenantAAsync(HttpClient a)
+    internal static async Task<Seeded> SeedTenantAAsync(HttpClient a, string secret = Secret)
     {
-        var account = await CreateAsync(a, "/api/accounts", CreateAccountRequestBuilder.A().Named($"{Secret} Checking").OfType("Checking").StartingAt(1234m).Build());
+        var account = await CreateAsync(a, "/api/accounts", CreateAccountRequestBuilder.A().Named($"{secret} Checking").OfType("Checking").StartingAt(1234m).Build());
         var transaction = await CreateAsync(a, "/api/transactions",
-            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{Secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
-        var category = await CreateAsync(a, "/api/categories", CreateCategoryRequestBuilder.A().AtPath("zz-a-secret").Named($"{Secret} Category").Build());
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
+        var category = await CreateAsync(a, "/api/categories", CreateCategoryRequestBuilder.A().AtPath(secret.ToLowerInvariant()).Named($"{secret} Category").Build());
         var flow = await CreateAsync(a, "/api/recurring-flows",
-            CreateRecurringFlowRequestBuilder.A().OnAccount(account).Named($"{Secret} Rent").WithCounterparty($"{Secret} Landlord").Build());
+            CreateRecurringFlowRequestBuilder.A().OnAccount(account).Named($"{secret} Rent").WithCounterparty($"{secret} Landlord").Build());
         var asset = await CreateAsync(a, "/api/assets",
-            CreateAssetRequestBuilder.A().Named($"{Secret} Laptop").Build());
+            CreateAssetRequestBuilder.A().Named($"{secret} Laptop").Build());
         var bill = await CreateAsync(a, "/api/sheet/bills",
-            SaveBillRequestBuilder.A().InSection(Secret).Named($"{Secret} Bill").DueOn(4).Build());
+            SaveBillRequestBuilder.A().InSection(secret).Named($"{secret} Bill").DueOn(4).Build());
         var report = await CreateAsync(a, "/api/reports",
-            SaveReportRequestBuilder.A().Named($"{Secret} Report").Described("d")
+            SaveReportRequestBuilder.A().Named($"{secret} Report").Described("d")
                 .WithPanels(new ReportPanel("p", "transactions | summarize t = sum(amount) by merchant", new VizSpec("column", "merchant", ["t"]))).Build());
-        var goal = await CreateAsync(a, "/api/goals", new { name = $"{Secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
+        var goal = await CreateAsync(a, "/api/goals", new { name = $"{secret} Goal", targetAmount = 1000m, savedAmount = 10m, targetDate = (string?)null }, HttpMethod.Put);
 
         var transaction2 = await CreateAsync(a, "/api/transactions",
-            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{Secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
+            CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(50m).WithDirection("Debit").Described($"{secret} Coffee").On(new DateOnly(2026, 1, 15)).Build());
         var integrationResponse = await a.PostAsJsonAsync("/api/integrations", new
         {
-            name = $"{Secret} Hook",
+            name = $"{secret} Hook",
             kind = "Rest",
             enabled = true,
             url = "https://nonexistent.invalid/v1",
@@ -130,9 +130,9 @@ public sealed class TenantIsolationMatrixTests(FlowLedgerApiFactory factory) : I
         integrationResponse.IsSuccessStatusCode.Should().BeTrue("seeding the integration failed");
         var integration = JsonDocument.Parse(await integrationResponse.Content.ReadAsStringAsync()).RootElement.GetProperty("integration").GetProperty("id").GetGuid();
 
-        (await a.PutAsJsonAsync("/api/budgets", new { category = $"{Secret}-budget", monthlyLimit = 111m })).IsSuccessStatusCode.Should().BeTrue();
-        (await a.PutAsJsonAsync("/api/category-rules", new { pattern = $"{Secret}-rule", categoryPath = "zz-a-secret" })).IsSuccessStatusCode.Should().BeTrue();
-        (await a.PutAsJsonAsync("/api/merchant-aliases", new { pattern = $"{Secret}-alias", alias = $"{Secret} Alias" })).IsSuccessStatusCode.Should().BeTrue();
+        (await a.PutAsJsonAsync("/api/budgets", new { category = $"{secret}-budget", monthlyLimit = 111m })).IsSuccessStatusCode.Should().BeTrue();
+        (await a.PutAsJsonAsync("/api/category-rules", new { pattern = $"{secret}-rule", categoryPath = secret.ToLowerInvariant() })).IsSuccessStatusCode.Should().BeTrue();
+        (await a.PutAsJsonAsync("/api/merchant-aliases", new { pattern = $"{secret}-alias", alias = $"{secret} Alias" })).IsSuccessStatusCode.Should().BeTrue();
 
         return new Seeded(account, transaction, category, flow, asset, bill, report, goal, transaction2, integration);
     }

@@ -4,14 +4,20 @@
     </TitleContent>
     <DialogContent>
         <MudForm @ref="_form" aria-label="Sheet row form">
-            <MudTextField @bind-Value="_name" Label="Name" Required="true" RequiredError="Name is required" Class="mb-2" />
+            @if (_feedback.Summary is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" role="alert">@_feedback.Summary</MudAlert>
+            }
+            <MudTextField @bind-Value="_name" @bind-Value:after="_feedback.Clear" Label="Name" Required="true" RequiredError="Name is required" Class="mb-2"
+                          aria-label="Row name" Error="@_feedback.Has("name")" ErrorText="@_feedback.For("name")" />
             <MudGrid Spacing="2">
-                <MudItem xs="6"><MudSelect T="string" @bind-Value="_section" Label="Section" Required="true">
+                <MudItem xs="6"><MudSelect T="string" @bind-Value="_section" @bind-Value:after="_feedback.Clear" Label="Section" Required="true" aria-label="Section"
+                                            Error="@_feedback.Has("section")" ErrorText="@_feedback.For("section")">
                     @foreach (var s in Sections) { <MudSelectItem Value="@s">@s</MudSelectItem> }
                 </MudSelect></MudItem>
                 <MudItem xs="6"><MudTextField @bind-Value="_payer" Label="Payer" /></MudItem>
-                <MudItem xs="12"><MudSelect T="string" @bind-Value="_frequency" Label="Repeats"
-                                            HelperText="@FrequencyHelp">
+                <MudItem xs="12"><MudSelect T="string" @bind-Value="_frequency" @bind-Value:after="_feedback.Clear" Label="Repeats" aria-label="Repeats"
+                                            HelperText="@FrequencyHelp" Error="@_feedback.Has("frequency")" ErrorText="@_feedback.For("frequency")">
                     <MudSelectItem Value="@("Monthly")">Once a month</MudSelectItem>
                     <MudSelectItem Value="@("TwiceMonthly")">Twice a month</MudSelectItem>
                     <MudSelectItem Value="@("Weekly")">Every week</MudSelectItem>
@@ -19,22 +25,30 @@
                 </MudSelect></MudItem>
                 @if (_frequency is "Weekly" or "EveryNWeeks")
                 {
-                    <MudItem xs="@(_frequency == "EveryNWeeks" ? 6 : 12)"><MudDatePicker @bind-Date="_anchor" Label="A date one payment falls on" Required="true" /></MudItem>
+                    <MudItem xs="@(_frequency == "EveryNWeeks" ? 6 : 12)"><MudDatePicker @bind-Date="_anchor" @bind-Date:after="_feedback.Clear" Label="A date one payment falls on" Required="true"
+                                                                                  Error="@_feedback.Has("anchorDate")" ErrorText="@_feedback.For("anchorDate")" /></MudItem>
                     @if (_frequency == "EveryNWeeks")
                     {
-                        <MudItem xs="6"><MudNumericField @bind-Value="_interval" Label="Every how many weeks" Min="2" Max="52" /></MudItem>
+                        <MudItem xs="6"><MudNumericField @bind-Value="_interval" @bind-Value:after="_feedback.Clear" Label="Every how many weeks" Min="2" Max="52"
+                                                                         Error="@_feedback.Has("intervalWeeks")" ErrorText="@_feedback.For("intervalWeeks")" /></MudItem>
                     }
                 }
                 else
                 {
-                    <MudItem xs="@(_frequency == "TwiceMonthly" ? 6 : 12)"><MudNumericField @bind-Value="_due" Label="@(_frequency == "TwiceMonthly" ? "First due day" : "Due day (blank = floating)")" Min="1" Max="31" Clearable="true" /></MudItem>
+                    <MudItem xs="@(_frequency == "TwiceMonthly" ? 6 : 12)"><MudNumericField @bind-Value="_due" @bind-Value:after="_feedback.Clear" Label="@(_frequency == "TwiceMonthly" ? "First due day" : "Due day (blank = floating)")" Min="1" Max="31" Clearable="true"
+                                                                                  Error="@_feedback.Has("dueDay")" ErrorText="@_feedback.For("dueDay")" /></MudItem>
                     @if (_frequency == "TwiceMonthly")
                     {
-                        <MudItem xs="6"><MudNumericField @bind-Value="_due2" Label="Second due day" Min="1" Max="31" /></MudItem>
+                        <MudItem xs="6"><MudNumericField @bind-Value="_due2" @bind-Value:after="_feedback.Clear" Label="Second due day" Min="1" Max="31"
+                                                                         Error="@_feedback.Has("secondDueDay")" ErrorText="@_feedback.For("secondDueDay")" /></MudItem>
                     }
                 }
-                <MudItem xs="6"><MudNumericField @bind-Value="_estimated" Label="@(_frequency == "Monthly" ? "Estimated" : "Estimated each time")" Min="0m" Format="F2" /></MudItem>
-                <MudItem xs="6"><MudNumericField @bind-Value="_actual" Label="@(_frequency == "Monthly" ? "Actual" : "Actual each time")" Min="0m" Format="F2" Clearable="true" /></MudItem>
+                <MudItem xs="6"><MudNumericField @bind-Value="_estimated" @bind-Value:after="_feedback.Clear" Label="@(_frequency == "Monthly" ? "Estimated" : "Estimated each time")" Min="0m" Format="F2"
+                                         Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Estimated amount"
+                                         Error="@_feedback.Has("estimated")" ErrorText="@_feedback.For("estimated")" /></MudItem>
+                <MudItem xs="6"><MudNumericField @bind-Value="_actual" @bind-Value:after="_feedback.Clear" Label="@(_frequency == "Monthly" ? "Actual" : "Actual each time")" Min="0m" Format="F2" Clearable="true"
+                                         Adornment="Adornment.Start" AdornmentText="@Format.CurrencyAdornment" aria-label="Actual amount"
+                                         Error="@_feedback.Has("actual")" ErrorText="@_feedback.For("actual")" /></MudItem>
             </MudGrid>
             <div class="d-flex flex-wrap" style="gap:4px 16px">
                 <MudCheckBox @bind-Value="_debt" Label="Debt" />
@@ -67,6 +81,14 @@
     [Parameter] public FlowLedger.Contracts.SheetRowDto? Row { get; set; }
     [Parameter] public string? RowSection { get; set; }
     [Parameter] public List<string> Sections { get; set; } = [];
+
+    /// <summary>
+    /// When set, the dialog performs the save itself and stays open on failure, so the API's per-field validation errors appear next to
+    /// the fields they belong to (#211). Delete still closes with <see cref="DeleteResult"/>.
+    /// </summary>
+    [Parameter] public Func<FlowLedger.Contracts.SaveBillRequest, Task>? SaveAsync { get; set; }
+
+    private readonly FormFeedback _feedback = new();
 
     private MudForm _form = default!;
     private string _name = "";
@@ -120,12 +142,28 @@
         if (!_form.IsValid) return;
         if (_frequency is "Weekly" or "EveryNWeeks" && _anchor is null) return;
         if (_frequency is "Weekly" or "EveryNWeeks") _due = null;
-        MudDialog.Close(DialogResult.Ok(new FlowLedger.Contracts.SaveBillRequest(
+        var request = new FlowLedger.Contracts.SaveBillRequest(
             _section, _name, _payer, _debt, _perpetual, _optional, _business, _auto,
             _due, _estimated, _actual, _service, _account, _match,
             _frequency,
             _frequency == "EveryNWeeks" ? _interval : null,
             _frequency is "Weekly" or "EveryNWeeks" && _anchor is { } a ? DateOnly.FromDateTime(a) : null,
-            _frequency == "TwiceMonthly" ? _due2 : null)));
+            _frequency == "TwiceMonthly" ? _due2 : null);
+        if (SaveAsync is null)
+        {
+            MudDialog.Close(DialogResult.Ok(request));
+            return;
+        }
+
+        _feedback.Clear();
+        try
+        {
+            await SaveAsync(request);
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+        catch (Exception ex) when (_feedback.TryCapture(ex))
+        {
+            // Stay open: the summary and the field messages are now rendered.
+        }
     }
 }

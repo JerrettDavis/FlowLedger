@@ -18,13 +18,16 @@
 
         <MudText Typo="Typo.body2" Class="fl-muted mb-3">@KindHelp</MudText>
 
-        <MudTextField T="string" @bind-Value="_name" Label="Name" Immediate="true" MaxLength="80" Margin="Margin.Dense" Class="mb-2" AutoFocus="true" />
-        <MudTextField T="string" @bind-Value="_url" Label="@UrlLabel" Immediate="true" Margin="Margin.Dense" Class="mb-2"
-                      Placeholder="@UrlPlaceholder" HelperText="@UrlHelp" />
+        <MudTextField T="string" @bind-Value="_name" @bind-Value:after="_feedback.Clear" Label="Name" Immediate="true" MaxLength="80" Margin="Margin.Dense" Class="mb-2" AutoFocus="true"
+                      aria-label="Integration name" Error="@_feedback.Has("name")" ErrorText="@_feedback.For("name")" />
+        <MudTextField T="string" @bind-Value="_url" @bind-Value:after="_feedback.Clear" Label="@UrlLabel" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                      Placeholder="@UrlPlaceholder" HelperText="@UrlHelp" aria-label="@UrlLabel"
+                      Error="@_feedback.Has("url")" ErrorText="@_feedback.For("url")" />
         @if (_kind == "Soap")
         {
-            <MudTextField T="string" @bind-Value="_soapEndpoint" Label="Service endpoint override (optional)" Immediate="true" Margin="Margin.Dense" Class="mb-2"
-                          HelperText="Leave empty to use the address inside the WSDL." />
+            <MudTextField T="string" @bind-Value="_soapEndpoint" @bind-Value:after="_feedback.Clear" Label="Service endpoint override (optional)" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          HelperText="Leave empty to use the address inside the WSDL." aria-label="Service endpoint override"
+                          Error="@_feedback.Has("soapEndpoint")" ErrorText="@_feedback.For("soapEndpoint")" />
         }
 
         <MudSelect T="string" @bind-Value="_auth" Label="Authentication" Margin="Margin.Dense" Class="mb-2">
@@ -35,15 +38,18 @@
         </MudSelect>
         @if (_auth == "Basic")
         {
-            <MudTextField T="string" @bind-Value="_authUser" Label="User name" Immediate="true" Margin="Margin.Dense" Class="mb-2" />
+            <MudTextField T="string" @bind-Value="_authUser" @bind-Value:after="_feedback.Clear" Label="User name" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          aria-label="User name" Error="@_feedback.Has("authUser")" ErrorText="@_feedback.For("authUser")" />
         }
         else if (_auth == "ApiKey")
         {
-            <MudTextField T="string" @bind-Value="_authUser" Label="Header name" Placeholder="X-API-Key" Immediate="true" Margin="Margin.Dense" Class="mb-2" />
+            <MudTextField T="string" @bind-Value="_authUser" @bind-Value:after="_feedback.Clear" Label="Header name" Placeholder="X-API-Key" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          aria-label="Header name" Error="@_feedback.Has("authUser")" ErrorText="@_feedback.For("authUser")" />
         }
         @if (_auth != "None")
         {
-            <MudTextField T="string" @bind-Value="_credential" InputType="InputType.Password" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+            <MudTextField T="string" @bind-Value="_credential" @bind-Value:after="_feedback.Clear" InputType="InputType.Password" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                          Error="@_feedback.Has("credential")" ErrorText="@_feedback.For("credential")"
                           Label="@(_auth == "Basic" ? "Password" : _auth == "Bearer" ? "Token" : "Key")"
                           HelperText="@(Existing?.HasCredential == true ? "A credential is saved. Leave empty to keep it; it is never shown again." : "Stored encrypted and never shown again.")" />
             @if (Existing?.HasCredential == true)
@@ -59,8 +65,9 @@
             }
         }
 
-        <MudTextField T="string" @bind-Value="_headers" Label="Extra headers (one per line, Name: value)" Lines="3" Immediate="true" Margin="Margin.Dense" Class="mb-2"
-                      HelperText="Not secret. Put keys and tokens in the authentication fields above." />
+        <MudTextField T="string" @bind-Value="_headers" @bind-Value:after="_feedback.Clear" Label="Extra headers (one per line, Name: value)" Lines="3" Immediate="true" Margin="Margin.Dense" Class="mb-2"
+                      HelperText="Not secret. Put keys and tokens in the authentication fields above." aria-label="Extra headers"
+                      Error="@_feedback.Has("headers")" ErrorText="@_feedback.For("headers")" />
 
         @if (_kind == "Webhook")
         {
@@ -74,9 +81,13 @@
 
         <MudSwitch T="bool" @bind-Value="_enabled" Color="Color.Primary" Label="Enabled" Class="mt-2" />
 
-        @if (_error is not null)
+        @if ((_error ?? _feedback.Summary) is { } message)
         {
-            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" role="alert">@message</MudAlert>
+        }
+        @if (_feedback.For("events") is { } eventsError)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@eventsError</MudText>
         }
     </DialogContent>
     <DialogActions>
@@ -108,6 +119,7 @@
     private HashSet<string> _events = [];
     private bool _busy;
     private string? _error;
+    private readonly FormFeedback _feedback = new();
 
     private string KindHelp => _kind switch
     {
@@ -166,6 +178,7 @@
     private async Task SaveAsync()
     {
         _error = null;
+        _feedback.Clear();
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var line in _headers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -187,6 +200,10 @@
                 string.IsNullOrEmpty(_credential) ? null : _credential, _clearCredential, headers,
                 _kind == "Webhook" ? [.. _events] : null, string.IsNullOrWhiteSpace(_soapEndpoint) ? null : _soapEndpoint.Trim()));
             MudDialog.Close(DialogResult.Ok(saved));
+        }
+        catch (Exception ex) when (_feedback.TryCapture(ex))
+        {
+            // Stay open: the summary and the field messages are now rendered.
         }
         catch (Exception ex)
         {

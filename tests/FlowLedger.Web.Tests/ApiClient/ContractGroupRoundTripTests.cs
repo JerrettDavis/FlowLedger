@@ -61,7 +61,7 @@ public sealed class ContractGroupRoundTripTests
         var result = new QueryResult([new QueryColumn("n", "number")], [[1], [2]], false, 3);
 
         AssertRoundTrips(viz);
-        AssertRoundTrips(new SavedReportDto("r1", "Monthly", "desc", "Report", false, [panel], At, null));
+        AssertRoundTrips(SavedReportDtoBuilder.A().WithPanels(panel).Build());
         AssertRoundTrips(SaveReportRequestBuilder.A().Named("Monthly").WithPanels(panel).Build());
         AssertRoundTrips(new RunReportResultDto("r1", "Monthly", null, "Report",
             [new PanelResultDto("Trend", "q", viz, result, null), new PanelResultDto("Bad", "q", viz, null, "boom")]));
@@ -72,22 +72,18 @@ public sealed class ContractGroupRoundTripTests
     [Fact]
     public void Recurring_flow_types_round_trip()
     {
-        AssertRoundTrips(new RecurringFlowDto(Id1, Id2, "Rent", 1500m, "USD", "Outflow", "Fixed", "Monthly", 1, null, null, null,
-            D, null, null, "Landlord", true, At, 1500m));
+        AssertRoundTrips(RecurringFlowDtoBuilder.A().WithId(Id1).OnAccount(Id2).Named("Rent").WithAmount(1500m).WithCounterparty("Landlord").Build());
         AssertRoundTrips(CreateRecurringFlowRequestBuilder.A().OnAccount(Id2).Named("Pay").WithAmount(2000m).WithDirection("Inflow")
             .Every("TwiceMonthly", dayOfMonth: 1, secondDayOfMonth: 15).From(D, D.AddYears(1)).InCategory(Id1).WithCounterparty(null).Build());
         AssertRoundTrips(UpdateRecurringFlowRequestBuilder.A().WithAmount(9.99m).WithModel("Variable").Build());
-        AssertRoundTrips(new RecurringSuggestionDto("k", Id1, "Checking", "Netflix", "Outflow", 15.49m, "USD", "Fixed", "Monthly", 3, null,
-            null, null, D, D.AddMonths(1), 6, 0.92, true));
+        AssertRoundTrips(RecurringSuggestionDtoBuilder.A().Build());
     }
 
     [Fact]
     public void Asset_and_net_worth_types_round_trip()
     {
         var valuation = new AssetValuationDto(Id1, 100m, D, "Manual", null, At);
-        var asset = new AssetDto(Id1, "Car", "Vehicle", "Honda", null, null, null, D, 20000m, "USD", 18000m, D, 17500m, "Depreciation",
-            0.15m, 2000m, 10, Id2, "Loan", 5000m, 13000m, -2000m, new Dictionary<string, string> { ["vin"] = "x" }, true, At,
-            [valuation], new ValuationSpreadDto(1m, 3m, 2m, 2m, 3, 30));
+        AssetDto asset = AssetDtoBuilder.A().WithId(Id1).WithValuations([valuation]).Build();
         var worth = new NetWorthDto(10m, 4m, 3m, 9m, 1m, "USD", true, [new CurrencyTotalDto("EUR", 1m, 0m, 0m, 1m, 0m)]);
 
         AssertRoundTrips(asset);
@@ -106,9 +102,7 @@ public sealed class ContractGroupRoundTripTests
     public void Bill_sheet_types_round_trip()
     {
         var totals = new SheetTotalsDto(new SheetTotalsLine(1m, 2m, 3m, 4m, 5m), new SheetTotalsLine(1m, 1m, 1m, 1m, 1m));
-        var row = new SheetRowDto(Id1, "Power", "Me", false, true, false, false, true, 5, 90m, null, "Utility", "****1234", "power", false,
-            new Dictionary<string, SheetCellDto> { ["2026-03"] = new(true, 88m, D, "Bank", 1, 1) }, BillFrequency.TwiceMonthly, null, D, 20,
-            new Dictionary<string, IReadOnlyList<SheetSlotDto>> { ["2026-03"] = [new SheetSlotDto(0, D, true, 88m, D, "Bank")] }, 180m);
+        SheetRowDto row = SheetRowDtoBuilder.A().WithId(Id1).Build();
         var view = new SheetViewDto(["2026-03"], "2026-03", [new SheetSectionDto("Home", [row], totals)], totals,
             new SheetMonthSummaryDto("2026-03", 1, 2, 88m, 90m));
 

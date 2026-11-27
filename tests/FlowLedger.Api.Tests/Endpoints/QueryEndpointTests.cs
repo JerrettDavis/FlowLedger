@@ -33,7 +33,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Ask_with_a_blank_question_is_answered_without_calling_any_model()
     {
-        var response = await _client.PostAsJsonAsync("/api/query/ask", new AskQueryRequest("   "));
+        var response = await _client.PostAsJsonAsync("/api/query/ask", AskQueryRequestBuilder.A().Asking("   ").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<AskQueryResult>();
@@ -54,7 +54,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
         await Spend(other, theirs.Id, 999m, "Yacht");
 
         var response = await _client.PostAsJsonAsync("/api/query/run",
-            new RunQueryRequest("transactions | summarize total = sum(amount), n = count() by merchant"));
+            RunQueryRequestBuilder.A().Running("transactions | summarize total = sum(amount), n = count() by merchant").Build());
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = (await response.Content.ReadFromJsonAsync<QueryResult>())!;
 
@@ -65,7 +65,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     [Fact]
     public async Task Run_reports_syntax_errors_as_400_with_position()
     {
-        var response = await _client.PostAsJsonAsync("/api/query/run", new RunQueryRequest("transactions | where nope == 1"));
+        var response = await _client.PostAsJsonAsync("/api/query/run", RunQueryRequestBuilder.A().Running("transactions | where nope == 1").Build());
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("Unknown column");
     }
@@ -132,7 +132,7 @@ public sealed class QueryEndpointTests(FlowLedgerApiFactory factory) : IAsyncLif
     public async Task Query_requires_authentication()
     {
         using var anon = factory.CreateClient();
-        (await anon.PostAsJsonAsync("/api/query/run", new RunQueryRequest("transactions"))).StatusCode
+        (await anon.PostAsJsonAsync("/api/query/run", RunQueryRequestBuilder.A().Running("transactions").Build())).StatusCode
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 }

@@ -90,10 +90,12 @@ public sealed partial class FlowLedgerApiClient
     {
         if (!response.IsSuccessStatusCode)
         {
+            var problem = await ReadProblemAsync(response, ct);
             throw new ApiClientException(
-                await ReadValidationMessageAsync(response, ct) ?? await ReadProblemDetailAsync(response, ct)
+                problem.ValidationMessage ?? await ReadProblemDetailAsync(response, ct)
                     ?? $"{fallback} (server returned {(int)response.StatusCode}).",
-                response.StatusCode);
+                response.StatusCode,
+                fieldErrors: problem.FieldErrors);
         }
     }
 
@@ -112,10 +114,7 @@ public sealed partial class FlowLedgerApiClient
         {
             var response = await SendVersionedAsync(HttpMethod.Put, "/api/goals", new { id, name, targetAmount, savedAmount, targetDate }, expectedVersion, ct);
             ThrowIfChangedElsewhere(response, "goal");
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new ApiClientException($"Couldn't save goal (server returned {(int)response.StatusCode}).", response.StatusCode);
-            }
+            await ThrowIfFailedAsync(response, "save goal", ct);
 
             return true;
         });

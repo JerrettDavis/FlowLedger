@@ -201,7 +201,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
         var created = await CreateAccount();
 
         var response = await _client.PutAsJsonAsync(
-            $"/api/accounts/{created.Id}/type", new ChangeAccountTypeRequest("CreditCard"));
+            $"/api/accounts/{created.Id}/type", ChangeAccountTypeRequestBuilder.A().To("CreditCard").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await response.Content.ReadFromJsonAsync<AccountDto>();
@@ -219,7 +219,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
         var created = await CreateAccount();
 
         var response = await _client.PutAsJsonAsync(
-            $"/api/accounts/{created.Id}/type", new ChangeAccountTypeRequest("NotARealType"));
+            $"/api/accounts/{created.Id}/type", ChangeAccountTypeRequestBuilder.A().To("NotARealType").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -228,7 +228,7 @@ public sealed class AccountEndpointTests(FlowLedgerApiFactory factory) : IAsyncL
     public async Task Put_type_returns_404_for_missing_account()
     {
         var response = await _client.PutAsJsonAsync(
-            $"/api/accounts/{Guid.NewGuid()}/type", new ChangeAccountTypeRequest("Savings"));
+            $"/api/accounts/{Guid.NewGuid()}/type", ChangeAccountTypeRequestBuilder.A().To("Savings").Build());
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
