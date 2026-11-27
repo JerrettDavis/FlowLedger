@@ -1,6 +1,7 @@
 using FlowLedger.Application.Abstractions;
 using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.LocalAi;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.LocalAi;
@@ -103,8 +104,11 @@ public class LocalAiCoreTests
     {
         var merchants = new[]
         {
-            new MerchantOccurrence("STARBUCKS #1042", 30), new MerchantOccurrence("Starbucks Store 55", 12), new MerchantOccurrence("SQ *STARBUCKS", 3),
-            new MerchantOccurrence("Shell Oil 9921", 20), new MerchantOccurrence("Netflix", 12),
+            MerchantOccurrenceBuilder.A().WithCount(30).Build(), MerchantOccurrenceBuilder.A().WithRaw("Starbucks Store 55").Build(), MerchantOccurrenceBuilder.A()
+                                                                                                                             .WithRaw("SQ *STARBUCKS")
+                                                                                                                             .WithCount(3)
+                                                                                                                             .Build(),
+            MerchantOccurrenceBuilder.A().WithRaw("Shell Oil 9921").WithCount(20).Build(), MerchantOccurrenceBuilder.A().WithRaw("Netflix").Build(),
         };
         var groups = await MerchantGrouper.GroupAsync(Hash, merchants, 0.62);
         groups.Should().ContainSingle();

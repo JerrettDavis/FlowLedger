@@ -2,6 +2,7 @@ using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Features.Transactions;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Transactions;
@@ -12,7 +13,10 @@ public sealed class MerchantAliasServiceTests
     {
         public Dictionary<string, string> Rules { get; } = new();
         public Task<IReadOnlyList<MerchantAliasDto>> ListAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<MerchantAliasDto>>(Rules.Select(r => new MerchantAliasDto(r.Key, r.Value)).ToList());
+            => Task.FromResult<IReadOnlyList<MerchantAliasDto>>(Rules.Select(r => MerchantAliasDtoBuilder.A()
+                                                                                                  .WithPattern(r.Key)
+                                                                                                  .WithAlias(r.Value)
+                                                                                                  .Build()).ToList());
         public Task SetAsync(string pattern, string alias, CancellationToken ct = default) { Rules[pattern] = alias; return Task.CompletedTask; }
         public Task<bool> RemoveAsync(string pattern, CancellationToken ct = default) => Task.FromResult(Rules.Remove(pattern));
     }

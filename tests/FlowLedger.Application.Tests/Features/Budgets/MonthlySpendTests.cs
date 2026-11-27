@@ -18,7 +18,7 @@ public sealed class MonthlySpendTests
     [Fact]
     public void Parse_maps_rows_case_insensitively_and_coerces_numbers()
     {
-        var result = new QueryResult([], [new object?[] { "Food/Groceries", 150m }, new object?[] { null, 5.5d }, new object?[] { "Rent", null }], false, 0);
+        var result = QueryResultBuilder.A().WithElapsedMs(0).Build();
 
         var map = MonthlySpend.Parse(result);
 

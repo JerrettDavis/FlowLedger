@@ -2,6 +2,7 @@ using FlowLedger.Application.Features.Alerts;
 using FlowLedger.Application.Features.HomeAssistant;
 using FlowLedger.Application.Features.Integrations;
 using FlowLedger.Application.Tests.Fakes;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Alerts;
@@ -116,8 +117,7 @@ public sealed class AlertDeliveryServiceTests
         var integrations = new IntegrationService(store, transport, new Network(), tenant, FlowLedger.TestSupport.TestClock.Provider);
         if (webhookEvents is not null)
         {
-            await integrations.SaveAsync(null, new IntegrationSaveRequest(
-                "Hook", IntegrationKind.Webhook, true, "https://hooks.example.com/in", IntegrationAuth.None, null, null, false, null, webhookEvents, null));
+            await integrations.SaveAsync(null, IntegrationSaveRequestBuilder.A().Named("Hook").OfKind(IntegrationKind.Webhook).At("https://hooks.example.com/in").ForEvents(webhookEvents).Build());
         }
 
         var claims = new FakeHomeAssistantStore(HomeAssistantSettings.Default);

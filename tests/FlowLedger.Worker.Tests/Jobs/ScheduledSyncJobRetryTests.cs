@@ -3,6 +3,7 @@ using FlowLedger.Infrastructure.Sync;
 using FlowLedger.Integrations.Abstractions;
 using FlowLedger.SharedKernel;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FlowLedger.Worker.Jobs;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,7 +41,7 @@ public sealed class ScheduledSyncJobRetryTests
         public Task<SyncResult> SyncAsync(CancellationToken ct = default)
         {
             Calls++;
-            return error is null ? Task.FromResult(new SyncResult(0, 0, 0, 0)) : Task.FromException<SyncResult>(error);
+            return error is null ? Task.FromResult(SyncResultBuilder.A().Build()) : Task.FromException<SyncResult>(error);
         }
     }
 

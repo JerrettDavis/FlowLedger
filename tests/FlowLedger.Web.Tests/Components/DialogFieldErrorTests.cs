@@ -25,8 +25,16 @@ public sealed class DialogFieldErrorTests : BunitContext, IAsyncLifetime
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("null", Encoding.UTF8, "application/json") });
     }
 
-    private static readonly AccountDto Checking = new(
-        Guid.NewGuid(), "Checking", "Checking", 10m, "USD", null, null, true, DateTimeOffset.UnixEpoch, null);
+    private static readonly AccountDto Checking = AccountDtoBuilder.A()
+                                                          .WithId(Guid.NewGuid())
+                                                          .WithBalanceAmount(10m)
+                                                          .WithInstitution(null)
+                                                          .WithExternalAccountRef(null)
+                                                          .WithCreatedAt(DateTimeOffset.UnixEpoch)
+                                                          .WithTypeLockedByUser(false)
+                                                          .WithMode("Standard")
+                                                          .WithHideTransactions(false)
+                                                          .Build();
 
     private IRenderedComponent<MudDialogProvider> Provider()
     {

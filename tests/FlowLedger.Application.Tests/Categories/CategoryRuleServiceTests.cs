@@ -2,6 +2,7 @@ using FlowLedger.Application.Features.Categories;
 using FlowLedger.Application.Tests.Fakes;
 using FlowLedger.Domain.Aggregates;
 using FlowLedger.Domain.ValueObjects;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Categories;
@@ -12,7 +13,10 @@ public sealed class CategoryRuleServiceTests
     {
         public Dictionary<string, string> Rules { get; } = new();
         public Task<IReadOnlyList<CategoryRuleDto>> ListAsync(CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<CategoryRuleDto>>(Rules.Select(r => new CategoryRuleDto(r.Key, r.Value)).ToList());
+            => Task.FromResult<IReadOnlyList<CategoryRuleDto>>(Rules.Select(r => CategoryRuleDtoBuilder.A()
+                                                                                                 .WithPattern(r.Key)
+                                                                                                 .WithCategoryPath(r.Value)
+                                                                                                 .Build()).ToList());
         public Task SetAsync(string pattern, string categoryPath, CancellationToken ct = default) { Rules[pattern] = categoryPath; return Task.CompletedTask; }
         public Task<bool> RemoveAsync(string pattern, CancellationToken ct = default) => Task.FromResult(Rules.Remove(pattern));
     }
@@ -54,7 +58,10 @@ public sealed class CategoryRuleServiceTests
     [Fact]
     public void Longest_matching_pattern_wins()
     {
-        var rules = new[] { new CategoryRuleDto("SHELL", "Auto/Gas"), new CategoryRuleDto("SHELL OIL CAFE", "Food/Coffee") };
+        var rules = new[] { CategoryRuleDtoBuilder.A().Build(), CategoryRuleDtoBuilder.A()
+                                                                                  .WithPattern("SHELL OIL CAFE")
+                                                                                  .WithCategoryPath("Food/Coffee")
+                                                                                  .Build() };
 
         CategoryRuleService.Match(rules, "shell  oil cafe 123", null)!.CategoryPath.Should().Be("Food/Coffee");
         CategoryRuleService.Match(rules, "SHELL 4411", null)!.CategoryPath.Should().Be("Auto/Gas");

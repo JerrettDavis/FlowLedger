@@ -27,7 +27,7 @@ public sealed class SubscriptionEndpointTests(FlowLedgerApiFactory factory) : IA
     }
 
     private static async Task ChargeAsync(HttpClient client, Guid account, decimal amount, DateOnly date)
-        => (await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest(account, amount, "USD", "Debit", "Streamly Video", date, null, null, null, null)))
+        => (await client.PostAsJsonAsync("/api/transactions", CreateTransactionRequestBuilder.A().OnAccount(account).WithAmount(amount).Described("Streamly Video").On(date).Build()))
             .EnsureSuccessStatusCode();
 
     [Fact]

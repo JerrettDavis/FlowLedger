@@ -25,6 +25,10 @@ public sealed class TransactionDtoBuilder
     private string? _notes;
     private string? _fingerprint;
     private bool _postedDateSet;
+    private DateTimeOffset _createdAt = new(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+    private string? _suggestedName;
+    private IReadOnlyList<string>? _tags;
+    private IReadOnlyList<TransactionSplitDto>? _splits;
 
     public static TransactionDtoBuilder A() => new();
 
@@ -35,6 +39,11 @@ public sealed class TransactionDtoBuilder
     public TransactionDtoBuilder OnAccount(Guid accountId) { _accountId = accountId; return this; }
     public TransactionDtoBuilder WithAmount(decimal amount) { _amount = amount; return this; }
     public TransactionDtoBuilder InCurrency(string currency) { _currency = currency; return this; }
+    public TransactionDtoBuilder WithDirection(string direction) { _direction = direction; return this; }
+    public TransactionDtoBuilder WithCreatedAt(DateTimeOffset createdAt) { _createdAt = createdAt; return this; }
+    public TransactionDtoBuilder WithSuggestedName(string? suggestedName) { _suggestedName = suggestedName; return this; }
+    public TransactionDtoBuilder WithTags(IReadOnlyList<string>? tags) { _tags = tags; return this; }
+    public TransactionDtoBuilder WithSplits(IReadOnlyList<TransactionSplitDto>? splits) { _splits = splits; return this; }
     public TransactionDtoBuilder Debit() { _direction = "Debit"; return this; }
     public TransactionDtoBuilder Credit() { _direction = "Credit"; return this; }
     public TransactionDtoBuilder Described(string description) { _description = description; return this; }
@@ -58,7 +67,7 @@ public sealed class TransactionDtoBuilder
         _id, _accountId, _amount, _currency, _direction, _description, _status, _source,
         _effectiveDate, _postedDateSet ? _postedDate : _effectiveDate,
         _categoryId, _merchantName, _notes, _fingerprint,
-        new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+        _createdAt, _suggestedName, _tags, _splits);
 
     public static implicit operator TransactionDto(TransactionDtoBuilder builder) => builder.Build();
 }

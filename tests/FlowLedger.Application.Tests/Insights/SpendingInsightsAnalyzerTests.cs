@@ -1,5 +1,6 @@
 using FlowLedger.Application.Features.Insights;
 using FlowLedger.TestSupport;
+using FlowLedger.TestSupport.Builders;
 using FluentAssertions;
 
 namespace FlowLedger.Application.Tests.Insights;
@@ -152,7 +153,10 @@ public sealed class SpendingInsightsAnalyzerTests
     {
         var parent = Tx(100, "Debit", "2026-11-03", Groceries) with
         {
-            Splits = [new TransactionSplitDto(70, Groceries, null), new TransactionSplitDto(30, Utilities, null)],
+            Splits = [TransactionSplitDtoBuilder.A().WithCategoryId(Groceries).Build(), TransactionSplitDtoBuilder.A()
+                                                                                    .WithAmount(30)
+                                                                                    .WithCategoryId(Utilities)
+                                                                                    .Build()],
         };
 
         var res = Run([parent], Q());

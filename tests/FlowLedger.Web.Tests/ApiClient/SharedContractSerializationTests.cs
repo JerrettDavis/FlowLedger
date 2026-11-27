@@ -16,9 +16,7 @@ public sealed class SharedContractSerializationTests
     private static readonly JsonSerializerOptions WebOptions = (JsonSerializerOptions)typeof(FlowLedger.Web.ApiClient.FlowLedgerApiClient)
         .GetField("JsonOptions", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
 
-    private static readonly AccountDto Account = new(
-        Guid.Parse("11111111-1111-1111-1111-111111111111"), "Checking", "Checking", 12.34m, "USD", "Bank", "ext-1", true,
-        new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero), null, true, "Holding", true);
+    private static readonly AccountDto Account = AccountDtoBuilder.A().Build();
 
     [Fact]
     public void AccountDto_response_uses_camelCase_wire_names_and_reads_back_in_Web()
@@ -53,7 +51,7 @@ public sealed class SharedContractSerializationTests
     public void Account_requests_serialized_by_Web_are_accepted_by_the_API_binder()
     {
         var create = CreateAccountRequestBuilder.A().Named("Savings").OfType("Savings").StartingAt(100m).At("Bank").Build();
-        var settings = new AccountSettingsRequest(false, "Holding", true);
+        var settings = AccountSettingsRequestBuilder.A().Active(false).InMode("Holding").HidingTransactions().Build();
         var rename = UpdateAccountRequestBuilder.A().Named("New").Build();
         var retype = ChangeAccountTypeRequestBuilder.A().To("Credit").Build();
 
@@ -66,10 +64,19 @@ public sealed class SharedContractSerializationTests
     [Fact]
     public void TransactionDto_and_dashboard_activity_round_trip_between_API_and_Web_options()
     {
-        var tx = new TransactionDto(
-            Guid.Parse("33333333-3333-3333-3333-333333333333"), Guid.Parse("11111111-1111-1111-1111-111111111111"), -5.5m, "USD",
-            "Outflow", "Coffee", "Posted", "Manual", new DateOnly(2026, 1, 2), null, null, "Cafe", null, null,
-            new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero), null, ["a"], [new TransactionSplitDto(1m, null, null)]);
+        var tx = TransactionDtoBuilder.A()
+            .WithId(Guid.Parse("33333333-3333-3333-3333-333333333333"))
+            .OnAccount(Guid.Parse("11111111-1111-1111-1111-111111111111"))
+            .WithAmount(-5.5m)
+            .WithDirection("Outflow")
+            .Described("Coffee")
+            .FromSource("Manual")
+            .Unposted(new DateOnly(2026, 1, 2))
+            .WithMerchant("Cafe")
+            .WithCreatedAt(new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero))
+            .WithTags(["a"])
+            .WithSplits([TransactionSplitDtoBuilder.A().WithAmount(1m).Build()])
+            .Build();
 
         var json = JsonSerializer.Serialize(tx, ApiOptions);
         using (var doc = JsonDocument.Parse(json))
@@ -83,7 +90,10 @@ public sealed class SharedContractSerializationTests
         Assert.Equal(["a"], back.Tags);
         Assert.Single(back.Splits!);
 
-        var activity = new DashboardActivityDto([tx], [], 0m, [], 500m, [new FlaggedTransactionDto(tx, ["big"])], 1m, 2m);
+        var activity = DashboardActivityDtoBuilder.A()
+                                   .WithRecentPosted([tx])
+                                   .WithSuspicious([FlaggedTransactionDtoBuilder.A().WithTransaction(tx).Build()])
+                                   .Build();
         var activityBack = JsonSerializer.Deserialize<DashboardActivityDto>(JsonSerializer.Serialize(activity, ApiOptions), WebOptions)!;
         Assert.Single(activityBack.RecentPosted);
         Assert.Equal(["big"], activityBack.Suspicious[0].Reasons);
@@ -95,7 +105,7 @@ public sealed class SharedContractSerializationTests
     [Fact]
     public void CategoryDto_and_requests_round_trip_with_camelCase_names()
     {
-        var category = new CategoryDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Food.Dining", "Dining", false, null);
+        var category = CategoryDtoBuilder.A().Build();
         var json = JsonSerializer.Serialize(category, ApiOptions);
 
         Assert.Equal("""{"id":"22222222-2222-2222-2222-222222222222","path":"Food.Dining","displayName":"Dining","isSystem":false,"parentId":null,"version":0}""", json);
