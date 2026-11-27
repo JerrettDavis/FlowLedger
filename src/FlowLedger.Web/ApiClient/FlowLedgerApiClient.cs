@@ -136,9 +136,6 @@ public sealed partial class FlowLedgerApiClient
     [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} creating transaction")]
     private partial void LogNonSuccessCreatingTransaction(int statusCode);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} creating recurring flow")]
-    private partial void LogNonSuccessCreatingRecurringFlow(int statusCode);
-
     [LoggerMessage(Level = LogLevel.Error, Message = "Non-success status {StatusCode} updating recurring flow {Id}")]
     private partial void LogNonSuccessUpdatingRecurringFlow(int statusCode, Guid id);
 
