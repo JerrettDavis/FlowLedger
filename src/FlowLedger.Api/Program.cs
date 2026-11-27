@@ -136,6 +136,13 @@ builder.Services.AddOptions<ApiOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+// #135: the effective "signed tenant assertion required" switch (explicit Api:RequireSignedTenant, else true outside Development with OIDC on).
+builder.Services.AddOptions<ApiOptions>().PostConfigure<IConfiguration, Microsoft.Extensions.Hosting.IHostEnvironment>(
+    (o, cfg, env) => o.RequireSignedTenant = MultiUserSettings.RequireSignedTenant(cfg, env));
+
+// #145: the API's own sign-up policy (closed sign-up cannot be bypassed by calling /api/users/resolve; gates billable provisioning).
+builder.Services.AddSingleton(sp => SignUpPolicy.From(sp.GetRequiredService<IConfiguration>()));
+
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 // Fixed windows partitioned per tenant (authenticated) or per remote IP (anonymous), so one user or one
 // noisy caller cannot exhaust everyone's budget. See RateLimitPartitions.
@@ -170,6 +177,9 @@ var app = builder.Build();
             "Api:TenantSigningKey must be at least 32 characters and different from Api:Key (e.g. `openssl rand -hex 32`).");
     }
 }
+
+// #135/#145: fail closed (or warn) for unsafe multi-user settings; every check is inert unless OIDC is configured on this service.
+MultiUserSettings.Validate(app.Configuration, app.Environment, app.Logger);
 
 // ── Production startup guard (secret hygiene) ────────────────────────────────
 // Refuse to start a non-Development instance with a missing or default API key.

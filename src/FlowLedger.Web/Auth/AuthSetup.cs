@@ -21,6 +21,11 @@ public static class AuthSetup
     public static OidcOptions AddFlowLedgerAuth(this WebApplicationBuilder builder)
     {
         var oidc = builder.Configuration.GetSection(OidcOptions.SectionName).Get<OidcOptions>() ?? new OidcOptions();
+        if (oidc.Enabled)
+        {
+            oidc.SignUpMode = FlowLedger.ServiceDefaults.MultiUserSettings.ResolveSignUpMode(builder.Configuration);
+        }
+
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddHttpContextAccessor();
 
@@ -105,10 +110,18 @@ public static class AuthSetup
                                 email = principal.FindFirstValue("email"),
                                 emailVerified = string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase),
                                 displayName = principal.FindFirstValue(oidc.NameClaim) ?? principal.FindFirstValue("name") ?? principal.FindFirstValue("preferred_username"),
+                                // #145: an unknown login only gets a new tenant when the sign-up mode allows it (Open, or InviteOnly + allowlist hit).
+                                allowProvisioning = oidc.AllowsNewTenants,
                             }),
                         };
                         req.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
                         using var resp = await http.SendAsync(req, ctx.HttpContext.RequestAborted);
+                        if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            ctx.Fail("Sign-up is closed: this account is not registered and is not on the FlowLedger invite list.");
+                            return;
+                        }
+
                         resp.EnsureSuccessStatusCode();
                         var user = await resp.Content.ReadFromJsonAsync<ResolveResponse>(cancellationToken: ctx.HttpContext.RequestAborted)
                                    ?? throw new InvalidOperationException("Empty user-resolution response.");
