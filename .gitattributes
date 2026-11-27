@@ -9,3 +9,6 @@ Dockerfile  text eol=lf
 # Windows batch files need CRLF.
 *.cmd       text eol=crlf
 *.bat       text eol=crlf
+
+# NuGet lock files are generated on Windows and Linux alike: keep them LF so regeneration never produces whole-file diffs (#190).
+packages.lock.json text eol=lf
