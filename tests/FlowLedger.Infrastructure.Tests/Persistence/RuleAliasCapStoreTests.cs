@@ -97,7 +97,7 @@ public sealed class RuleAliasCapStoreTests : IAsyncLifetime
         Guid first = default;
         for (var i = 0; i < FlowLedger.Infrastructure.Persistence.Repositories.EfGoalStore.MaxGoals; i++)
         {
-            var id = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
+            var (id, _) = await goals.UpsertAsync(tenant, null, $"G{i}", 100m, 0m, null);
             if (i == 0) { first = id; }
         }
 

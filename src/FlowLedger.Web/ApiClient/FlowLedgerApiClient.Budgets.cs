@@ -18,11 +18,12 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task SetBudgetAsync(string category, decimal monthlyLimit, CancellationToken ct = default)
+    public async Task SetBudgetAsync(string category, decimal monthlyLimit, uint? expectedVersion = null, CancellationToken ct = default)
     {
         await ExecuteAsync("save budget", async () =>
         {
-            var response = await _http.PutAsJsonAsync("/api/budgets", new { category, monthlyLimit }, ct);
+            var response = await SendVersionedAsync(HttpMethod.Put, "/api/budgets", new { category, monthlyLimit }, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "budget");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't save budget (server returned {(int)response.StatusCode}).", response.StatusCode);
@@ -32,11 +33,12 @@ public sealed partial class FlowLedgerApiClient
         });
     }
 
-    public async Task DeleteBudgetAsync(string category, CancellationToken ct = default)
+    public async Task DeleteBudgetAsync(string category, uint? expectedVersion = null, CancellationToken ct = default)
     {
         await ExecuteAsync("remove budget", async () =>
         {
-            var response = await _http.DeleteAsync($"/api/budgets?category={Uri.EscapeDataString(category)}", ct);
+            var response = await SendVersionedAsync(HttpMethod.Delete, $"/api/budgets?category={Uri.EscapeDataString(category)}", null, expectedVersion, ct);
+            ThrowIfChangedElsewhere(response, "budget");
             if (!response.IsSuccessStatusCode)
             {
                 throw new ApiClientException($"Couldn't remove budget (server returned {(int)response.StatusCode}).", response.StatusCode);
