@@ -12,7 +12,6 @@ namespace FlowLedger.Api.Tests.Endpoints;
 public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyncLifetime
 {
     // The API reads the real clock for "this month", so the seeded dates must too: one read, shared by every test.
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
 
     private HttpClient _client = null!;
 
@@ -58,7 +57,7 @@ public sealed class DashboardEndpointTests(FlowLedgerApiFactory factory) : IAsyn
         var mine = factory.CreateAuthenticatedClient(Guid.NewGuid());
         var acct = (await (await mine.PostAsJsonAsync("/api/accounts",
             new CreateAccountRequest("Checking", "Checking", 0m, "USD", null, null))).Content.ReadFromJsonAsync<AccountDto>())!;
-        var today = Today;
+        var today = factory.ServerToday;
         Task<HttpResponseMessage> Spend(decimal amount, string desc) => mine.PostAsJsonAsync("/api/transactions",
             new CreateTransactionRequest(acct.Id, amount, "USD", "Debit", desc, today, today, null, desc, null));
         async Task<DashboardInsightsDto> Insights() =>
