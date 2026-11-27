@@ -3,6 +3,7 @@
 @inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Linked logins — FlowLedger</PageTitle>
 
@@ -99,10 +100,15 @@ else
 
     private async Task DeleteMyData()
     {
+        if (!await DialogService.ConfirmAsync("Delete my data", "Permanently delete everything stored for this account? This cannot be undone.", "Delete everything"))
+        {
+            return;
+        }
+
         _deleting = true;
         try
         {
-            _deleted = await ApiClient.DeleteMyDataAsync(_confirmDelete ?? string.Empty);
+            _deleted =await ApiClient.DeleteMyDataAsync(_confirmDelete ?? string.Empty);
             if (_deleted is null)
             {
                 Snackbar.Add("The data was not deleted. The household account cannot be deleted from here.", Severity.Warning);
