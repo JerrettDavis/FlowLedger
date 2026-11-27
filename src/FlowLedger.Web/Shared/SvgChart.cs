@@ -141,7 +141,7 @@ public static class SvgChart
         }
         int dashLen = (int)Math.Ceiling(pathLen) + 10;
 
-        var svg = $@"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} {H}' aria-hidden='true'>
+        var svg = $@"<svg class='fl-chart-svg' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} {H}' aria-hidden='true'>
   {gridLines}
   <polygon points='{areaPts}' fill='var(--mud-palette-primary)' fill-opacity='0.10'/>
   {zeroLineStr}

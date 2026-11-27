@@ -63,9 +63,11 @@ body.fl-col-resizing { cursor: col-resize; user-select: none; }
    Containers must not clip (overflow) or sticky would bind to them instead of the viewport. */
 :root { --fl-sticky-top: 65px; }
 @media (max-width: 599.98px) { :root { --fl-sticky-top: 57px; } }
-.mud-main-content .mud-table-container,
+.mud-main-content .mud-table-container:not([style*="height"]),
 .mud-main-content .mud-simple-table,
 .mud-main-content .mud-simple-table .mud-table-container { overflow: visible !important; }
+/* A grid given a fixed Height (the virtualized Money Plan) scrolls inside its own box: clipping is what lets virtualization and the sticky header work. */
+.mud-main-content .mud-table-container[style*="height"] { overflow: auto; }
 .mud-main-content .mud-dialog .mud-table-container { overflow: auto !important; }
 .mud-main-content table thead th,
 .mud-main-content table .mud-table-head th {
@@ -197,6 +199,17 @@ html, body { max-width: 100%; }
   .mud-main-content .fl-stack tbody td:empty { display: none; }
   .mud-main-content .fl-stack tbody td[data-label]::before { content: attr(data-label) ": "; color: var(--mud-palette-text-secondary); font-size: .75rem; }
   .mud-main-content .fl-stack tbody td:has(> .mud-icon-button) { margin-left: auto; }
+}
+/* The stacked-cell rule above beats .fl-hide-xs, so low-priority cells (counts) stayed on a 390px phone and pushed the row action onto its own line. */
+@media (max-width: 479.98px) {
+  .mud-main-content .fl-stack tbody td.fl-hide-xs { display: none; }
+}
+
+/* Phone charts are drawn in a fixed viewBox that scales to about half size, which made axis text about 5px. Enlarge it in viewBox units. */
+@media (max-width: 599.98px) {
+  .mud-chart svg text { font-size: 16px; }
+  .fl-chart-box svg text, .fl-chart-svg text { font-size: 20px; }
+  .fl-chart-dense text { font-size: 13px; }
 }
 
 /* Dialogs render outside .fl-page, so they get the same wrap/shrink rules. */
