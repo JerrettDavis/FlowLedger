@@ -89,7 +89,6 @@ internal sealed class EfTenantErasure(
 
     private async Task MarkDeletedAsync(Guid tenantId, CancellationToken ct)
     {
-        await db.Database.ExecuteSqlRawAsync(NpgsqlTenantRegistry.CreateSqlText, ct);
         await db.Database.ExecuteSqlRawAsync(
             "INSERT INTO tenants (id, status, deleted_at) VALUES (@t, 'deleted', now()) " +
             "ON CONFLICT (id) DO UPDATE SET status = 'deleted', deleted_at = COALESCE(tenants.deleted_at, now())",

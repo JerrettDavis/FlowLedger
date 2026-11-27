@@ -22,7 +22,7 @@ bank ids (a vending machine used twice, a recurring $55 service), so a naive "sa
    Sync and CSV import consult the tombstones, so a merged-away row can never be re-created. The log is visible at `GET /api/duplicates/log`.
 5. Auto-merge runs after each sync that added rows (before categorization) and after each CSV import; `Duplicates:AutoMerge=false` turns it
    off (suggestions remain). Dismissed pairs are remembered (`duplicate_dismissals`) and never suggested again.
-6. Tables are ad-hoc (`CREATE TABLE IF NOT EXISTS`, registered in `AdHocSchema`), so backups, exports and restore drills carry them.
+6. Tables are EF-managed (idempotent `CREATE TABLE IF NOT EXISTS` migration, since the runtime `AdHocSchema` was removed in #154), so backups, exports and restore drills carry them.
 
 ## Not done
 

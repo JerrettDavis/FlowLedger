@@ -72,6 +72,10 @@ public sealed class FlowLedgerDbContext : DbContext
     internal DbSet<AuditEventRecord> AuditEvents => Set<AuditEventRecord>();
     internal DbSet<JobRunRecord> JobRuns => Set<JobRunRecord>();
     internal DbSet<WebhookReplayRecord> WebhookReplays => Set<WebhookReplayRecord>();
+    internal DbSet<TenantRegistryRecord> Tenants => Set<TenantRegistryRecord>();
+    internal DbSet<AppUserRecord> AppUsers => Set<AppUserRecord>();
+    internal DbSet<AppUserLinkCodeRecord> AppUserLinkCodes => Set<AppUserLinkCodeRecord>();
+    internal DbSet<SystemSettingRecord> SystemSettings => Set<SystemSettingRecord>();
 
     // ── Constructors ─────────────────────────────────────────────────────────
 
@@ -126,6 +130,10 @@ public sealed class FlowLedgerDbContext : DbContext
         modelBuilder.ApplyConfiguration(new AuditEventRecordConfiguration());
         modelBuilder.ApplyConfiguration(new JobRunRecordConfiguration());
         modelBuilder.ApplyConfiguration(new WebhookReplayRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantRegistryRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AppUserRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new AppUserLinkCodeRecordConfiguration());
+        modelBuilder.ApplyConfiguration(new SystemSettingRecordConfiguration());
 
         // ── Global query filters (PLAN §13) ──────────────────────────────────
         // Always built (never conditional on the tenant context). The tenant is read from the
