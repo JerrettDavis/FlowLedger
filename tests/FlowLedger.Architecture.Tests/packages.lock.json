@@ -469,8 +469,8 @@
       },
       "Microsoft.ML.OnnxRuntime.Managed": {
         "type": "Transitive",
-        "resolved": "1.24.4",
-        "contentHash": "e5jsEo0HcCKDMkuRsMSievKoMv10Odv4MGmxbCin8SEm4Pto1qTpwti47xRwMtk9I/zVvfAiFIWquOq/0+22DA==",
+        "resolved": "1.32.0",
+        "contentHash": "ApCfJdeUnrO4v+9KWtxnm/Uk3UlzdbNqGb64uBXh85RToxYbW1COJM/avDj3INNTwfEE6LUIWaJIxov0YWNa1g==",
         "dependencies": {
           "System.Numerics.Tensors": "9.0.0"
         }
@@ -679,8 +679,8 @@
           "FluentValidation.DependencyInjectionExtensions": "[12.2.0, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
           "Microsoft.OpenApi": "[2.13.1, )",
-          "Quartz": "[4.8.0, )",
-          "Quartz.AspNetCore": "[4.8.0, )",
+          "Quartz": "[4.8.1, )",
+          "Quartz.AspNetCore": "[4.8.1, )",
           "Serilog": "[4.4.0, )"
         }
       },
@@ -719,10 +719,10 @@
           "LLamaSharp.Backend.Cpu": "[0.30.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.15, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.15, )",
-          "Microsoft.ML.OnnxRuntime": "[1.24.4, )",
+          "Microsoft.ML.OnnxRuntime": "[1.32.0, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.4, )",
-          "Quartz": "[4.8.0, )",
-          "Quartz.AspNetCore": "[4.8.0, )"
+          "Quartz": "[4.8.1, )",
+          "Quartz.AspNetCore": "[4.8.1, )"
         }
       },
       "flowledger.integrations.abstractions": {
@@ -745,7 +745,7 @@
           "FluentValidation": "[12.2.0, )",
           "FluentValidation.DependencyInjectionExtensions": "[12.2.0, )",
           "Microsoft.Extensions.Http.Resilience": "[11.0.1, )",
-          "PatternKit.Core": "[0.147.37, )"
+          "PatternKit.Core": "[0.147.39, )"
         }
       },
       "flowledger.integrations.quiltt": {
@@ -809,8 +809,8 @@
           "FlowLedger.Application": "[1.0.0, )",
           "FlowLedger.Infrastructure": "[1.0.0, )",
           "FlowLedger.ServiceDefaults": "[1.0.0, )",
-          "Quartz": "[4.8.0, )",
-          "Quartz.AspNetCore": "[4.8.0, )"
+          "Quartz": "[4.8.1, )",
+          "Quartz.AspNetCore": "[4.8.1, )"
         }
       },
       "Bogus": {
@@ -993,11 +993,11 @@
       },
       "Microsoft.ML.OnnxRuntime": {
         "type": "CentralTransitive",
-        "requested": "[1.24.4, )",
-        "resolved": "1.24.4",
-        "contentHash": "895huFBVrZkZEGjlsxBSZD3p6D32Cdz6q8DM9UcUps2YKFYdFR8TefaTggFBUTYlvcSyfNTpmOOU/ZkeL69izw==",
+        "requested": "[1.32.0, )",
+        "resolved": "1.32.0",
+        "contentHash": "3O3isLjl6ChjMvzZMt3in+uUymFxQK5+vd1UuSShmbUjHezHXgcze6KF5NquC/uPuL/++0CpI7qUBRrf+g1ezg==",
         "dependencies": {
-          "Microsoft.ML.OnnxRuntime.Managed": "1.24.4"
+          "Microsoft.ML.OnnxRuntime.Managed": "1.32.0"
         }
       },
       "Microsoft.OpenApi": {
@@ -1078,15 +1078,15 @@
       },
       "PatternKit.Core": {
         "type": "CentralTransitive",
-        "requested": "[0.147.37, )",
-        "resolved": "0.147.37",
-        "contentHash": "nc1Mw0H+3h2eCLb9ypxF912mMrr3s2aA0/V85DUm2VpeQ4EX5OerYVRKvKYaBjVjWngzysMT/2ZBmhdfS2Gxsw=="
+        "requested": "[0.147.39, )",
+        "resolved": "0.147.39",
+        "contentHash": "IdEt1Z17jgjO45l7JlBt6SLx9N15DEoPeEFB4VgTpFI9sSniiih9qCQFKOtO7TjpoZN4iOD7f8VdJKHc+V0NaA=="
       },
       "Quartz": {
         "type": "CentralTransitive",
-        "requested": "[4.8.0, )",
-        "resolved": "4.8.0",
-        "contentHash": "JmeatKhnCxaIdLyUkq3JwGlxif1qOqU/hNYnpLA9mHG2JslbDlwg+aQ+nejMMrY1eoOevKx0DBZ2Xz6qNqj2lg==",
+        "requested": "[4.8.1, )",
+        "resolved": "4.8.1",
+        "contentHash": "i0s9pxAAQ8FN2LO+JEGQg6DMdAlJ6zOVQ8zPs/xDHAX/zXJLK+WmybQuEab3Lkzv0VcOwPcWwbwNagwt/g1ghA==",
         "dependencies": {
           "Microsoft.Extensions.Configuration.Binder": "10.0.0",
           "Microsoft.Extensions.DependencyInjection": "10.0.0",
@@ -1098,11 +1098,11 @@
       },
       "Quartz.AspNetCore": {
         "type": "CentralTransitive",
-        "requested": "[4.8.0, )",
-        "resolved": "4.8.0",
-        "contentHash": "6jfD1rMoMOnAVGQ1BK59DqE3hCPd0itykj+cwdbxYrk/MMLHs9lH3z0Ea9djpS6NnaHho2WVpR8zvVQ7sTtJ2A==",
+        "requested": "[4.8.1, )",
+        "resolved": "4.8.1",
+        "contentHash": "8CkejD44P36CKM4S0NxlvJb/woy9E47prXaggUnwdhX7cniTSlK1QRw88YSmEYO0q0AucNPxLg9A/4eoNFNpMA==",
         "dependencies": {
-          "Quartz": "4.8.0"
+          "Quartz": "4.8.1"
         }
       },
       "Serilog": {

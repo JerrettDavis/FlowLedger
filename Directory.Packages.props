@@ -5,7 +5,7 @@
 
   <!-- Build-time analyzers (#113); referenced for every project from Directory.Build.props. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.3.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
     <PackageVersion Include="Meziantou.Analyzer" Version="3.0.340" />
   </ItemGroup>
 
@@ -53,8 +53,8 @@
        Scheduler
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Quartz" Version="4.8.0" />
-    <PackageVersion Include="Quartz.AspNetCore" Version="4.8.0" />
+    <PackageVersion Include="Quartz" Version="4.8.1" />
+    <PackageVersion Include="Quartz.AspNetCore" Version="4.8.1" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -111,6 +111,7 @@
     <PackageVersion Include="xunit.extensibility.core" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
     <PackageVersion Include="coverlet.collector" Version="10.1.1" />
+    <!-- Pinned to 7.x: 8.x moved to a commercial (Xceed) license and changed the API. -->
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
     <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.11.3" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
@@ -121,8 +122,8 @@
        Testing — BDD
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="TinyBDD" Version="0.19.48" />
-    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.48" />
+    <PackageVersion Include="TinyBDD" Version="0.19.49" />
+    <PackageVersion Include="TinyBDD.Xunit" Version="0.19.49" />
   </ItemGroup>
 
   <!-- ============================================================
@@ -135,14 +136,14 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="CsCheck" Version="5.0.1" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.1" />
-    <PackageVersion Include="WireMock.Net" Version="2.32.0" />
+    <PackageVersion Include="WireMock.Net" Version="2.34.0" />
   </ItemGroup>
 
   <!-- ============================================================
        Local AI (in-process, no external server)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.24.4" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
     <!-- llama.cpp in-process (optional generative tie-breaker). Backend/CPU version must match LLamaSharp exactly. -->
     <PackageVersion Include="LLamaSharp" Version="0.30.0" />
     <PackageVersion Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
@@ -152,7 +153,7 @@
        Patterns (dogfooding)
   ============================================================ -->
   <ItemGroup>
-    <PackageVersion Include="PatternKit.Core" Version="0.147.37" />
+    <PackageVersion Include="PatternKit.Core" Version="0.147.39" />
   </ItemGroup>
 
   <!-- ============================================================

@@ -48,6 +48,14 @@ updates:
       # once a stable AspNetCore.OpenApi release supports Microsoft.OpenApi 3.x.
       - dependency-name: "Microsoft.OpenApi"
         versions: [">=3.0.0"]
+      # FluentAssertions 8.x is under a commercial license; stay on 7.x.
+      - dependency-name: "FluentAssertions"
+        versions: [">=8.0.0"]
+      # axe-core 4.12+ adds label-content-name-mismatch, which flags many existing controls; adopt after the a11y cleanup.
+      - dependency-name: "Deque.AxeCore.Playwright"
+        versions: [">=4.12.0"]
+      - dependency-name: "Deque.AxeCore.Commons"
+        versions: [">=4.12.0"]
 
   - package-ecosystem: "docker"
     directories:
