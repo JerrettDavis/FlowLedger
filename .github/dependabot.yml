@@ -48,6 +48,9 @@ updates:
       # once a stable AspNetCore.OpenApi release supports Microsoft.OpenApi 3.x.
       - dependency-name: "Microsoft.OpenApi"
         versions: [">=3.0.0"]
+      # FluentAssertions 8.x is under a commercial license; stay on 7.x.
+      - dependency-name: "FluentAssertions"
+        versions: [">=8.0.0"]
 
   - package-ecosystem: "docker"
     directories:
