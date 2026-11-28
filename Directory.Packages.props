@@ -113,7 +113,7 @@
     <PackageVersion Include="coverlet.collector" Version="10.1.1" />
     <!-- Pinned to 7.x: 8.x moved to a commercial (Xceed) license and changed the API. -->
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
-    <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.14.0" />
+    <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.11.3" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
     <PackageVersion Include="Microsoft.Playwright.Xunit" Version="1.65.1" />
   </ItemGroup>
